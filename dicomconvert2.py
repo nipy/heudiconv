@@ -199,7 +199,10 @@ def convert(items, anonymizer=None, symlink=True, converter=None):
     prov_files = []
     tmpdir = mkdtemp()
     for item in items:
-        outtypes = item[1]
+        if isinstance(item[1], (list, tuple)):
+            outtypes = item[1]
+        else:
+            outtypes = [item[1]]
         prefix = item[0]
         print('Converting %s' % prefix)
         dirname = os.path.dirname(prefix + '.ext')
@@ -240,7 +243,11 @@ def convert(items, anonymizer=None, symlink=True, converter=None):
                         convertnode.inputs.gzip_output = outtype == 'nii.gz'
                         convertnode.inputs.terminal_output = 'allatonce'
                         res = convertnode.run()
-                        shutil.copyfile(res.outputs.converted_files, outname)
+                        if isinstance(res.outputs.converted_files, list):
+                            print("Cannot convert dicom files - series likely has multiple orientations: ", item[2])
+                            continue
+                        else:
+                            shutil.copyfile(res.outputs.converted_files, outname)
                         if isdefined(res.outputs.bvecs):
                             outname_bvecs = prefix + '.bvecs'
                             outname_bvals = prefix + '.bvals'

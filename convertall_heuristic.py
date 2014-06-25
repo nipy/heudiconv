@@ -16,7 +16,7 @@ def infotodict(seqinfo):
     subindex: sub index within group
     """
     
-    data = create_key('run{item:03d}', outtype=('nii.gz'))
+    data = create_key('run{item:03d}', outtype=('nii.gz',))
     info = {data: []}
     last_run = len(seqinfo)
     for s in seqinfo:
