@@ -191,10 +191,6 @@ def embed_nifti(dcmfiles, niftifile, infofile, force=False):
         fp.writelines(meta)
     return niftifile, infofile
 
-def convert_with_dcm2nii(in_files):
-    import os
-    from nipype.interfaces.dcm2nii import Dcm2nii
-
 def convert(items, anonymizer=None, symlink=True, converter=None):
     prov_files = []
     tmpdir = mkdtemp()
@@ -226,17 +222,26 @@ def convert(items, anonymizer=None, symlink=True, converter=None):
             elif outtype in ['nii', 'nii.gz']:
                 outname = prefix + '.' + outtype
                 scaninfo = prefix + '_scaninfo.json'
-                print(outname)
                 if not os.path.exists(outname):
+                    from nipype import config
+                    config.enable_provenance()
+                    from nipype import Function, Node
+                    from nipype.interfaces.base import isdefined
+                    print converter
                     if converter == 'mri_convert':
-                        cmd = 'mri_convert %s %s' % (item[2][0], outname)
-                        print(cmd)
-                        os.system(cmd)
+                        from nipype.interfaces.freesurfer.preprocess import MRIConvert
+                        convertnode = Node(MRIConvert(), name = 'convert')
+                        convertnode.base_dir = tmpdir
+                        if outtype == 'nii.gz':
+                            convertnode.inputs.out_type = 'niigz'
+                        convertnode.inputs.in_file = item[2][0]
+                        convertnode.inputs.out_file = outname
+                        #cmd = 'mri_convert %s %s' % (item[2][0], outname)
+                        #print(cmd)
+                        #os.system(cmd)
+                        res=convertnode.run()
                     elif converter == 'dcm2nii':
-                        from nipype import config
-                        config.enable_provenance()
-                        from nipype import Node
-                        from nipype.interfaces.dcm2nii import Dcm2nii, isdefined
+                        from nipype.interfaces.dcm2nii import Dcm2nii
                         convertnode = Node(Dcm2nii(), name='convert')
                         convertnode.base_dir = tmpdir
                         convertnode.inputs.source_names = item[2]
@@ -253,13 +258,12 @@ def convert(items, anonymizer=None, symlink=True, converter=None):
                             outname_bvals = prefix + '.bvals'
                             shutil.copyfile(res.outputs.bvecs, outname_bvecs)
                             shutil.copyfile(res.outputs.bvals, outname_bvals)
-                        prov_file = prefix + '_prov.ttl'
-                        shutil.copyfile(os.path.join(convertnode.base_dir,
-                                                     convertnode.name,
-                                                     'provenance.ttl'),
-                                        prov_file)
-                        prov_files.append(prov_file)
-                    from nipype import Function, Node
+                    prov_file = prefix + '_prov.ttl'
+                    shutil.copyfile(os.path.join(convertnode.base_dir,
+                                                 convertnode.name,
+                                                 'provenance.ttl'),
+                                    prov_file)
+                    prov_files.append(prov_file)
                     embedfunc = Node(Function(input_names=['dcmfiles',
                                                            'niftifile',
                                                            'infofile',
@@ -344,7 +348,7 @@ s3
     parser.add_argument('-s','--subjects',dest='subjs', required=True,
                         type=str, nargs='+', help='list of subjects')
     parser.add_argument('-c','--converter', dest='converter',
-                        default='mri_convert',
+                        default='dcm2nii',
                         choices=('mri_convert', 'dcmstack', 'dcm2nii'),
                         help='tool to use for dicom conversion')
     parser.add_argument('-o','--outdir', dest='outputdir',
