@@ -110,6 +110,11 @@ def process_dicoms(fl):
     seqinfo = []
     for series, mwidx in sorted(group_map.items()):
         mw = mwgroup[mwidx]
+        if not mw.image_shape:
+            # can happen for PSg DICOMS (Softcopy Grayscale Presentation State
+            # objects) or RAW DICOMS (with proprietary data), both should not be
+            # interesting in this context
+            continue
         dcminfo = mw.dcm_data
         files = np.array(fl)[np.array(groups[0]) == series].tolist()
         filegroup[series] = files
