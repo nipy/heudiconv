@@ -1,4 +1,4 @@
-#!/software/python/anaconda/envs/resting/bin/python
+#!/usr/bin/env python
 
 """Convert dicom TimTrio dirs based on heuristic info
 
@@ -349,7 +349,8 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
             write_config(infofile, info)
             write_config(editfile, info)
         cinfo = conversion_info(sid, tdir, info, filegroup)
-        convert(cinfo, converter=converter)
+        if converter != 'none':
+            convert(cinfo, converter=converter)
 
 
 if __name__ == '__main__':
@@ -370,8 +371,10 @@ s3
                         type=str, nargs='+', help='list of subjects')
     parser.add_argument('-c', '--converter', dest='converter',
                         default='dcm2nii',
-                        choices=('mri_convert', 'dcmstack', 'dcm2nii'),
-                        help='tool to use for dicom conversion')
+                        choices=('mri_convert', 'dcmstack', 'dcm2nii', 'none'),
+                        help='''tool to use for dicom conversion. Setting to 
+                        "none" disables the actual conversion step -- useful
+                        for testing heuristics.''')
     parser.add_argument('-o', '--outdir', dest='outputdir',
                         default=os.getcwd(),
                         help='output directory for conversion')
