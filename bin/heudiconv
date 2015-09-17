@@ -310,7 +310,7 @@ def convert(items, anonymizer=None, symlink=True, converter=None):
 def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
                    queue=None, anon_sid_cmd=None, anon_outdir=None):
     for sid in subjs:
-        if queue:
+        if queue == 'slurm':
             # TODO This needs to be updated to better scale with additional args
             progname = os.path.abspath(inspect.getfile(inspect.currentframe()))
             convertcmd = ' '.join(['python', progname, '-d', dicom_dir_template,
@@ -400,8 +400,10 @@ s3
                         Also see --conv-outdir''')
     parser.add_argument('-f', '--heuristic', dest='heuristic_file', required=True,
                         help='python script containing heuristic')
-    parser.add_argument('-q', '--queue', dest='queue',
-                        help='SLURM partition to use if available')
+    parser.add_argument('-q', '--queue', dest='queue', default=None,
+                        choices=('slurm',),
+                        help='''select batch system to submit jobs to instead
+                        of running the conversion serially''')
     args = parser.parse_args()
     convert_dicoms(args.subjs, os.path.abspath(args.dicom_dir_template),
                    os.path.abspath(args.outputdir),
