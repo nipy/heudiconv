@@ -344,7 +344,7 @@ if __name__ == '__main__':
 """
            Example:
 
-           dicomconvert2.py -d rawdata/%s -o . -f heuristic.py -s s1 s2
+           heudiconv -d rawdata/%s -o . -f heuristic.py -s s1 s2
 s3
 """))
     parser = argparse.ArgumentParser(description=docstr)
