@@ -14,7 +14,6 @@ file and rerun the conversion
 """
 
 import argparse
-from copy import deepcopy
 from glob import glob
 import inspect
 import json
@@ -25,9 +24,8 @@ from tempfile import mkdtemp
 
 import dicom as dcm
 import dcmstack as ds
-from dcmstack import DcmMetaExtension
-import nibabel as nb
 import numpy as np
+
 
 def save_json(filename, data):
     """Save data to a json file
@@ -100,7 +98,7 @@ def process_dicoms(fl):
         ingrp = False
         for idx in range(N):
             same = mw.is_same_series(mwgroup[idx])
-            #print idx, same, groups[idx][0] 
+            #print idx, same, groups[idx][0]
             if same:
                 ingrp = True
                 if series_number >= 0:
@@ -114,7 +112,7 @@ def process_dicoms(fl):
             groups[1].append(len(mwgroup) - 1)
 
     group_map = dict(zip(groups[0], groups[1]))
-    
+
     total = 0
     filegroup = {}
     seqinfo = []
@@ -135,7 +133,7 @@ def process_dicoms(fl):
         if len(size) < 4:
             size.append(1)
         try:
-            TR = float(dcminfo.RepetitionTime)/1000.
+            TR = float(dcminfo.RepetitionTime) / 1000.
         except AttributeError:
             TR = -1
         try:
@@ -143,7 +141,7 @@ def process_dicoms(fl):
         except AttributeError:
             TE = -1
         info = [total, os.path.split(files[0])[1], series, '-', '-', '-'] + \
-               size + [TR, TE, dcminfo.ProtocolName, 'MoCo' in dcminfo.SeriesDescription]
+            size + [TR, TE, dcminfo.ProtocolName, 'MoCo' in dcminfo.SeriesDescription]
         seqinfo.append(info)
     return seqinfo, filegroup
 
@@ -153,11 +151,13 @@ def write_config(outfile, info):
     with open(outfile, 'wt') as fp:
         fp.writelines(PrettyPrinter().pformat(info))
 
+
 def read_config(infile):
     info = None
     with open(infile, 'rt') as fp:
         info = eval(fp.read())
     return info
+
 
 def conversion_info(subject, outdir, info, filegroup):
     convert_info = []
@@ -187,19 +187,19 @@ def embed_nifti(dcmfiles, niftifile, infofile, force=False):
     if len(stack) > 1:
         raise ValueError('Found multiple series')
     stack = stack[0]
-        
+
     #Create the nifti image using the data array
     if not os.path.exists(niftifile):
         nifti_image = stack.to_nifti(embed_meta=True)
         nifti_image.to_filename(niftifile)
         return ds.NiftiWrapper(nifti_image).meta_ext.to_json()
     orig_nii = nb.load(niftifile)
-    orig_hdr = orig_nii.get_header()
+    #orig_hdr = orig_nii.get_header()
     aff = orig_nii.get_affine()
     ornt = nb.orientations.io_orientation(aff)
     axcodes = nb.orientations.ornt2axcodes(ornt)
     new_nii = stack.to_nifti(voxel_order=''.join(axcodes), embed_meta=True)
-    new_hdr = new_nii.get_header()
+    #new_hdr = new_nii.get_header()
     #orig_hdr.extensions = new_hdr.extensions
     #orig_nii.update_header()
     #orig_nii.to_filename(niftifile)
@@ -207,6 +207,7 @@ def embed_nifti(dcmfiles, niftifile, infofile, force=False):
     with open(infofile, 'wt') as fp:
         fp.writelines(meta)
     return niftifile, infofile
+
 
 def convert(items, anonymizer=None, symlink=True, converter=None):
     prov_files = []
@@ -247,7 +248,7 @@ def convert(items, anonymizer=None, symlink=True, converter=None):
                     print converter
                     if converter == 'mri_convert':
                         from nipype.interfaces.freesurfer.preprocess import MRIConvert
-                        convertnode = Node(MRIConvert(), name = 'convert')
+                        convertnode = Node(MRIConvert(), name='convert')
                         convertnode.base_dir = tmpdir
                         if outtype == 'nii.gz':
                             convertnode.inputs.out_type = 'niigz'
@@ -256,7 +257,7 @@ def convert(items, anonymizer=None, symlink=True, converter=None):
                         #cmd = 'mri_convert %s %s' % (item[2][0], outname)
                         #print(cmd)
                         #os.system(cmd)
-                        res=convertnode.run()
+                        res = convertnode.run()
                     elif converter == 'dcm2nii':
                         from nipype.interfaces.dcm2nii import Dcm2nii
                         convertnode = Node(Dcm2nii(), name='convert')
@@ -312,7 +313,7 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
         if queue:
             progname = os.path.abspath(inspect.getfile(inspect.currentframe()))
             convertcmd = ' '.join(['python', progname, '-d', dicom_dir_template,
-                                   '-o', outdir, '-f', heuristic_file, '-s', sid, 
+                                   '-o', outdir, '-f', heuristic_file, '-s', sid,
                                    '-c', converter])
             script_file = 'sg-%s.sh' % sid
             with open(script_file, 'wt') as fp:
@@ -323,7 +324,7 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
         sdir = dicom_dir_template % sid
         fl = sorted(glob(sdir))
         #dcmfile = dcm.read_file(fl[0], force=True)
-        #print sid, 'Dicom: ', dcmfile.PatientName, sid == dcmfile.PatientName 
+        #print sid, 'Dicom: ', dcmfile.PatientName, sid == dcmfile.PatientName
         tdir = os.path.join(outdir, sid)
         idir = os.path.join(tdir, 'info')
         if not os.path.exists(idir):
@@ -333,8 +334,8 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
         sys.path.append(path)
         mod = __import__(fname.split('.')[0])
 
-        infofile =  os.path.join(idir, '%s.auto.txt' % sid)
-        editfile =  os.path.join(idir, '%s.edit.txt' % sid)
+        infofile = os.path.join(idir, '%s.auto.txt' % sid)
+        editfile = os.path.join(idir, '%s.edit.txt' % sid)
         if os.path.exists(editfile):
             info = read_config(editfile)
             filegroup = load_json(os.path.join(idir, 'filegroup.json'))
@@ -352,7 +353,7 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
 
 
 if __name__ == '__main__':
-    docstr= '\n'.join((__doc__,
+    docstr = '\n'.join((__doc__,
 """
            Example:
 
@@ -360,23 +361,23 @@ if __name__ == '__main__':
 s3
 """))
     parser = argparse.ArgumentParser(description=docstr)
-    parser.add_argument('-d','--dicom_dir_template',
+    parser.add_argument('-d', '--dicom_dir_template',
                         dest='dicom_dir_template',
                         required=True,
                         help='location of dicomdir that can be indexed with subject id'
                         )
-    parser.add_argument('-s','--subjects',dest='subjs', required=True,
+    parser.add_argument('-s', '--subjects', dest='subjs', required=True,
                         type=str, nargs='+', help='list of subjects')
-    parser.add_argument('-c','--converter', dest='converter',
+    parser.add_argument('-c', '--converter', dest='converter',
                         default='dcm2nii',
                         choices=('mri_convert', 'dcmstack', 'dcm2nii'),
                         help='tool to use for dicom conversion')
-    parser.add_argument('-o','--outdir', dest='outputdir',
+    parser.add_argument('-o', '--outdir', dest='outputdir',
                         default=os.getcwd(),
                         help='output directory for conversion')
-    parser.add_argument('-f','--heuristic', dest='heuristic_file', required=True,
+    parser.add_argument('-f', '--heuristic', dest='heuristic_file', required=True,
                         help='python script containing heuristic')
-    parser.add_argument('-q','--queue',dest='queue',
+    parser.add_argument('-q', '--queue', dest='queue',
                         help='SLURM partition to use if available')
     args = parser.parse_args()
     convert_dicoms(args.subjs, os.path.abspath(args.dicom_dir_template),
