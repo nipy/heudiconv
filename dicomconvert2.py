@@ -183,9 +183,9 @@ def embed_nifti(dcmfiles, niftifile, infofile, force=False):
     axcodes = nb.orientations.ornt2axcodes(ornt)
     new_nii = stack.to_nifti(voxel_order=''.join(axcodes), embed_meta=True)
     new_hdr = new_nii.get_header()
-    orig_hdr.extensions = new_hdr.extensions
-    orig_nii.update_header()
-    orig_nii.to_filename(niftifile)
+    #orig_hdr.extensions = new_hdr.extensions
+    #orig_nii.update_header()
+    #orig_nii.to_filename(niftifile)
     meta = ds.NiftiWrapper(new_nii).meta_ext.to_json()
     with open(infofile, 'wt') as fp:
         fp.writelines(meta)
@@ -297,7 +297,10 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
             convertcmd = ' '.join(['python', progname, '-d', dicom_dir_template,
                                    '-o', outdir, '-f', heuristic_file, '-s', sid, 
                                    '-c', converter])
-            outcmd = 'ezsub.py -n sg-%s -q %s -c \"%s\"'%(sid, queue, convertcmd)
+            script_file = 'sg-%s.sh' % sid
+            with open(script_file, 'wt') as fp:
+                fp.writelines(['#!/bin/bash\n', convertcmd])
+            outcmd = 'sbatch -J sg-%s -p %s -N1 -c2 --mem=20G %s' % (sid, queue, script_file)
             os.system(outcmd)
             continue
         sdir = dicom_dir_template % sid
@@ -357,7 +360,7 @@ s3
     parser.add_argument('-f','--heuristic', dest='heuristic_file', required=True,
                         help='python script containing heuristic')
     parser.add_argument('-q','--queue',dest='queue',
-                        help='PBS queue to use if available')
+                        help='SLURM partition to use if available')
     args = parser.parse_args()
     convert_dicoms(args.subjs, os.path.abspath(args.dicom_dir_template),
                    os.path.abspath(args.outputdir),
