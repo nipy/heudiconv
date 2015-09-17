@@ -291,8 +291,8 @@ def convert(items, anonymizer=None, symlink=True, converter=None):
                                               function=embed_nifti),
                                      name='embedder')
                     embedfunc.inputs.dcmfiles = item[2]
-                    embedfunc.inputs.niftifile = outname
-                    embedfunc.inputs.infofile = scaninfo
+                    embedfunc.inputs.niftifile = os.path.abspath(outname)
+                    embedfunc.inputs.infofile = os.path.abspath(scaninfo)
                     embedfunc.inputs.force = True
                     embedfunc.base_dir = tmpdir
                     res = embedfunc.run()
@@ -308,9 +308,10 @@ def convert(items, anonymizer=None, symlink=True, converter=None):
 
 
 def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
-                   queue=None):
+                   queue=None, anon_sid_cmd=None, anon_outdir=None):
     for sid in subjs:
         if queue:
+            # TODO This needs to be updated to better scale with additional args
             progname = os.path.abspath(inspect.getfile(inspect.currentframe()))
             convertcmd = ' '.join(['python', progname, '-d', dicom_dir_template,
                                    '-o', outdir, '-f', heuristic_file, '-s', sid,
@@ -325,8 +326,14 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
         fl = sorted(glob(sdir))
         #dcmfile = dcm.read_file(fl[0], force=True)
         #print sid, 'Dicom: ', dcmfile.PatientName, sid == dcmfile.PatientName
-        tdir = os.path.join(outdir, sid)
-        idir = os.path.join(tdir, 'info')
+        anon_sid = sid
+        if not anon_sid_cmd is None:
+            from subprocess import check_output
+            anon_sid = check_output([anon_sid_cmd, sid]).strip()
+        if anon_outdir is None:
+            anon_outdir = outdir
+        tdir = os.path.join(anon_outdir, anon_sid)
+        idir = os.path.join(outdir, sid, 'info')
         if not os.path.exists(idir):
             os.makedirs(idir)
         shutil.copy(heuristic_file, idir)
@@ -348,7 +355,7 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
             info = mod.infotodict(seqinfo)
             write_config(infofile, info)
             write_config(editfile, info)
-        cinfo = conversion_info(sid, tdir, info, filegroup)
+        cinfo = conversion_info(anon_sid, tdir, info, filegroup)
         if converter != 'none':
             convert(cinfo, converter=converter)
 
@@ -377,7 +384,20 @@ s3
                         for testing heuristics.''')
     parser.add_argument('-o', '--outdir', dest='outputdir',
                         default=os.getcwd(),
-                        help='output directory for conversion')
+                        help=''''output directory for conversion setup (for
+                        further customization and future reference. This
+                        directory will refer to non-anonymized subject IDs''')
+    parser.add_argument('-a', '--conv-outdir', dest='conv_outputdir',
+                        default=None,
+                        help='''output directory for converted files. By
+                        default this is identical to --outdir. This option is
+                        most useful in combination with --anon-cmd''')
+    parser.add_argument('--anon-cmd', dest='anon_cmd',
+                        default=None,
+                        help='''command to run to convert subject IDs used for
+                        DICOMs to anonymmized IDs. Such command must take a
+                        single argument and return a single anonymized ID.
+                        Also see --conv-outdir''')
     parser.add_argument('-f', '--heuristic', dest='heuristic_file', required=True,
                         help='python script containing heuristic')
     parser.add_argument('-q', '--queue', dest='queue',
@@ -387,4 +407,6 @@ s3
                    os.path.abspath(args.outputdir),
                    heuristic_file=os.path.realpath(args.heuristic_file),
                    converter=args.converter,
-                   queue=args.queue)
+                   queue=args.queue,
+                   anon_sid_cmd=args.anon_cmd,
+                   anon_outdir=args.conv_outputdir)
