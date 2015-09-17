@@ -83,24 +83,34 @@ def process_dicoms(fl):
             del mw.series_signature['SequenceName']
         except:
             pass
+        series_number = int(mw.dcm_data.SeriesNumber)
         if not groups:
             mwgroup.append(mw)
-            groups[0].append(int(mw.dcm_data.SeriesNumber))
+            groups[0].append(series_number)
             groups[1].append(len(mwgroup) - 1)
             continue
         N = len(mwgroup)
+        # filter out unwanted non-image-data DICOMs by assigning
+        # a series number < 0 (see test below)
+        if mw.dcm_data[0x0008, 0x0016].repval in (
+                'Raw Data Storage',
+                'GrayscaleSoftcopyPresentationStateStorage'):
+            series_number = -1
         #print fidx, N, filename
         ingrp = False
         for idx in range(N):
             same = mw.is_same_series(mwgroup[idx])
             #print idx, same, groups[idx][0] 
             if same:
-                groups[0].append(int(mwgroup[idx].dcm_data.SeriesNumber))
-                groups[1].append(idx)
                 ingrp = True
+                if series_number >= 0:
+                    groups[0].append(int(mwgroup[idx].dcm_data.SeriesNumber))
+                else:
+                    groups[0].append(series_number)
+                groups[1].append(idx)
         if not ingrp:
             mwgroup.append(mw)
-            groups[0].append(int(mw.dcm_data.SeriesNumber))
+            groups[0].append(series_number)
             groups[1].append(len(mwgroup) - 1)
 
     group_map = dict(zip(groups[0], groups[1]))
@@ -109,19 +119,15 @@ def process_dicoms(fl):
     filegroup = {}
     seqinfo = []
     for series, mwidx in sorted(group_map.items()):
+        if series < 0:
+            # skip our fake series with unwanted files
+            continue
         mw = mwgroup[mwidx]
-        if not mw.image_shape:
-            # can happen for PSg DICOMS (Softcopy Grayscale Presentation State
-            # objects), should not be interesting in this context
+        if mw.image_shape is None:
+            # this whole thing has now image data (maybe just PSg DICOMs)
+            # nothing to see here, just move on
             continue
         dcminfo = mw.dcm_data
-        try:
-            # ignore RAW DICOMS (with proprietary data), they should not contain
-            # any image data, and dcmstack chokes on them
-            if dcminfo[0x0008, 0x0016].repval == 'Raw Data Storage':
-                continue
-        except KeyError:
-            pass
         files = np.array(fl)[np.array(groups[0]) == series].tolist()
         filegroup[series] = files
         size = list(mw.image_shape) + [len(files)]
