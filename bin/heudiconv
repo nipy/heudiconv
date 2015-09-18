@@ -65,10 +65,12 @@ def load_json(filename):
     return data
 
 
-def process_dicoms(fl, dcmsession=None):
+def process_dicoms(fl, dcmsession=None, basedir=None):
     groups = [[], []]
     mwgroup = []
     for fidx, filename in enumerate(fl):
+        if not basedir is None:
+            filename = os.path.join(basedir, filename)
         mw = ds.wrapper_from_data(dcm.read_file(filename, force=True))
         try:
             del mw.series_signature['iop']
@@ -120,6 +122,8 @@ def process_dicoms(fl, dcmsession=None):
     total = 0
     filegroup = {}
     seqinfo = []
+    fl = np.array(fl)
+    groups0 = np.array(groups[0])
     for series, mwidx in sorted(group_map.items()):
         if series == 'none':
             # skip our fake series with unwanted files
@@ -130,7 +134,7 @@ def process_dicoms(fl, dcmsession=None):
             # nothing to see here, just move on
             continue
         dcminfo = mw.dcm_data
-        files = np.array(fl)[np.array(groups[0]) == series].tolist()
+        files = fl[groups0 == str(series)].tolist()
         filegroup[series] = files
         size = list(mw.image_shape) + [len(files)]
         total += size[-1]
@@ -163,7 +167,7 @@ def read_config(infile):
     return info
 
 
-def conversion_info(subject, outdir, info, filegroup):
+def conversion_info(subject, outdir, info, filegroup, basedir=None):
     convert_info = []
     for key, items in info.items():
         if not items:
@@ -175,11 +179,14 @@ def conversion_info(subject, outdir, info, filegroup):
             if not isinstance(itemgroup, list):
                 itemgroup = [itemgroup]
             for subindex, item in enumerate(itemgroup):
-                outprefix = template.format(item=idx + 1, subject=subject, seqitem=item, subindex=subindex + 1)
                 try:
-                    convert_info.append((os.path.join(outpath, outprefix), outtype, filegroup[item]))
+                    files = filegroup[item]
                 except KeyError:
-                    convert_info.append((os.path.join(outpath, outprefix), outtype, filegroup[unicode(item)]))
+                    files = filegroup[unicode(item)]
+                if not basedir is None:
+                    files = [os.path.join(basedir, f) for f in files]
+                outprefix = template.format(item=idx + 1, subject=subject, seqitem=item, subindex=subindex + 1)
+                convert_info.append((os.path.join(outpath, outprefix), outtype, files))
     return convert_info
 
 
@@ -215,7 +222,7 @@ def embed_nifti(dcmfiles, niftifile, infofile, force=False):
 
 def convert(items, anonymizer=None, symlink=True, converter=None):
     prov_files = []
-    tmpdir = mkdtemp()
+    tmpdir = mkdtemp(prefix='heudiconvtmp')
     for item in items:
         if isinstance(item[1], (list, tuple)):
             outtypes = item[1]
@@ -342,13 +349,12 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
             # strategy: extract everything in a temp dir and assemble a list
             # of all files in all tarballs
             content = []
-            tmpdir = mkdtemp()
+            tmpdir = mkdtemp(prefix='heudiconvtmp')
             # needs sorting to keep the generated "session" label deterministic
             for i, t in enumerate(sorted(fl)):
                 tf = tarfile.open(t)
                 # get all files, assemble full path in tmp dir
-                tf_content = [os.path.join(tmpdir, m.name)
-                              for m in tf.getmembers() if m.isfile()]
+                tf_content = [m.name for m in tf.getmembers() if m.isfile()]
                 content += tf_content
                 if len(fl) > 1:
                     # more than one tarball, take care of "session" indicator
@@ -381,7 +387,7 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
             info = read_config(editfile)
             filegroup = load_json(os.path.join(idir, 'filegroup.json'))
         else:
-            seqinfo, filegroup = process_dicoms(fl, dcmsessions)
+            seqinfo, filegroup = process_dicoms(fl, dcmsessions, basedir=tmpdir)
             save_json(os.path.join(idir, 'filegroup.json'), filegroup)
             with open(os.path.join(idir, 'dicominfo.txt'), 'wt') as fp:
                 for seq in seqinfo:
@@ -389,8 +395,8 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
             info = mod.infotodict(seqinfo)
             write_config(infofile, info)
             write_config(editfile, info)
-        cinfo = conversion_info(anon_sid, tdir, info, filegroup)
         if converter != 'none':
+            cinfo = conversion_info(anon_sid, tdir, info, filegroup, basedir=tmpdir)
             convert(cinfo, converter=converter)
         if not tmpdir is None:
             # clean up tmp dir with extracted tarball
