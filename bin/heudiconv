@@ -21,6 +21,7 @@ import os
 import shutil
 import sys
 from tempfile import mkdtemp
+import tarfile
 
 import dicom as dcm
 import dcmstack as ds
@@ -64,7 +65,7 @@ def load_json(filename):
     return data
 
 
-def process_dicoms(fl):
+def process_dicoms(fl, dcmsession=None):
     groups = [[], []]
     mwgroup = []
     for fidx, filename in enumerate(fl):
@@ -81,10 +82,12 @@ def process_dicoms(fl):
             del mw.series_signature['SequenceName']
         except:
             pass
-        series_number = int(mw.dcm_data.SeriesNumber)
+        series_id = mw.dcm_data.SeriesNumber
+        if not dcmsession is None:
+            series_id = '%s-%s' % (dcmsession[fidx], series_id)
         if not groups:
             mwgroup.append(mw)
-            groups[0].append(series_number)
+            groups[0].append(series_id)
             groups[1].append(len(mwgroup) - 1)
             continue
         N = len(mwgroup)
@@ -93,7 +96,7 @@ def process_dicoms(fl):
         if mw.dcm_data[0x0008, 0x0016].repval in (
                 'Raw Data Storage',
                 'GrayscaleSoftcopyPresentationStateStorage'):
-            series_number = -1
+            series_id = 'none'
         #print fidx, N, filename
         ingrp = False
         for idx in range(N):
@@ -101,14 +104,15 @@ def process_dicoms(fl):
             #print idx, same, groups[idx][0]
             if same:
                 ingrp = True
-                if series_number >= 0:
-                    groups[0].append(int(mwgroup[idx].dcm_data.SeriesNumber))
-                else:
-                    groups[0].append(series_number)
+                if series_id != 'none':
+                    series_id = mwgroup[idx].dcm_data.SeriesNumber
+                    if not dcmsession is None:
+                        series_id = '%s-%s' % (dcmsession[fidx], series_id)
+                groups[0].append(series_id)
                 groups[1].append(idx)
         if not ingrp:
             mwgroup.append(mw)
-            groups[0].append(series_number)
+            groups[0].append(series_id)
             groups[1].append(len(mwgroup) - 1)
 
     group_map = dict(zip(groups[0], groups[1]))
@@ -117,7 +121,7 @@ def process_dicoms(fl):
     filegroup = {}
     seqinfo = []
     for series, mwidx in sorted(group_map.items()):
-        if series < 0:
+        if series == 'none':
             # skip our fake series with unwanted files
             continue
         mw = mwgroup[mwidx]
@@ -310,6 +314,7 @@ def convert(items, anonymizer=None, symlink=True, converter=None):
 def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
                    queue=None, anon_sid_cmd=None, anon_outdir=None):
     for sid in subjs:
+        tmpdir = None
         if queue == 'slurm':
             # TODO This needs to be updated to better scale with additional args
             progname = os.path.abspath(inspect.getfile(inspect.currentframe()))
@@ -322,8 +327,37 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
             outcmd = 'sbatch -J sg-%s -p %s -N1 -c2 --mem=20G %s' % (sid, queue, script_file)
             os.system(outcmd)
             continue
+        # expand the input template
         sdir = dicom_dir_template % sid
+        # and see what matches
         fl = sorted(glob(sdir))
+        dcmsessions = None
+        # some people keep compressed tarballs around -- be nice!
+        if len(fl) and tarfile.is_tarfile(fl[0]):
+            # check if we got a list of tarfiles
+            if not len(fl) == sum([tarfile.is_tarfile(i) for i in fl]):
+                raise ValueError("some but not all input files are tar files")
+            # tarfiles already know what they contain, and often the filenames
+            # are unique, or at least in a unqiue subdir per session
+            # strategy: extract everything in a temp dir and assemble a list
+            # of all files in all tarballs
+            content = []
+            tmpdir = mkdtemp()
+            # needs sorting to keep the generated "session" label deterministic
+            for i, t in enumerate(sorted(fl)):
+                tf = tarfile.open(t)
+                # get all files, assemble full path in tmp dir
+                tf_content = [os.path.join(tmpdir, m.name)
+                              for m in tf.getmembers() if m.isfile()]
+                content += tf_content
+                if len(fl) > 1:
+                    # more than one tarball, take care of "session" indicator
+                    if dcmsessions is None:
+                        dcmsessions = []
+                    dcmsessions += ([i] * len(tf_content))
+                # extract into tmp dir
+                tf.extractall(path=tmpdir)
+            fl = content
         #dcmfile = dcm.read_file(fl[0], force=True)
         #print sid, 'Dicom: ', dcmfile.PatientName, sid == dcmfile.PatientName
         anon_sid = sid
@@ -347,7 +381,7 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
             info = read_config(editfile)
             filegroup = load_json(os.path.join(idir, 'filegroup.json'))
         else:
-            seqinfo, filegroup = process_dicoms(fl)
+            seqinfo, filegroup = process_dicoms(fl, dcmsessions)
             save_json(os.path.join(idir, 'filegroup.json'), filegroup)
             with open(os.path.join(idir, 'dicominfo.txt'), 'wt') as fp:
                 for seq in seqinfo:
@@ -358,6 +392,9 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
         cinfo = conversion_info(anon_sid, tdir, info, filegroup)
         if converter != 'none':
             convert(cinfo, converter=converter)
+        if not tmpdir is None:
+            # clean up tmp dir with extracted tarball
+            shutil.rmtree(tmpdir)
 
 
 if __name__ == '__main__':
@@ -372,8 +409,11 @@ s3
     parser.add_argument('-d', '--dicom_dir_template',
                         dest='dicom_dir_template',
                         required=True,
-                        help='location of dicomdir that can be indexed with subject id'
-                        )
+                        help='''location of dicomdir that can be indexed with
+                        subject id. Tarballs (can be compressed) are supported
+                        in additions to directory. All matching tarballs for a
+                        subject are extracted and their content processed in
+                        a single pass''')
     parser.add_argument('-s', '--subjects', dest='subjs', required=True,
                         type=str, nargs='+', help='list of subjects')
     parser.add_argument('-c', '--converter', dest='converter',
