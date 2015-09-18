@@ -65,7 +65,7 @@ def load_json(filename):
     return data
 
 
-def process_dicoms(fl, dcmsession=None, basedir=None):
+def process_dicoms(fl, dcmsession=None, basedir=None, dcmfilter=None):
     groups = [[], []]
     mwgroup = []
     for fidx, filename in enumerate(fl):
@@ -89,8 +89,11 @@ def process_dicoms(fl, dcmsession=None, basedir=None):
         except AttributeError:
             # not a normal DICOM -> ignore
             series_id = 'none'
-        if not dcmsession is None and not series_id == 'none':
-            series_id = '%s-%s' % (dcmsession[fidx], series_id)
+        if not series_id == 'none':
+            if not dcmfilter is None and dcmfilter(mw.dcm_data):
+                series_id = 'none'
+            if not dcmsession is None:
+                series_id = '%s-%s' % (dcmsession[fidx], series_id)
         if not groups:
             mwgroup.append(mw)
             groups[0].append(series_id)
@@ -396,7 +399,9 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
             info = read_config(editfile)
             filegroup = load_json(os.path.join(idir, 'filegroup.json'))
         else:
-            seqinfo, filegroup = process_dicoms(fl, dcmsessions, basedir=tmpdir)
+            seqinfo, filegroup = process_dicoms(
+                fl, dcmsessions, basedir=tmpdir,
+                dcmfilter=getattr(mod, 'filter_dicom', None))
             save_json(os.path.join(idir, 'filegroup.json'), filegroup)
             with open(os.path.join(idir, 'dicominfo.txt'), 'wt') as fp:
                 for seq in seqinfo:
