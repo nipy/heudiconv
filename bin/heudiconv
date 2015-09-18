@@ -386,7 +386,7 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
             anon_outdir = outdir
         tdir = os.path.join(anon_outdir, anon_sid)
         idir = os.path.join(outdir, sid)
-        if not anon_outdir == outdir:
+        if anon_outdir == outdir:
             # if all goes into a single dir, have a dedicated 'info' subdir
             idir = os.path.join(idir, 'info')
         if not os.path.exists(idir):
