@@ -269,7 +269,7 @@ def convert(items, anonymizer=None, symlink=True, converter=None):
                         if outtype == 'nii.gz':
                             convertnode.inputs.out_type = 'niigz'
                         convertnode.inputs.in_file = item[2][0]
-                        convertnode.inputs.out_file = outname
+                        convertnode.inputs.out_file = os.path.abspath(outname)
                         #cmd = 'mri_convert %s %s' % (item[2][0], outname)
                         #print(cmd)
                         #os.system(cmd)
