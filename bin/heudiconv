@@ -84,18 +84,23 @@ def process_dicoms(fl, dcmsession=None, basedir=None):
             del mw.series_signature['SequenceName']
         except:
             pass
-        series_id = mw.dcm_data.SeriesNumber
-        if not dcmsession is None:
+        try:
+            series_id = mw.dcm_data.SeriesNumber
+        except AttributeError:
+            # not a normal DICOM -> ignore
+            series_id = 'none'
+        if not dcmsession is None and not series_id == 'none':
             series_id = '%s-%s' % (dcmsession[fidx], series_id)
         if not groups:
             mwgroup.append(mw)
             groups[0].append(series_id)
             groups[1].append(len(mwgroup) - 1)
             continue
+
         N = len(mwgroup)
         # filter out unwanted non-image-data DICOMs by assigning
         # a series number < 0 (see test below)
-        if mw.dcm_data[0x0008, 0x0016].repval in (
+        if not series_id == 'none' and mw.dcm_data[0x0008, 0x0016].repval in (
                 'Raw Data Storage',
                 'GrayscaleSoftcopyPresentationStateStorage'):
             series_id = 'none'
@@ -353,8 +358,12 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
             # needs sorting to keep the generated "session" label deterministic
             for i, t in enumerate(sorted(fl)):
                 tf = tarfile.open(t)
+                # check content and sanitize permission bits
+                tmembers = tf.getmembers()
+                for tm in tmembers:
+                    tm.mode = 0o700
                 # get all files, assemble full path in tmp dir
-                tf_content = [m.name for m in tf.getmembers() if m.isfile()]
+                tf_content = [m.name for m in tmembers if m.isfile()]
                 content += tf_content
                 if len(fl) > 1:
                     # more than one tarball, take care of "session" indicator
@@ -362,7 +371,7 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
                         dcmsessions = []
                     dcmsessions += ([i] * len(tf_content))
                 # extract into tmp dir
-                tf.extractall(path=tmpdir)
+                tf.extractall(path=tmpdir, members=tmembers)
             fl = content
         #dcmfile = dcm.read_file(fl[0], force=True)
         #print sid, 'Dicom: ', dcmfile.PatientName, sid == dcmfile.PatientName
