@@ -85,7 +85,8 @@ def process_dicoms(fl, dcmsession=None, basedir=None, dcmfilter=None):
         except:
             pass
         try:
-            series_id = mw.dcm_data.SeriesNumber
+            series_id = '%s-%s' % (mw.dcm_data.SeriesNumber,
+                                   mw.dcm_data.ProtocolName)
         except AttributeError:
             # not a normal DICOM -> ignore
             series_id = 'none'
@@ -115,7 +116,8 @@ def process_dicoms(fl, dcmsession=None, basedir=None, dcmfilter=None):
             if same:
                 ingrp = True
                 if series_id != 'none':
-                    series_id = mwgroup[idx].dcm_data.SeriesNumber
+                    series_id = '%s-%s' % (mwgroup[idx].dcm_data.SeriesNumber,
+                                           mwgroup[idx].dcm_data.ProtocolName)
                     if not dcmsession is None:
                         series_id = '%s-%s' % (dcmsession[fidx], series_id)
                 groups[0].append(series_id)
