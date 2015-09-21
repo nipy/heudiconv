@@ -34,11 +34,17 @@ def infotodict(seqinfo):
     for s in seqinfo:
         if not '_bold_' in s[12]:
             continue
-        resolution = s[12].split('_')[-2][:-3]
+        if not '_coverage'in s[12]:
+            resolution = s[12].split('_')[-2][:-3]
+            task = 'orientation_run-{item:02d}'
+        else:
+            resolution = s[12].split('_')[5][:-3]
+            task = 'coverage'
         assert(float(resolution))
 
-        templ = 'ses-%smm/func/{subject}_ses-%smm_task-orientation_run-{item:02d}' \
-                % (resolution, resolution)
+        templ = 'ses-%smm/func/{subject}_ses-%smm_task-%s' \
+                % (resolution, resolution, task)
+
         if s[13] == True:
             templ += '_bolddico'
         else:
