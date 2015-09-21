@@ -229,7 +229,7 @@ def embed_nifti(dcmfiles, niftifile, infofile, force=False):
 
 
 def convert(items, anonymizer=None, symlink=True, converter=None,
-        scaninfo_suffix='_scaninfo.json'):
+        scaninfo_suffix='_scaninfo.json', custom_callable=None):
     prov_files = []
     tmpdir = mkdtemp(prefix='heudiconvtmp')
     for item in items:
@@ -324,6 +324,8 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                     os.chmod(outname, 0440)
                     os.chmod(scaninfo, 0440)
                     os.chmod(prov_file, 0440)
+        if not custom_callable is None:
+            custom_callable(*item)
     shutil.rmtree(tmpdir)
 
 
@@ -417,7 +419,9 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
             cinfo = conversion_info(anon_sid, tdir, info, filegroup, basedir=tmpdir)
             convert(cinfo, converter=converter,
                     scaninfo_suffix=getattr(
-                        mod, 'scaninfo_suffix', '_scaninfo.json'))
+                        mod, 'scaninfo_suffix', '_scaninfo.json'),
+                    custom_callable=getattr(
+                        mod, 'custom_callable', None))
         if not tmpdir is None:
             # clean up tmp dir with extracted tarball
             shutil.rmtree(tmpdir)

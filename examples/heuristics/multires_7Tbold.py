@@ -7,6 +7,7 @@ def create_key(template, outtype=('nii.gz',), annotation_classes=None):
         raise ValueError('Template must be a valid format string')
     return (template, outtype, annotation_classes)
 
+
 def filter_dicom(dcmdata):
     """Return True if a DICOM dataset should be filtered out, else False"""
     comments = getattr(dcmdata, 'ImageComments', '')
@@ -15,6 +16,27 @@ def filter_dicom(dcmdata):
             print("Filter out image with comment '%s'" % comments)
             return True
     return False
+
+
+def extract_moco_params(basename, outypes, dicoms):
+    if not '_rec-dico' in basename:
+        return
+    from dicom import read_file as dcm_read
+    # get acquisition time for all dicoms
+    dcm_times = [(d,
+                  float(dcm_read(d, stop_before_pixels=True).AcquisitionTime))
+                    for d in dicoms]
+    # store MoCo info from image comments sorted by acqusition time
+    moco = ['\t'.join(
+        [str(float(i)) for i in dcm_read(fn, stop_before_pixels=True).ImageComments.split()[1].split(',')])
+                for fn, t in sorted(dcm_times, key=lambda x: x[1])]
+    outname = basename[:-4] + 'recording-motion_physio.tsv'
+    with open(outname, 'wt') as fp:
+        for m in moco:
+            fp.write('%s\n' % (m,))
+
+custom_callable = extract_moco_params
+
 
 def infotodict(seqinfo):
     """Heuristic evaluator for determining which runs belong where
@@ -38,19 +60,19 @@ def infotodict(seqinfo):
             continue
         if not '_coverage'in s[12]:
             resolution = s[12].split('_')[-2][:-3]
-            task = 'orientation_run-{item:02d}'
+            label = 'orientation%s_run-{item:02d}'
         else:
             resolution = s[12].split('_')[5][:-3]
-            task = 'coverage'
+            label = 'coverage%s'
         assert(float(resolution))
-
-        templ = 'ses-%smm/func/{subject}_ses-%smm_task-%s' \
-                % (resolution, resolution, task)
-
         if s[13] == True:
-            templ += '_bolddico'
+            label = label % ('_rec-dico',)
         else:
-            templ += '_bold'
+            label = label % ('',)
+
+        templ = 'ses-%smm/func/{subject}_ses-%smm_task-%s_bold' \
+                % (resolution, resolution, label)
+
         key = create_key(templ)
 
         if not key in info:
