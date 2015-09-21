@@ -228,7 +228,8 @@ def embed_nifti(dcmfiles, niftifile, infofile, force=False):
     return niftifile, infofile
 
 
-def convert(items, anonymizer=None, symlink=True, converter=None):
+def convert(items, anonymizer=None, symlink=True, converter=None,
+        scaninfo_suffix='_scaninfo.json'):
     prov_files = []
     tmpdir = mkdtemp(prefix='heudiconvtmp')
     for item in items:
@@ -258,7 +259,7 @@ def convert(items, anonymizer=None, symlink=True, converter=None):
                             os.link(filename, outfile)
             elif outtype in ['nii', 'nii.gz']:
                 outname = prefix + '.' + outtype
-                scaninfo = prefix + '_scaninfo.json'
+                scaninfo = prefix + scaninfo_suffix
                 if not os.path.exists(outname):
                     from nipype import config
                     config.enable_provenance()
@@ -414,7 +415,9 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
             write_config(editfile, info)
         if converter != 'none':
             cinfo = conversion_info(anon_sid, tdir, info, filegroup, basedir=tmpdir)
-            convert(cinfo, converter=converter)
+            convert(cinfo, converter=converter,
+                    scaninfo_suffix=getattr(
+                        mod, 'scaninfo_suffix', '_scaninfo.json'))
         if not tmpdir is None:
             # clean up tmp dir with extracted tarball
             shutil.rmtree(tmpdir)
