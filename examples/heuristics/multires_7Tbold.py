@@ -59,11 +59,10 @@ def infotodict(seqinfo):
         if not '_bold_' in s[12]:
             continue
         if not '_coverage'in s[12]:
-            resolution = s[12].split('_')[-2][:-3]
             label = 'orientation%s_run-{item:02d}'
         else:
-            resolution = s[12].split('_')[5][:-3]
             label = 'coverage%s'
+        resolution = s[12].split('_')[5][:-3]
         assert(float(resolution))
         if s[13] == True:
             label = label % ('_rec-dico',)

@@ -25,7 +25,6 @@ import tarfile
 
 import dicom as dcm
 import dcmstack as ds
-import numpy as np
 
 
 def save_json(filename, data):
@@ -66,6 +65,12 @@ def load_json(filename):
 
 
 def process_dicoms(fl, dcmsession=None, basedir=None, dcmfilter=None):
+    if dcmsession is None:
+        multi_session = False
+        dcmsession = [0] * len(fl)
+    else:
+        multi_session = True
+
     groups = [[], []]
     mwgroup = []
     for fidx, filename in enumerate(fl):
@@ -85,16 +90,15 @@ def process_dicoms(fl, dcmsession=None, basedir=None, dcmfilter=None):
         except:
             pass
         try:
-            series_id = '%s-%s' % (mw.dcm_data.SeriesNumber,
-                                   mw.dcm_data.ProtocolName)
+            series_id = (dcmsession[fidx],
+                         mw.dcm_data.SeriesNumber,
+                         mw.dcm_data.ProtocolName)
         except AttributeError:
             # not a normal DICOM -> ignore
-            series_id = 'none'
-        if not series_id == 'none':
+            series_id = (dcmsession[fidx], -1, 'none')
+        if not series_id[0] < 0:
             if not dcmfilter is None and dcmfilter(mw.dcm_data):
-                series_id = 'none'
-            if not dcmsession is None:
-                series_id = '%s-%s' % (dcmsession[fidx], series_id)
+                series_id = (dcmsession[fidx], -1, mw.dcm_data.ProtocolName)
         if not groups:
             mwgroup.append(mw)
             groups[0].append(series_id)
@@ -104,10 +108,10 @@ def process_dicoms(fl, dcmsession=None, basedir=None, dcmfilter=None):
         N = len(mwgroup)
         # filter out unwanted non-image-data DICOMs by assigning
         # a series number < 0 (see test below)
-        if not series_id == 'none' and mw.dcm_data[0x0008, 0x0016].repval in (
+        if not series_id[1] < 0 and mw.dcm_data[0x0008, 0x0016].repval in (
                 'Raw Data Storage',
                 'GrayscaleSoftcopyPresentationStateStorage'):
-            series_id = 'none'
+            series_id = (dcmsession[fidx], -1, mw.dcm_data.ProtocolName)
         #print fidx, N, filename
         ingrp = False
         for idx in range(N):
@@ -115,11 +119,10 @@ def process_dicoms(fl, dcmsession=None, basedir=None, dcmfilter=None):
             #print idx, same, groups[idx][0]
             if same:
                 ingrp = True
-                if series_id != 'none':
-                    series_id = '%s-%s' % (mwgroup[idx].dcm_data.SeriesNumber,
-                                           mwgroup[idx].dcm_data.ProtocolName)
-                    if not dcmsession is None:
-                        series_id = '%s-%s' % (dcmsession[fidx], series_id)
+                if series_id[1] >= 0:
+                    series_id = (dcmsession[fidx],
+                                 mwgroup[idx].dcm_data.SeriesNumber,
+                                 mwgroup[idx].dcm_data.ProtocolName)
                 groups[0].append(series_id)
                 groups[1].append(idx)
         if not ingrp:
@@ -132,10 +135,10 @@ def process_dicoms(fl, dcmsession=None, basedir=None, dcmfilter=None):
     total = 0
     filegroup = {}
     seqinfo = []
-    fl = np.array(fl)
-    groups0 = np.array(groups[0])
+    # for the next line to make any sense the series_id needs to
+    # be sortable in a way that preserves the series order
     for series, mwidx in sorted(group_map.items()):
-        if series == 'none':
+        if series[1] < 0:
             # skip our fake series with unwanted files
             continue
         mw = mwgroup[mwidx]
@@ -144,7 +147,13 @@ def process_dicoms(fl, dcmsession=None, basedir=None, dcmfilter=None):
             # nothing to see here, just move on
             continue
         dcminfo = mw.dcm_data
-        files = fl[groups0 == str(series)].tolist()
+        files = [fl[i] for i, s in enumerate(groups[0]) if s == series]
+        # turn the series_id into a human-readable string -- string is needed
+        # for JSON storage later on
+        if multi_session:
+            series = '%i-%i-%s' % series
+        else:
+            series = '%i-%s' % series[1:]
         filegroup[series] = files
         size = list(mw.image_shape) + [len(files)]
         total += size[-1]
