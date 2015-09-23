@@ -1,0 +1,27 @@
+Source: heudiconv
+Maintainer: NeuroDebian Team <team@neuro.debian.net>
+Uploaders: Michael Hanke <mih@debian.org>
+Section: science
+Priority: optional
+Build-Depends: debhelper (>= 9),
+               help2man
+Standards-Version: 3.9.6
+Homepage: https://github.com/nipy/heudiconv
+
+Package: heudiconv
+Architecture: all
+Depends: ${misc:Depends},
+         python,
+         python-dcmstack,
+         python-dicom,
+         python-nibabel,
+         python-numpy,
+         python-nipype,
+Recommends: mricron
+Description: DICOM converter with support for structure heuristics
+ This is a flexible dicom converter for organizing brain imaging data into
+ structured directory layouts. It allows for flexible directory layouts and
+ naming schemes through customizable heuristics implementations.
+ It only converts the necessary dicoms, not everything in a directory.
+ It tracks the provenance of the conversion from dicom to nifti in w3c
+ prov format.
