@@ -240,7 +240,7 @@ def embed_nifti(dcmfiles, niftifile, infofile, force=False):
 
 
 def convert(items, anonymizer=None, symlink=True, converter=None,
-        scaninfo_suffix='_scaninfo.json', custom_callable=None):
+        scaninfo_suffix='_scaninfo.json', custom_callable=None, with_prov=False):
     prov_files = []
     tmpdir = mkdtemp(prefix='heudiconvtmp')
     for item in items:
@@ -272,8 +272,9 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                 outname = prefix + '.' + outtype
                 scaninfo = prefix + scaninfo_suffix
                 if not os.path.exists(outname):
-                    from nipype import config
-                    config.enable_provenance()
+                    if with_prov:
+                        from nipype import config
+                        config.enable_provenance()
                     from nipype import Function, Node
                     from nipype.interfaces.base import isdefined
                     print converter
@@ -307,12 +308,15 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                             outname_bvals = prefix + '.bvals'
                             shutil.copyfile(res.outputs.bvecs, outname_bvecs)
                             shutil.copyfile(res.outputs.bvals, outname_bvals)
-                    prov_file = prefix + '_prov.ttl'
-                    shutil.copyfile(os.path.join(convertnode.base_dir,
-                                                 convertnode.name,
-                                                 'provenance.ttl'),
-                                    prov_file)
-                    prov_files.append(prov_file)
+                            
+                    if with_prov:
+                        prov_file = prefix + '_prov.ttl'
+                        shutil.copyfile(os.path.join(convertnode.base_dir,
+                                                     convertnode.name,
+                                                    'provenance.ttl'),
+                                        prov_file)
+                        prov_files.append(prov_file)
+                        
                     embedfunc = Node(Function(input_names=['dcmfiles',
                                                            'niftifile',
                                                            'infofile',
@@ -327,21 +331,24 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                     embedfunc.inputs.force = True
                     embedfunc.base_dir = tmpdir
                     res = embedfunc.run()
-                    g = res.provenance.rdf()
-                    g.parse(prov_file,
-                            format='turtle')
-                    g.serialize(prov_file, format='turtle')
-                    #out_file, meta_dict = embed_nifti(item[2], outname, force=True)
                     os.chmod(outname, 0440)
                     os.chmod(scaninfo, 0440)
-                    os.chmod(prov_file, 0440)
+                    
+                    if with_prov:
+                        g = res.provenance.rdf()
+                        g.parse(prov_file,
+                                format='turtle')
+                        g.serialize(prov_file, format='turtle')
+                        embed_nifti(item[2], outname, force=True)
+                        os.chmod(prov_file, 0440)
+                    
         if not custom_callable is None:
             custom_callable(*item)
     shutil.rmtree(tmpdir)
 
 
 def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
-                   queue=None, anon_sid_cmd=None, anon_outdir=None):
+                   queue=None, anon_sid_cmd=None, anon_outdir=None, with_prov=False):
     for sid in subjs:
         tmpdir = None
         if queue == 'slurm':
@@ -350,6 +357,8 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
             convertcmd = ' '.join(['python', progname, '-d', dicom_dir_template,
                                    '-o', outdir, '-f', heuristic_file, '-s', sid,
                                    '-c', converter])
+            if with_prov:
+                convertcmd += " --with-prov"
             script_file = 'sg-%s.sh' % sid
             with open(script_file, 'wt') as fp:
                 fp.writelines(['#!/bin/bash\n', convertcmd])
@@ -432,7 +441,8 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
                     scaninfo_suffix=getattr(
                         mod, 'scaninfo_suffix', '_scaninfo.json'),
                     custom_callable=getattr(
-                        mod, 'custom_callable', None))
+                        mod, 'custom_callable', None),
+                    with_prov=with_prov)
         if not tmpdir is None:
             # clean up tmp dir with extracted tarball
             shutil.rmtree(tmpdir)
@@ -485,6 +495,8 @@ s3
                         choices=('slurm',),
                         help='''select batch system to submit jobs to instead
                         of running the conversion serially''')
+    parser.add_argument('-p', '--with-prov', dest='with_prov', action='store_true',
+                        help='''Store additional provenance information. Requires python-rdflib.''')
     args = parser.parse_args()
     convert_dicoms(args.subjs, os.path.abspath(args.dicom_dir_template),
                    os.path.abspath(args.outputdir),
@@ -492,4 +504,5 @@ s3
                    converter=args.converter,
                    queue=args.queue,
                    anon_sid_cmd=args.anon_cmd,
-                   anon_outdir=args.conv_outputdir)
+                   anon_outdir=args.conv_outputdir,
+                   with_prov=args.with_prov)
