@@ -330,18 +330,20 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                     embedfunc.inputs.infofile = os.path.abspath(scaninfo)
                     embedfunc.inputs.force = True
                     embedfunc.base_dir = tmpdir
-                    res = embedfunc.run()
+                    cwd = os.getcwd()
+                    try:
+                        res = embedfunc.run()
+                        os.chmod(scaninfo, 0440)
+                        if with_prov:
+                            g = res.provenance.rdf()
+                            g.parse(prov_file,
+                                    format='turtle')
+                            g.serialize(prov_file, format='turtle')
+                            os.chmod(prov_file, 0440)
+                    except:
+                        os.chdir(cwd)
                     os.chmod(outname, 0440)
-                    os.chmod(scaninfo, 0440)
-                    
-                    if with_prov:
-                        g = res.provenance.rdf()
-                        g.parse(prov_file,
-                                format='turtle')
-                        g.serialize(prov_file, format='turtle')
-                        embed_nifti(item[2], outname, force=True)
-                        os.chmod(prov_file, 0440)
-                    
+
         if not custom_callable is None:
             custom_callable(*item)
     shutil.rmtree(tmpdir)
@@ -351,7 +353,7 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
                    queue=None, anon_sid_cmd=None, anon_outdir=None, with_prov=False):
     for sid in subjs:
         tmpdir = None
-        if queue == 'slurm':
+        if queue:
             # TODO This needs to be updated to better scale with additional args
             progname = os.path.abspath(inspect.getfile(inspect.currentframe()))
             convertcmd = ' '.join(['python', progname, '-d', dicom_dir_template,
@@ -492,7 +494,6 @@ s3
     parser.add_argument('-f', '--heuristic', dest='heuristic_file', required=True,
                         help='python script containing heuristic')
     parser.add_argument('-q', '--queue', dest='queue', default=None,
-                        choices=('slurm',),
                         help='''select batch system to submit jobs to instead
                         of running the conversion serially''')
     parser.add_argument('-p', '--with-prov', dest='with_prov', action='store_true',
