@@ -1,0 +1,1 @@
+bin/heudiconv -d ~/data/AA_dicoms/%s_*/*/*.dcm -o /tmp/AA -s S2529LVY S4188NBT S5271NYO S6086STG S8848XEU S9184VMG S3543JIU S4379IUI S6009OQW S8576CQQ S9161QLW S9650KBD -f heuristics/bids_of_jan.py --anon-cmd heuristics/bids_norm_subject_id.py --infofile-style bids -c dcm2nii

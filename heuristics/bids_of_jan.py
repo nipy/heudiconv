@@ -16,24 +16,24 @@ def infotodict(seqinfo):
     subindex: sub index within group
     """
     
-    rs_lr = create_key('func/sub-{subject}_task-rest_acq-LR_run-{item:01d}_bold')
-    rs_lr_sbref = create_key('func/sub-{subject}_task-rest_acq-LR_run-{item:01d}_sbref')
-    rs_rl = create_key('func/sub-{subject}_task-rest_acq-RL_run-{item:01d}_bold')
-    rs_rl_sbref = create_key('func/sub-{subject}_task-rest_acq-RL_run-{item:01d}_sbref')
-    dwi_dir90lr = create_key('dwi/sub-{subject}_acq-dir90LR_run-{item:01d}_dwi')
-    dwi_dir90lr_sbref = create_key('dwi/sub-{subject}_acq-dir90LR_run-{item:01d}_sbref')
-    dwi_dir90rl = create_key('dwi/sub-{subject}_acq-dir90RL_run-{item:01d}_dwi')
-    dwi_dir90rl_sbref = create_key('dwi/sub-{subject}_acq-dir90RL_run-{item:01d}_sbref')
-    dwi_dir91lr = create_key('dwi/sub-{subject}_acq-dir90LR_run-{item:01d}_dwi')
-    dwi_dir91lr_sbref = create_key('dwi/sub-{subject}_acq-dir90LR_run-{item:01d}_sbref')
-    dwi_dir91rl = create_key('dwi/sub-{subject}_acq-dir90RL_run-{item:01d}_dwi')
-    dwi_dir91rl_sbref = create_key('dwi/sub-{subject}_acq-dir90RL_run-{item:01d}_sbref')
-    nback = create_key('func/sub-{subject}_task-nback_run-{item:01d}_bold')
-    nback_sbref = create_key('func/sub-{subject}_task-nback_run-{item:01d}_sbref')
-    fmap_lr = create_key('fmap/sub-{subject}_dir-1_run-{item:01d}_epi')
-    fmap_rl = create_key('fmap/sub-{subject}_dir-2_run-{item:01d}_epi')
-    t1 = create_key('anat/sub-{subject}_run-{item:01d}_T1w')
-    t2 = create_key('anat/sub-{subject}_run-{item:01d}_T2w')
+    rs_lr = create_key('func/{subject}_task-rest_acq-LR_run-{item:01d}_bold')
+    rs_lr_sbref = create_key('func/{subject}_task-rest_acq-LR_run-{item:01d}_sbref')
+    rs_rl = create_key('func/{subject}_task-rest_acq-RL_run-{item:01d}_bold')
+    rs_rl_sbref = create_key('func/{subject}_task-rest_acq-RL_run-{item:01d}_sbref')
+    dwi_dir90lr = create_key('dwi/{subject}_acq-dir90LR_run-{item:01d}_dwi')
+    dwi_dir90lr_sbref = create_key('dwi/{subject}_acq-dir90LR_run-{item:01d}_sbref')
+    dwi_dir90rl = create_key('dwi/{subject}_acq-dir90RL_run-{item:01d}_dwi')
+    dwi_dir90rl_sbref = create_key('dwi/{subject}_acq-dir90RL_run-{item:01d}_sbref')
+    dwi_dir91lr = create_key('dwi/{subject}_acq-dir90LR_run-{item:01d}_dwi')
+    dwi_dir91lr_sbref = create_key('dwi/{subject}_acq-dir90LR_run-{item:01d}_sbref')
+    dwi_dir91rl = create_key('dwi/{subject}_acq-dir90RL_run-{item:01d}_dwi')
+    dwi_dir91rl_sbref = create_key('dwi/{subject}_acq-dir90RL_run-{item:01d}_sbref')
+    nback = create_key('func/{subject}_task-nback_run-{item:01d}_bold')
+    nback_sbref = create_key('func/{subject}_task-nback_run-{item:01d}_sbref')
+    fmap_lr = create_key('fmap/{subject}_dir-1_run-{item:01d}_epi')
+    fmap_rl = create_key('fmap/{subject}_dir-2_run-{item:01d}_epi')
+    t1 = create_key('anat/{subject}_run-{item:01d}_T1w')
+    t2 = create_key('anat/{subject}_run-{item:01d}_T2w')
     info = {rs_lr: [], rs_rl: [], dwi_dir90lr: [], dwi_dir90rl: [], dwi_dir91lr: [], dwi_dir91rl: [], t1: [], t2: [], nback: [],
             rs_lr_sbref: [], rs_rl_sbref: [], dwi_dir90lr_sbref: [], dwi_dir90rl_sbref: [], dwi_dir91lr_sbref: [], dwi_dir91rl_sbref: [], nback_sbref: [],
             fmap_lr: [], fmap_rl: []}
@@ -76,14 +76,14 @@ def infotodict(seqinfo):
             else:
                 info[dwi_dir91lr_sbref].append(s[2])
         elif (s[12] == 'HPC Nback'):
-            if (nt > 60):
+            if (nt > 100):
                 info[nback].append(s[2])
-            else:
+            elif (nt == 1):
                 info[nback_sbref].append(s[2])
-        #elif (s[12] == 'SpinEchoFieldMap_RL_BIC_v2'):
-        #    info[fmap_rl].append(s[2])
-        #elif (s[12] == 'SpinEchoFieldMap_LR_BIC_v2'):
-        #    info[fmap_lr].append(s[2])
+        elif (s[12] == 'SpinEchoFieldMap_RL_BIC_v2'):
+            info[fmap_rl].append(s[2])
+        elif (s[12] == 'SpinEchoFieldMap_LR_BIC_v2'):
+            info[fmap_lr].append(s[2])
         else:
             pass
     return info

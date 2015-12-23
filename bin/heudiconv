@@ -34,7 +34,7 @@ def get_phase_encode(dcm_file):
 
     ## note x and y are flipped relative to dicom 
     ## to get direction in nifti
-    ret_dirs = [("x","x-"),("y","y-"),("z","z-")] 
+    ret_dirs = [("i","i-"),("j","j-"),("k","k-")] 
 
     dcm_dat = dicom.read_file(dcm_file)
     ## get the direction cosine
@@ -62,7 +62,7 @@ def get_phase_encode(dcm_file):
 def get_slice_direction(dcm_file):
     
 
-    ret_dirs = [("x","x-"),("y","y-"),("z-","z")] 
+    ret_dirs = [("i","i-"),("j","j-"),("k-","k")] 
 
     dcm_dat = dicom.read_file(dcm_file)
     csa = csareader.get_csa_header(dcm_dat)
@@ -74,7 +74,7 @@ def get_slice_direction(dcm_file):
     else:
         return None
 
-def get_effective_echo_spacing(dcm_file):
+def get_effective_echo_spacing_and_total_readout(dcm_file):
     dcmobj = dicom.read_file(dcm_file)
     if dcmobj.InPlanePhaseEncodingDirection == "ROW":
         idx = 2
@@ -82,9 +82,11 @@ def get_effective_echo_spacing(dcm_file):
         idx = 0
 
     if ("0019", "1028") in dcmobj and dcmobj[("0019", "1028")].value > 0 and dcmobj.AcquisitionMatrix[idx] > 0:
-        return 1/(dcmobj[("0019", "1028")].value * dcmobj.AcquisitionMatrix[idx])
+        echo_spacing = 1/(dcmobj[("0019", "1028")].value * dcmobj.AcquisitionMatrix[idx])
+        total_readout = echo_spacing * (dcmobj.AcquisitionMatrix[idx] - 1)
+        return echo_spacing, total_readout
     else:
-        return None
+        return None, None
 
 def slice_timing_and_multiband(dcm_file):
     dcmobj = dicom.read_file(dcm_file)
@@ -107,9 +109,10 @@ def extract_metadata(dicom_file, output_json, extra_fields={}):
                       "PhaseEncodingDirection": get_phase_encode(dicom_file),
                       "EchoTime": dcmobj.EchoTime/1000.0,
                      })
-    echo_spacing = get_effective_echo_spacing(dicom_file)
+    echo_spacing, total_readout = get_effective_echo_spacing_and_total_readout(dicom_file)
     if echo_spacing:
         json_dict["EffectiveEchoSpacing"] = echo_spacing
+        json_dict["TotalReadoutTime"] = total_readout
     
     slice_timing, mb_factor = slice_timing_and_multiband(dicom_file)
     
@@ -409,8 +412,8 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                         else:
                             shutil.copyfile(res.outputs.converted_files, outname)
                         if isdefined(res.outputs.bvecs):
-                            outname_bvecs = prefix + '.bvecs'
-                            outname_bvals = prefix + '.bvals'
+                            outname_bvecs = prefix + '.bvec'
+                            outname_bvals = prefix + '.bval'
                             shutil.copyfile(res.outputs.bvecs, outname_bvecs)
                             shutil.copyfile(res.outputs.bvals, outname_bvals)
                             
@@ -426,33 +429,34 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                                 infofile = os.path.abspath(scaninfo),
                                 infofile_style = infofile_style,
                                 force = True)
-                        
-                    embedfunc = Node(Function(input_names=['dcmfiles',
-                                                           'niftifile',
-                                                           'infofile',
-                                                           'force'],
-                                              output_names=['outfile',
-                                                            'meta'],
-                                              function=embed_nifti),
-                                     name='embedder')
-                    embedfunc.inputs.dcmfiles = item[2]
-                    embedfunc.inputs.niftifile = os.path.abspath(outname)
-                    embedfunc.inputs.infofile = os.path.abspath(scaninfo)
-                    embedfunc.inputs.force = True
-                    embedfunc.base_dir = tmpdir
-                    cwd = os.getcwd()
-                    try:
-                        res = embedfunc.run()
-                        os.chmod(scaninfo, 0440)
-                        if with_prov:
-                            g = res.provenance.rdf()
-                            g.parse(prov_file,
-                                    format='turtle')
-                            g.serialize(prov_file, format='turtle')
-                            os.chmod(prov_file, 0440)
-                    except:
-                        os.chdir(cwd)
-                    os.chmod(outname, 0440)
+#                         
+#                     embedfunc = Node(Function(input_names=['dcmfiles',
+#                                                            'niftifile',
+#                                                            'infofile',
+#                                                            'force',
+#                                                            'infofile_style'],
+#                                               output_names=['outfile',
+#                                                             'meta'],
+#                                               function=embed_nifti),
+#                                      name='embedder')
+#                     embedfunc.inputs.dcmfiles = item[2]
+#                     embedfunc.inputs.niftifile = os.path.abspath(outname)
+#                     embedfunc.inputs.infofile = os.path.abspath(scaninfo)
+#                     embedfunc.inputs.force = True
+#                     embedfunc.base_dir = tmpdir
+#                     cwd = os.getcwd()
+#                     try:
+#                         res = embedfunc.run()
+#                         os.chmod(scaninfo, 0440)
+#                         if with_prov:
+#                             g = res.provenance.rdf()
+#                             g.parse(prov_file,
+#                                     format='turtle')
+#                             g.serialize(prov_file, format='turtle')
+#                             os.chmod(prov_file, 0440)
+#                     except:
+#                         os.chdir(cwd)
+#                     os.chmod(outname, 0440)
                     os.chmod(scaninfo, 0440)
 
 
@@ -486,7 +490,7 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
         fl = sorted(glob(sdir))
         dcmsessions = None
         # some people keep compressed tarballs around -- be nice!
-        if len(fl) and tarfile.is_tarfile(fl[0]):
+        if len(fl) and not os.path.isdir(fl[0]) and tarfile.is_tarfile(fl[0]):
             # check if we got a list of tarfiles
             if not len(fl) == sum([tarfile.is_tarfile(i) for i in fl]):
                 raise ValueError("some but not all input files are tar files")
