@@ -26,6 +26,108 @@ import tarfile
 import dicom as dcm
 import dcmstack as ds
 
+import dicom
+import numpy as np
+from nibabel.nicom import csareader
+
+def get_phase_encode(dcm_file):
+
+    ## note x and y are flipped relative to dicom 
+    ## to get direction in nifti
+    ret_dirs = [("i","i-"),("j","j-"),("k","k-")] 
+
+    dcm_dat = dicom.read_file(dcm_file)
+    ## get the direction cosine
+    dcm_image_dir = dcm_dat.ImageOrientationPatient
+    dcm_image_dir_row = (dcm_image_dir[0],dcm_image_dir[1],dcm_image_dir[2])
+    dcm_image_dir_col = (dcm_image_dir[3],dcm_image_dir[4],dcm_image_dir[5])
+    ## get the phase encode
+    dcm_phase_encode = dcm_dat.InPlanePhaseEncodingDirection
+    if dcm_phase_encode == "ROW":
+        dcm_vec = dcm_image_dir_row
+    else:
+        dcm_vec = dcm_image_dir_col
+        
+        
+    ## we now have the direction of the phase encode vector
+    max_index = np.argmax(np.abs(dcm_vec))
+    
+    try:
+        val = csareader.get_csa_header(dcm_dat)['tags']['PhaseEncodingDirectionPositive']['items'][0]
+    except:
+        return None
+    
+    return ret_dirs[max_index][val]
+
+def get_slice_direction(dcm_file):
+    
+
+    ret_dirs = [("i","i-"),("j","j-"),("k-","k")] 
+
+    dcm_dat = dicom.read_file(dcm_file)
+    csa = csareader.get_csa_header(dcm_dat)
+    norm = csareader.get_slice_normal(csa)
+    
+    if norm != None:    
+        max_index = np.argmax(np.abs(norm))
+        return ret_dirs[max_index][norm[max_index] > 0]
+    else:
+        return None
+
+def get_effective_echo_spacing_and_total_readout(dcm_file):
+    dcmobj = dicom.read_file(dcm_file)
+    if dcmobj.InPlanePhaseEncodingDirection == "ROW":
+        idx = 2
+    elif dcmobj.InPlanePhaseEncodingDirection == "COL":
+        idx = 0
+
+    if ("0019", "1028") in dcmobj and dcmobj[("0019", "1028")].value > 0 and dcmobj.AcquisitionMatrix[idx] > 0:
+        echo_spacing = 1/(dcmobj[("0019", "1028")].value * dcmobj.AcquisitionMatrix[idx])
+        total_readout = echo_spacing * (dcmobj.AcquisitionMatrix[idx] - 1)
+        return echo_spacing, total_readout
+    else:
+        return None, None
+
+def slice_timing_and_multiband(dcm_file):
+    dcmobj = dicom.read_file(dcm_file)
+    if ("0019", "1029") in dcmobj:
+        slice_timing = dcmobj[("0019", "1029")].value
+        slice_timing = np.around(np.array(slice_timing)/1000.0, 3).tolist()
+        zero_slices_count = (np.array(slice_timing) == 0).sum()
+        if zero_slices_count > 1:
+            return slice_timing, zero_slices_count
+        else:
+            return slice_timing, None
+    else:
+        return None, None
+
+def extract_metadata(dicom_file, output_json, extra_fields={}):
+    dcmobj = dicom.read_file(dicom_file)
+    json_dict = {}
+    json_dict.update({"RepetitionTime": dcmobj.RepetitionTime/1000.0,
+                      "SliceEncodingDirection": get_slice_direction(dicom_file),
+                      "PhaseEncodingDirection": get_phase_encode(dicom_file),
+                      "EchoTime": dcmobj.EchoTime/1000.0,
+                     })
+    echo_spacing, total_readout = get_effective_echo_spacing_and_total_readout(dicom_file)
+    if echo_spacing:
+        json_dict["EffectiveEchoSpacing"] = echo_spacing
+        json_dict["TotalReadoutTime"] = total_readout
+    
+    slice_timing, mb_factor = slice_timing_and_multiband(dicom_file)
+    
+    # some multiband sequences report incorrect slice timing
+    if slice_timing and np.array(slice_timing).max() < json_dict["RepetitionTime"]:
+        json_dict["SliceTiming"] = slice_timing
+    if mb_factor:
+        json_dict["MultibandAccelerationFactor"] = mb_factor
+        
+    json_dict.update(extra_fields)
+    
+    
+    json.dump(json_dict, open(output_json, "w"),
+              sort_keys=True, indent=4, separators=(',', ': '))
+
 
 def save_json(filename, data):
     """Save data to a json file
@@ -209,38 +311,44 @@ def conversion_info(subject, outdir, info, filegroup, basedir=None):
     return convert_info
 
 
-def embed_nifti(dcmfiles, niftifile, infofile, force=False):
-    import dcmstack as ds
-    import nibabel as nb
-    import os
-    stack = ds.parse_and_stack(dcmfiles, force=force).values()
-    if len(stack) > 1:
-        raise ValueError('Found multiple series')
-    stack = stack[0]
-
-    #Create the nifti image using the data array
-    if not os.path.exists(niftifile):
-        nifti_image = stack.to_nifti(embed_meta=True)
-        nifti_image.to_filename(niftifile)
-        return ds.NiftiWrapper(nifti_image).meta_ext.to_json()
-    orig_nii = nb.load(niftifile)
-    #orig_hdr = orig_nii.get_header()
-    aff = orig_nii.get_affine()
-    ornt = nb.orientations.io_orientation(aff)
-    axcodes = nb.orientations.ornt2axcodes(ornt)
-    new_nii = stack.to_nifti(voxel_order=''.join(axcodes), embed_meta=True)
-    #new_hdr = new_nii.get_header()
-    #orig_hdr.extensions = new_hdr.extensions
-    #orig_nii.update_header()
-    #orig_nii.to_filename(niftifile)
-    meta = ds.NiftiWrapper(new_nii).meta_ext.to_json()
-    with open(infofile, 'wt') as fp:
-        fp.writelines(meta)
+def embed_nifti(dcmfiles, niftifile, infofile, force=False, infofile_style='dcmstack'):
+    if infofile_style == 'dcmstack':
+        import dcmstack as ds
+        import nibabel as nb
+        import os
+        stack = ds.parse_and_stack(dcmfiles, force=force).values()
+        if len(stack) > 1:
+            raise ValueError('Found multiple series')
+        stack = stack[0]
+    
+        #Create the nifti image using the data array
+        if not os.path.exists(niftifile):
+            nifti_image = stack.to_nifti(embed_meta=True)
+            nifti_image.to_filename(niftifile)
+            return ds.NiftiWrapper(nifti_image).meta_ext.to_json()
+        orig_nii = nb.load(niftifile)
+        #orig_hdr = orig_nii.get_header()
+        aff = orig_nii.get_affine()
+        ornt = nb.orientations.io_orientation(aff)
+        axcodes = nb.orientations.ornt2axcodes(ornt)
+        new_nii = stack.to_nifti(voxel_order=''.join(axcodes), embed_meta=True)
+        #new_hdr = new_nii.get_header()
+        #orig_hdr.extensions = new_hdr.extensions
+        #orig_nii.update_header()
+        #orig_nii.to_filename(niftifile)
+        meta = ds.NiftiWrapper(new_nii).meta_ext.to_json()
+    
+        with open(infofile, 'wt') as fp:
+            fp.writelines(meta)
+    elif infofile_style == 'bids':
+        # we are not taking the first file because some multiband sequences report wrong slice timing in the first volume
+        extract_metadata(dcmfiles[-1], infofile)
     return niftifile, infofile
 
 
 def convert(items, anonymizer=None, symlink=True, converter=None,
-        scaninfo_suffix='_scaninfo.json', custom_callable=None, with_prov=False):
+            scaninfo_suffix='_scaninfo.json', custom_callable=None, with_prov=False,
+            infofile_style='dcmstack'):
     prov_files = []
     tmpdir = mkdtemp(prefix='heudiconvtmp')
     for item in items:
@@ -304,8 +412,8 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                         else:
                             shutil.copyfile(res.outputs.converted_files, outname)
                         if isdefined(res.outputs.bvecs):
-                            outname_bvecs = prefix + '.bvecs'
-                            outname_bvals = prefix + '.bvals'
+                            outname_bvecs = prefix + '.bvec'
+                            outname_bvals = prefix + '.bval'
                             shutil.copyfile(res.outputs.bvecs, outname_bvecs)
                             shutil.copyfile(res.outputs.bvals, outname_bvals)
                             
@@ -316,33 +424,41 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                                                     'provenance.ttl'),
                                         prov_file)
                         prov_files.append(prov_file)
-                        
-                    embedfunc = Node(Function(input_names=['dcmfiles',
-                                                           'niftifile',
-                                                           'infofile',
-                                                           'force'],
-                                              output_names=['outfile',
-                                                            'meta'],
-                                              function=embed_nifti),
-                                     name='embedder')
-                    embedfunc.inputs.dcmfiles = item[2]
-                    embedfunc.inputs.niftifile = os.path.abspath(outname)
-                    embedfunc.inputs.infofile = os.path.abspath(scaninfo)
-                    embedfunc.inputs.force = True
-                    embedfunc.base_dir = tmpdir
-                    cwd = os.getcwd()
-                    try:
-                        res = embedfunc.run()
-                        os.chmod(scaninfo, 0440)
-                        if with_prov:
-                            g = res.provenance.rdf()
-                            g.parse(prov_file,
-                                    format='turtle')
-                            g.serialize(prov_file, format='turtle')
-                            os.chmod(prov_file, 0440)
-                    except:
-                        os.chdir(cwd)
-                    os.chmod(outname, 0440)
+                    
+                    embed_nifti(dcmfiles = item[2], niftifile = os.path.abspath(outname),
+                                infofile = os.path.abspath(scaninfo),
+                                infofile_style = infofile_style,
+                                force = True)
+#                         
+#                     embedfunc = Node(Function(input_names=['dcmfiles',
+#                                                            'niftifile',
+#                                                            'infofile',
+#                                                            'force',
+#                                                            'infofile_style'],
+#                                               output_names=['outfile',
+#                                                             'meta'],
+#                                               function=embed_nifti),
+#                                      name='embedder')
+#                     embedfunc.inputs.dcmfiles = item[2]
+#                     embedfunc.inputs.niftifile = os.path.abspath(outname)
+#                     embedfunc.inputs.infofile = os.path.abspath(scaninfo)
+#                     embedfunc.inputs.force = True
+#                     embedfunc.base_dir = tmpdir
+#                     cwd = os.getcwd()
+#                     try:
+#                         res = embedfunc.run()
+#                         os.chmod(scaninfo, 0440)
+#                         if with_prov:
+#                             g = res.provenance.rdf()
+#                             g.parse(prov_file,
+#                                     format='turtle')
+#                             g.serialize(prov_file, format='turtle')
+#                             os.chmod(prov_file, 0440)
+#                     except:
+#                         os.chdir(cwd)
+#                     os.chmod(outname, 0440)
+                    os.chmod(scaninfo, 0440)
+
 
         if not custom_callable is None:
             custom_callable(*item)
@@ -350,7 +466,8 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
 
 
 def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
-                   queue=None, anon_sid_cmd=None, anon_outdir=None, with_prov=False):
+                   queue=None, anon_sid_cmd=None, anon_outdir=None, with_prov=False,
+                   infofile_style='dcmstack'):
     for sid in subjs:
         tmpdir = None
         if queue:
@@ -373,7 +490,7 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
         fl = sorted(glob(sdir))
         dcmsessions = None
         # some people keep compressed tarballs around -- be nice!
-        if len(fl) and tarfile.is_tarfile(fl[0]):
+        if len(fl) and not os.path.isdir(fl[0]) and tarfile.is_tarfile(fl[0]):
             # check if we got a list of tarfiles
             if not len(fl) == sum([tarfile.is_tarfile(i) for i in fl]):
                 raise ValueError("some but not all input files are tar files")
@@ -439,12 +556,17 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
             write_config(editfile, info)
         if converter != 'none':
             cinfo = conversion_info(anon_sid, tdir, info, filegroup, basedir=tmpdir)
+            if infofile_style == 'dcmstack':
+                scaninfo_suffix = '_scaninfo.json'
+            elif infofile_style == 'bids':
+                scaninfo_suffix = '.json'
             convert(cinfo, converter=converter,
                     scaninfo_suffix=getattr(
-                        mod, 'scaninfo_suffix', '_scaninfo.json'),
+                        mod, 'scaninfo_suffix', scaninfo_suffix),
                     custom_callable=getattr(
                         mod, 'custom_callable', None),
-                    with_prov=with_prov)
+                    with_prov=with_prov,
+                    infofile_style=infofile_style)
         if not tmpdir is None:
             # clean up tmp dir with extracted tarball
             shutil.rmtree(tmpdir)
@@ -498,6 +620,8 @@ s3
                         of running the conversion serially''')
     parser.add_argument('-p', '--with-prov', dest='with_prov', action='store_true',
                         help='''Store additional provenance information. Requires python-rdflib.''')
+    parser.add_argument('--infofile-style', dest="infofile_style", choices=('dcmstack', 'bids'), default='dcmstack')
+    
     args = parser.parse_args()
     convert_dicoms(args.subjs, os.path.abspath(args.dicom_dir_template),
                    os.path.abspath(args.outputdir),
@@ -506,4 +630,5 @@ s3
                    queue=args.queue,
                    anon_sid_cmd=args.anon_cmd,
                    anon_outdir=args.conv_outputdir,
-                   with_prov=args.with_prov)
+                   with_prov=args.with_prov,
+                   infofile_style=args.infofile_style)

@@ -16,70 +16,74 @@ def infotodict(seqinfo):
     subindex: sub index within group
     """
     
-    rs = create_key('functional/{subject}_task010_run{item:03d}_rest')
-    boldt1 = create_key('functional/{subject}_task001_run{item:03d}_bold')
-    boldt2 = create_key('functional/{subject}_task002_run{item:03d}_bold')
-    boldt3 = create_key('functional/{subject}_task003_run{item:03d}_bold')
-    boldt4 = create_key('functional/{subject}_task004_run{item:03d}_bold')
-    boldt5 = create_key('functional/{subject}_task005_run{item:03d}_bold')
-    boldt6 = create_key('functional/{subject}_task006_run{item:03d}_bold')
-    boldt7 = create_key('functional/{subject}_task007_run{item:03d}_bold')
-    boldt8 = create_key('functional/{subject}_task008_run{item:03d}_bold')
-    fm1 = create_key('fieldmap/{subject}_fieldmap_{item:03d}')
-    dwi = create_key('diffusion/{subject}_fieldmap_dwi_{item:03d}', outtype=('dicom', 'nii.gz'))
-    t1 = create_key('anatomy/{subject}_fieldmap_T1w_{item:03d}')
-    asl = create_key('functional/{subject}_task009_run{item:03d}_asl')
-    aslcal = create_key('functional/{subject}_task009_run{item:03d}_aslcal_{subindex:03d}')
-    info = {rs: [], boldt1: [], boldt2: [], boldt3: [], boldt4: [], 
-            boldt5: [], boldt6: [], boldt7: [], boldt8: [],
-            fm1: [],  dwi: [], t1: [], 
-            asl: [], aslcal: [[]]}
+    rs_lr = create_key('func/{subject}_task-rest_acq-LR_run-{item:01d}_bold')
+    rs_lr_sbref = create_key('func/{subject}_task-rest_acq-LR_run-{item:01d}_sbref')
+    rs_rl = create_key('func/{subject}_task-rest_acq-RL_run-{item:01d}_bold')
+    rs_rl_sbref = create_key('func/{subject}_task-rest_acq-RL_run-{item:01d}_sbref')
+    dwi_dir90lr = create_key('dwi/{subject}_acq-dir90LR_run-{item:01d}_dwi')
+    dwi_dir90lr_sbref = create_key('dwi/{subject}_acq-dir90LR_run-{item:01d}_sbref')
+    dwi_dir90rl = create_key('dwi/{subject}_acq-dir90RL_run-{item:01d}_dwi')
+    dwi_dir90rl_sbref = create_key('dwi/{subject}_acq-dir90RL_run-{item:01d}_sbref')
+    dwi_dir91lr = create_key('dwi/{subject}_acq-dir90LR_run-{item:01d}_dwi')
+    dwi_dir91lr_sbref = create_key('dwi/{subject}_acq-dir90LR_run-{item:01d}_sbref')
+    dwi_dir91rl = create_key('dwi/{subject}_acq-dir90RL_run-{item:01d}_dwi')
+    dwi_dir91rl_sbref = create_key('dwi/{subject}_acq-dir90RL_run-{item:01d}_sbref')
+    nback = create_key('func/{subject}_task-nback_run-{item:01d}_bold')
+    nback_sbref = create_key('func/{subject}_task-nback_run-{item:01d}_sbref')
+    fmap_lr = create_key('fmap/{subject}_dir-1_run-{item:01d}_epi')
+    fmap_rl = create_key('fmap/{subject}_dir-2_run-{item:01d}_epi')
+    t1 = create_key('anat/{subject}_run-{item:01d}_T1w')
+    t2 = create_key('anat/{subject}_run-{item:01d}_T2w')
+    info = {rs_lr: [], rs_rl: [], dwi_dir90lr: [], dwi_dir90rl: [], dwi_dir91lr: [], dwi_dir91rl: [], t1: [], t2: [], nback: [],
+            rs_lr_sbref: [], rs_rl_sbref: [], dwi_dir90lr_sbref: [], dwi_dir90rl_sbref: [], dwi_dir91lr_sbref: [], dwi_dir91rl_sbref: [], nback_sbref: [],
+            fmap_lr: [], fmap_rl: []}
     last_run = len(seqinfo)
     for s in seqinfo:
+        print s[12]
         x,y,sl,nt = (s[6], s[7], s[8], s[9])
-        if (sl == 176) and (nt == 1) and ('MPRAGE' in s[12]):
+        if (nt == 1) and (s[12] == 'T1w_MPR_BIC_v1'):
             info[t1] = [s[2]]
-        elif (nt > 60) and ('ge_func_2x2x2_Resting' in s[12]):
-            if not s[13]:
-                info[rs].append(int(s[2]))
-        elif (nt == 156) and ('ge_functionals_128_PACE_ACPC-30' in s[12]) and s[2] < last_run:
-            if not s[13]:
-                info[boldt1].append(s[2])
-                last_run = s[2]
-        elif (nt == 155) and ('ge_functionals_128_PACE_ACPC-30' in s[12]):
-            if not s[13]:
-                info[boldt2].append(s[2])
-        elif (nt == 222) and ('ge_functionals_128_PACE_ACPC-30' in s[12]):
-            if not s[13]:
-                info[boldt3].append(s[2])
-        elif (nt == 114) and ('ge_functionals_128_PACE_ACPC-30' in s[12]):
-            if not s[13]:
-                info[boldt4].append(s[2])
-        elif (nt == 156) and ('ge_functionals_128_PACE_ACPC-30' in s[12]):
-            if not s[13] and (s[2] > last_run):
-                info[boldt5].append(s[2])
-        elif (nt == 324) and ('ge_func_3.1x3.1x4_PACE' in s[12]):
-            if not s[13]:
-                info[boldt6].append(s[2])
-        elif (nt == 250) and ('ge_func_3.1x3.1x4_PACE' in s[12]):
-            if not s[13]:
-                info[boldt7].append(s[2])
-        elif (nt == 136) and ('ge_func_3.1x3.1x4_PACE' in s[12]):
-            if not s[13]:
-                info[boldt8].append(s[2])
-        elif (nt == 101) and ('ep2d_pasl_FairQuipssII' in s[12]):
-            if not s[13]:
-                info[asl].append(s[2])
-        elif (nt == 1) and ('ep2d_pasl_FairQuipssII' in s[12]):
-            info[aslcal][0].append(s[2])
-        elif (sl > 1) and (nt == 70) and ('DIFFUSION' in s[12]):
-            info[dwi].append(s[2])
-        elif ('field_mapping_128' in s[12]):
-            info[fm].append(s[2])
-        elif ('field_mapping_3.1' in s[12]):
-            info[fm].append(s[2])
-        elif ('field_mapping_Resting' in s[12]):
-            info[fm].append(s[2])
+        elif (nt == 1) and (s[12] == 'T2w_SPC_BIC_v1'):
+            info[t2] = [s[2]]
+        elif (s[12] == 'rfMRI_REST_LR_BIC_v2'):
+            if (nt > 60):
+                info[rs_lr].append(s[2])
+            else:
+                info[rs_lr_sbref].append(s[2])
+        elif (s[12] == 'rfMRI_REST_RL_BIC_v2'):
+            if (nt > 60):
+                info[rs_rl].append(s[2])
+            else:
+                info[rs_rl_sbref].append(s[2])
+        elif (s[12] == 'DWI_dir90_RL'):
+            if (nt > 60):
+                info[dwi_dir90rl].append(s[2])
+            else:
+                info[dwi_dir90rl_sbref].append(s[2])
+        elif (s[12] == 'DWI_dir90_LR'):
+            if (nt > 60):
+                info[dwi_dir90lr].append(s[2])
+            else:
+                info[dwi_dir90lr_sbref].append(s[2])
+        elif (s[12] == 'DWI_dir91_RL'):
+            if (nt > 60):
+                info[dwi_dir91rl].append(s[2])
+            else:
+                info[dwi_dir91rl_sbref].append(s[2])
+        elif (s[12] == 'DWI_dir91_LR'):
+            if (nt > 60):
+                info[dwi_dir91lr].append(s[2])
+            else:
+                info[dwi_dir91lr_sbref].append(s[2])
+        elif (s[12] == 'HPC Nback'):
+            if (nt > 100):
+                info[nback].append(s[2])
+            elif (nt == 1):
+                info[nback_sbref].append(s[2])
+        elif (s[12] == 'SpinEchoFieldMap_RL_BIC_v2'):
+            info[fmap_rl].append(s[2])
+        elif (s[12] == 'SpinEchoFieldMap_LR_BIC_v2'):
+            info[fmap_lr].append(s[2])
         else:
             pass
     return info
