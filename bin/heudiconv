@@ -295,7 +295,7 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                         convertnode = Node(Dcm2nii(), name='convert')
                         convertnode.base_dir = tmpdir
                         convertnode.inputs.source_names = item[2]
-			convertnode.inputs.gzip_output = output == 'nii.gz'
+                        convertnode.inputs.gzip_output = outtype == 'nii.gz'
                         convertnode.inputs.terminal_output = 'allatonce'
                         res = convertnode.run()
                         if isinstance(res.outputs.converted_files, list):
@@ -322,7 +322,7 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                         if isinstance(res.outputs.converted_files, list):
                             print("series likely has multiple orientations: ", item[2])
                             for idx, fl in enumerate(res.outputs.converted_files):
-                                outname = prefix + str(idx) '.' + outtype
+                                outname = prefix + str(idx) + '.' + outtype
                                 shutil.copyfile(fl, outname_bids)
                         else:
                             shutil.copyfile(res.outputs.converted_files, outname)
