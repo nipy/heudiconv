@@ -240,7 +240,7 @@ def embed_nifti(dcmfiles, niftifile, infofile, force=False):
 
 
 def convert(items, anonymizer=None, symlink=True, converter=None,
-        scaninfo_suffix='_scaninfo.json', custom_callable=None, with_prov=False):
+        scaninfo_suffix='.json', custom_callable=None, with_prov=False):
     prov_files = []
     tmpdir = mkdtemp(prefix='heudiconvtmp')
     for item in items:
@@ -295,7 +295,7 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                         convertnode = Node(Dcm2nii(), name='convert')
                         convertnode.base_dir = tmpdir
                         convertnode.inputs.source_names = item[2]
-                        convertnode.inputs.gzip_output = outtype == 'nii.gz'
+			convertnode.inputs.gzip_output = output == 'nii.gz'
                         convertnode.inputs.terminal_output = 'allatonce'
                         res = convertnode.run()
                         if isinstance(res.outputs.converted_files, list):
@@ -309,6 +309,34 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                             shutil.copyfile(res.outputs.bvecs, outname_bvecs)
                             shutil.copyfile(res.outputs.bvals, outname_bvals)
                             
+                    elif converter == 'dcm2niix':
+                        from nipype.interfaces.dcm2nii import Dcm2niix
+                        convertnode = Node(Dcm2niix(), name='convert')
+                        convertnode.base_dir = tmpdir
+                        convertnode.inputs.source_names = item[2]
+			convertnode.inputs.out_filename = os.path.basename(dirname)
+                        convertnode.inputs.terminal_output = 'allatonce'
+                        convertnode.inputs.bids_format = True #mutable
+                        convertnode.inputs.merge_imgs = True #mutable
+                        res = convertnode.run()
+                        if isinstance(res.outputs.converted_files, list):
+                            print("series likely has multiple orientations: ", item[2])
+                            for idx, fl in enumerate(res.outputs.converted_files):
+                                outname = prefix + str(idx) '.' + outtype
+                                shutil.copyfile(fl, outname_bids)
+                        else:
+                            shutil.copyfile(res.outputs.converted_files, outname)
+                        if isdefined(res.outputs.bvecs):
+                            outname_bvecs = prefix + '.bvecs'
+                            outname_bvals = prefix + '.bvals'
+                            shutil.copyfile(res.outputs.bvecs, outname_bvecs)
+                            shutil.copyfile(res.outputs.bvals, outname_bvals)
+                        if isdefined(res.outputs.bids): ### extract bids
+                            isbids = True
+                            outname_bids = prefix + '.bids'
+                            shutil.copyfile(res.outputs.bids, outname_bids)
+
+
                     if with_prov:
                         prov_file = prefix + '_prov.ttl'
                         shutil.copyfile(os.path.join(convertnode.base_dir,
@@ -364,7 +392,8 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
             script_file = 'sg-%s.sh' % sid
             with open(script_file, 'wt') as fp:
                 fp.writelines(['#!/bin/bash\n', convertcmd])
-            outcmd = 'sbatch -J sg-%s -p %s -N1 -c2 --mem=20G %s' % (sid, queue, script_file)
+            outcmd = 'sbatch -J dicom-%s -p %s -N1 -c2 --mem=20G %s' % (sid, queue, script_file)
+
             os.system(outcmd)
             continue
         # expand the input template
@@ -470,14 +499,15 @@ s3
     parser.add_argument('-s', '--subjects', dest='subjs', required=True,
                         type=str, nargs='+', help='list of subjects')
     parser.add_argument('-c', '--converter', dest='converter',
-                        default='dcm2nii',
-                        choices=('mri_convert', 'dcmstack', 'dcm2nii', 'none'),
+                        required=True,
+                        choices=('mri_convert', 'dcmstack', 'dcm2nii', 'dcm2niix',
+                                 'none'),
                         help='''tool to use for dicom conversion. Setting to 
                         "none" disables the actual conversion step -- useful
                         for testing heuristics.''')
     parser.add_argument('-o', '--outdir', dest='outputdir',
                         default=os.getcwd(),
-                        help=''''output directory for conversion setup (for
+                        help='''output directory for conversion setup (for
                         further customization and future reference. This
                         directory will refer to non-anonymized subject IDs''')
     parser.add_argument('-a', '--conv-outdir', dest='conv_outputdir',
