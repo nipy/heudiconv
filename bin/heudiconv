@@ -395,7 +395,6 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
             with open(script_file, 'wt') as fp:
                 fp.writelines(['#!/bin/bash\n', convertcmd])
             outcmd = 'sbatch -J dicom-%s -p %s -N1 -c2 --mem=20G %s' % (sid, queue, script_file)
-
             os.system(outcmd)
             continue
         # expand the input template
