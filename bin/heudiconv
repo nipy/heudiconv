@@ -295,7 +295,7 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                         convertnode = Node(Dcm2nii(), name='convert')
                         convertnode.base_dir = tmpdir
                         convertnode.inputs.source_names = item[2]
-			convertnode.inputs.gzip_output = output == 'nii.gz'
+                        convertnode.inputs.gzip_output = outtype == 'nii.gz'
                         convertnode.inputs.terminal_output = 'allatonce'
                         res = convertnode.run()
                         if isinstance(res.outputs.converted_files, list):
@@ -317,13 +317,15 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
 			convertnode.inputs.out_filename = os.path.basename(dirname)
                         convertnode.inputs.terminal_output = 'allatonce'
                         convertnode.inputs.bids_format = True #mutable
-                        convertnode.inputs.merge_imgs = True #mutable
+                        convertnode.inputs.merge_imgs = False #mutable
                         res = convertnode.run()
                         if isinstance(res.outputs.converted_files, list):
-                            print("series likely has multiple orientations: ", item[2])
+                            print("series likely has multiple orientations")
                             for idx, fl in enumerate(res.outputs.converted_files):
-                                outname = prefix + str(idx) '.' + outtype
-                                shutil.copyfile(fl, outname_bids)
+                                #prefix = item[0]
+                                #prefix = prefix + '-' + str(idx)
+                                outname = prefix + '-' + str(idx) + '.' + outtype
+                                shutil.copyfile(fl, outname)
                         else:
                             shutil.copyfile(res.outputs.converted_files, outname)
                         if isdefined(res.outputs.bvecs):
@@ -332,10 +334,12 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                             shutil.copyfile(res.outputs.bvecs, outname_bvecs)
                             shutil.copyfile(res.outputs.bvals, outname_bvals)
                         if isdefined(res.outputs.bids): ### extract bids
-                            isbids = True
-                            outname_bids = prefix + '.bids'
-                            shutil.copyfile(res.outputs.bids, outname_bids)
-
+                            try:
+                               isbids = True
+                               outname_bids = prefix + '.bids'
+                               shutil.copyfile(res.outputs.bids, outname_bids)
+                            except TypeError: ##catch error for lists
+                               continue
 
                     if with_prov:
                         prov_file = prefix + '_prov.ttl'
