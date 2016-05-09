@@ -322,14 +322,12 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                         if isinstance(res.outputs.converted_files, list):
                             print("series likely has multiple orientations")
                             for idx, fl in enumerate(res.outputs.converted_files):
-                                #prefix = item[0]
-                                #prefix = prefix + '-' + str(idx)
                                 outname = prefix + '-' + str(idx) + '.' + outtype
                                 shutil.copyfile(fl, outname)
                         else:
                             shutil.copyfile(res.outputs.converted_files, outname)
                         if isdefined(res.outputs.bvecs):
-                            outname_bvecs = prefix + '.bvecs'
+t                           outname_bvecs = prefix + '.bvecs'
                             outname_bvals = prefix + '.bvals'
                             shutil.copyfile(res.outputs.bvecs, outname_bvecs)
                             shutil.copyfile(res.outputs.bvals, outname_bvals)
