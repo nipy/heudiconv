@@ -186,7 +186,7 @@ def read_config(infile):
     return info
 
 
-def conversion_info(subject, outdir, info, filegroup, basedir=None):
+def conversion_info(subject, outdir, info, filegroup, basedir=None, ses=None):
     convert_info = []
     for key, items in info.items():
         if not items:
@@ -204,7 +204,11 @@ def conversion_info(subject, outdir, info, filegroup, basedir=None):
                     files = filegroup[unicode(item)]
                 if not basedir is None:
                     files = [os.path.join(basedir, f) for f in files]
-                outprefix = template.format(item=idx + 1, subject=subject, seqitem=item, subindex=subindex + 1)
+                if ses:
+                    outprefix = template.format(item=idx + 1, subject=subject, seqitem=item, subindex=subindex + 1, 
+                                                session='ses-' + str(ses))
+                else:
+                    outprefix = template.format(item=idx + 1, subject=subject, seqitem=item, subindex=subindex + 1)
                 convert_info.append((os.path.join(outpath, outprefix), outtype, files))
     return convert_info
 
@@ -240,7 +244,8 @@ def embed_nifti(dcmfiles, niftifile, infofile, force=False):
 
 
 def convert(items, anonymizer=None, symlink=True, converter=None,
-        scaninfo_suffix='.json', custom_callable=None, with_prov=False):
+        scaninfo_suffix='.json', custom_callable=None, with_prov=False,
+        ses=None):
     prov_files = []
     tmpdir = mkdtemp(prefix='heudiconvtmp')
     for item in items:
@@ -314,7 +319,7 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                         convertnode = Node(Dcm2niix(), name='convert')
                         convertnode.base_dir = tmpdir
                         convertnode.inputs.source_names = item[2]
-			convertnode.inputs.out_filename = os.path.basename(dirname)
+                        convertnode.inputs.out_filename = os.path.basename(dirname)
                         convertnode.inputs.terminal_output = 'allatonce'
                         convertnode.inputs.bids_format = True #mutable
                         convertnode.inputs.merge_imgs = False #mutable
@@ -327,7 +332,7 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                         else:
                             shutil.copyfile(res.outputs.converted_files, outname)
                         if isdefined(res.outputs.bvecs):
-t                           outname_bvecs = prefix + '.bvecs'
+                            outname_bvecs = prefix + '.bvecs'
                             outname_bvals = prefix + '.bvals'
                             shutil.copyfile(res.outputs.bvecs, outname_bvecs)
                             shutil.copyfile(res.outputs.bvals, outname_bvals)
@@ -380,104 +385,109 @@ t                           outname_bvecs = prefix + '.bvecs'
 
 
 def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
-                   queue=None, anon_sid_cmd=None, anon_outdir=None, with_prov=False):
+                   queue=None, anon_sid_cmd=None, anon_outdir=None, with_prov=False,
+                   ses=None):
     for sid in subjs:
-        tmpdir = None
-        if queue:
-            # TODO This needs to be updated to better scale with additional args
-            progname = os.path.abspath(inspect.getfile(inspect.currentframe()))
-            convertcmd = ' '.join(['python', progname, '-d', dicom_dir_template,
-                                   '-o', outdir, '-f', heuristic_file, '-s', sid,
-                                   '-c', converter])
-            if with_prov:
-                convertcmd += " --with-prov"
-            script_file = 'sg-%s.sh' % sid
-            with open(script_file, 'wt') as fp:
-                fp.writelines(['#!/bin/bash\n', convertcmd])
-            outcmd = 'sbatch -J dicom-%s -p %s -N1 -c2 --mem=20G %s' % (sid, queue, script_file)
-            os.system(outcmd)
-            continue
-        # expand the input template
-        sdir = dicom_dir_template % sid
-        # and see what matches
-        fl = sorted(glob(sdir))
-        dcmsessions = None
-        # some people keep compressed tarballs around -- be nice!
-        if len(fl) and tarfile.is_tarfile(fl[0]):
-            # check if we got a list of tarfiles
-            if not len(fl) == sum([tarfile.is_tarfile(i) for i in fl]):
-                raise ValueError("some but not all input files are tar files")
-            # tarfiles already know what they contain, and often the filenames
-            # are unique, or at least in a unqiue subdir per session
-            # strategy: extract everything in a temp dir and assemble a list
-            # of all files in all tarballs
-            content = []
-            tmpdir = mkdtemp(prefix='heudiconvtmp')
-            # needs sorting to keep the generated "session" label deterministic
-            for i, t in enumerate(sorted(fl)):
-                tf = tarfile.open(t)
-                # check content and sanitize permission bits
-                tmembers = tf.getmembers()
-                for tm in tmembers:
-                    tm.mode = 0o700
-                # get all files, assemble full path in tmp dir
-                tf_content = [m.name for m in tmembers if m.isfile()]
-                content += tf_content
-                if len(fl) > 1:
-                    # more than one tarball, take care of "session" indicator
-                    if dcmsessions is None:
-                        dcmsessions = []
-                    dcmsessions += ([i] * len(tf_content))
-                # extract into tmp dir
-                tf.extractall(path=tmpdir, members=tmembers)
-            fl = content
-        #dcmfile = dcm.read_file(fl[0], force=True)
-        #print sid, 'Dicom: ', dcmfile.PatientName, sid == dcmfile.PatientName
-        anon_sid = sid
-        if not anon_sid_cmd is None:
-            from subprocess import check_output
-            anon_sid = check_output([anon_sid_cmd, sid]).strip()
-        if anon_outdir is None:
-            anon_outdir = outdir
-        tdir = os.path.join(anon_outdir, anon_sid)
-        idir = os.path.join(outdir, sid)
-        if anon_outdir == outdir:
-            # if all goes into a single dir, have a dedicated 'info' subdir
-            idir = os.path.join(idir, 'info')
-        if not os.path.exists(idir):
-            os.makedirs(idir)
-        shutil.copy(heuristic_file, idir)
-        path, fname = os.path.split(heuristic_file)
-        sys.path.append(path)
-        mod = __import__(fname.split('.')[0])
-
-        infofile = os.path.join(idir, '%s.auto.txt' % sid)
-        editfile = os.path.join(idir, '%s.edit.txt' % sid)
-        if os.path.exists(editfile):
-            info = read_config(editfile)
-            filegroup = load_json(os.path.join(idir, 'filegroup.json'))
+	tmpdir = None
+	if queue:
+	    # TODO This needs to be updated to better scale with additional args
+	    progname = os.path.abspath(inspect.getfile(inspect.currentframe()))
+	    convertcmd = ' '.join(['python', progname, '-d', dicom_dir_template,
+	                           '-o', outdir, '-f', heuristic_file, '-s', sid,
+	                           '-c', converter, '-ss', ses])
+	    if with_prov:
+	        convertcmd += " --with-prov"
+	    script_file = 'dicom-%s.sh' % sid
+	    with open(script_file, 'wt') as fp:
+	        fp.writelines(['#!/bin/bash\n', convertcmd])
+	    outcmd = 'sbatch -J dicom-%s -p %s -N1 -c2 --mem=20G %s' % (sid, queue, script_file)
+	    os.system(outcmd)
+	    continue
+	# expand the input template
+	sdir = dicom_dir_template % sid
+	# and see what matches
+	fl = sorted(glob(sdir))
+	dcmsessions = None
+	# some people keep compressed tarballs around -- be nice!
+	if len(fl) and tarfile.is_tarfile(fl[0]):
+	    # check if we got a list of tarfiles
+	    if not len(fl) == sum([tarfile.is_tarfile(i) for i in fl]):
+	        raise ValueError("some but not all input files are tar files")
+	    # tarfiles already know what they contain, and often the filenames
+	    # are unique, or at least in a unqiue subdir per session
+	    # strategy: extract everything in a temp dir and assemble a list
+	    # of all files in all tarballs
+	    content = []
+	    tmpdir = mkdtemp(prefix='heudiconvtmp')
+	    # needs sorting to keep the generated "session" label deterministic
+	    for i, t in enumerate(sorted(fl)):
+	        tf = tarfile.open(t)
+	        # check content and sanitize permission bits
+	        tmembers = tf.getmembers()
+	        for tm in tmembers:
+	            tm.mode = 0o700
+	        # get all files, assemble full path in tmp dir
+	        tf_content = [m.name for m in tmembers if m.isfile()]
+	        content += tf_content
+	        if len(fl) > 1:
+	            # more than one tarball, take care of "session" indicator
+	            if dcmsessions is None:
+	                dcmsessions = []
+	            dcmsessions += ([i] * len(tf_content))
+	        # extract into tmp dir
+	        tf.extractall(path=tmpdir, members=tmembers)
+	    fl = content
+	#dcmfile = dcm.read_file(fl[0], force=True)
+	#print sid, 'Dicom: ', dcmfile.PatientName, sid == dcmfile.PatientName
+	anon_sid = sid
+	if not anon_sid_cmd is None:
+	    from subprocess import check_output
+	    anon_sid = check_output([anon_sid_cmd, sid]).strip()
+	if anon_outdir is None:
+	    anon_outdir = outdir
+	tdir = os.path.join(anon_outdir, anon_sid)
+	if ses:
+            idir = os.path.join(outdir, sid, 'ses-%s'%str(ses))
         else:
-            seqinfo, filegroup = process_dicoms(
-                fl, dcmsessions, basedir=tmpdir,
-                dcmfilter=getattr(mod, 'filter_dicom', None))
-            save_json(os.path.join(idir, 'filegroup.json'), filegroup)
-            with open(os.path.join(idir, 'dicominfo.txt'), 'wt') as fp:
-                for seq in seqinfo:
-                    fp.write('\t'.join([str(val) for val in seq]) + '\n')
-            info = mod.infotodict(seqinfo)
-            write_config(infofile, info)
-            write_config(editfile, info)
-        if converter != 'none':
-            cinfo = conversion_info(anon_sid, tdir, info, filegroup, basedir=tmpdir)
-            convert(cinfo, converter=converter,
-                    scaninfo_suffix=getattr(
-                        mod, 'scaninfo_suffix', '_scaninfo.json'),
-                    custom_callable=getattr(
-                        mod, 'custom_callable', None),
-                    with_prov=with_prov)
-        if not tmpdir is None:
-            # clean up tmp dir with extracted tarball
-            shutil.rmtree(tmpdir)
+            idir = os.path.join(outdir, sid)
+	if anon_outdir == outdir:
+	    # if all goes into a single dir, have a dedicated 'info' subdir
+            idir = os.path.join(idir, 'info')
+	if not os.path.exists(idir):
+	    os.makedirs(idir)
+	shutil.copy(heuristic_file, idir)
+	path, fname = os.path.split(heuristic_file)
+	sys.path.append(path)
+	mod = __import__(fname.split('.')[0])
+
+	infofile = os.path.join(idir, '%s.auto.txt' % sid)
+	editfile = os.path.join(idir, '%s.edit.txt' % sid)
+	if os.path.exists(editfile):
+	    info = read_config(editfile)
+	    filegroup = load_json(os.path.join(idir, 'filegroup.json'))
+	else:
+	    seqinfo, filegroup = process_dicoms(
+	        fl, dcmsessions, basedir=tmpdir,
+	        dcmfilter=getattr(mod, 'filter_dicom', None))
+	    save_json(os.path.join(idir, 'filegroup.json'), filegroup)
+	    with open(os.path.join(idir, 'dicominfo.txt'), 'wt') as fp:
+	        for seq in seqinfo:
+	            fp.write('\t'.join([str(val) for val in seq]) + '\n')
+	    info = mod.infotodict(seqinfo)
+	    write_config(infofile, info)
+	    write_config(editfile, info)
+	if converter != 'none':
+	    cinfo = conversion_info(anon_sid, tdir, info, filegroup, basedir=tmpdir, 
+                                    ses=ses)
+	    convert(cinfo, converter=converter,
+	            scaninfo_suffix=getattr(
+	                mod, 'scaninfo_suffix', '.json'), ##remove if bids?
+	            custom_callable=getattr(
+	                mod, 'custom_callable', None),
+	            with_prov=with_prov)
+	if not tmpdir is None:
+	    # clean up tmp dir with extracted tarball
+	    shutil.rmtree(tmpdir)
 
 
 if __name__ == '__main__':
@@ -529,6 +539,8 @@ s3
                         of running the conversion serially''')
     parser.add_argument('-p', '--with-prov', dest='with_prov', action='store_true',
                         help='''Store additional provenance information. Requires python-rdflib.''')
+    parser.add_argument('-ss', '--ses', dest='session', default=None,
+                        help='''session for longitudinal studies, default is none''')
     args = parser.parse_args()
     convert_dicoms(args.subjs, os.path.abspath(args.dicom_dir_template),
                    os.path.abspath(args.outputdir),
@@ -537,4 +549,5 @@ s3
                    queue=args.queue,
                    anon_sid_cmd=args.anon_cmd,
                    anon_outdir=args.conv_outputdir,
-                   with_prov=args.with_prov)
+                   with_prov=args.with_prov,
+                   ses=args.session)
