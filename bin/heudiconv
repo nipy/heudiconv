@@ -403,7 +403,9 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
             progname = os.path.abspath(inspect.getfile(inspect.currentframe()))
             convertcmd = ' '.join(['python', progname, '-d', dicom_dir_template,
                                    '-o', outdir, '-f', heuristic_file, '-s', sid,
-                                   '-c', converter, '-ss', ses])
+                                   '-c', converter])
+            if ses:
+                convertcmd += " --ses " + str(ses)
             if with_prov:
                 convertcmd += " --with-prov"
             if is_bids:
