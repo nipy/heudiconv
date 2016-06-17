@@ -231,13 +231,11 @@ def embed_nifti(dcmfiles, niftifile, infofile, force=False):
     #orig_nii.update_header()
     #orig_nii.to_filename(niftifile)
     meta = ds.NiftiWrapper(new_nii).meta_ext.to_json()
-    with open(infofile, 'wt') as fp:
+    with open(infofile, 'at') as fp:
         fp.writelines(meta)
     return niftifile, infofile
 
 def compress_dicoms(dicom_list, prefix, sourcedir):
-    if not os.path.exists(sourcedir):
-        os.makedirs(sourcedir)
     tmpdir = mkdtemp(prefix='dicomtar')
     outtar = os.path.join(sourcedir, prefix + '.dicom.tgz')
     with tarfile.open(outtar, 'w:gz') as tar:
@@ -268,6 +266,8 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
         for outtype in outtypes:
             if outtype == 'dicom':
                 if is_bids:
+                    if not os.path.exists(sourcedir):
+                        os.makedirs(sourcedir)
                     dicom_list = []
                     for filename in item[2]:
                         dicom_list.append(filename)
@@ -360,33 +360,33 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                                         prov_file)
                         prov_files.append(prov_file)
                         
-                    if not is_bids or converter != 'dcm2niix': ##uses dcm2niix's infofile
-                        embedfunc = Node(Function(input_names=['dcmfiles',
-                                                           'niftifile',
-                                                           'infofile',
-                                                           'force'],
-                                              output_names=['outfile',
-                                                            'meta'],
-                                              function=embed_nifti),
-                                         name='embedder')
-                        embedfunc.inputs.dcmfiles = item[2]
-                        embedfunc.inputs.niftifile = os.path.abspath(outname)
-                        embedfunc.inputs.infofile = os.path.abspath(scaninfo)
-                        embedfunc.inputs.force = True
-                        embedfunc.base_dir = tmpdir
-                        cwd = os.getcwd()
-                        try:
-                            res = embedfunc.run()
-                            os.chmod(scaninfo, 0440)
-                            if with_prov:
-                                g = res.provenance.rdf()
-                                g.parse(prov_file,
-                                        format='turtle')
-                                g.serialize(prov_file, format='turtle')
-                                os.chmod(prov_file, 0440)
-                        except:
-                            os.chdir(cwd)
-                        os.chmod(outname, 0440)
+                    #if not is_bids or converter != 'dcm2niix': ##uses dcm2niix's infofile
+                embedfunc = Node(Function(input_names=['dcmfiles',
+                                                       'niftifile',
+                                                       'infofile',
+                                                       'force'],
+                                          output_names=['outfile',
+                                                        'meta'],
+                                         function=embed_nifti),
+                                 name='embedder')
+                embedfunc.inputs.dcmfiles = item[2]
+                embedfunc.inputs.niftifile = os.path.abspath(outname)
+                embedfunc.inputs.infofile = os.path.abspath(scaninfo)
+                embedfunc.inputs.force = True
+                embedfunc.base_dir = tmpdir
+                cwd = os.getcwd()
+                try:
+                    res = embedfunc.run()
+                    os.chmod(scaninfo, 0440)
+                    if with_prov:
+                        g = res.provenance.rdf()
+                        g.parse(prov_file,
+                                format='turtle')
+                        g.serialize(prov_file, format='turtle')
+                        os.chmod(prov_file, 0440)
+                except:
+                    os.chdir(cwd)
+                os.chmod(outname, 0440)
 
         if not custom_callable is None:
             custom_callable(*item)
