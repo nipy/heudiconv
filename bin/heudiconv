@@ -206,33 +206,31 @@ def conversion_info(subject, outdir, info, filegroup, basedir=None, ses=None):
                 convert_info.append((os.path.join(outpath, outprefix), outtype, files))
     return convert_info
 
-def embed_nifti(dcmfiles, niftifile, infofile, force=False):
+def embed_nifti(dcmfiles, niftifile, infofile, bids_info=None, force=False):
     import dcmstack as ds
     import nibabel as nb
     import os
+    import json
     stack = ds.parse_and_stack(dcmfiles, force=force).values()
     if len(stack) > 1:
         raise ValueError('Found multiple series')
     stack = stack[0]
-
     #Create the nifti image using the data array
     if not os.path.exists(niftifile):
         nifti_image = stack.to_nifti(embed_meta=True)
         nifti_image.to_filename(niftifile)
         return ds.NiftiWrapper(nifti_image).meta_ext.to_json()
     orig_nii = nb.load(niftifile)
-    #orig_hdr = orig_nii.get_header()
     aff = orig_nii.get_affine()
     ornt = nb.orientations.io_orientation(aff)
     axcodes = nb.orientations.ornt2axcodes(ornt)
     new_nii = stack.to_nifti(voxel_order=''.join(axcodes), embed_meta=True)
-    #new_hdr = new_nii.get_header()
-    #orig_hdr.extensions = new_hdr.extensions
-    #orig_nii.update_header()
-    #orig_nii.to_filename(niftifile)
     meta = ds.NiftiWrapper(new_nii).meta_ext.to_json()
-    with open(infofile, 'at') as fp:
-        fp.writelines(meta)
+    meta_info = json.loads(meta)
+    if bids_info:
+        meta_info = dict(meta_info.items() + bids_info.items())
+    with open(infofile, 'wt') as fp:
+        json.dump(meta_info, fp, indent=0, sort_keys=True)
     return niftifile, infofile
 
 def compress_dicoms(dicom_list, prefix, sourcedir):
@@ -347,7 +345,7 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                             shutil.copyfile(res.outputs.bvals, outname_bvals)
                         if isdefined(res.outputs.bids): ### extract bids
                             try:
-                               outname_bids = prefix + '.json'
+                               outname_bids = prefix + '.bids'
                                shutil.copyfile(res.outputs.bids, outname_bids)
                             except TypeError: ##catch lists
                                continue
@@ -364,6 +362,7 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                 embedfunc = Node(Function(input_names=['dcmfiles',
                                                        'niftifile',
                                                        'infofile',
+                                                       'bids_info',
                                                        'force'],
                                           output_names=['outfile',
                                                         'meta'],
@@ -372,6 +371,11 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                 embedfunc.inputs.dcmfiles = item[2]
                 embedfunc.inputs.niftifile = os.path.abspath(outname)
                 embedfunc.inputs.infofile = os.path.abspath(scaninfo)
+                if is_bids and (converter == 'dcm2niix'):
+                    embedfunc.inputs.bids_info = load_json(os.path.abspath(outname_bids))
+                    os.remove(outname_bids)
+                else:
+                    embedfunc.inputs.bids_info = None
                 embedfunc.inputs.force = True
                 embedfunc.base_dir = tmpdir
                 cwd = os.getcwd()
