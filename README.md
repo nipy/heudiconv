@@ -19,6 +19,12 @@ structured directory layouts.
 - nipype
 - nibabel
 
+One of the following:
+- dcm2nii
+- dcm2niix
+- mri_convert
+- dcmstack
+
 ## How it works (in some more detail)
 
 Call heudiconv like this:
