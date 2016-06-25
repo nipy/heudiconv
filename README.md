@@ -12,6 +12,19 @@ structured directory layouts.
   prov format
 - the example shows a conversion to openfmri layout structure
 
+## Dependencies
+
+- pydicom
+- dcmstack
+- nipype
+- nibabel
+
+One of the following:
+- dcm2nii
+- dcm2niix
+- mri_convert
+- dcmstack
+
 ## How it works (in some more detail)
 
 Call heudiconv like this:
