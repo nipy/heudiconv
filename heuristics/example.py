@@ -1,9 +1,11 @@
 import os
 
+
 def create_key(template, outtype=('nii.gz',), annotation_classes=None):
     if template is None or not template:
         raise ValueError('Template must be a valid format string')
-    return (template, outtype, annotation_classes)
+    return template, outtype, annotation_classes
+
 
 def infotodict(seqinfo):
     """Heuristic evaluator for determining which runs belong where
@@ -38,7 +40,7 @@ def infotodict(seqinfo):
             asl: [], aslcal: [[]]}
     last_run = len(seqinfo)
     for s in seqinfo:
-        x,y,sl,nt = (s[6], s[7], s[8], s[9])
+        x, y, sl, nt = (s[6], s[7], s[8], s[9])
         if (sl == 176) and (nt == 1) and ('MPRAGE' in s[12]):
             info[t1] = [s[2]]
         elif (nt > 60) and ('ge_func_2x2x2_Resting' in s[12]):

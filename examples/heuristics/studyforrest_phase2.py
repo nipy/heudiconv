@@ -2,10 +2,12 @@ import os
 
 scaninfo_suffix = '.json'
 
+
 def create_key(template, outtype=('nii.gz',), annotation_classes=None):
     if template is None or not template:
         raise ValueError('Template must be a valid format string')
-    return (template, outtype, annotation_classes)
+    return template, outtype, annotation_classes
+
 
 def infotodict(seqinfo):
     """Heuristic evaluator for determining which runs belong where
@@ -25,7 +27,7 @@ def infotodict(seqinfo):
     }
     info = {}
     for s in seqinfo:
-        if not 'EPI_3mm' in s[12]:
+        if 'EPI_3mm' not in s[12]:
             continue
         label = s[12].split('_')[2].split()[0].strip('1234567890').lower()
         if label in ('movie', 'retmap', 'visloc'):
@@ -43,7 +45,7 @@ def infotodict(seqinfo):
         else:
             raise(RuntimeError, "YOU SHALL NOT PASS!")
 
-        if not key in info:
+        if key not in info:
             info[key] = []
 
         info[key].append(s[2])

@@ -1,9 +1,11 @@
 import os
 
+
 def create_key(template, outtype=('nii.gz',), annotation_classes=None):
     if template is None or not template:
         raise ValueError('Template must be a valid format string')
-    return (template, outtype, annotation_classes)
+    return template, outtype, annotation_classes
+
 
 def infotodict(seqinfo):
     """Heuristic evaluator for determining which runs belong where
@@ -20,6 +22,7 @@ def infotodict(seqinfo):
     info = {data: []}
     last_run = len(seqinfo)
     for s in seqinfo:
-        x,y,sl,nt = (s[6], s[7], s[8], s[9])
+        # TODO: clean it up -- unused stuff laying around
+        x, y, sl, nt = (s[6], s[7], s[8], s[9])
         info[data].append(s[2])
     return info

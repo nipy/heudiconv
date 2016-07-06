@@ -1,9 +1,11 @@
 import os
 
+
 def create_key(template, outtype=('nii.gz',), annotation_classes=None):
     if template is None or not template:
         raise ValueError('Template must be a valid format string')
-    return (template, outtype, annotation_classes)
+    return template, outtype, annotation_classes
+
 
 def infotodict(seqinfo):
     """Heuristic evaluator for determining which runs belong where
@@ -75,11 +77,11 @@ def infotodict(seqinfo):
         elif (sl > 1) and (nt == 70) and ('DIFFUSION' in s[12]):
             info[dwi].append(s[2])
         elif ('field_mapping_128' in s[12]):
-            info[fm].append(s[2])
+            info[fm1].append(s[2])
         elif ('field_mapping_3.1' in s[12]):
-            info[fm].append(s[2])
+            info[fm1].append(s[2])
         elif ('field_mapping_Resting' in s[12]):
-            info[fm].append(s[2])
+            info[fm1].append(s[2])
         else:
             pass
     return info
