@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
-"""Convert dicom TimTrio dirs based on heuristic info
+"""Convert DICOM TimTrio dirs based on heuristic info
 
 This function uses DicomStack and mri_convert to convert Siemens
-TrioTim directories. It proceeeds by extracting dicominfo from each
+TrioTim directories. It proceeds by extracting dicominfo from each
 subject and writing a config file $subject_id/$subject_id.auto.txt in
 the output directory. Users can create a copy of the file called
 $subject_id.edit.txt and modify it to change the files that are
@@ -26,6 +26,7 @@ import tarfile
 import dicom as dcm
 import dcmstack as ds
 
+
 def save_json(filename, data):
     """Save data to a json file
 
@@ -37,10 +38,9 @@ def save_json(filename, data):
         Dictionary to save in json file.
 
     """
+    with open(filename, 'w') as fp:
+        json.dump(data, fp, sort_keys=True, indent=4)
 
-    fp = file(filename, 'w')
-    json.dump(data, fp, sort_keys=True, indent=4)
-    fp.close()
 
 def load_json(filename):
     """Load data from a json file
@@ -55,11 +55,10 @@ def load_json(filename):
     data : dict
 
     """
-
-    fp = file(filename, 'r')
-    data = json.load(fp)
-    fp.close()
+    with open(filename, 'r') as fp:
+        data = json.load(fp)
     return data
+
 
 def process_dicoms(fl, dcmsession=None, basedir=None, dcmfilter=None):
     if dcmsession is None:
@@ -169,16 +168,18 @@ def process_dicoms(fl, dcmsession=None, basedir=None, dcmfilter=None):
         seqinfo.append(info)
     return seqinfo, filegroup
 
+
 def write_config(outfile, info):
     from pprint import PrettyPrinter
     with open(outfile, 'wt') as fp:
         fp.writelines(PrettyPrinter().pformat(info))
 
+
 def read_config(infile):
-    info = None
     with open(infile, 'rt') as fp:
         info = eval(fp.read())
     return info
+
 
 def conversion_info(subject, outdir, info, filegroup, basedir=None, ses=None):
     convert_info = []
@@ -205,6 +206,7 @@ def conversion_info(subject, outdir, info, filegroup, basedir=None, ses=None):
                     outprefix = template.format(item=idx + 1, subject=subject, seqitem=item, subindex=subindex + 1)
                 convert_info.append((os.path.join(outpath, outprefix), outtype, files))
     return convert_info
+
 
 def embed_nifti(dcmfiles, niftifile, infofile, bids_info=None, force=False):
     import dcmstack as ds
@@ -233,6 +235,7 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info=None, force=False):
         json.dump(meta_info, fp, indent=0, sort_keys=True)
     return niftifile, infofile
 
+
 def compress_dicoms(dicom_list, prefix, sourcedir):
     tmpdir = mkdtemp(prefix='dicomtar')
     outtar = os.path.join(sourcedir, prefix + '.dicom.tgz')
@@ -244,6 +247,7 @@ def compress_dicoms(dicom_list, prefix, sourcedir):
             tar.add(outfile, recursive=False)
     tar.close()
     shutil.rmtree(tmpdir)
+
 
 def convert(items, anonymizer=None, symlink=True, converter=None,
         scaninfo_suffix='.json', custom_callable=None, with_prov=False,

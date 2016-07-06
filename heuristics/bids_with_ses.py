@@ -1,9 +1,11 @@
 import os
 
+
 def create_key(template, outtype=('nii.gz',), annotation_classes=None):
     if template is None or not template:
         raise ValueError('Template must be a valid format string')
-    return (template, outtype, annotation_classes)
+    return template, outtype, annotation_classes
+
 
 def infotodict(seqinfo):
     """Heuristic evaluator for determining which runs belong where
@@ -39,7 +41,7 @@ def infotodict(seqinfo):
         if (sl == 176 or sl == 352) and (nt == 1) and ('MEMPRAGE' in s[12]):
             info[t1] = [s[2]]
         elif (nt == 1) and ('MEMPRAGE' in s[12]):
-	    info[t1] = [s[2]]
+            info[t1] = [s[2]]
         elif (sl == 176 or sl == 352) and (nt == 1) and ('T2_SPACE' in s[12]):
             info[t2] = [s[2]]
         elif ('field_mapping_diffusion' in s[12]):
@@ -62,13 +64,13 @@ def infotodict(seqinfo):
         elif (nt == 227 or nt == 454) and ('transfer2' in s[12]):
             if not s[13]:
                 info[boldt3].append([s[2]])
-	elif (('run1' in s[12]) or ('run6' in s[12])) and (nt == 159):
-	    if not s[13]:
-	       info[nofb_task].append([s[2]])
-	elif (('run2' in s[12]) or ('run3' in s[12]) or ('run4' in s[12])
-		or ('run5' in s[12])) and (nt == 159):
-	    if not s[13]:
-		info[fb_task].append([s[2]])
+        elif (('run1' in s[12]) or ('run6' in s[12])) and (nt == 159):
+            if not s[13]:
+               info[nofb_task].append([s[2]])
+        elif (('run2' in s[12]) or ('run3' in s[12]) or ('run4' in s[12])
+                or ('run5' in s[12])) and (nt == 159):
+            if not s[13]:
+                info[fb_task].append([s[2]])
         else:
             pass
     return info

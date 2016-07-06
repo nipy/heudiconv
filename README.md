@@ -1,16 +1,16 @@
 # HeuDiConv
 
-This is a flexible dicom converter for organizing brain imaging data into
+This is a flexible DICOM converter for organizing brain imaging data into
 structured directory layouts.
 
 - it allows flexible directory layouts and naming schemes through
   customizable heuristics implementations
-- it only converts the necessary dicoms, not everything in a directory
-- you can keep links to dicom files in the participant layout
+- it only converts the necessary DICOMs, not everything in a directory
+- you can keep links to DICOM files in the participant layout
 - it's faster than parsesdicomdir or mri_convert if you use dcm2nii option
-- it tracks the provenance of the conversion from dicom to nifti in w3c
-  prov format
-- the example shows a conversion to openfmri layout structure
+- it tracks the provenance of the conversion from DICOM to NIfTI in W3C
+  PROV format
+- the example shows a conversion to [OpenfMRI](http://openfmri.org) layout structure
 
 ## Dependencies
 
@@ -27,7 +27,7 @@ One of the following:
 
 ## How it works (in some more detail)
 
-Call heudiconv like this:
+Call `heudiconv` like this:
 
     heudiconv -d '%s*.tar*' -s xx05 -f ~/myheuristics/convertall.py
 
@@ -38,7 +38,7 @@ subject ID for the conversion (this could be a list of multiple IDs), and
 `-f ~/myheuristics/convertall.py` identifies a heuristic implementation for this
 conversion (see below) for details.
 
-This call will located the DICOMs (in any number of matching tarballs), extract
+This call will locate the DICOMs (in any number of matching tarballs), extract
 them to a temporary directory, search for any DICOM series it can find, and
 attempts a conversion storing output in the current directory. The output
 directory will contain a subdirectory per subject, which in turn contains an
