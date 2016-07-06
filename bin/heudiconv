@@ -373,7 +373,6 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                 embedfunc.inputs.infofile = os.path.abspath(scaninfo)
                 if is_bids and (converter == 'dcm2niix'):
                     embedfunc.inputs.bids_info = load_json(os.path.abspath(outname_bids))
-                    #os.remove(outname_bids)
                 else:
                     embedfunc.inputs.bids_info = None
                 embedfunc.inputs.force = True
