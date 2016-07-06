@@ -20,8 +20,8 @@ structured directory layouts.
 - nibabel
 
 One of the following:
+- dcm2niix (preferred)
 - dcm2nii
-- dcm2niix
 - mri_convert
 - dcmstack
 
