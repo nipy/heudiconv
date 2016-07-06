@@ -1,0 +1,4 @@
+pydicom
+dcmstack
+rdflib
+nipype
