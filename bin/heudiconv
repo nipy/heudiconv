@@ -26,6 +26,8 @@ import tarfile
 import dicom as dcm
 import dcmstack as ds
 
+import logging
+lgr = logging.getLogger('heudiconv')
 
 def save_json(filename, data):
     """Save data to a json file
@@ -514,6 +516,40 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
             # clean up tmp dir with extracted tarball
             shutil.rmtree(tmpdir)
 
+#
+# Additional handlers
+#
+def is_interactive():
+    """Return True if all in/outs are tty"""
+    # TODO: check on windows if hasattr check would work correctly and add value:
+    #
+    return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
+
+
+_sys_excepthook = sys.excepthook # Just in case we ever need original one
+
+def setup_exceptionhook():
+    """Overloads default sys.excepthook with our exceptionhook handler.
+
+       If interactive, our exceptionhook handler will invoke
+       pdb.post_mortem; if not interactive, then invokes default handler.
+    """
+
+    def _pdb_excepthook(type, value, tb):
+        if is_interactive():
+            import traceback, pdb
+            traceback.print_exception(type, value, tb)
+            print()
+            pdb.post_mortem(tb)
+        else:
+            lgr.warn("We cannot setup exception hook since not in interactive mode")
+            # we are in interactive mode or we don't have a tty-like
+            # device, so we call the default hook
+            #sys.__excepthook__(type, value, tb)
+            _sys_excepthook(type, value, tb)
+
+    sys.excepthook = _pdb_excepthook
+
 
 if __name__ == '__main__':
     docstr = '\n'.join((__doc__,
@@ -568,7 +604,13 @@ s3
                         help='''session for longitudinal studies, default is none''')
     parser.add_argument('-b', '--bids', dest='bids', action='store_true',
                         help='''flag for output into BIDS structure''')
+    parser.add_argument('--dbg', action='store_true', dest='debug',
+                        help="do not catch exceptions and show exception traceback")
     args = parser.parse_args()
+
+    if args.debug:
+        setup_exceptionhook()
+
     convert_dicoms(args.subjs, os.path.abspath(args.dicom_dir_template),
                    os.path.abspath(args.outputdir),
                    heuristic_file=os.path.realpath(args.heuristic_file),
