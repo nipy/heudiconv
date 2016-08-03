@@ -262,6 +262,7 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
         prefix = item[0]
         print('Converting %s' % prefix)
         dirname = os.path.dirname(prefix + '.ext')
+        outname_bids = prefix + '.json'
         print(dirname)
         if not os.path.exists(dirname):
             os.makedirs(dirname)
@@ -349,7 +350,6 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                             shutil.copyfile(res.outputs.bvals, outname_bvals)
                         if isdefined(res.outputs.bids): ### extract bids
                             try:
-                               outname_bids = prefix + '.json'
                                shutil.copyfile(res.outputs.bids, outname_bids)
                             except TypeError: ##catch lists
                                continue
@@ -363,6 +363,7 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                         prov_files.append(prov_file)
                         
                     #if not is_bids or converter != 'dcm2niix': ##uses dcm2niix's infofile
+                from nipype import Node, Function
                 embedfunc = Node(Function(input_names=['dcmfiles',
                                                        'niftifile',
                                                        'infofile',
