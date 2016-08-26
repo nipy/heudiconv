@@ -1,4 +1,4 @@
-# HeuDiConv
+# HeuDiConv - Heuristic DICOM Converter
 
 This is a flexible DICOM converter for organizing brain imaging data into
 structured directory layouts.
@@ -7,10 +7,23 @@ structured directory layouts.
   customizable heuristics implementations
 - it only converts the necessary DICOMs, not everything in a directory
 - you can keep links to DICOM files in the participant layout
-- it's faster than parsesdicomdir or mri_convert if you use dcm2nii option
+- it's faster than parsesdicomdir or mri_convert if you use dcm2niix option
 - it tracks the provenance of the conversion from DICOM to NIfTI in W3C
   PROV format
-- the example shows a conversion to [OpenfMRI](http://openfmri.org) layout structure
+- the cmrr_heuristic example shows a conversion to [BIDS](http://bids.neuroimaging.io) 
+  layout structure
+
+## Install
+
+You can clone this directory and do a `make install`
+
+or you can download the `heudiconv` script from the bin directory
+
+```
+curl -O https://raw.githubusercontent.com/nipy/heudiconv/master/bin/heudiconv
+chmod +x heudiconv
+```
+as long as the following dependencies are in your path you can use the script
 
 ## Dependencies
 

@@ -195,6 +195,11 @@ def conversion_info(subject, outdir, info, filegroup, basedir=None, ses=None):
             if not isinstance(itemgroup, list):
                 itemgroup = [itemgroup]
             for subindex, item in enumerate(itemgroup):
+                parameters = {}
+                if isinstance(item, dict):
+                    parameters = {k:v for k,v in item.items()}
+                    item = parameters['item']
+                    del parameters['item']
                 try:
                     files = filegroup[item]
                 except KeyError:
@@ -202,10 +207,16 @@ def conversion_info(subject, outdir, info, filegroup, basedir=None, ses=None):
                 if not basedir is None:
                     files = [os.path.join(basedir, f) for f in files]
                 if ses:
-                    outprefix = template.format(item=idx + 1, subject=subject, seqitem=item, subindex=subindex + 1, 
-                                                session='ses-' + str(ses))
+                    outprefix = template.format(item=idx + 1, subject=subject,
+                                                seqitem=item,
+                                                subindex=subindex + 1,
+                                                session='ses-' + str(ses),
+                                                **parameters)
                 else:
-                    outprefix = template.format(item=idx + 1, subject=subject, seqitem=item, subindex=subindex + 1)
+                    outprefix = template.format(item=idx + 1, subject=subject,
+                                                seqitem=item,
+                                                subindex=subindex + 1,
+                                                **parameters)
                 convert_info.append((os.path.join(outpath, outprefix), outtype, files))
     return convert_info
 
