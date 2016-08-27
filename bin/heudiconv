@@ -309,7 +309,7 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                         config.enable_provenance()
                     from nipype import Function, Node
                     from nipype.interfaces.base import isdefined
-                    print converter
+                    print(converter)
                     if converter == 'mri_convert':
                         from nipype.interfaces.freesurfer.preprocess import MRIConvert
                         convertnode = Node(MRIConvert(), name='convert')
