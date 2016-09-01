@@ -63,6 +63,28 @@ def load_json(filename):
 
 
 def process_dicoms(fl, dcmsession=None, basedir=None, dcmfilter=None):
+    """Process list of dicoms and return  seqinfo and file group
+
+    Parameters
+    ----------
+    fl : list of str
+      List of files to consider
+    dcmsession : list of int, optional
+      List of session ids (?) for each file if `fl`
+      corresponds to multiple sessions
+    basedir : str, optional
+      Base directory relative to which filenames are provided in `fl`
+    dcmfilter : callable, optional
+      If called on dcm_data and returns True, it is used to set
+      series_id
+
+    Returns
+    -------
+    seqinfo, filegrp : list of list, dict
+      `seqinfo` is a list of info entries per each sequence (some entry 
+      there defines a key for `filegrp`)
+      `filegrp` is a dictionary with files groupped per each sequence.
+    """
     if dcmsession is None:
         multi_session = False
         dcmsession = [0] * len(fl)
@@ -95,7 +117,7 @@ def process_dicoms(fl, dcmsession=None, basedir=None, dcmfilter=None):
             # not a normal DICOM -> ignore
             series_id = (dcmsession[fidx], -1, 'none')
         if not series_id[0] < 0:
-            if not dcmfilter is None and dcmfilter(mw.dcm_data):
+            if dcmfilter is not None and dcmfilter(mw.dcm_data):
                 series_id = (dcmsession[fidx], -1, mw.dcm_data.ProtocolName)
         if not groups:
             mwgroup.append(mw)
