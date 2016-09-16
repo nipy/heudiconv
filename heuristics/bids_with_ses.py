@@ -25,7 +25,7 @@ def infotodict(seqinfo):
     t2 = create_key('{session}/anat/sub-{subject}_T2w', outtype=and_dicom)
     fm_diff = create_key('{session}/fmap/sub-{subject}_fieldmap-dwi')
     dwi_ap = create_key('{session}/dwi/sub-{subject}_dir-AP_dwi', outtype=and_dicom)
-    dwi_pa = create_key('{session}/fmap/sub-{subject}_dir-PA_dwi', outtype=and_dicom)
+    dwi_pa = create_key('{session}/dwi/sub-{subject}_dir-PA_dwi', outtype=and_dicom)
     fm_rest= create_key('{session}/fmap/sub-{subject}_fieldmap-rest')
     rs = create_key('{session}/func/sub-{subject}_task-rest_run-{item:02d}_bold', outtype=and_dicom)
     boldt1 = create_key('{session}/func/sub-{subject}_task-bird1back_run-{item:02d}_bold', outtype=and_dicom)
