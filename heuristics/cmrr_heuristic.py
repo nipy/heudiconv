@@ -6,6 +6,16 @@ def create_key(template, outtype=('nii.gz','dicom'), annotation_classes=None):
     return (template, outtype, annotation_classes)
 
 
+def infotodict(seqinfo):
+    """Heuristic evaluator for determining which runs belong where
+    
+    allowed template fields - follow python string module: 
+    
+    item: index within category 
+    subject: participant id 
+    seqitem: run number during scanning
+    subindex: sub index within group
+    """
     t1 = create_key('anat/sub-{subject}_T1w')
     t2 = create_key('anat/sub-{subject}_T2w')
     rest = create_key('func/sub-{subject}_dir-{acq}_task-rest_run-{item:02d}_bold')
