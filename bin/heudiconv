@@ -31,20 +31,30 @@ from os.path import isdir
 
 import logging
 lgr = logging.getLogger('heudiconv')
+# Rudimentary logging support.  If you want it better -- we need to have
+# more than one file otherwise it is not manageable
+logging.basicConfig(
+    format='%(levelname)s: %(message)s',
+    level=getattr(logging, os.environ.get('HEUDICONV_LOGLEVEL', 'INFO'))
+)
+lgr.debug("Starting the abomination")  # just to "run-test" logging
 
 
 SeqInfo = namedtuple(
     'SeqInfo',
-    ['total_files_till_now',
-     'example_dcm_file',
-     'series_number',
-     'unspecified1',
-     'unspecified2',
-     'unspecified3',
-     'dim1', 'dim2', 'dim3', 'dim4',
-     'TR', 'TE',
-     'series_description',
-     'is_motion_corrected'
+    ['total_files_till_now',  # 0
+     'example_dcm_file',      # 1
+     'series_number',         # 2
+     'unspecified1',          # 3
+     'unspecified2',          # 4
+     'unspecified3',          # 5
+     'dim1', 'dim2', 'dim3', 'dim4', # 6, 7, 8, 9
+     'TR', 'TE',              # 10, 11
+     'series_description',    # 12
+     'is_motion_corrected',   # 13
+     'patient_id',            # 14
+     'study_description',     # 15
+     'referring_physician_name',  # 16
      ]
 )
 
@@ -82,6 +92,10 @@ def load_json(filename):
         data = json.load(fp)
     return data
 
+
+# They (https://github.com/nipy/heudiconv/issues/11#issuecomment-144665678)
+# wanted it as a feature to have EVERYTHING in one file, so here you come
+#
 
 #
 #  find_files utility copied/borrowed from DataLad (Copyright 2016 DataLad developers, MIT license)
@@ -251,6 +265,7 @@ def process_dicoms(fl, dcmsession=None, basedir=None, dcmfilter=None):
             TE = float(dcminfo.EchoTime)
         except AttributeError:
             TE = -1
+
         info = SeqInfo(
             total,
             os.path.split(files[0])[1],
@@ -259,9 +274,14 @@ def process_dicoms(fl, dcmsession=None, basedir=None, dcmfilter=None):
             size[0], size[1], size[2], size[3],
             TR, TE,
             dcminfo.ProtocolName,
-            'MoCo' in dcminfo.SeriesDescription
+            'MoCo' in dcminfo.SeriesDescription,
+            # New ones by us XXXX
+            dcminfo.PatientID,
+            dcminfo.StudyDescription,
+            dcminfo.ReferringPhysicianName,
         )
         seqinfo.append(info)
+    lgr.info("Generated sequence info with %d entries", len(info))
     return seqinfo, filegroup
 
 
@@ -291,27 +311,35 @@ def conversion_info(subject, outdir, info, filegroup, basedir=None, ses=None):
             for subindex, item in enumerate(itemgroup):
                 parameters = {}
                 if isinstance(item, dict):
-                    parameters = {k:v for k,v in item.items()}
+                    parameters = {k: v for k, v in item.items()}
                     item = parameters['item']
                     del parameters['item']
+
+                # some helper meta-varaibles
+                parameters.update(dict(
+                    item=idx + 1,
+                    subject=subject,
+                    seqitem=item,
+                    subindex=subindex + 1,
+                    session='ses-' + str(ses), # if not used -- not used -- not a problem
+                    bids_subject_session_prefix=
+                        'sub-%s' % subject + (('_ses-%s' % ses) if ses else ''),
+                    bids_subject_session_dir=
+                        'sub-%s/' % subject + (('ses-%s/' % ses) if ses else ''),
+
+                ))
+
                 try:
                     files = filegroup[item]
                 except KeyError:
                     files = filegroup[unicode(item)]
-                if not basedir is None:
+
+                if basedir is not None:
                     files = [os.path.join(basedir, f) for f in files]
-                if ses:
-                    outprefix = template.format(item=idx + 1, subject=subject,
-                                                seqitem=item,
-                                                subindex=subindex + 1,
-                                                session='ses-' + str(ses),
-                                                **parameters)
-                else:
-                    outprefix = template.format(item=idx + 1, subject=subject,
-                                                seqitem=item,
-                                                subindex=subindex + 1,
-                                                **parameters)
+
+                outprefix = template.format(**parameters)
                 convert_info.append((os.path.join(outpath, outprefix), outtype, files))
+
     return convert_info
 
 
@@ -356,9 +384,9 @@ def compress_dicoms(dicom_list, prefix, sourcedir):
     shutil.rmtree(tmpdir)
 
 
-def convert(items, anonymizer=None, symlink=True, converter=None,
+def convert(items, symlink=True, converter=None,
         scaninfo_suffix='.json', custom_callable=None, with_prov=False,
-        ses=None, is_bids=False, sourcedir=None):
+        is_bids=False, sourcedir=None):
     prov_files = []
     tmpdir = mkdtemp(prefix='heudiconvtmp')
     for item in items:
@@ -548,6 +576,7 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
                 )
             fl = sorted(find_files('.*', topdir=dicom_dir_template))
 
+        lgr.info("Processing %d dicoms", len(fl))
         dcmsessions = None
         # some people keep compressed tarballs around -- be nice!
         if len(fl) and tarfile.is_tarfile(fl[0]):
@@ -578,29 +607,20 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
                 # extract into tmp dir
                 tf.extractall(path=tmpdir, members=tmembers)
             fl = content
+
         #dcmfile = dcm.read_file(fl[0], force=True)
         #print sid, 'Dicom: ', dcmfile.PatientName, sid == dcmfile.PatientName
-        anon_sid = sid
-        if not anon_sid_cmd is None:
-            from subprocess import check_output
-            anon_sid = check_output([anon_sid_cmd, sid]).strip()
-        if anon_outdir is None:
-            anon_outdir = outdir
-        tdir = os.path.join(anon_outdir, anon_sid)
+
         idir = os.path.join(outdir, sid)
-        sourcedir = None
-        if is_bids:
-            if ses:
-                idir = os.path.join(outdir, sid, 'ses-%s'%str(ses))
-                sourcedir = os.path.join(outdir, 'sourcedata', sid, 'ses-%s'%str(ses))
-            else:
-                idir = os.path.join(outdir, sid)
-                sourcedir = os.path.join(outdir, 'sourcedata', sid)
+        if is_bids and ses:
+            idir = os.path.join(idir, 'ses-%s' % str(ses))
+
         if anon_outdir == outdir:
             # if all goes into a single dir, have a dedicated 'info' subdir
             idir = os.path.join(idir, 'info')
         if not os.path.exists(idir):
             os.makedirs(idir)
+
         shutil.copy(heuristic_file, idir)
         path, fname = os.path.split(heuristic_file)
         sys.path.append(path)
@@ -609,6 +629,8 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
         infofile = os.path.join(idir, '%s.auto.txt' % sid)
         editfile = os.path.join(idir, '%s.edit.txt' % sid)
         if os.path.exists(editfile):
+            lgr.info("Reloading existing filegroup.json because %s exists",
+                     editfile)
             info = read_config(editfile)
             filegroup = load_json(os.path.join(idir, 'filegroup.json'))
         else:
@@ -619,19 +641,67 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
             with open(os.path.join(idir, 'dicominfo.txt'), 'wt') as fp:
                 for seq in seqinfo:
                     fp.write('\t'.join([str(val) for val in seq]) + '\n')
+            lgr.debug("Calling out to %s.infodict", mod)
             info = mod.infotodict(seqinfo)
             write_config(infofile, info)
             write_config(editfile, info)
+
+        if not sid:
+            # figure out the sid out of available information
+            # XXX session information handling is somewhat backwards since done above
+            # already. Moreover above logic with .edit.txt file -- seqinfo is
+            # available only on initial run - TODO
+            if not hasattr(mod, 'get_session_subject_id'):
+                raise ValueError(
+                    "%s has no get_session_subject_id needed to figure out "
+                    "subject/session from DICOMs" % mod
+                )
+
+            session_subject_ids = set(mod.get_session_subject_id(s) for s in seqinfo)
+            assert len(session_subject_ids) == 1, "atm we support processing only 1 subject/session at a time"
+            sess, sid = session_subject_ids.pop()
+
+        #
+        # Annonimization
+        #
+        anon_sid = sid
+        if anon_sid_cmd is not None:
+            from subprocess import check_output
+            anon_sid = check_output([anon_sid_cmd, sid]).strip()
+            lgr.info("Annonimized sid %s into %s", sid, anon_sid)
+        if anon_outdir is None:
+            anon_outdir = outdir
+
+        #
+        # Conversion
+        #
+
+        sourcedir = None
+        if is_bids:
+            sourcedir = os.path.join(outdir, 'sourcedata', sid)
+            if ses:
+                sourcedir = os.path.join(sourcedir, 'ses-%s' % str(ses))
+
+        tdir = os.path.join(anon_outdir, anon_sid)
         if converter != 'none':
-            cinfo = conversion_info(anon_sid, tdir, info, filegroup, basedir=tmpdir, 
+            lgr.info("Doing conversion using %s", converter)
+            cinfo = conversion_info(anon_sid, tdir, info, filegroup,
+                                    basedir=tmpdir,
                                     ses=ses)
-            convert(cinfo, converter=converter,
+            convert(cinfo,
+                    converter=converter,
                     scaninfo_suffix=getattr(
                         mod, 'scaninfo_suffix', '.json'),
                     custom_callable=getattr(
                         mod, 'custom_callable', None),
-                    with_prov=with_prov, ses=ses, is_bids=is_bids, sourcedir=sourcedir)
-        if not tmpdir is None:
+                    with_prov=with_prov,
+                    is_bids=is_bids,
+                    sourcedir=sourcedir)
+
+        #
+        # Cleanup
+        #
+        if tmpdir is not None:
             # clean up tmp dir with extracted tarball
             shutil.rmtree(tmpdir)
 
