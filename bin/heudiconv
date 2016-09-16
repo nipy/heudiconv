@@ -26,6 +26,8 @@ import tarfile
 import dicom as dcm
 import dcmstack as ds
 
+from os.path import isdir
+
 import logging
 lgr = logging.getLogger('heudiconv')
 
@@ -60,6 +62,49 @@ def load_json(filename):
     with open(filename, 'r') as fp:
         data = json.load(fp)
     return data
+
+
+#
+#  find_files utility copied/borrowed from DataLad (Copyright 2016 DataLad developers, MIT license)
+#
+
+import re
+from os.path import sep as dirsep
+from os.path import curdir
+from os.path import join as opj
+
+_VCS_REGEX = '%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (dirsep, dirsep)
+
+
+def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False):
+    """Generator to find files matching regex
+
+    Parameters
+    ----------
+    regex: basestring
+    exclude: basestring, optional
+      Matches to exclude
+    exclude_vcs:
+      If True, excludes commonly known VCS subdirectories.  If string, used
+      as regex to exclude those files (regex: `%r`)
+    topdir: basestring, optional
+      Directory where to search
+    dirs: bool, optional
+      Either to match directories as well as files
+    """
+
+    for dirpath, dirnames, filenames in os.walk(topdir):
+        names = (dirnames + filenames) if dirs else filenames
+        # TODO: might want to uniformize on windows to use '/'
+        paths = (opj(dirpath, name) for name in names)
+        for path in filter(re.compile(regex).search, paths):
+            path = path.rstrip(dirsep)
+            if exclude and re.search(exclude, path):
+                continue
+            if exclude_vcs and re.search(_VCS_REGEX, path):
+                continue
+            yield path
+find_files.__doc__ %= (_VCS_REGEX,)
 
 
 def process_dicoms(fl, dcmsession=None, basedir=None, dcmfilter=None):
@@ -420,16 +465,16 @@ def convert(items, anonymizer=None, symlink=True, converter=None,
                 cwd = os.getcwd()
                 try:
                     res = embedfunc.run()
-                    os.chmod(scaninfo, 0440)
+                    os.chmod(scaninfo, 0o0440)
                     if with_prov:
                         g = res.provenance.rdf()
                         g.parse(prov_file,
                                 format='turtle')
                         g.serialize(prov_file, format='turtle')
-                        os.chmod(prov_file, 0440)
+                        os.chmod(prov_file, 0o0440)
                 except:
                     os.chdir(cwd)
-                os.chmod(outname, 0440)
+                os.chmod(outname, 0o0440)
 
         if not custom_callable is None:
             custom_callable(*item)
@@ -459,10 +504,23 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
             outcmd = 'sbatch -J dicom-%s -p %s -N1 -c2 --mem=20G %s' % (sid, queue, script_file)
             os.system(outcmd)
             continue
+
+        # TODO: RF into a function
         # expand the input template
-        sdir = dicom_dir_template % sid
-        # and see what matches
-        fl = sorted(glob(sdir))
+        if sid:
+            sdir = dicom_dir_template % sid
+            # and see what matches
+            fl = sorted(glob(sdir))
+        else:
+            # we were given no subject so we consider dicom_dir_template to be
+            # and actual directory to process
+            if not isdir(dicom_dir_template):
+                raise ValueError(
+                    "No subject id was provided, and dicom_dir_template=%s is not "
+                    "an existing directory to traverse" % str(dicom_dir_template)
+                )
+            fl = sorted(find_files('.*', topdir=dicom_dir_template))
+
         dcmsessions = None
         # some people keep compressed tarballs around -- be nice!
         if len(fl) and tarfile.is_tarfile(fl[0]):
@@ -655,3 +713,4 @@ s3
                    with_prov=args.with_prov,
                    ses=args.session,
                    is_bids=args.bids)
+
