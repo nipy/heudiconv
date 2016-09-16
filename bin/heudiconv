@@ -26,10 +26,29 @@ import tarfile
 import dicom as dcm
 import dcmstack as ds
 
+from collections import namedtuple
 from os.path import isdir
 
 import logging
 lgr = logging.getLogger('heudiconv')
+
+
+SeqInfo = namedtuple(
+    'SeqInfo',
+    ['total_files_till_now',
+     'example_dcm_file',
+     'series_number',
+     'unspecified1',
+     'unspecified2',
+     'unspecified3',
+     'dim1', 'dim2', 'dim3', 'dim4',
+     'TR', 'TE',
+     'series_description',
+     'is_motion_corrected'
+     ]
+)
+
+
 
 def save_json(filename, data):
     """Save data to a json file
@@ -232,8 +251,16 @@ def process_dicoms(fl, dcmsession=None, basedir=None, dcmfilter=None):
             TE = float(dcminfo.EchoTime)
         except AttributeError:
             TE = -1
-        info = [total, os.path.split(files[0])[1], series, '-', '-', '-'] + \
-            size + [TR, TE, dcminfo.ProtocolName, 'MoCo' in dcminfo.SeriesDescription]
+        info = SeqInfo(
+            total,
+            os.path.split(files[0])[1],
+            series,
+            '-', '-', '-',
+            size[0], size[1], size[2], size[3],
+            TR, TE,
+            dcminfo.ProtocolName,
+            'MoCo' in dcminfo.SeriesDescription
+        )
         seqinfo.append(info)
     return seqinfo, filegroup
 
