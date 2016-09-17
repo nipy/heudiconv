@@ -6,6 +6,16 @@ import logging
 lgr = logging.getLogger('heudiconv')
 
 
+def create_key(subdir, file_suffix, outtype=('nii.gz',),
+               annotation_classes=None):
+    if not subdir:
+        raise ValueError('subdir must be a valid format string')
+    # may be even add "performing physician" if defined??
+    template = "{referring_physician_name}/{study_description}/{bids_subject_session_dir}/" \
+               "%s/{bids_subject_session_prefix}_%s" % (subdir, file_suffix)
+    return template, outtype, annotation_classes
+
+
 def infotodict(seqinfo):
     """Heuristic evaluator for determining which runs belong where
     
@@ -39,12 +49,6 @@ def infotodict(seqinfo):
     # lgr.debug("Figured out subject %s. Session prefix: %s", subject_id, session_prefix)
     # del subject_id   # not to be used
 
-    def create_key(subdir, file_suffix, outtype=('nii.gz',), annotation_classes=None):
-        if not subdir:
-            raise ValueError('subdir must be a valid format string')
-        template = "%s/{bids_subject_session}_%s" % (subdir, file_suffix)
-        return template, outtype, annotation_classes
-
     t1 = create_key('anat', 'T1w', outtype=and_dicom)
     t2 = create_key('anat', 'T2w', outtype=and_dicom)
     fm_diff = create_key('fmap', 'fieldmap-dwi')
@@ -62,7 +66,45 @@ def infotodict(seqinfo):
     info = defaultdict(list)
     last_run = len(seqinfo)
     skipped, skipped_unknown = [], []
+
     for s in seqinfo:
+        template = None
+        suffix = ''
+        seq = []
+
+        # figure out type of image from s.image_info
+        image_dir = {
+            'P': 'fmap',
+            'FMRI': 'func',
+            'MPR': 'anat',
+            'M': 'anat',
+            'DIFFUSION': 'dwi',
+        }.get(s.image_type[2], None)
+
+        if image_dir is None:
+            # must be exhaustive!
+            raise ValueError(
+                "Cannot figure out type of image with image_info %s"
+                % str(s.image_type)
+            )
+
+        if s.is_derived:
+            # Let's for now stash those close to original images
+            image_dir += '/derivative'
+            # just keep it lower case and without special characters
+            seq.append(s.series_description.lower())
+
+        # analyze s.protocol_name (series_number is based on it) for full name mapping etc
+        if image_dir == 'func':
+            if '_pace_' in s.protocol_name:
+                suffix += '_pace'  # or should it be part of seq-
+            else:
+                # assume bold by default
+                suffix += '_bold'
+
+            # TODO run.  might be needed for fieldmap
+
+        # .series_description in case of
         sdesc = s.study_description
         # temporary aliases for those phantoms which we already collected
         # so we rename them into this
@@ -73,46 +115,18 @@ def infotodict(seqinfo):
         # in bids record we could have  _run[+=]
         #  which would say to either increment run number from already encountered
         #  or reuse the last one
+        if seq:
+            suffix += 'seq-%s' % ('+'.join(seq))
 
-        x, y, sl, nt = (s[6], s[7], s[8], s[9])
-        if (sl == 176 or sl == 352) and (nt == 1) and ('MEMPRAGE' in s[12]):
-            info[t1] = [s[2]]
-        elif (nt == 1) and ('MEMPRAGE' in s[12]):
-            info[t1] = [s[2]]
-        elif (sl == 176 or sl == 352) and (nt == 1) and ('T2_SPACE' in s[12]):
-            info[t2] = [s[2]]
-        elif ('field_mapping_diffusion' in s[12]):
-            info[fm_diff].append([s[2]])
-        elif (nt >= 70) and ('DIFFUSION_HighRes_AP' in s[12]):
-            info[dwi_ap].append([s[2]])
-        elif ('DIFFUSION_HighRes_PA' in s[12]):
-            info[dwi_pa].append([s[2]])
-        elif ('field_mapping_resting' in s[12]):
-            info[fm_rest].append([s[2]])
-        elif (nt == 144) and ('resting' in s[12]):
-            if not s[13]:
-                info[rs].append([(s[2])])
-        elif (nt == 183 or nt == 366) and ('localizer' in s[12]):
-            if not s[13]:
-                info[boldt1].append([s[2]])
-        elif (nt == 227 or nt == 454) and ('transfer1' in s[12]):
-            if not s[13]:
-                info[boldt2].append([s[2]])
-        elif (nt == 227 or nt == 454) and ('transfer2' in s[12]):
-            if not s[13]:
-                info[boldt3].append([s[2]])
-        elif (('run1' in s[12]) or ('run6' in s[12])) and (nt == 159):
-            if not s[13]:
-               info[nofb_task].append([s[2]])
-        elif (('run2' in s[12]) or ('run3' in s[12]) or ('run4' in s[12])
-                or ('run5' in s[12])) and (nt == 159):
-            if not s[13]:
-                info[fb_task].append([s[2]])
-        elif "_Scout_" in s.series_description:
-            skipped.append(s.series_number)
-            lgr.debug("Ignoring %s", sdesc)
+        if template:
+            info[template].append(s.series_number)
         else:
-            skipped_unknown.append(s.series_number)
+            # some are ok to skip and not to whine
+            if "_Scout_" in s.series_description:
+                skipped.append(s.series_number)
+                lgr.debug("Ignoring %s", s.series_number)
+            else:
+                skipped_unknown.append(s.series_number)
 
     info = dict(info)  # convert to dict since outside functionality depends on it being a basic dict
     if skipped:

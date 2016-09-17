@@ -52,13 +52,15 @@ SeqInfo = namedtuple(
      'TR', 'TE',              # 10, 11
      'protocol_name',         # 12
      'is_motion_corrected',   # 13
-     'patient_id',            # 14
-     'study_description',     # 15
-     'referring_physician_name',  # 16
-     'series_description',    # 17
+     # Introduced with namedtuple
+     'is_derived',
+     'patient_id',
+     'study_description',
+     'referring_physician_name',
+     'series_description',
+     'image_type',
      ]
 )
-
 
 
 def save_json(filename, data):
@@ -277,23 +279,27 @@ def process_dicoms(fl, dcmsession=None, basedir=None, dcmfilter=None):
             dcminfo.ProtocolName,
             'MoCo' in dcminfo.SeriesDescription,
             # New ones by us
+            'derived' in [x.lower() for x in dcminfo.get('ImageType', [])],
             dcminfo.PatientID,
             dcminfo.StudyDescription,
             dcminfo.ReferringPhysicianName,
             dcminfo.SeriesDescription,
+            dcminfo.ImageType,
         )
         # candidates
         # dcminfo.AccessionNumber
-        # dcminfo.ImageType
         #   len(dcminfo.ReferencedImageSequence)
         #   len(dcminfo.SourceImageSequence)
         # FOR demographics
         # dcminfo.PatientsAge
         # dcminfo.PatientsSex
-        lgr.debug("%s: nref=%d nsrc=%d" % (
+        lgr.debug("%30s %27s %5s nref=%-2d nsrc=%-2d %s" % (
+            info.series_number,
             dcminfo.SeriesDescription,
+            info.is_derived,
             len(dcminfo.get('ReferencedImageSequence', '')),
             len(dcminfo.get('SourceImageSequence', '')),
+            info.image_type
         ))
         #if dcminfo.SeriesDescription == 'ep2d_bold_moco_p2':
         #    import pdb; pdb.set_trace()
@@ -342,8 +348,9 @@ def conversion_info(subject, outdir, info, filegroup, basedir=None, ses=None):
                     bids_subject_session_prefix=
                         'sub-%s' % subject + (('_ses-%s' % ses) if ses else ''),
                     bids_subject_session_dir=
-                        'sub-%s/' % subject + (('ses-%s/' % ses) if ses else ''),
-
+                        'sub-%s' % subject + (('/ses-%s' % ses) if ses else ''),
+                    # referring_physician_name
+                    # study_description
                 ))
 
                 try:
