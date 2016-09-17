@@ -50,11 +50,12 @@ SeqInfo = namedtuple(
      'unspecified3',          # 5
      'dim1', 'dim2', 'dim3', 'dim4', # 6, 7, 8, 9
      'TR', 'TE',              # 10, 11
-     'series_description',    # 12
+     'protocol_name',         # 12
      'is_motion_corrected',   # 13
      'patient_id',            # 14
      'study_description',     # 15
      'referring_physician_name',  # 16
+     'series_description',    # 17
      ]
 )
 
@@ -275,11 +276,27 @@ def process_dicoms(fl, dcmsession=None, basedir=None, dcmfilter=None):
             TR, TE,
             dcminfo.ProtocolName,
             'MoCo' in dcminfo.SeriesDescription,
-            # New ones by us XXXX
+            # New ones by us
             dcminfo.PatientID,
             dcminfo.StudyDescription,
             dcminfo.ReferringPhysicianName,
+            dcminfo.SeriesDescription,
         )
+        # candidates
+        # dcminfo.AccessionNumber
+        # dcminfo.ImageType
+        #   len(dcminfo.ReferencedImageSequence)
+        #   len(dcminfo.SourceImageSequence)
+        # FOR demographics
+        # dcminfo.PatientsAge
+        # dcminfo.PatientsSex
+        lgr.debug("%s: nref=%d nsrc=%d" % (
+            dcminfo.SeriesDescription,
+            len(dcminfo.get('ReferencedImageSequence', '')),
+            len(dcminfo.get('SourceImageSequence', '')),
+        ))
+        #if dcminfo.SeriesDescription == 'ep2d_bold_moco_p2':
+        #    import pdb; pdb.set_trace()
         seqinfo.append(info)
     lgr.info("Generated sequence info with %d entries", len(info))
     return seqinfo, filegroup
