@@ -13,6 +13,8 @@ file and rerun the conversion
 
 """
 
+__version__ = '0.1'
+
 import argparse
 from glob import glob
 import inspect
@@ -764,7 +766,7 @@ def setup_exceptionhook():
     sys.excepthook = _pdb_excepthook
 
 
-if __name__ == '__main__':
+def main(args=None):
     docstr = '\n'.join((__doc__,
 """
            Example:
@@ -772,7 +774,7 @@ if __name__ == '__main__':
            heudiconv -d rawdata/%s -o . -f heuristic.py -s s1 s2
 s3
 """))
-    parser = argparse.ArgumentParser(description=docstr)
+    parser = argparse.ArgumentParser(description=docstr, version=__version__)
     parser.add_argument('-d', '--dicom_dir_template',
                         dest='dicom_dir_template',
                         required=True,
@@ -819,7 +821,7 @@ s3
                         help='''flag for output into BIDS structure''')
     parser.add_argument('--dbg', action='store_true', dest='debug',
                         help="do not catch exceptions and show exception traceback")
-    args = parser.parse_args()
+    args = parser.parse_args(args)
 
     if args.debug:
         setup_exceptionhook()
@@ -835,3 +837,6 @@ s3
                    ses=args.session,
                    is_bids=args.bids)
 
+
+if __name__ == '__main__':
+    main()
