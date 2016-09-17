@@ -25,9 +25,6 @@ import sys
 from tempfile import mkdtemp
 import tarfile
 
-import dicom as dcm
-import dcmstack as ds
-
 from collections import namedtuple
 from os.path import isdir
 
@@ -168,6 +165,9 @@ def process_dicoms(fl, dcmsession=None, basedir=None, dcmfilter=None):
       there defines a key for `filegrp`)
       `filegrp` is a dictionary with files groupped per each sequence.
     """
+    import dcmstack as ds
+    import dicom as dcm
+
     if dcmsession is None:
         multi_session = False
         dcmsession = [0] * len(fl)
@@ -774,7 +774,8 @@ def main(args=None):
            heudiconv -d rawdata/%s -o . -f heuristic.py -s s1 s2
 s3
 """))
-    parser = argparse.ArgumentParser(description=docstr, version=__version__)
+    parser = argparse.ArgumentParser(description=docstr)
+    parser.add_argument('--version', action='version', version=__version__)
     parser.add_argument('-d', '--dicom_dir_template',
                         dest='dicom_dir_template',
                         required=True,

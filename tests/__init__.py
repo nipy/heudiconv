@@ -24,4 +24,4 @@
 #             sys.path.insert(0, path)
 
 # symlinks rule!
-import heudiconv
+from . import heudiconv
