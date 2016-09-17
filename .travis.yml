@@ -20,6 +20,7 @@ before_install:
   # which might be needed later for tools
   #- bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
   #- travis_retry sudo apt-get update -qq
+  - pip install codecov
 
 
 script:
