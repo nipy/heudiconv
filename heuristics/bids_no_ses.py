@@ -29,7 +29,7 @@ def infotodict(seqinfo):
     sholo=create_key('func/sub-{subject}_task-sholo_run-{item:02d}_bold', outtype=('dicom', 'nii.gz'))
 
     info={rs:[], spin_AP:[], spin_PA:[], dwi_PA:[], dwi_AP:[], t1:[], t2:[], morphing:[], sholo:[]}
-    import pdb; pdb.set_trace()
+
     for s in seqinfo:
         x, y, sl, nt = (s[6], s[7], s[8], s[9])
         if (nt == 300) and ('SMS5_rsfMRI' in s[12]):
