@@ -637,10 +637,42 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
         #dcmfile = dcm.read_file(fl[0], force=True)
         #print sid, 'Dicom: ', dcmfile.PatientName, sid == dcmfile.PatientName
 
+        seqinfo = None   # we might need it earlier than later
+        if not sid:
+            # figure out the sid out of available information
+            seqinfo, filegroup = process_dicoms(
+                fl, dcmsessions, basedir=tmpdir,
+                dcmfilter=getattr(mod, 'filter_dicom', None))
+            # XXX session information handling is somewhat backwards since done above
+            # already. Moreover above logic with .edit.txt file -- seqinfo is
+            # available only on initial run - TODO
+            if not hasattr(mod, 'get_session_subject_id'):
+                raise ValueError(
+                    "%s has no get_session_subject_id needed to figure out "
+                    "subject/session from DICOMs" % mod
+                )
+
+            session_subject_ids = set(mod.get_session_subject_id(s)
+                                      for s in seqinfo)
+            assert len(session_subject_ids) == 1, \
+                "atm we support processing only 1 subject/session at a time"
+            sess, sid = session_subject_ids.pop()
+
+        #
+        # Annonimization
+        #
+        anon_sid = sid
+        if anon_sid_cmd is not None:
+            from subprocess import check_output
+            anon_sid = check_output([anon_sid_cmd, sid]).strip()
+            lgr.info("Annonimized sid %s into %s", sid, anon_sid)
+        if anon_outdir is None:
+            anon_outdir = outdir
+
+        # Figure out where to stick supplemental info files
         idir = os.path.join(outdir, sid)
         if is_bids and ses:
             idir = os.path.join(idir, 'ses-%s' % str(ses))
-
         if anon_outdir == outdir:
             # if all goes into a single dir, have a dedicated 'info' subdir
             idir = os.path.join(idir, 'info')
@@ -654,15 +686,18 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
 
         infofile = os.path.join(idir, '%s.auto.txt' % sid)
         editfile = os.path.join(idir, '%s.edit.txt' % sid)
-        if os.path.exists(editfile):
+        if os.path.exists(editfile):  # XXX may be condition on seqinfo is None
             lgr.info("Reloading existing filegroup.json because %s exists",
                      editfile)
             info = read_config(editfile)
             filegroup = load_json(os.path.join(idir, 'filegroup.json'))
         else:
-            seqinfo, filegroup = process_dicoms(
-                fl, dcmsessions, basedir=tmpdir,
-                dcmfilter=getattr(mod, 'filter_dicom', None))
+            if seqinfo is None:
+                seqinfo, filegroup = process_dicoms(
+                    fl, dcmsessions, basedir=tmpdir,
+                    dcmfilter=getattr(mod, 'filter_dicom', None))
+            else:
+                lgr.debug("DICOMS were already processed, reusing that info")
             save_json(os.path.join(idir, 'filegroup.json'), filegroup)
             with open(os.path.join(idir, 'dicominfo.txt'), 'wt') as fp:
                 for seq in seqinfo:
@@ -671,32 +706,6 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
             info = mod.infotodict(seqinfo)
             write_config(infofile, info)
             write_config(editfile, info)
-
-        if not sid:
-            # figure out the sid out of available information
-            # XXX session information handling is somewhat backwards since done above
-            # already. Moreover above logic with .edit.txt file -- seqinfo is
-            # available only on initial run - TODO
-            if not hasattr(mod, 'get_session_subject_id'):
-                raise ValueError(
-                    "%s has no get_session_subject_id needed to figure out "
-                    "subject/session from DICOMs" % mod
-                )
-
-            session_subject_ids = set(mod.get_session_subject_id(s) for s in seqinfo)
-            assert len(session_subject_ids) == 1, "atm we support processing only 1 subject/session at a time"
-            sess, sid = session_subject_ids.pop()
-
-        #
-        # Annonimization
-        #
-        anon_sid = sid
-        if anon_sid_cmd is not None:
-            from subprocess import check_output
-            anon_sid = check_output([anon_sid_cmd, sid]).strip()
-            lgr.info("Annonimized sid %s into %s", sid, anon_sid)
-        if anon_outdir is None:
-            anon_outdir = outdir
 
         #
         # Conversion
