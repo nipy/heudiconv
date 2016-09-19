@@ -428,12 +428,15 @@ def convert(items, symlink=True, converter=None,
         if not os.path.exists(dirname):
             os.makedirs(dirname)
         for outtype in outtypes:
+            item_dicoms = item[2]
+            lgr.info("Processing %d dicoms", len(item_dicoms))
+            lgr.debug(" those dicoms are: %s", item_dicoms)
             if outtype == 'dicom':
                 if is_bids:
                     if not os.path.exists(sourcedir):
                         os.makedirs(sourcedir)
                     dicom_list = []
-                    for filename in item[2]:
+                    for filename in item_dicoms:
                         dicom_list.append(filename)
                     compress_dicoms(dicom_list, os.path.basename(prefix), sourcedir)
                 else:
@@ -441,7 +444,7 @@ def convert(items, symlink=True, converter=None,
                     if os.path.exists(dicomdir):
                         shutil.rmtree(dicomdir)
                     os.mkdir(dicomdir)
-                    for filename in item[2]:
+                    for filename in item_dicoms:
                         outfile = os.path.join(dicomdir, os.path.split(filename)[1])
                         if not os.path.islink(outfile):
                             if symlink:
@@ -464,41 +467,31 @@ def convert(items, symlink=True, converter=None,
                         convertnode.base_dir = tmpdir
                         if outtype == 'nii.gz':
                             convertnode.inputs.out_type = 'niigz'
-                        convertnode.inputs.in_file = item[2][0]
+                        convertnode.inputs.in_file = item_dicoms[0]
                         convertnode.inputs.out_file = os.path.abspath(outname)
                         #cmd = 'mri_convert %s %s' % (item[2][0], outname)
                         #print(cmd)
                         #os.system(cmd)
                         res = convertnode.run()
-                    elif converter == 'dcm2nii':
-                        from nipype.interfaces.dcm2nii import Dcm2nii
-                        convertnode = Node(Dcm2nii(), name='convert')
+                    elif converter in {'dcm2nii', 'dcm2niix'}:
+                        from nipype.interfaces.dcm2nii import Dcm2nii, Dcm2niix
+                        convertnode = Node(
+                            {'dcm2nii': Dcm2nii,
+                             'dcm2niix': Dcm2niix}[converter](),
+                            name='convert')
                         convertnode.base_dir = tmpdir
-                        convertnode.inputs.source_names = item[2]
-                        convertnode.inputs.gzip_output = outtype == 'nii.gz'
-                        convertnode.inputs.terminal_output = 'allatonce'
-                        res = convertnode.run()
-                        if isinstance(res.outputs.converted_files, list):
-                            print("Cannot convert dicom files - series likely has multiple orientations: ", item[2])
-                            continue
+                        convertnode.inputs.source_names = item_dicoms
+                        if converter == 'dcm2nii':
+                            convertnode.inputs.gzip_output = outtype == 'nii.gz'
                         else:
-                            shutil.copyfile(res.outputs.converted_files, outname)
-                        if isdefined(res.outputs.bvecs):
-                            outname_bvecs = prefix + '.bvec'
-                            outname_bvals = prefix + '.bval'
-                            shutil.copyfile(res.outputs.bvecs, outname_bvecs)
-                            shutil.copyfile(res.outputs.bvals, outname_bvals)
-                            
-                    elif converter == 'dcm2niix':
-                        from nipype.interfaces.dcm2nii import Dcm2niix
-                        convertnode = Node(Dcm2niix(), name='convert')
-                        convertnode.base_dir = tmpdir
-                        convertnode.inputs.source_names = item[2]
-                        convertnode.inputs.out_filename = os.path.basename(dirname)
+                            convertnode.inputs.out_filename = os.path.basename(dirname)
                         convertnode.inputs.terminal_output = 'allatonce'
                         res = convertnode.run()
                         if isinstance(res.outputs.converted_files, list):
-                            print("series likely has multiple orientations")
+                            lgr.warning(
+                                "Following series likely has multiple orientations: ",
+                                item_dicoms
+                            )
                             for idx, fl in enumerate(res.outputs.converted_files):
                                 outname = prefix + '-' + str(idx) + '.' + outtype
                                 shutil.copyfile(fl, outname)
@@ -509,11 +502,15 @@ def convert(items, symlink=True, converter=None,
                             outname_bvals = prefix + '.bval'
                             shutil.copyfile(res.outputs.bvecs, outname_bvecs)
                             shutil.copyfile(res.outputs.bvals, outname_bvals)
-                        if isdefined(res.outputs.bids): ### extract bids
+
+                        if converter == 'dcm2niix' \
+                                and isdefined(res.outputs.bids):
+                            ### extract bids
                             try:
-                               shutil.copyfile(res.outputs.bids, outname_bids)
-                            except TypeError: ##catch lists
-                               continue
+                                shutil.copyfile(res.outputs.bids, outname_bids)
+                            except TypeError:  ##catch lists
+                                lgr.warning("There was someone catching lists!")
+                                continue
 
                     if with_prov:
                         prov_file = prefix + '_prov.ttl'
@@ -534,7 +531,7 @@ def convert(items, symlink=True, converter=None,
                                                         'meta'],
                                          function=embed_nifti),
                                  name='embedder')
-                embedfunc.inputs.dcmfiles = item[2]
+                embedfunc.inputs.dcmfiles = item_dicoms
                 embedfunc.inputs.niftifile = os.path.abspath(outname)
                 embedfunc.inputs.infofile = os.path.abspath(scaninfo)
                 if is_bids and (converter == 'dcm2niix'):
