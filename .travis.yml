@@ -22,6 +22,7 @@ before_install:
   #- travis_retry sudo apt-get update -qq
   # for now even remove requirements.txt since dependencies aren't avail
   - echo '' > requirements.txt
+  - pip install -r dev-requirements.txt
   - pip install codecov
 
 
