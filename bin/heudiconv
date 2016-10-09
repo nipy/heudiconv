@@ -27,6 +27,7 @@ import tarfile
 
 from collections import namedtuple
 from collections import defaultdict
+from collections import OrderedDict as ordereddict
 from os.path import isdir
 
 import logging
@@ -44,7 +45,7 @@ SeqInfo = namedtuple(
     'SeqInfo',
     ['total_files_till_now',  # 0
      'example_dcm_file',      # 1
-     'series_number',         # 2
+     'series_id',             # 2
      'unspecified1',          # 3
      'unspecified2',          # 4
      'unspecified3',          # 5
@@ -259,11 +260,9 @@ def group_dicoms_into_seqinfos(fl, dcmfilter=None, per_studyUID=False):
             if dcmfilter is not None and dcmfilter(mw.dcm_data):
                 series_id = (-1, mw.dcm_data.ProtocolName)
 
-        if per_studyUID:
-            series_id = series_id + (studyUID,)
-
         if not groups:
             raise RuntimeError("Yarik really thinks this is never ran!")
+            # if I was wrong -- then per_studyUID might need to go above
             # yoh: I don't think this would ever be executed!
             mwgroup.append(mw)
             groups[0].append(series_id)
@@ -276,6 +275,11 @@ def group_dicoms_into_seqinfos(fl, dcmfilter=None, per_studyUID=False):
                 'Raw Data Storage',
                 'GrayscaleSoftcopyPresentationStateStorage'):
             series_id = (-1, mw.dcm_data.ProtocolName)
+
+        if per_studyUID:
+            series_id = series_id + (studyUID_,)
+
+
         #print fidx, N, filename
         ingrp = False
         for idx in range(len(mwgroup)):
@@ -288,6 +292,8 @@ def group_dicoms_into_seqinfos(fl, dcmfilter=None, per_studyUID=False):
                 if series_id[0] >= 0:
                     series_id = (mwgroup[idx].dcm_data.SeriesNumber,
                                  mwgroup[idx].dcm_data.ProtocolName)
+                    if per_studyUID:
+                        series_id = series_id + (studyUID_,)
                 groups[0].append(series_id)
                 groups[1].append(idx)
 
@@ -299,8 +305,8 @@ def group_dicoms_into_seqinfos(fl, dcmfilter=None, per_studyUID=False):
     group_map = dict(zip(groups[0], groups[1]))
 
     total = 0
-    filegroup = {}
-    seqinfo = []
+    seqinfo = ordereddict()
+
     # for the next line to make any sense the series_id needs to
     # be sortable in a way that preserves the series order
     for series_id, mwidx in sorted(group_map.items()):
@@ -316,10 +322,12 @@ def group_dicoms_into_seqinfos(fl, dcmfilter=None, per_studyUID=False):
         files = [fl[i] for i, s in enumerate(groups[0]) if s == series_id]
         # turn the series_id into a human-readable string -- string is needed
         # for JSON storage later on
+        if per_studyUID:
+            studyUID = series_id[2]
+            series_id = series_id[:2]
+
         series_id = '-'.join(map(str, series_id))
-        if series_id in filegroup:
-            raise RuntimeError("Already processed series %r" % series_id)
-        filegroup[series_id] = files
+
         size = list(mw.image_shape) + [len(files)]
         total += size[-1]
         if len(size) < 4:
@@ -348,7 +356,7 @@ def group_dicoms_into_seqinfos(fl, dcmfilter=None, per_studyUID=False):
             dcminfo.StudyDescription,
             dcminfo.ReferringPhysicianName,
             dcminfo.SeriesDescription,
-            dcminfo.ImageType,
+            tuple(dcminfo.ImageType),
         )
         # candidates
         # dcminfo.AccessionNumber
@@ -358,17 +366,26 @@ def group_dicoms_into_seqinfos(fl, dcmfilter=None, per_studyUID=False):
         # dcminfo.PatientsAge
         # dcminfo.PatientsSex
         lgr.debug("%30s %27s %5s nref=%-2d nsrc=%-2d %s" % (
-            info.series_number,
+            info.series_id,
             dcminfo.SeriesDescription,
             info.is_derived,
             len(dcminfo.get('ReferencedImageSequence', '')),
             len(dcminfo.get('SourceImageSequence', '')),
             info.image_type
         ))
-        seqinfo.append(info)
+        if per_studyUID:
+            if studyUID not in seqinfo:
+                seqinfo[studyUID] = ordereddict()
+            seqinfo[studyUID][info] = files
+        else:
+            seqinfo[info] = files
 
-    lgr.info("Generated sequence info with %d entries", len(seqinfo))
-    return seqinfo, filegroup
+    if per_studyUID:
+        lgr.info("Generated sequence info for %d studies with %d entries total",
+                 len(seqinfo), sum(map(len, seqinfo.values())))
+    else:
+        lgr.info("Generated sequence info with %d entries", len(seqinfo))
+    return seqinfo
 
 
 def write_config(outfile, info):
@@ -660,27 +677,6 @@ def convert_dicoms(sid,
         # at this point
         # dcmsessions =
 
-        seqinfo = None   # we might need it earlier than later
-        if not sid:
-            # figure out the sid out of available information
-            seqinfo, filegroup = group_dicoms_into_seqinfos(
-                dicoms,
-                dcmfilter=getattr(heuristic, 'filter_dicom', None))
-            # XXX session information handling is somewhat backwards since done above
-            # already. Moreover above logic with .edit.txt file -- seqinfo is
-            # available only on initial run - TODO
-            if not hasattr(heuristic, 'get_session_subject_id'):
-                raise ValueError(
-                    "%s has no get_session_subject_id needed to figure out "
-                    "subject/session from DICOMs" % heuristic
-                )
-
-            session_subject_ids = set(heuristic.get_session_subject_id(s)
-                                      for s in seqinfo)
-            assert len(session_subject_ids) == 1, \
-                "atm we support processing only 1 subject/session at a time"
-            sess, sid = session_subject_ids.pop()
-
         #
         # Annonimization
         #
@@ -720,12 +716,13 @@ def convert_dicoms(sid,
             # So either it would need to be brought back or reconsidered altogether
             # (since no sample data to test on etc)
         else:
-            if seqinfo is None:
-                seqinfo, filegroup = group_dicoms_into_seqinfos(
-                    dicoms,
-                    dcmfilter=getattr(heuristic, 'filter_dicom', None))
-            else:
-                lgr.debug("DICOMS were already processed, reusing that info")
+            # TODO -- might have been done outside already!
+            seqinfo_dict = group_dicoms_into_seqinfos(
+                dicoms,
+                dcmfilter=getattr(heuristic, 'filter_dicom', None))
+            seqinfo = list(seqinfo_dict.keys())
+            filegroup = {si.series_id: x for si, x in seqinfo_dict.items()}
+
             save_json(filegroup_file, filegroup)
             dicominfo_file = os.path.join(idir, 'dicominfo%s.tsv' % ses_suffix)
             with open(dicominfo_file, 'wt') as fp:
@@ -1007,12 +1004,16 @@ s3
             files_ += files_ex
 
         # sort all DICOMS using heuristic
+        # TODO:  this one is not groupping by StudyUID but may be we should!
         seqinfo, filegroup = group_dicoms_into_seqinfos(
             files_,
             dcmfilter=getattr(heuristic, 'filter_dicom', None),
             per_studyUID=True)
-        import pdb; pdb.set_trace()
 
+        if not getattr(heuristic, 'sort_seqinfo', None):
+            raise NotImplementedError("For now, if no subj template is provided, requiring heuristic to have sort_seqinfo")
+        heuristic.sort_seqinfo(seqinfo)
+        import pdb; pdb.set_trace()
         # now we need to take those seqinfos and group into per locator/subject/session
         raise NotImplementedError()
 
