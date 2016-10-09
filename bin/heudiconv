@@ -184,7 +184,7 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False)
 find_files.__doc__ %= (_VCS_REGEX,)
 
 
-def group_dicoms_into_seqinfos(fl, dcmfilter=None):
+def group_dicoms_into_seqinfos(fl, dcmfilter=None, per_studyUID=False):
     """Process list of dicoms and return seqinfo and file group
 
     `seqinfo` contains per-sequence extract of fields from DICOMs which
@@ -197,6 +197,9 @@ def group_dicoms_into_seqinfos(fl, dcmfilter=None):
     dcmfilter : callable, optional
       If called on dcm_data and returns True, it is used to set
       series_id
+    per_studyUID : bool, optional
+      Then would add a StudyInstanceUID into study id.  So it would not then
+      generalize across re-runs on new data.
 
     Returns
     -------
@@ -226,24 +229,41 @@ def group_dicoms_into_seqinfos(fl, dcmfilter=None):
             except:
                 pass
 
-        if studyUID is None:
-            studyUID = mw.dcm_data.StudyInstanceUID
-        else:
-            assert studyUID == mw.dcm_data.StudyInstanceUID
+        try:
+            studyUID_ = mw.dcm_data.StudyInstanceUID
+        except AttributeError:
+            #import pdb; pdb.set_trace()
+            lgr.info("File %s is missing any StudyInstanceUID" % filename)
+            studyUID_ = None
+            #continue
+
         try:
             series_id = (mw.dcm_data.SeriesNumber,
                          mw.dcm_data.ProtocolName)
+            studyUID_ = mw.dcm_data.StudyInstanceUID
+
+            if not per_studyUID:
+                # verify that we are working with a single study
+                if studyUID is None:
+                    studyUID = studyUID_
+                else:
+                    assert studyUID == studyUID_
         except AttributeError as exc:
             lgr.warning('Ignoring %s since not quite a "normal" DICOM: %s',
                         filename, exc)
             # not a normal DICOM -> ignore
             series_id = (-1, 'none')
+            studyUID_ = None
 
         if not series_id[0] < 0:
             if dcmfilter is not None and dcmfilter(mw.dcm_data):
                 series_id = (-1, mw.dcm_data.ProtocolName)
 
+        if per_studyUID:
+            series_id = series_id + (studyUID,)
+
         if not groups:
+            raise RuntimeError("Yarik really thinks this is never ran!")
             # yoh: I don't think this would ever be executed!
             mwgroup.append(mw)
             groups[0].append(series_id)
@@ -252,7 +272,7 @@ def group_dicoms_into_seqinfos(fl, dcmfilter=None):
 
         # filter out unwanted non-image-data DICOMs by assigning
         # a series number < 0 (see test below)
-        if not series_id[1] < 0 and mw.dcm_data[0x0008, 0x0016].repval in (
+        if not series_id[0] < 0 and mw.dcm_data[0x0008, 0x0016].repval in (
                 'Raw Data Storage',
                 'GrayscaleSoftcopyPresentationStateStorage'):
             series_id = (-1, mw.dcm_data.ProtocolName)
@@ -262,6 +282,8 @@ def group_dicoms_into_seqinfos(fl, dcmfilter=None):
             same = mw.is_same_series(mwgroup[idx])
             #print idx, same, groups[idx][0]
             if same:
+                # the same series should have the same study uuid
+                assert mwgroup[idx].dcm_data.get('StudyInstanceUID', None) == studyUID_
                 ingrp = True
                 if series_id[0] >= 0:
                     series_id = (mwgroup[idx].dcm_data.SeriesNumber,
@@ -294,7 +316,7 @@ def group_dicoms_into_seqinfos(fl, dcmfilter=None):
         files = [fl[i] for i, s in enumerate(groups[0]) if s == series_id]
         # turn the series_id into a human-readable string -- string is needed
         # for JSON storage later on
-        series_id = '%i-%s' % series_id
+        series_id = '-'.join(map(str, series_id))
         if series_id in filegroup:
             raise RuntimeError("Already processed series %r" % series_id)
         filegroup[series_id] = files
@@ -691,6 +713,12 @@ def convert_dicoms(sid,
                      edit_file)
             info = read_config(edit_file)
             filegroup = load_json(filegroup_file)
+            # XXX Yarik finally understood why basedir was dragged along!
+            # So we could reuse the same PATHs definitions possibly consistent
+            # across re-runs... BUT that wouldn't work anyways if e.g.
+            # DICOMs dumped with SOP UUIDs thus differing across runs etc
+            # So either it would need to be brought back or reconsidered altogether
+            # (since no sample data to test on etc)
         else:
             if seqinfo is None:
                 seqinfo, filegroup = group_dicoms_into_seqinfos(
@@ -808,7 +836,8 @@ def is_interactive():
     return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
 
 
-_sys_excepthook = sys.excepthook # Just in case we ever need original one
+_sys_excepthook = sys.excepthook  # Just in case we ever need original one
+
 
 def setup_exceptionhook():
     """Overloads default sys.excepthook with our exceptionhook handler.
@@ -819,15 +848,13 @@ def setup_exceptionhook():
 
     def _pdb_excepthook(type, value, tb):
         if is_interactive():
-            import traceback, pdb
+            import traceback
+            import pdb
             traceback.print_exception(type, value, tb)
             print()
             pdb.post_mortem(tb)
         else:
             lgr.warn("We cannot setup exception hook since not in interactive mode")
-            # we are in interactive mode or we don't have a tty-like
-            # device, so we call the default hook
-            #sys.__excepthook__(type, value, tb)
             _sys_excepthook(type, value, tb)
 
     sys.excepthook = _pdb_excepthook
@@ -935,7 +962,7 @@ s3
     session = args.session
     subjs = args.subjs
 
-    # Move into a function!
+    # TODO: Move into a function!
     if dicom_dir_template:
         dicom_dir_template = os.path.abspath(dicom_dir_template)
         assert not files_opt  # see above TODO
@@ -966,22 +993,32 @@ s3
     else:
         # prep files
         assert(files_opt)
+        assert(not subjs)
         files = []
         for f in files_opt:
             if isdir(f):
                 files += sorted(find_files('.*', topdir=f))
             else:
                 files.append(f)
+
         # in this scenario we don't care about sessions obtained this way
-        files = []
-        for _, files_ in get_extracted_dicoms(args.files):
-            files += files_
+        files_ = []
+        for _, files_ex in get_extracted_dicoms(files):
+            files_ += files_ex
 
         # sort all DICOMS using heuristic
+        seqinfo, filegroup = group_dicoms_into_seqinfos(
+            files_,
+            dcmfilter=getattr(heuristic, 'filter_dicom', None),
+            per_studyUID=True)
+        import pdb; pdb.set_trace()
+
+        # now we need to take those seqinfos and group into per locator/subject/session
         raise NotImplementedError()
 
     # extract tarballs, and replace their entries with expanded lists of files
     # TODO: we might need to sort so sessions are ordered???
+    lgr.info("Need to process %d study sessions", len(study_sessions))
     for (locator, session, subject), files in study_sessions.items():
         convert_dicoms(
                    subject,
