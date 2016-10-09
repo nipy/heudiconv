@@ -49,6 +49,8 @@ def infotodict(seqinfo):
     # lgr.debug("Figured out subject %s. Session prefix: %s", subject_id, session_prefix)
     # del subject_id   # not to be used
 
+    # task -- if not specified -- where to get it???
+
     t1 = create_key('anat', 'T1w', outtype=and_dicom)
     t2 = create_key('anat', 'T2w', outtype=and_dicom)
     fm_diff = create_key('fmap', 'fieldmap-dwi')
