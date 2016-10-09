@@ -60,6 +60,7 @@ SeqInfo = namedtuple(
      'referring_physician_name',
      'series_description',
      'image_type',
+     'accession_number',
      ]
 )
 
@@ -93,7 +94,9 @@ class TempDirs(object):
         self.cleanup()
 
     def cleanup(self):
+        lgr.info("Removing %d temporary directories", len(self.dirs))
         for t in self.dirs[:]:
+            lgr.debug("Removing %s", t)
             self.rmtree(t)
 
     def rmtree(self, tmpdir):
@@ -357,6 +360,7 @@ def group_dicoms_into_seqinfos(fl, dcmfilter=None, per_studyUID=False):
             dcminfo.ReferringPhysicianName,
             dcminfo.SeriesDescription,
             tuple(dcminfo.ImageType),
+            dcminfo.AccessionNumber,
         )
         # candidates
         # dcminfo.AccessionNumber
@@ -407,6 +411,8 @@ def conversion_info(subject, outdir, info, filegroup, ses=None):
             continue
         template = key[0]
         outtype = key[1]
+        # So no annotation_classes of any kind!  so if not used -- what was the
+        # intension???? XXX
         outpath = outdir
         for idx, itemgroup in enumerate(items):
             if not isinstance(itemgroup, list):
@@ -554,6 +560,8 @@ def convert(items, symlink=True, converter=None,
                              'dcm2niix': Dcm2niix}[converter](),
                             name='convert')
                         convertnode.base_dir = tmpdir
+                        # need to be abspaths!
+                        item_dicoms = map(os.path.abspath, item_dicoms)
                         convertnode.inputs.source_names = item_dicoms
                         if converter == 'dcm2nii':
                             convertnode.inputs.gzip_output = outtype == 'nii.gz'
@@ -641,12 +649,22 @@ def convert_dicoms(sid,
                    queue=None,
                    anon_sid_cmd=None, anon_outdir=None, with_prov=False,
                    ses=None,
-                   is_bids=False):
+                   is_bids=False,
+                   seqinfo=None):
     if True:  # just to minimize diff for now, remove later and dedent
         #
         # TODO: Also better lives outside and just replicates all cmdline args?
         #
         if queue:
+            if seqinfo and not dicoms:
+                # flatten them all and provide into batching, which again
+                # would group them... heh
+                dicoms = sum(seqinfo.values(), [])
+                # so
+                raise NotImplementedError(
+                    "we already groupped them so need to add a switch to avoid "
+                    "any groupping, so no outdir prefix doubled etc"
+                )
             # TODO This needs to be updated to better scale with additional args
             progname = os.path.abspath(inspect.getfile(inspect.currentframe()))
             convertcmd = ' '.join(['python', progname,
@@ -670,8 +688,12 @@ def convert_dicoms(sid,
             os.system(outcmd)
             return
 
-        dicoms = dicoms
-        (lgr.info if dicoms else lgr.error)("Processing %d dicoms", len(dicoms))
+        if dicoms:
+            lgr.info("Processing %d dicoms", len(dicoms))
+        elif seqinfo:
+            lgr.info("Processing %d pre-sorted seqinfo entries", len(seqinfo))
+        else:
+            raise ValueError("neither dicoms nor seqinfo dict was provided")
 
         # in this reimplementation we can have only a single session assigned
         # at this point
@@ -717,9 +739,13 @@ def convert_dicoms(sid,
             # (since no sample data to test on etc)
         else:
             # TODO -- might have been done outside already!
-            seqinfo_dict = group_dicoms_into_seqinfos(
-                dicoms,
-                dcmfilter=getattr(heuristic, 'filter_dicom', None))
+            if dicoms:
+                seqinfo_dict = group_dicoms_into_seqinfos(
+                    dicoms,
+                    dcmfilter=getattr(heuristic, 'filter_dicom', None))
+            else:
+                # TODO: rename to avoid ambiguity etc
+                seqinfo_dict = seqinfo
             seqinfo = list(seqinfo_dict.keys())
             filegroup = {si.series_id: x for si, x in seqinfo_dict.items()}
 
@@ -821,6 +847,98 @@ def load_heuristic(heuristic_file):
     mod = __import__(fname.split('.')[0])
     mod.filename = heuristic_file
     return mod
+
+
+def get_study_sessions(dicom_dir_template, files_opt, heuristic, outputdir,
+                       session, subjs):
+    """Given options from cmdline sort files or dicom seqinfos into
+    study_sessions which put together files for a single session of a subject
+    in a study
+
+    Two major possible workflows:
+    - if dicom_dir_template provided -- doesn't pre-load DICOMs and just
+      loads files pointed by each subject and possibly sessions as corresponding
+      to different tarballs
+    - if files_opt is provided, sorts all DICOMs it can find under those paths
+    """
+    study_sessions = {}
+    if dicom_dir_template:
+        dicom_dir_template = os.path.abspath(dicom_dir_template)
+        assert not files_opt  # see above TODO
+        assert subjs
+        # expand the input template
+        if '%s' not in dicom_dir_template:
+            raise ValueError(
+                "dicom dir template must have '%s' as a placeholder for a "
+                "subject id.  Got %r" % dicom_dir_template)
+        for sid in subjs:
+            sdir = dicom_dir_template % sid
+            # and see what matches
+            files = sorted(glob(sdir))
+            for session_, files_ in get_extracted_dicoms(files):
+                if session_ is not None and session:
+                    lgr.warning(
+                        "We had session specified (%s) but while analyzing "
+                        "files got a new value %r (using it instead)"
+                        % (session, session_))
+                # in this setup we do not care about tracking "studies" so
+                # locator would be the same None
+                study_sessions[
+                    StudySessionInfo(
+                        None,
+                        session_ if session_ is not None else session,
+                        sid,
+                    )] = files_
+    else:
+        # prep files
+        assert (files_opt)
+        assert (not subjs)
+        files = []
+        for f in files_opt:
+            if isdir(f):
+                files += sorted(find_files('.*', topdir=f))
+            else:
+                files.append(f)
+
+        # in this scenario we don't care about sessions obtained this way
+        files_ = []
+        for _, files_ex in get_extracted_dicoms(files):
+            files_ += files_ex
+
+        # sort all DICOMS using heuristic
+        # TODO:  this one is not groupping by StudyUID but may be we should!
+        seqinfo_dict = group_dicoms_into_seqinfos(
+            files_,
+            dcmfilter=getattr(heuristic, 'filter_dicom', None),
+            per_studyUID=True)
+
+        if not getattr(heuristic, 'infotoids', None):
+            raise NotImplementedError(
+                "For now, if no subj template is provided, requiring "
+                "heuristic to have infotoids")
+
+        for studyUID, seqinfo in seqinfo_dict.items():
+            # so we have a single study, we need to figure out its
+            # locator, session, subject
+            # TODO: Try except to ignore those we can't handle?
+            # actually probably there should be a dedicated exception for
+            # heuristics to throw if they detect that the study they are given
+            # is not the one they would be willing to work on
+            ids = heuristic.infotoids(seqinfo.keys(), outputdir=outputdir)
+            # TODO:  probably infotoids is doomed to do more and possibly
+            # split into multiple sessions!!!! but then it should be provided
+            # full seqinfo with files which it would place into multiple groups
+            study_session_info = StudySessionInfo(
+                ids.get('locator'),
+                ids.get('session', session),
+                ids.get('subject', None))
+            if study_session_info in study_sessions:
+                raise ValueError(
+                    "We already have a study session with the same value %s"
+                    % study_session_info)
+            study_sessions[study_session_info] = seqinfo
+
+    return study_sessions
 
 
 #
@@ -949,84 +1067,38 @@ s3
     # pre-process provided list of files and possibly sort into groups/sessions
     #
 
-    files_groups = {}  # ATM feels duplicating insides of convert_dicoms -- TODO: RF
     # for now will be just
     # Group files per each study/subject/session
-    study_sessions = {}
 
     dicom_dir_template = args.dicom_dir_template
     files_opt = args.files
     session = args.session
     subjs = args.subjs
+    outputdir = os.path.abspath(args.outputdir)
 
     # TODO: Move into a function!
-    if dicom_dir_template:
-        dicom_dir_template = os.path.abspath(dicom_dir_template)
-        assert not files_opt  # see above TODO
-        assert subjs
-        # expand the input template
-        if '%s' not in dicom_dir_template:
-            raise ValueError(
-                "dicom dir template must have '%s' as a placeholder for a "
-                "subject id.  Got %r" % dicom_dir_template)
-        for sid in subjs:
-            sdir = dicom_dir_template % sid
-            # and see what matches
-            files = sorted(glob(sdir))
-            for session_, files_ in get_extracted_dicoms(files):
-                if session_ is not None and session:
-                    lgr.warning(
-                        "We had session specified (%s) but while analyzing "
-                        "files got a new value %r (using it instead)"
-                        % (session, session_))
-                # in this setup we do not care about tracking "studies" so
-                # locator would be the same None
-                study_sessions[
-                    StudySessionInfo(
-                        None,
-                        session_ if session_ is not None else session,
-                        sid,
-                    )] = files_
-    else:
-        # prep files
-        assert(files_opt)
-        assert(not subjs)
-        files = []
-        for f in files_opt:
-            if isdir(f):
-                files += sorted(find_files('.*', topdir=f))
-            else:
-                files.append(f)
-
-        # in this scenario we don't care about sessions obtained this way
-        files_ = []
-        for _, files_ex in get_extracted_dicoms(files):
-            files_ += files_ex
-
-        # sort all DICOMS using heuristic
-        # TODO:  this one is not groupping by StudyUID but may be we should!
-        seqinfo_dict = group_dicoms_into_seqinfos(
-            files_,
-            dcmfilter=getattr(heuristic, 'filter_dicom', None),
-            per_studyUID=True)
-
-        if not getattr(heuristic, 'sort_seqinfo', None):
-            raise NotImplementedError("For now, if no subj template is provided, requiring heuristic to have sort_seqinfo")
-
-        for studyUID, seqinfo in seqinfo_dict.items():
-            heuristic.sort_seqinfo(seqinfo)
-        import pdb; pdb.set_trace()
-        # now we need to take those seqinfos and group into per locator/subject/session
-        raise NotImplementedError()
-
-    # extract tarballs, and replace their entries with expanded lists of files
+    study_sessions = get_study_sessions(dicom_dir_template, files_opt,
+                                        heuristic, outputdir, session, subjs)# extract tarballs, and replace their entries with expanded lists of files
     # TODO: we might need to sort so sessions are ordered???
     lgr.info("Need to process %d study sessions", len(study_sessions))
-    for (locator, session, subject), files in study_sessions.items():
+    for (locator, session, subject), files_or_seqinfo in study_sessions.items():
+
+        if not len(files_or_seqinfo):
+            raise ValueError("nothing to process?")
+        # that is how life is ATM :-/ since we don't do sorting if subj
+        # template is provided
+        if isinstance(files_or_seqinfo, dict):
+            assert(isinstance(list(files_or_seqinfo.keys())[0], SeqInfo))
+            files = None
+            seqinfo = files_or_seqinfo
+        else:
+            files = files_or_seqinfo
+            seqinfo = None
+
         convert_dicoms(
                    subject,
                    files,
-                   opj(os.path.abspath(args.outputdir), locator or ''),
+                   opj(outputdir, locator or ''),
                    heuristic=heuristic,
                    converter=args.converter,
                    queue=args.queue,
@@ -1034,7 +1106,9 @@ s3
                    anon_outdir=args.conv_outputdir,
                    with_prov=args.with_prov,
                    ses=session,
-                   is_bids=args.bids)
+                   is_bids=args.bids,
+                   seqinfo=seqinfo)
+
     tempdirs.cleanup()
 
 
