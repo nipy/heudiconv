@@ -213,6 +213,10 @@ def group_dicoms_into_seqinfos(fl, dcmfilter=None):
     groups = [[], []]
     mwgroup = []
 
+    studyUID = None  # for sanity check that all DICOMs came from the same
+                     # "study".  If not -- what is the use-case? (interrupted acquisition?)
+                     # and how would then we deal with series numbers
+                     # which would differ already
     for fidx, filename in enumerate(fl):
         mw = ds.wrapper_from_data(dcm.read_file(filename, force=True))
 
@@ -222,6 +226,10 @@ def group_dicoms_into_seqinfos(fl, dcmfilter=None):
             except:
                 pass
 
+        if studyUID is None:
+            studyUID = mw.dcm_data.StudyInstanceUID
+        else:
+            assert studyUID == mw.dcm_data.StudyInstanceUID
         try:
             series_id = (mw.dcm_data.SeriesNumber,
                          mw.dcm_data.ProtocolName)
