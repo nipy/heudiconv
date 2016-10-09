@@ -1005,14 +1005,16 @@ s3
 
         # sort all DICOMS using heuristic
         # TODO:  this one is not groupping by StudyUID but may be we should!
-        seqinfo, filegroup = group_dicoms_into_seqinfos(
+        seqinfo_dict = group_dicoms_into_seqinfos(
             files_,
             dcmfilter=getattr(heuristic, 'filter_dicom', None),
             per_studyUID=True)
 
         if not getattr(heuristic, 'sort_seqinfo', None):
             raise NotImplementedError("For now, if no subj template is provided, requiring heuristic to have sort_seqinfo")
-        heuristic.sort_seqinfo(seqinfo)
+
+        for studyUID, seqinfo in seqinfo_dict.items():
+            heuristic.sort_seqinfo(seqinfo)
         import pdb; pdb.set_trace()
         # now we need to take those seqinfos and group into per locator/subject/session
         raise NotImplementedError()
