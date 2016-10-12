@@ -30,6 +30,8 @@ from collections import defaultdict
 from collections import OrderedDict as ordereddict
 from os.path import isdir
 
+PY3 = sys.version_info[0] >= 3
+
 import logging
 lgr = logging.getLogger('heudiconv')
 # Rudimentary logging support.  If you want it better -- we need to have
@@ -369,9 +371,10 @@ def group_dicoms_into_seqinfos(fl, dcmfilter=None, per_studyUID=False):
         # FOR demographics
         # dcminfo.PatientsAge
         # dcminfo.PatientsSex
-        lgr.debug("%30s %27s %5s nref=%-2d nsrc=%-2d %s" % (
+        lgr.debug("%30s %27s %27s %5s nref=%-2d nsrc=%-2d %s" % (
             info.series_id,
             dcminfo.SeriesDescription,
+            dcminfo.ProtocolName,
             info.is_derived,
             len(dcminfo.get('ReferencedImageSequence', '')),
             len(dcminfo.get('SourceImageSequence', '')),
@@ -442,11 +445,9 @@ def conversion_info(subject, outdir, info, filegroup, ses=None):
                 try:
                     files = filegroup[item]
                 except KeyError:
-                    files = filegroup[unicode(item)]
-
+                    files = filegroup[(str if PY3 else unicode)(item)]
                 outprefix = template.format(**parameters)
                 convert_info.append((os.path.join(outpath, outprefix), outtype, files))
-
     return convert_info
 
 
@@ -481,19 +482,36 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info=None, force=False):
 def compress_dicoms(dicom_list, prefix, sourcedir):
     tmpdir = mkdtemp(prefix='dicomtar')
     outtar = os.path.join(sourcedir, prefix + '.dicom.tgz')
-    with tarfile.open(outtar, 'w:gz') as tar:
+    if os.path.exists(outtar):
+        raise RuntimeError("File %s already exists, will not override"
+                           % outtar)
+    with tarfile.open(outtar, 'w:gz', dereference=True) as tar:
         for filename in dicom_list:
             outfile = os.path.join(tmpdir, os.path.basename(filename))
             if not os.path.islink(outfile):
-                os.symlink(filename, outfile)
-            tar.add(outfile, recursive=False)
+                os.symlink(os.path.realpath(filename), outfile)
+            # place into archive stripping any lead directories and
+            # adding the one corresponding to prefix
+            tar.add(outfile,
+                    arcname=opj(prefix, os.path.basename(outfile)),
+                    recursive=False)
     tar.close()
     shutil.rmtree(tmpdir)
 
 
+def safe_copyfile(src, dest):
+    """Copy file but blow if destination name already exists
+    """
+    if os.path.isdir(dest):
+        dest = os.path.join(dest, os.path.basename(src))
+    if os.path.lexists(dest):
+        raise ValueError("was asked to copy %s but destination already exists: %s"
+                         % (src, dest))
+    shutil.copyfile(src, dest)
+
 def convert(items, symlink=True, converter=None,
         scaninfo_suffix='.json', custom_callable=None, with_prov=False,
-        is_bids=False, sourcedir=None):
+        is_bids=False, sourcedir=None, outdir=None):
     prov_files = []
     tmpdir = mkdtemp(prefix='heudiconvtmp')
     for item in items:
@@ -510,16 +528,23 @@ def convert(items, symlink=True, converter=None,
             os.makedirs(dirname)
         for outtype in outtypes:
             item_dicoms = item[2]
-            lgr.info("Processing %d dicoms", len(item_dicoms))
+            lgr.info("Processing %d dicoms for output type %s",
+                     len(item_dicoms), outtype)
             lgr.log(1, " those dicoms are: %s", item_dicoms)
             if outtype == 'dicom':
                 if is_bids:
-                    if not os.path.exists(sourcedir):
-                        os.makedirs(sourcedir)
-                    dicom_list = []
-                    for filename in item_dicoms:
-                        dicom_list.append(filename)
-                    compress_dicoms(dicom_list, os.path.basename(prefix), sourcedir)
+                    # mimic the same hierarchy location as the prefix
+                    # although it could all have been done probably
+                    # within heuristic really
+                    sourcedir_ = os.path.join(
+                        sourcedir,
+                        os.path.dirname(
+                            os.path.relpath(prefix, outdir)))
+                    if not os.path.exists(sourcedir_):
+                        os.makedirs(sourcedir_)
+                    compress_dicoms(item_dicoms,
+                                    os.path.basename(prefix),
+                                    sourcedir_)
                 else:
                     dicomdir = prefix + '_dicom'
                     if os.path.exists(dicomdir):
@@ -576,27 +601,31 @@ def convert(items, symlink=True, converter=None,
                             )
                             for idx, fl in enumerate(res.outputs.converted_files):
                                 outname = prefix + '-' + str(idx) + '.' + outtype
-                                shutil.copyfile(fl, outname)
+                                safe_copyfile(fl, outname)
                         else:
-                            shutil.copyfile(res.outputs.converted_files, outname)
+                            safe_copyfile(res.outputs.converted_files, outname)
+
                         if isdefined(res.outputs.bvecs):
                             outname_bvecs = prefix + '.bvec'
                             outname_bvals = prefix + '.bval'
-                            shutil.copyfile(res.outputs.bvecs, outname_bvecs)
-                            shutil.copyfile(res.outputs.bvals, outname_bvals)
+                            safe_copyfile(res.outputs.bvecs, outname_bvecs)
+                            safe_copyfile(res.outputs.bvals, outname_bvals)
 
                         if converter == 'dcm2niix' \
                                 and isdefined(res.outputs.bids):
                             ### extract bids
                             try:
-                                shutil.copyfile(res.outputs.bids, outname_bids)
-                            except TypeError:  ##catch lists
-                                lgr.warning("There was someone catching lists!")
+                                safe_copyfile(res.outputs.bids, outname_bids)
+                            except TypeError as exc:  ##catch lists
+                                lgr.warning(
+                                    "There was someone catching lists!: %s",
+                                    exc
+                                )
                                 continue
 
                     if with_prov:
                         prov_file = prefix + '_prov.ttl'
-                        shutil.copyfile(os.path.join(convertnode.base_dir,
+                        safe_copyfile(os.path.join(convertnode.base_dir,
                                                      convertnode.name,
                                                     'provenance.ttl'),
                                         prov_file)
@@ -711,7 +740,7 @@ def convert_dicoms(sid,
             anon_outdir = outdir
 
         # Figure out where to stick supplemental info dicoms
-        idir = os.path.join(outdir, sid)
+        idir = os.path.join(outdir, '.heudiconv', sid)
         if is_bids and ses:
             idir = os.path.join(idir, 'ses-%s' % str(ses))
         if anon_outdir == outdir:
@@ -765,11 +794,13 @@ def convert_dicoms(sid,
 
         sourcedir = None
         if is_bids:
-            sourcedir = os.path.join(outdir, 'sourcedata', sid)
-            if ses:
-                sourcedir = os.path.join(sourcedir, 'ses-%s' % str(ses))
+            sourcedir = os.path.join(outdir, 'sourcedata')
+            # the other portion of the path would mimic BIDS layout
+            # so we don't need to worry here about sub, ses at all
+            tdir = anon_outdir
+        else:
+            tdir = os.path.join(anon_outdir, anon_sid)
 
-        tdir = os.path.join(anon_outdir, anon_sid)
         if converter != 'none':
             lgr.info("Doing conversion using %s", converter)
             cinfo = conversion_info(anon_sid, tdir, info, filegroup,
@@ -782,7 +813,8 @@ def convert_dicoms(sid,
                         heuristic, 'custom_callable', None),
                     with_prov=with_prov,
                     is_bids=is_bids,
-                    sourcedir=sourcedir)
+                    sourcedir=sourcedir,
+                    outdir=tdir)
 
 
 def get_extracted_dicoms(fl):
@@ -896,7 +928,8 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outputdir,
         files = []
         for f in files_opt:
             if isdir(f):
-                files += sorted(find_files('.*', topdir=f))
+                files += sorted(find_files(
+                    '.*', topdir=f, exclude_vcs=True, exclude="/\.datalad/"))
             else:
                 files.append(f)
 

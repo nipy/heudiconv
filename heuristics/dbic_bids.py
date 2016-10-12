@@ -6,7 +6,7 @@ import logging
 lgr = logging.getLogger('heudiconv')
 
 
-def create_key(subdir, file_suffix, outtype=('nii.gz',),
+def create_key(subdir, file_suffix, outtype=('nii.gz', 'dicom'),
                annotation_classes=None):
     if not subdir:
         raise ValueError('subdir must be a valid format string')
@@ -56,7 +56,15 @@ def infotodict(seqinfo):
             'MIP_TRA': 'anat',  # angiography
         }.get(s.image_type[2], None)
 
-        regd = parse_dbic_protocol_name(s.protocol_name)
+        protocol_name_tuned = s.protocol_name
+        # Few common replacements
+        if protocol_name_tuned in {'AAHead_Scout'}:
+            protocol_name_tuned = 'anat-scout'
+
+        regd = parse_dbic_protocol_name(protocol_name_tuned)
+
+        if s.image_type[2].startswith('MIP'):
+            regd['acq'] = regd.get('acq', '') + s.image_type[2]
 
         if not regd:
             skipped_unknown.append(s.series_id)
@@ -66,9 +74,9 @@ def infotodict(seqinfo):
         modality_label = regd.pop('modality_label', None)
 
         if image_type_modality and modality != image_type_modality:
-            import pdb; pdb.set_trace()
-            lgr.warning("Deduced modality to be %s from DICOM, but got %s out of %s",
-                        image_type_modality, modality, s.protocol_name)
+            lgr.warning(
+                "Deduced modality to be %s from DICOM, but got %s out of %s",
+                image_type_modality, modality, protocol_name_tuned)
 
         if s.is_derived:
             # Let's for now stash those close to original images
@@ -79,10 +87,9 @@ def infotodict(seqinfo):
             # XXXX what for???
             seq.append(s.series_description.lower())
 
-
         # analyze s.protocol_name (series_id is based on it) for full name mapping etc
         if modality == 'func' and not modality_label:
-            if '_pace_' in s.protocol_name:
+            if '_pace_' in protocol_name_tuned:
                 modality_label = 'pace'  # or should it be part of seq-
             else:
                 # assume bold by default
@@ -112,9 +119,10 @@ def infotodict(seqinfo):
                                   else current_run)
 
         suffix_parts = [
-            run_label,
             None if not regd.get('task') else "task-%s" % regd['task'],
+            None if not regd.get('acq') else "acq-%s" % regd['acq'],
             regd.get('bids'),
+            run_label,
             modality_label,
         ]
         # filter tose which are None, and join with _
@@ -171,6 +179,7 @@ def infotoids(seqinfos, outputdir):
     lgr.info("Processing sequence infos to deduce study/session")
     study_description = get_unique(seqinfos, 'study_description')
     subject = get_unique(seqinfos, 'patient_id')
+    # TODO:  fix up subject id if missing some 0s
     locator = study_description.replace('^', '/')
 
     # TODO: actually check if given study is study we would care about
@@ -228,42 +237,70 @@ def parse_dbic_protocol_name(protocol_name):
     # https://docs.google.com/document/d/1R54cgOe481oygYVZxI7NHrifDyFUZAjOBwCTu7M7y48/edit?usp=sharing
     import re
 
-    bids_regex = re.compile(
-        r"""
-        bids_           # our prefix to signal BIDS layout
-        (?P<modality>[^-_]+)(-(?P<modality_label>[^-_]+))?   # modality
-        (_ses(?P<session>([+=]|-[^-_]+)))?                 # session
-        (_run(?P<run>([+=]|-[^-_]+)))?                     # run
-        (_task-(?P<task>[^-_]+))?                          # task
-        (?P<bids>(_[^_]+)+)?                               # more of _ separated items for generic BIDS
-        (__.*?)?       # some custom suffix which will not be included anywhere
-        """,
-        flags=re.X
-    )
+    # TODO -- redo without mandating order of e.g. _run vs _task to go first,
+    # since BIDS somewhat imposes the order but it doesn't matter. So better be
+    # flexible -- split first on __ and then on _ within the first field and analyze
+    # bids_regex = re.compile(
+    #     r"""
+    #     (?P<modality>[^-_]+)(-(?P<modality_label>[^-_]+))?   # modality
+    #     (_ses(?P<session>([+=]|-[^-_]+)))?                 # session
+    #     (_run(?P<run>([+=]|-[^-_]+)))?                     # run
+    #     (_task-(?P<task>[^-_]+))?                          # task
+    #     (?P<bids>(_[^_]+)+)?                               # more of _ separated items for generic BIDS
+    #     (__.*?)?       # some custom suffix which will not be included anywhere
+    #     """,
+    #     flags=re.X
+    # )
 
-    reg = bids_regex.match(protocol_name)
+    # Remove possible suffix we don't care about after __
+    protocol_name = protocol_name.split('__', 1)[0]
 
-    if not reg:
-        lgr.debug("Did not match protocol %s as DBIC BIDS protocol",
-                  protocol_name)
+    bids = None  # we don't know yet for sure
+    # We need to figure out if it is a valid bids
+    split = protocol_name.split('_')
+    prefix = split[0]
+    if prefix != 'bids' and '-' in prefix:
+        prefix, _ = prefix.split('-', 1)
+    if prefix == 'bids':
+        bids = True  # for sure
+        split = split[1:]
+
+    def split2(s):
+        # split on - if present, if not -- 2nd one returned None
+        if '-' in s:
+            return s.split('-', 1)
+        return s, None
+
+    # Let's analyze first element which should tell us sequence type
+    modality, modality_label = split2(split[0])
+    if modality not in {'anat', 'func', 'dwi', 'behav', 'fmap'}:
+        # It is not something we don't consume
+        if bids:
+            lgr.warning("It was instructed to be BIDS sequence but unknown "
+                        "type %s found", modality)
         return {}
-    regd = reg.groupdict()
 
-    # pop those which were not found (i.e None)
-    for k in list(regd.keys()):
-        if regd[k] is None:
-            regd.pop(k)
+    regd = dict(modality=modality)
+    if modality_label:
+        regd['modality_label'] = modality_label
+    # now go through each to see if one which we care
+    bids_leftovers = []
+    for s in split[1:]:
+        key, value = split2(s)
+        if value is None and key[-1] in "+=":
+            value = key[-1]
+            key = key[:-1]
+        if key in ['ses', 'run', 'task', 'acq']:
+            # those we care about explicitly
+            regd[{'ses': 'session'}.get(key, key)] = value
+        else:
+            bids_leftovers.append(s)
 
-    for f in 'run', 'session':
-        # strip leading - in values
-        if f in regd:
-            regd[f] = regd[f].lstrip('-')
-
-    # strip leading _ for consistency
-    if regd.get('bids', None) is not None:
-        regd['bids'] = regd['bids'].lstrip('_')
+    if bids_leftovers:
+        regd['bids'] = '_'.join(bids_leftovers)
 
     # TODO: might want to check for all known "standard" BIDS suffixes here
+    # among bids_leftovers, thus serve some kind of BIDS validator
 
     # if not regd.get('modality_label', None):
     #     # might need to assign a default label for each modality if was not
@@ -279,23 +316,32 @@ def test_parse_dbic_protocol_name():
     pdpn = parse_dbic_protocol_name
 
     assert pdpn("nondbic_func-bold") == {}
+    assert pdpn("cancelme_func-bold") == {}
 
     assert pdpn("bids_func-bold") == \
+           pdpn("func-bold") == \
            {'modality': 'func', 'modality_label': 'bold'}
 
+    # pdpn("bids_func_ses+_task-boo_run+") == \
+    # order should not matter
     assert pdpn("bids_func_ses+_run+_task-boo") == \
            {
-               'modality': 'func', 'modality_label': 'bold',
+               'modality': 'func',
+               # 'modality_label': 'bold',
                'session': '+',
                'run': '+',
                'task': 'boo',
             }
-    assert pdpn("bids_func-pace_ses-1_run-2_task-boo_bids-please__therest") == \
+    # TODO: fix for that
+    assert pdpn("bids_func-pace_ses-1_task-boo_acq-bu_bids-please_run-2__therest") == \
+           pdpn("bids_func-pace_ses-1_run-2_task-boo_acq-bu_bids-please__therest") == \
+           pdpn("func-pace_ses-1_task-boo_acq-bu_bids-please_run-2") == \
            {
                'modality': 'func', 'modality_label': 'pace',
                'session': '1',
                'run': '2',
                'task': 'boo',
+               'acq': 'bu',
                'bids': 'bids-please'
            }
 
