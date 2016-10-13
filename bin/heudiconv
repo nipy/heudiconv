@@ -31,6 +31,7 @@ from collections import OrderedDict as ordereddict
 from os.path import isdir
 from os.path import basename
 from os.path import dirname
+from os.path import exists
 
 PY3 = sys.version_info[0] >= 3
 
@@ -514,14 +515,12 @@ def safe_copyfile(src, dest):
     shutil.copyfile(src, dest)
 
 
-def convert(items, seqinfos=None, symlink=True, converter=None,
+def convert(items, symlink=True, converter=None,
         scaninfo_suffix='.json', custom_callable=None, with_prov=False,
         is_bids=False, sourcedir=None, outdir=None):
     prov_files = []
     tmpdir = mkdtemp(prefix='heudiconvtmp')
-    assert(not seqinfos or len(items) == len(seqinfos))
     for item_idx, item in enumerate(items):
-        seqinfo = seqinfos[item_idx] if seqinfos else None
         if isinstance(item[1], (list, tuple)):
             outtypes = item[1]
         else:
@@ -554,13 +553,8 @@ def convert(items, seqinfos=None, symlink=True, converter=None,
                             os.path.relpath(prefix, outdir)))
                     if not os.path.exists(sourcedir_):
                         os.makedirs(sourcedir_)
-                    if modality == 'fmap':
-                        # might have multiple - M and P, so lets suffix accordingly
-                        suffix = {'M': '_magnitude', 'P': '_phase'}[seqinfo.image_type[2]]
-                    else:
-                        suffix = ''
                     compress_dicoms(item_dicoms,
-                                    os.path.basename(prefix) + suffix,
+                                    os.path.basename(prefix),
                                     sourcedir_)
                 else:
                     dicomdir = prefix + '_dicom'
@@ -627,20 +621,8 @@ def convert(items, seqinfos=None, symlink=True, converter=None,
                             # dwi etc which might spit out multiple files
                             if is_bids:
                                 if modality == 'fmap':
-                                    # possible filenames and their mapping to suffixes:
-                                    fmap_filenames = {
-                                        'fmap': '_magnitude1',
-                                        '_e2fmap': '_magnitude2',
-                                        '_e2_ph': '_phasediff',
-                                    }
-                                    suffixes = []
-                                    for f in res_files:
-                                        fbasename = basename(f)[:-(len(outtype) + 1)]
-                                        try:
-                                            suffixes.append(fmap_filenames[fbasename])
-                                        except KeyError:
-                                            raise ValueError("Do not know how to deal with %s output file for fmap" % fbasename)
-
+                                    # expected!
+                                    suffixes = ["%d" % (i+1) for i in range(len(res_files))]
                             if not suffixes:
                                 lgr.warning(
                                     "Following series files likely have "
@@ -648,10 +630,10 @@ def convert(items, seqinfos=None, symlink=True, converter=None,
                                     "generated: %s ...",
                                     len(res_files), item_dicoms[0]
                                 )
-                                suffixes = ['-%d' % i for i in range(len(res_files))]
+                                suffixes = ['-%d' % (i+1) for i in range(len(res_files))]
 
                             # Also copy BIDS files although they might need to be merged/postprocessed later
-                            if converter == 'dcm2niix' and isdefined( res.outputs.bids):
+                            if converter == 'dcm2niix' and isdefined(res.outputs.bids):
                                 assert(len(res.outputs.bids) == len(res_files))
                                 bids_files = res.outputs.bids
                             else:
@@ -677,13 +659,14 @@ def convert(items, seqinfos=None, symlink=True, converter=None,
                                     )
                                     continue
 
-                            # TODO: move into a function
-                            # we should provide specific handling for fmap,
-                            # dwi etc .json of which should get merged to satisfy
-                            # BIDS.  BUT wer might be somewhat not in time for a
-                            # party here since we sorted into multiple seqinfo
-                            # (e.g. magnitude, phase for fmap so we might want
-                            # to sort them into a single one)
+                        # Fix up and unify BIDS files
+                        tuneup_bids_json_files(outname_bids_files)
+                        # we should provide specific handling for fmap,
+                        # dwi etc .json of which should get merged to satisfy
+                        # BIDS.  BUT wer might be somewhat not in time for a
+                        # party here since we sorted into multiple seqinfo
+                        # (e.g. magnitude, phase for fmap so we might want
+                        # to sort them into a single one)
 
                     if with_prov:
                         prov_file = prefix + '_prov.ttl'
@@ -696,17 +679,56 @@ def convert(items, seqinfos=None, symlink=True, converter=None,
                 if len(outname_bids_files) > 1:
                     lgr.warning(
                         "For now not embedding BIDS and info generated .nii.gz itself since sequence produced multiple files")
-                    continue
+                else:
+                    #if not is_bids or converter != 'dcm2niix': ##uses dcm2niix's infofile
+                    embed_metadata_into_nifti(converter, is_bids, item_dicoms,
+                                              outname, outname_bids, prov_file,
+                                              scaninfo, tmpdir, with_prov)
+                os.chmod(outname, 0o0440)
 
-                #if not is_bids or converter != 'dcm2niix': ##uses dcm2niix's infofile
 
-                embed_metadata_into_nifti(converter, is_bids, item_dicoms,
-                                          outname, outname_bids, prov_file,
-                                          scaninfo, tmpdir, with_prov)
-
-        if not custom_callable is None:
+        if custom_callable is not None:
             custom_callable(*item)
     shutil.rmtree(tmpdir)
+
+
+def tuneup_bids_json_files(json_files):
+    """Given a list of BIDS .json files, e.g. """
+    if not json_files:
+        return
+
+    # Harmonize generic .json formatting
+    for jsonfile in json_files:
+        json_ = json.load(open(jsonfile))
+        json.dump(json_, open(jsonfile, 'w'), indent=2)
+
+    # Load the beast
+    modality = basename(dirname(jsonfile))
+
+    if modality == 'fmap':
+        json_basename = '_'.join(jsonfile.split('_')[:-1])
+        # if we got by now all needed .json files -- we can fix them up
+        # unfortunately order of "items" is not guaranteed atm
+        if len(glob(json_basename + '*.json')) == 3:
+            json_phasediffname = json_basename + '_phasediff.json'
+            json_ = json.load(open(json_phasediffname))
+            # TODO: we might want to reorder them since ATM
+            # the one for shorter TE is the 2nd one!
+            # For now just save truthfully by loading magnitude files
+            lgr.info("Placing EchoTime fields into phasediff file")
+            for i in 1, 2:
+                json_['EchoTime%d' % i] = \
+                    json.load(open(json_basename + '_magnitude%d.json' % i))[
+                        'EchoTime']
+            # might have been made R/O already
+            os.chmod(json_phasediffname, 0o0660)
+            json.dump(json_, open(json_phasediffname, 'w'), indent=2)
+            os.chmod(json_phasediffname, 0o0440)
+
+        # phasediff one should contain two PhaseDiff's
+        #  -- one for original amplitude and the other already replicating what is there
+        # so let's load json files for magnitudes and
+        # place them into phasediff
 
 
 def embed_metadata_into_nifti(converter, is_bids, item_dicoms, outname,
@@ -743,7 +765,7 @@ def embed_metadata_into_nifti(converter, is_bids, item_dicoms, outname,
             os.chmod(prov_file, 0o0440)
     except:
         os.chdir(cwd)
-    os.chmod(outname, 0o0440)
+
 
 
 def convert_dicoms(sid,
@@ -819,6 +841,8 @@ def convert_dicoms(sid,
         idir = os.path.join(outdir, '.heudiconv', sid)
         if is_bids and ses:
             idir = os.path.join(idir, 'ses-%s' % str(ses))
+        # yoh: in my case if idir exists, it means that that study/subject/session
+        # is already processed
         if anon_outdir == outdir:
             # if all goes into a single dir, have a dedicated 'info' subdir
             idir = os.path.join(idir, 'info')
@@ -879,7 +903,6 @@ def convert_dicoms(sid,
             cinfo = conversion_info(anon_sid, tdir, info, filegroup,
                                     ses=ses)
             convert(cinfo,
-                    seqinfo.keys() if seqinfo else None,  # so we have access to information about sequences
                     converter=converter,
                     scaninfo_suffix=getattr(
                         heuristic, 'scaninfo_suffix', '.json'),
@@ -1059,6 +1082,42 @@ def is_interactive():
     return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
 
 
+def populate_bids_templates(path):
+    # dataset descriptor
+    descriptor = opj(path, 'dataset_description.json')
+    if not exists(descriptor):
+        save_json(descriptor,
+              ordereddict([
+                  ('Name', "TODO: name of the dataset"),
+                  ('BIDSVersion', "1.0.1"),
+                  ('License', "TODO: choose a license, e.g. PDDL (http://opendatacommons.org/licenses/pddl/)"),
+                  ('Authors', ["TODO:", "First1 Last1", "First2 Last2", "..."]),
+                  ('Acknowledgements', "TODO: who should be acknowledge in helping to collect the data"),
+                  ('HowToAcknowledge', "TODO: describe how to acknowledge -- either cite a corresponding paper, or just in acknowledgement section"),
+                  ('Funding', ["TODO", "GRANT #1", "GRANT #2"]),
+                  ('ReferencesAndLinks', ["TODO", "List of papers or websites"]),
+                  ('DatasetDOI', 'TODO: eventually a DOI for the dataset')
+        ]))
+
+    sourcedata_README = opj(path, 'sourcedata', 'README')
+    if exists(dirname(sourcedata_README)) and not exists(sourcedata_README):
+        with open(sourcedata_README, 'w') as f:
+            f.write("""\
+TODO: Provide description about source data, e.g.
+
+Directory below contains DICOMS compressed into tarballs per each sequence,
+replicating directory hierarchy of the BIDS dataset itself.
+""")
+
+    README = opj(path, 'README')
+    if not exists(README):
+        with open(README, 'w') as f:
+            f.write("""\
+TODO: Provide description for the dataset -- basic details about the study,
+possibly pointing to pre-registration (if public or embargoed)
+""")
+
+
 _sys_excepthook = sys.excepthook  # Just in case we ever need original one
 
 
@@ -1189,6 +1248,9 @@ s3
                                         heuristic, outputdir, session, subjs)# extract tarballs, and replace their entries with expanded lists of files
     # TODO: we might need to sort so sessions are ordered???
     lgr.info("Need to process %d study sessions", len(study_sessions))
+
+    processed_studydirs = set()
+
     for (locator, session, subject), files_or_seqinfo in study_sessions.items():
 
         if not len(files_or_seqinfo):
@@ -1203,10 +1265,15 @@ s3
             files = files_or_seqinfo
             seqinfo = None
 
+        study_outputdir = opj(outputdir, locator or '')
+
+        # TODO: --datalad  cmdline option, which would take care about initiating
+        # the outputdir -> study_outputdir datasets if not yet there
+
         convert_dicoms(
                    subject,
                    files,
-                   opj(outputdir, locator or ''),
+                   study_outputdir,
                    heuristic=heuristic,
                    converter=args.converter,
                    queue=args.queue,
@@ -1216,6 +1283,15 @@ s3
                    ses=session,
                    is_bids=args.bids,
                    seqinfo=seqinfo)
+        processed_studydirs.add(outputdir)
+
+    if args.bids:
+        # Let's populate BIDS templates for folks to take care about
+        for study_outputdir in processed_studydirs:
+            populate_bids_templates(study_outputdir)
+
+            # TODO: record_collection of the subject/session although that information
+            # is pretty much present in .heudiconv/SUBJECT/info so we could just poke there
 
     tempdirs.cleanup()
 

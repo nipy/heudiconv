@@ -7,12 +7,16 @@ lgr = logging.getLogger('heudiconv')
 
 
 def create_key(subdir, file_suffix, outtype=('nii.gz', 'dicom'),
-               annotation_classes=None):
+               annotation_classes=None, prefix=''):
     if not subdir:
         raise ValueError('subdir must be a valid format string')
     # may be even add "performing physician" if defined??
-    template = "{bids_subject_session_dir}/" \
-               "%s/{bids_subject_session_prefix}_%s" % (subdir, file_suffix)
+    template = os.path.join(
+        prefix,
+        "{bids_subject_session_dir}",
+        subdir,
+        "{bids_subject_session_prefix}_%s" % file_suffix
+    )
     return template, outtype, annotation_classes
 
 
@@ -84,10 +88,13 @@ def infotodict(seqinfo):
             # Let's for now stash those close to original images
             # TODO: we might want a separate tree for all of this!?
             # so more of a parameter to the create_key
-            modality += '/derivative'
+            #modality += '/derivative'
             # just keep it lower case and without special characters
             # XXXX what for???
-            seq.append(s.series_description.lower())
+            #seq.append(s.series_description.lower())
+            prefix = os.path.join('derivatives', 'scanner')
+        else:
+            prefix = ''
 
         # analyze s.protocol_name (series_id is based on it) for full name mapping etc
         if modality == 'func' and not modality_label:
@@ -96,6 +103,12 @@ def infotodict(seqinfo):
             else:
                 # assume bold by default
                 modality_label = 'bold'
+
+        if modality == 'fmap' and not modality_label:
+            modality_label = {
+                'M': 'magnitude',  # might want explicit {file_index}  ?
+                'P': 'phasediff'
+            }[image_data_type]
 
         run = regd.get('run')
         if run is not None:
@@ -159,7 +172,7 @@ def infotodict(seqinfo):
             skipped.append(s.series_id)
             lgr.debug("Ignoring %s", s.series_id)
         else:
-            template = create_key(modality, suffix)
+            template = create_key(modality, suffix, prefix=prefix)
             info[template].append(s.series_id)
 
     info = dict(info)  # convert to dict since outside functionality depends on it being a basic dict
@@ -211,16 +224,18 @@ def infotoids(seqinfos, outputdir):
         # we have a session or possibly more than one even
         # let's figure out which case we have
         nonsign_vals = set(ses_markers).difference('+=')
+        # although we might want an explicit '=' to note the same session as
+        # mentioned before?
+        if len(nonsign_vals) > 1:
+            lgr.warning( #raise NotImplementedError(
+                "Cannot deal with multiple sessions in the same study yet!"
+                " We will process until the end of the first session"
+            )
         if nonsign_vals:
             if set(ses_markers).intersection('+='):
                 raise NotImplementedError(
                     "Should not mix hardcoded session markers with incremental ones (+=)"
                 )
-            # although we might want an explicit '=' to note the same session as
-            # mentioned before?
-            if len(nonsign_vals) > 1:
-                raise NotImplementedError(
-                    "Cannot deal with multiple sessions in the same study yet!")
             assert len(ses_markers) == 1
             session = ses_markers[0]
         else:
@@ -247,23 +262,6 @@ def parse_dbic_protocol_name(protocol_name):
 
     # Parse the name according to our convention
     # https://docs.google.com/document/d/1R54cgOe481oygYVZxI7NHrifDyFUZAjOBwCTu7M7y48/edit?usp=sharing
-    import re
-
-    # TODO -- redo without mandating order of e.g. _run vs _task to go first,
-    # since BIDS somewhat imposes the order but it doesn't matter. So better be
-    # flexible -- split first on __ and then on _ within the first field and analyze
-    # bids_regex = re.compile(
-    #     r"""
-    #     (?P<modality>[^-_]+)(-(?P<modality_label>[^-_]+))?   # modality
-    #     (_ses(?P<session>([+=]|-[^-_]+)))?                 # session
-    #     (_run(?P<run>([+=]|-[^-_]+)))?                     # run
-    #     (_task-(?P<task>[^-_]+))?                          # task
-    #     (?P<bids>(_[^_]+)+)?                               # more of _ separated items for generic BIDS
-    #     (__.*?)?       # some custom suffix which will not be included anywhere
-    #     """,
-    #     flags=re.X
-    # )
-
     # Remove possible suffix we don't care about after __
     protocol_name = protocol_name.split('__', 1)[0]
 
