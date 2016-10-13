@@ -37,7 +37,7 @@ def infotodict(seqinfo):
     skipped, skipped_unknown = [], []
     current_run = 0
     run_label = None   # run-
-
+    image_data_type = None
     for s in seqinfo:
         template = None
         suffix = ''
@@ -45,16 +45,18 @@ def infotodict(seqinfo):
 
         # figure out type of image from s.image_info -- just for checking ATM
         # since we primarily rely on encoded in the protocol name information
+        prev_image_data_type = image_data_type
+        image_data_type = s.image_type[2]
         image_type_modality = {
-            'P': 'fmap',
+            'P': 'fmap',   # phase
             'FMRI': 'func',
             'MPR': 'anat',
-            # 'M': 'func',  -- can be for scout, anat, bold
+            # 'M': 'func',  "magnitude"  -- can be for scout, anat, bold, fmap
             'DIFFUSION': 'dwi',
             'MIP_SAG': 'anat',  # angiography
             'MIP_COR': 'anat',  # angiography
             'MIP_TRA': 'anat',  # angiography
-        }.get(s.image_type[2], None)
+        }.get(image_data_type, None)
 
         protocol_name_tuned = s.protocol_name
         # Few common replacements
@@ -63,8 +65,8 @@ def infotodict(seqinfo):
 
         regd = parse_dbic_protocol_name(protocol_name_tuned)
 
-        if s.image_type[2].startswith('MIP'):
-            regd['acq'] = regd.get('acq', '') + s.image_type[2]
+        if image_data_type.startswith('MIP'):
+            regd['acq'] = regd.get('acq', '') + image_data_type
 
         if not regd:
             skipped_unknown.append(s.series_id)
@@ -99,9 +101,18 @@ def infotodict(seqinfo):
         if run is not None:
             # so we have an indicator for a run
             if run == '+':
-                current_run += 1
+                # some sequences, e.g.  fmap, would generate two (or more?)
+                # sequences -- e.g. one for magnitude(s) and other ones for
+                # phases.  In those we must not increment run!
+                if image_data_type == 'P':
+                    if prev_image_data_type != 'M':
+                        raise RuntimeError("Was expecting phase image to follow magnitude image, but previous one was %r", prev_image_data_type)
+                    # else we do nothing special
+                else:  # and otherwise we go to the next run
+                    current_run += 1
             elif run == '=':
-                pass
+                if not current_run:
+                    current_run = 1
             elif run.isdigit():
                 current_run_ = int(run)
                 if current_run_ < current_run:
@@ -143,7 +154,8 @@ def infotodict(seqinfo):
         #     suffix += 'seq-%s' % ('+'.join(seq))
 
         # some are ok to skip and not to whine
-        if "_Scout" in s.series_description:
+        if "_Scout" in s.series_description or \
+                (modality == 'anat' and modality_label == 'scout'):
             skipped.append(s.series_id)
             lgr.debug("Ignoring %s", s.series_id)
         else:

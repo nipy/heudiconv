@@ -29,6 +29,8 @@ from collections import namedtuple
 from collections import defaultdict
 from collections import OrderedDict as ordereddict
 from os.path import isdir
+from os.path import basename
+from os.path import dirname
 
 PY3 = sys.version_info[0] >= 3
 
@@ -244,7 +246,7 @@ def group_dicoms_into_seqinfos(fl, dcmfilter=None, per_studyUID=False):
             #continue
 
         try:
-            series_id = (mw.dcm_data.SeriesNumber,
+            series_id = (int(mw.dcm_data.SeriesNumber),
                          mw.dcm_data.ProtocolName)
             studyUID_ = mw.dcm_data.StudyInstanceUID
 
@@ -460,11 +462,13 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info=None, force=False):
     if len(stack) > 1:
         raise ValueError('Found multiple series')
     stack = stack[0]
+
     #Create the nifti image using the data array
     if not os.path.exists(niftifile):
         nifti_image = stack.to_nifti(embed_meta=True)
         nifti_image.to_filename(niftifile)
         return ds.NiftiWrapper(nifti_image).meta_ext.to_json()
+
     orig_nii = nb.load(niftifile)
     aff = orig_nii.get_affine()
     ornt = nb.orientations.io_orientation(aff)
@@ -509,28 +513,36 @@ def safe_copyfile(src, dest):
                          % (src, dest))
     shutil.copyfile(src, dest)
 
-def convert(items, symlink=True, converter=None,
+
+def convert(items, seqinfos=None, symlink=True, converter=None,
         scaninfo_suffix='.json', custom_callable=None, with_prov=False,
         is_bids=False, sourcedir=None, outdir=None):
     prov_files = []
     tmpdir = mkdtemp(prefix='heudiconvtmp')
-    for item in items:
+    assert(not seqinfos or len(items) == len(seqinfos))
+    for item_idx, item in enumerate(items):
+        seqinfo = seqinfos[item_idx] if seqinfos else None
         if isinstance(item[1], (list, tuple)):
             outtypes = item[1]
         else:
             outtypes = [item[1]]
         prefix = item[0]
-        dirname = os.path.dirname(prefix + '.ext')
+        prefix_dirname = os.path.dirname(prefix + '.ext')
+        prov_file = None
         outname_bids = prefix + '.json'
+        outname_bids_files = []  # actual bids files since dcm2niix might generate multiple ATM
         lgr.info('Converting %s -> %s . Converter: %s',
-                 prefix, dirname, converter)
-        if not os.path.exists(dirname):
-            os.makedirs(dirname)
+                 prefix, prefix_dirname, converter)
+        if not os.path.exists(prefix_dirname):
+            os.makedirs(prefix_dirname)
         for outtype in outtypes:
             item_dicoms = item[2]
             lgr.info("Processing %d dicoms for output type %s",
                      len(item_dicoms), outtype)
             lgr.log(1, " those dicoms are: %s", item_dicoms)
+
+            modality = basename(dirname(prefix)) if is_bids else None
+
             if outtype == 'dicom':
                 if is_bids:
                     # mimic the same hierarchy location as the prefix
@@ -542,8 +554,13 @@ def convert(items, symlink=True, converter=None,
                             os.path.relpath(prefix, outdir)))
                     if not os.path.exists(sourcedir_):
                         os.makedirs(sourcedir_)
+                    if modality == 'fmap':
+                        # might have multiple - M and P, so lets suffix accordingly
+                        suffix = {'M': '_magnitude', 'P': '_phase'}[seqinfo.image_type[2]]
+                    else:
+                        suffix = ''
                     compress_dicoms(item_dicoms,
-                                    os.path.basename(prefix),
+                                    os.path.basename(prefix) + suffix,
                                     sourcedir_)
                 else:
                     dicomdir = prefix + '_dicom'
@@ -591,19 +608,9 @@ def convert(items, symlink=True, converter=None,
                         if converter == 'dcm2nii':
                             convertnode.inputs.gzip_output = outtype == 'nii.gz'
                         else:
-                            convertnode.inputs.out_filename = os.path.basename(dirname)
+                            convertnode.inputs.out_filename = os.path.basename(prefix_dirname)
                         convertnode.inputs.terminal_output = 'allatonce'
                         res = convertnode.run()
-                        if isinstance(res.outputs.converted_files, list):
-                            lgr.warning(
-                                "Following series files likely have multiple orientations: %s",
-                                item_dicoms
-                            )
-                            for idx, fl in enumerate(res.outputs.converted_files):
-                                outname = prefix + '-' + str(idx) + '.' + outtype
-                                safe_copyfile(fl, outname)
-                        else:
-                            safe_copyfile(res.outputs.converted_files, outname)
 
                         if isdefined(res.outputs.bvecs):
                             outname_bvecs = prefix + '.bvec'
@@ -611,17 +618,72 @@ def convert(items, symlink=True, converter=None,
                             safe_copyfile(res.outputs.bvecs, outname_bvecs)
                             safe_copyfile(res.outputs.bvals, outname_bvals)
 
-                        if converter == 'dcm2niix' \
-                                and isdefined(res.outputs.bids):
-                            ### extract bids
-                            try:
-                                safe_copyfile(res.outputs.bids, outname_bids)
-                            except TypeError as exc:  ##catch lists
+                        res_files = res.outputs.converted_files
+                        if isinstance(res_files, list):
+                            # TODO: move into a function
+                            # by default just suffix them up
+                            suffixes = None
+                            # we should provide specific handling for fmap,
+                            # dwi etc which might spit out multiple files
+                            if is_bids:
+                                if modality == 'fmap':
+                                    # possible filenames and their mapping to suffixes:
+                                    fmap_filenames = {
+                                        'fmap': '_magnitude1',
+                                        '_e2fmap': '_magnitude2',
+                                        '_e2_ph': '_phasediff',
+                                    }
+                                    suffixes = []
+                                    for f in res_files:
+                                        fbasename = basename(f)[:-(len(outtype) + 1)]
+                                        try:
+                                            suffixes.append(fmap_filenames[fbasename])
+                                        except KeyError:
+                                            raise ValueError("Do not know how to deal with %s output file for fmap" % fbasename)
+
+                            if not suffixes:
                                 lgr.warning(
-                                    "There was someone catching lists!: %s",
-                                    exc
+                                    "Following series files likely have "
+                                    "multiple (%d) volumes (orientations?) "
+                                    "generated: %s ...",
+                                    len(res_files), item_dicoms[0]
                                 )
-                                continue
+                                suffixes = ['-%d' % i for i in range(len(res_files))]
+
+                            # Also copy BIDS files although they might need to be merged/postprocessed later
+                            if converter == 'dcm2niix' and isdefined( res.outputs.bids):
+                                assert(len(res.outputs.bids) == len(res_files))
+                                bids_files = res.outputs.bids
+                            else:
+                                bids_files = [None] * len(res_files)
+
+                            for fl, suffix, bids_file in zip(res_files, suffixes, bids_files):
+                                outname = "%s%s.%s" % (prefix, suffix, outtype)
+                                safe_copyfile(fl, outname)
+                                if bids_file:
+                                    outname_bids_file = "%s%s.json" % (prefix, suffix)
+                                    safe_copyfile(bids_file, outname_bids_file)
+                                    outname_bids_files.append(outname_bids_file)
+
+                        else:
+                            safe_copyfile(res_files, outname)
+                            if converter == 'dcm2niix' and isdefined(res.outputs.bids):
+                                try:
+                                    safe_copyfile(res.outputs.bids, outname_bids)
+                                    outname_bids_files.append(outname_bids)
+                                except TypeError as exc:  ##catch lists
+                                    lgr.warning(
+                                        "There was someone catching lists!: %s", exc
+                                    )
+                                    continue
+
+                            # TODO: move into a function
+                            # we should provide specific handling for fmap,
+                            # dwi etc .json of which should get merged to satisfy
+                            # BIDS.  BUT wer might be somewhat not in time for a
+                            # party here since we sorted into multiple seqinfo
+                            # (e.g. magnitude, phase for fmap so we might want
+                            # to sort them into a single one)
 
                     if with_prov:
                         prov_file = prefix + '_prov.ttl'
@@ -630,44 +692,58 @@ def convert(items, symlink=True, converter=None,
                                                     'provenance.ttl'),
                                         prov_file)
                         prov_files.append(prov_file)
-                        
-                    #if not is_bids or converter != 'dcm2niix': ##uses dcm2niix's infofile
-                from nipype import Node, Function
-                embedfunc = Node(Function(input_names=['dcmfiles',
-                                                       'niftifile',
-                                                       'infofile',
-                                                       'bids_info',
-                                                       'force'],
-                                          output_names=['outfile',
-                                                        'meta'],
-                                         function=embed_nifti),
-                                 name='embedder')
-                embedfunc.inputs.dcmfiles = item_dicoms
-                embedfunc.inputs.niftifile = os.path.abspath(outname)
-                embedfunc.inputs.infofile = os.path.abspath(scaninfo)
-                if is_bids and (converter == 'dcm2niix'):
-                    embedfunc.inputs.bids_info = load_json(os.path.abspath(outname_bids))
-                else:
-                    embedfunc.inputs.bids_info = None
-                embedfunc.inputs.force = True
-                embedfunc.base_dir = tmpdir
-                cwd = os.getcwd()
-                try:
-                    res = embedfunc.run()
-                    os.chmod(scaninfo, 0o0440)
-                    if with_prov:
-                        g = res.provenance.rdf()
-                        g.parse(prov_file,
-                                format='turtle')
-                        g.serialize(prov_file, format='turtle')
-                        os.chmod(prov_file, 0o0440)
-                except:
-                    os.chdir(cwd)
-                os.chmod(outname, 0o0440)
+
+                if len(outname_bids_files) > 1:
+                    lgr.warning(
+                        "For now not embedding BIDS and info generated .nii.gz itself since sequence produced multiple files")
+                    continue
+
+                #if not is_bids or converter != 'dcm2niix': ##uses dcm2niix's infofile
+
+                embed_metadata_into_nifti(converter, is_bids, item_dicoms,
+                                          outname, outname_bids, prov_file,
+                                          scaninfo, tmpdir, with_prov)
 
         if not custom_callable is None:
             custom_callable(*item)
     shutil.rmtree(tmpdir)
+
+
+def embed_metadata_into_nifti(converter, is_bids, item_dicoms, outname,
+                              outname_bids, prov_file, scaninfo, tmpdir,
+                              with_prov):
+    from nipype import Node, Function
+    embedfunc = Node(Function(input_names=['dcmfiles',
+                                           'niftifile',
+                                           'infofile',
+                                           'bids_info',
+                                           'force'],
+                              output_names=['outfile',
+                                            'meta'],
+                              function=embed_nifti),
+                     name='embedder')
+    embedfunc.inputs.dcmfiles = item_dicoms
+    embedfunc.inputs.niftifile = os.path.abspath(outname)
+    embedfunc.inputs.infofile = os.path.abspath(scaninfo)
+    if is_bids and (converter == 'dcm2niix'):
+        embedfunc.inputs.bids_info = load_json(os.path.abspath(outname_bids))
+    else:
+        embedfunc.inputs.bids_info = None
+    embedfunc.inputs.force = True
+    embedfunc.base_dir = tmpdir
+    cwd = os.getcwd()
+    try:
+        res = embedfunc.run()
+        os.chmod(scaninfo, 0o0440)
+        if with_prov:
+            g = res.provenance.rdf()
+            g.parse(prov_file,
+                    format='turtle')
+            g.serialize(prov_file, format='turtle')
+            os.chmod(prov_file, 0o0440)
+    except:
+        os.chdir(cwd)
+    os.chmod(outname, 0o0440)
 
 
 def convert_dicoms(sid,
@@ -769,22 +845,19 @@ def convert_dicoms(sid,
         else:
             # TODO -- might have been done outside already!
             if dicoms:
-                seqinfo_dict = group_dicoms_into_seqinfos(
+                seqinfo = group_dicoms_into_seqinfos(
                     dicoms,
                     dcmfilter=getattr(heuristic, 'filter_dicom', None))
-            else:
-                # TODO: rename to avoid ambiguity etc
-                seqinfo_dict = seqinfo
-            seqinfo = list(seqinfo_dict.keys())
-            filegroup = {si.series_id: x for si, x in seqinfo_dict.items()}
+            seqinfo_list = list(seqinfo.keys())
+            filegroup = {si.series_id: x for si, x in seqinfo.items()}
 
             save_json(filegroup_file, filegroup)
             dicominfo_file = os.path.join(idir, 'dicominfo%s.tsv' % ses_suffix)
             with open(dicominfo_file, 'wt') as fp:
-                for seq in seqinfo:
+                for seq in seqinfo_list:
                     fp.write('\t'.join([str(val) for val in seq]) + '\n')
             lgr.debug("Calling out to %s.infodict", heuristic)
-            info = heuristic.infotodict(seqinfo)
+            info = heuristic.infotodict(seqinfo_list)
             write_config(info_file, info)
             write_config(edit_file, info)
 
@@ -806,6 +879,7 @@ def convert_dicoms(sid,
             cinfo = conversion_info(anon_sid, tdir, info, filegroup,
                                     ses=ses)
             convert(cinfo,
+                    seqinfo.keys() if seqinfo else None,  # so we have access to information about sequences
                     converter=converter,
                     scaninfo_suffix=getattr(
                         heuristic, 'scaninfo_suffix', '.json'),
@@ -940,6 +1014,7 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outputdir,
 
         # sort all DICOMS using heuristic
         # TODO:  this one is not groupping by StudyUID but may be we should!
+        #import pdb; pdb.set_trace()
         seqinfo_dict = group_dicoms_into_seqinfos(
             files_,
             dcmfilter=getattr(heuristic, 'filter_dicom', None),
