@@ -1,0 +1,4 @@
+[run]
+include = tests/*
+          bin/*
+          setup.py

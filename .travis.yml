@@ -27,7 +27,8 @@ before_install:
 
 
 script:
-  - nosetests -s -v --with-doctest --doctest-tests --with-cov --cover-package . --logging-level=INFO tests
+  # - nosetests -s -v --with-doctest --doctest-tests --with-cov --cover-package . --logging-level=INFO tests
+  - coverage run `which py.test` -s -v tests
 
 after_success:
   - codecov
