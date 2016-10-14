@@ -66,6 +66,8 @@ SeqInfo = namedtuple(
      'series_description',
      'image_type',
      'accession_number',
+     'patient_age',
+     'patient_sex',
      ]
 )
 
@@ -366,14 +368,15 @@ def group_dicoms_into_seqinfos(fl, dcmfilter=None, per_studyUID=False):
             dcminfo.SeriesDescription,
             tuple(dcminfo.ImageType),
             dcminfo.AccessionNumber,
+            # For demographics to populate BIDS participants.tsv
+            dcminfo.PatientsAge,
+            dcminfo.PatientsSex,
         )
         # candidates
         # dcminfo.AccessionNumber
         #   len(dcminfo.ReferencedImageSequence)
         #   len(dcminfo.SourceImageSequence)
         # FOR demographics
-        # dcminfo.PatientsAge
-        # dcminfo.PatientsSex
         lgr.debug("%30s %27s %27s %5s nref=%-2d nsrc=%-2d %s" % (
             info.series_id,
             dcminfo.SeriesDescription,
@@ -1082,6 +1085,15 @@ def is_interactive():
     return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
 
 
+def create_file_if_missing(filename, content):
+    """Create file if missing, so we do not override any possibly introduced changes"""
+    if exists(filename):
+        return False
+    with open(filename, 'w') as f:
+        f.write(content)
+    return True
+
+
 def populate_bids_templates(path):
     # dataset descriptor
     descriptor = opj(path, 'dataset_description.json')
@@ -1092,7 +1104,7 @@ def populate_bids_templates(path):
                   ('BIDSVersion', "1.0.1"),
                   ('License', "TODO: choose a license, e.g. PDDL (http://opendatacommons.org/licenses/pddl/)"),
                   ('Authors', ["TODO:", "First1 Last1", "First2 Last2", "..."]),
-                  ('Acknowledgements', "TODO: who should be acknowledge in helping to collect the data"),
+                  ('Acknowledgements', "We thank Terry Sacket and the rest of the DBIC (Dartmouth Brain Imaging Center) personnel for assistance in data collection. TODO: more"),
                   ('HowToAcknowledge', "TODO: describe how to acknowledge -- either cite a corresponding paper, or just in acknowledgement section"),
                   ('Funding', ["TODO", "GRANT #1", "GRANT #2"]),
                   ('ReferencesAndLinks', ["TODO", "List of papers or websites"]),
@@ -1100,22 +1112,92 @@ def populate_bids_templates(path):
         ]))
 
     sourcedata_README = opj(path, 'sourcedata', 'README')
-    if exists(dirname(sourcedata_README)) and not exists(sourcedata_README):
-        with open(sourcedata_README, 'w') as f:
-            f.write("""\
+    if exists(dirname(sourcedata_README)):
+        create_file_if_missing(
+            sourcedata_README,
+            """\
 TODO: Provide description about source data, e.g.
 
 Directory below contains DICOMS compressed into tarballs per each sequence,
 replicating directory hierarchy of the BIDS dataset itself.
 """)
 
-    README = opj(path, 'README')
-    if not exists(README):
-        with open(README, 'w') as f:
-            f.write("""\
+    create_file_if_missing(
+        opj(path, 'CHANGES'),
+        """\
+0.0.1  Initial data acquired
+
+TODOs:
+  - verify and possibly extend information in participants.tsv
+    (see for example http://datasets.datalad.org/?dir=/openfmri/ds000208)
+  - fill out dataset_description.json, README, sourcedata/README (if present)
+  - provide _events.tsv file for each _bold.nii.gz with onsets of events
+    (see  "8.5 Task events"  of BIDS specification)
+""")
+
+    create_file_if_missing(
+        opj(path, 'README'),
+        """\
 TODO: Provide description for the dataset -- basic details about the study,
 possibly pointing to pre-registration (if public or embargoed)
 """)
+
+
+def add_participant_record(studydir, subject, age, sex):
+    participants_tsv = opj(studydir, 'participants.tsv')
+    participant_id = 'sub-%s' % subject
+
+    if not create_file_if_missing(
+        participants_tsv,
+        '\t'.join(['participant_id', 'age', 'sex', 'group']) + '\n'
+    ):
+        # check if may be subject record already exists
+        with open(participants_tsv) as f:
+            f.readline()
+            known_subjects = {l.split('\t')[0] for l in f.readline()}
+        if participant_id in known_subjects:
+            # already there -- not adding
+            return
+
+    # Add a new participant
+    with open(participants_tsv, 'a') as f:
+        f.write('\t'.join(map(str, [
+            participant_id,
+            age.lstrip('0').rstrip('Y'),
+            sex,
+            'control']))
+        + '\n')
+
+
+def prepare_for_datalad(topdir, studydir):
+    """Do all necessary preparations (if were not done before) and save
+    """
+    from datalad.api import create
+    from datalad.api import Dataset
+
+    studyrelpath = os.path.relpath(studydir, topdir)
+    assert not studyrelpath.startswith(os.path.pardir)  # so we are under
+    # now we need to test and initiate a DataLad dataset all along the path
+    curdir = topdir
+    for subdir in [''] + studyrelpath.split(os.path.sep):
+        curdir = opj(curdir, subdir)
+        ds = Dataset(curdir)
+        if not ds.is_installed():
+            lgr.info("Initiating %s", ds)
+            ds_ = create(curdir, force=True)
+            assert ds == ds_
+        assert ds.is_installed()
+
+    create_file_if_missing(
+            opj(studydir, '.gitattributes'),
+            """\
+*annex.largefiles = (largerthan = 100kb)
+*.json annex.largefiles = nothing
+*.txt annex.largefiles = nothing
+*.tsv annex.largefiles = nothing
+""")
+
+    ds.save
 
 
 _sys_excepthook = sys.excepthook  # Just in case we ever need original one
@@ -1283,7 +1365,14 @@ s3
                    ses=session,
                    is_bids=args.bids,
                    seqinfo=seqinfo)
-        processed_studydirs.add(outputdir)
+
+        if args.bids and seqinfo:
+            add_participant_record(study_outputdir,
+                                   subject,
+                                   seqinfo.keys()[0].patient_age,
+                                   seqinfo.keys()[0].patient_sex,
+                                   )
+        processed_studydirs.add(study_outputdir)
 
     if args.bids:
         # Let's populate BIDS templates for folks to take care about
