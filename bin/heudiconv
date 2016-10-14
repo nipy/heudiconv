@@ -1169,7 +1169,7 @@ def add_participant_record(studydir, subject, age, sex):
         + '\n')
 
 
-def prepare_for_datalad(topdir, studydir):
+def add_to_datalad(topdir, studydir, bids=False):
     """Do all necessary preparations (if were not done before) and save
     """
     from datalad.api import create
@@ -1201,6 +1201,19 @@ def prepare_for_datalad(topdir, studydir):
     # Let's make it a
     dstop = Dataset(topdir)
     dstop.save(auto_add_changes=True, recursive=True)
+
+    # TODO:  they are still appearing as native annex symlinked beasts
+    """
+    TODOs:
+    it needs
+    - unlock  (thin will be in effect)
+    - save/commit (does modechange 120000 => 100644
+
+    - we should mark dicoms and anatomicals as distribution-restricted
+    - could potentially somehow automate that all:
+      http://git-annex.branchable.com/tips/automatically_adding_metadata/
+    - possibly even make separate sub-datasets for originaldata, derivatives ?
+    """
 
 
 _sys_excepthook = sys.excepthook  # Just in case we ever need original one
@@ -1284,6 +1297,12 @@ s3
                         help='''session for longitudinal study_sessions, default is none''')
     parser.add_argument('-b', '--bids', dest='bids', action='store_true',
                         help='''flag for output into BIDS structure''')
+    parser.add_argument('--datalad', dest='datalad', action='store_true',
+                        help='''Store the entire collection as DataLad dataset(s).
+                        Small files will be committed directly to git, while large to annex.
+                        New version (6) of annex repositories will be used in a "thin"
+                        mode so it would look to mortals as just any other regular directory
+                        (i.e. no symlinks to under .git/annex).  For now just for BIDS mode.''')
     parser.add_argument('--dbg', action='store_true', dest='debug',
                         help="do not catch exceptions and show exception traceback")
 
@@ -1381,6 +1400,8 @@ s3
         # Let's populate BIDS templates for folks to take care about
         for study_outputdir in processed_studydirs:
             populate_bids_templates(study_outputdir)
+            if args.datalad:
+                add_to_datalad(outputdir, study_outputdir, bids=args.bids)
 
             # TODO: record_collection of the subject/session although that information
             # is pretty much present in .heudiconv/SUBJECT/info so we could just poke there

@@ -69,7 +69,7 @@ def test_prepare_for_datalad(tmpdir):
     os.makedirs(studydir_)
     heudiconv.populate_bids_templates(studydir_)
 
-    heudiconv.prepare_for_datalad(str(tmpdir), studydir_)
+    heudiconv.add_to_datalad(str(tmpdir), studydir_)
 
     from datalad.api import Dataset
     superds = Dataset(str(tmpdir))
