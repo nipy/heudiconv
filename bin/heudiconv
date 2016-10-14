@@ -543,7 +543,7 @@ def convert(items, symlink=True, converter=None,
                      len(item_dicoms), outtype)
             lgr.log(1, " those dicoms are: %s", item_dicoms)
 
-            modality = basename(dirname(prefix)) if is_bids else None
+            seqtype = basename(dirname(prefix)) if is_bids else None
 
             if outtype == 'dicom':
                 if is_bids:
@@ -623,7 +623,7 @@ def convert(items, symlink=True, converter=None,
                             # we should provide specific handling for fmap,
                             # dwi etc which might spit out multiple files
                             if is_bids:
-                                if modality == 'fmap':
+                                if seqtype == 'fmap':
                                     # expected!
                                     suffixes = ["%d" % (i+1) for i in range(len(res_files))]
                             if not suffixes:
@@ -706,9 +706,9 @@ def tuneup_bids_json_files(json_files):
         json.dump(json_, open(jsonfile, 'w'), indent=2)
 
     # Load the beast
-    modality = basename(dirname(jsonfile))
+    seqtype = basename(dirname(jsonfile))
 
-    if modality == 'fmap':
+    if seqtype == 'fmap':
         json_basename = '_'.join(jsonfile.split('_')[:-1])
         # if we got by now all needed .json files -- we can fix them up
         # unfortunately order of "items" is not guaranteed atm

@@ -51,7 +51,7 @@ def infotodict(seqinfo):
         # since we primarily rely on encoded in the protocol name information
         prev_image_data_type = image_data_type
         image_data_type = s.image_type[2]
-        image_type_modality = {
+        image_type_seqtype = {
             'P': 'fmap',   # phase
             'FMRI': 'func',
             'MPR': 'anat',
@@ -76,19 +76,19 @@ def infotodict(seqinfo):
             skipped_unknown.append(s.series_id)
             continue
 
-        modality = regd.pop('modality')
-        modality_label = regd.pop('modality_label', None)
+        seqtype = regd.pop('seqtype')
+        seqtype_label = regd.pop('seqtype_label', None)
 
-        if image_type_modality and modality != image_type_modality:
+        if image_type_seqtype and seqtype != image_type_seqtype:
             lgr.warning(
-                "Deduced modality to be %s from DICOM, but got %s out of %s",
-                image_type_modality, modality, protocol_name_tuned)
+                "Deduced seqtype to be %s from DICOM, but got %s out of %s",
+                image_type_seqtype, seqtype, protocol_name_tuned)
 
         if s.is_derived:
             # Let's for now stash those close to original images
             # TODO: we might want a separate tree for all of this!?
             # so more of a parameter to the create_key
-            #modality += '/derivative'
+            #seqtype += '/derivative'
             # just keep it lower case and without special characters
             # XXXX what for???
             #seq.append(s.series_description.lower())
@@ -97,15 +97,15 @@ def infotodict(seqinfo):
             prefix = ''
 
         # analyze s.protocol_name (series_id is based on it) for full name mapping etc
-        if modality == 'func' and not modality_label:
+        if seqtype == 'func' and not seqtype_label:
             if '_pace_' in protocol_name_tuned:
-                modality_label = 'pace'  # or should it be part of seq-
+                seqtype_label = 'pace'  # or should it be part of seq-
             else:
                 # assume bold by default
-                modality_label = 'bold'
+                seqtype_label = 'bold'
 
-        if modality == 'fmap' and not modality_label:
-            modality_label = {
+        if seqtype == 'fmap' and not seqtype_label:
+            seqtype_label = {
                 'M': 'magnitude',  # might want explicit {file_index}  ?
                 'P': 'phasediff'
             }[image_data_type]
@@ -147,7 +147,7 @@ def infotodict(seqinfo):
             None if not regd.get('acq') else "acq-%s" % regd['acq'],
             regd.get('bids'),
             run_label,
-            modality_label,
+            seqtype_label,
         ]
         # filter tose which are None, and join with _
         suffix = '_'.join(filter(bool, suffix_parts))
@@ -168,11 +168,11 @@ def infotodict(seqinfo):
 
         # some are ok to skip and not to whine
         if "_Scout" in s.series_description or \
-                (modality == 'anat' and modality_label == 'scout'):
+                (seqtype == 'anat' and seqtype_label == 'scout'):
             skipped.append(s.series_id)
             lgr.debug("Ignoring %s", s.series_id)
         else:
-            template = create_key(modality, suffix, prefix=prefix)
+            template = create_key(seqtype, suffix, prefix=prefix)
             info[template].append(s.series_id)
 
     info = dict(info)  # convert to dict since outside functionality depends on it being a basic dict
@@ -282,17 +282,17 @@ def parse_dbic_protocol_name(protocol_name):
         return s, None
 
     # Let's analyze first element which should tell us sequence type
-    modality, modality_label = split2(split[0])
-    if modality not in {'anat', 'func', 'dwi', 'behav', 'fmap'}:
+    seqtype, seqtype_label = split2(split[0])
+    if seqtype not in {'anat', 'func', 'dwi', 'behav', 'fmap'}:
         # It is not something we don't consume
         if bids:
             lgr.warning("It was instructed to be BIDS sequence but unknown "
-                        "type %s found", modality)
+                        "type %s found", seqtype)
         return {}
 
-    regd = dict(modality=modality)
-    if modality_label:
-        regd['modality_label'] = modality_label
+    regd = dict(seqtype=seqtype)
+    if seqtype_label:
+        regd['seqtype_label'] = seqtype_label
     # now go through each to see if one which we care
     bids_leftovers = []
     for s in split[1:]:
@@ -312,12 +312,12 @@ def parse_dbic_protocol_name(protocol_name):
     # TODO: might want to check for all known "standard" BIDS suffixes here
     # among bids_leftovers, thus serve some kind of BIDS validator
 
-    # if not regd.get('modality_label', None):
-    #     # might need to assign a default label for each modality if was not
+    # if not regd.get('seqtype_label', None):
+    #     # might need to assign a default label for each seqtype if was not
     #     # given
-    #     regd['modality_label'] = {
+    #     regd['seqtype_label'] = {
     #         'func': 'bold'
-    #     }.get(regd['modality'], None)
+    #     }.get(regd['seqtype'], None)
 
     return regd
 
@@ -330,14 +330,14 @@ def test_parse_dbic_protocol_name():
 
     assert pdpn("bids_func-bold") == \
            pdpn("func-bold") == \
-           {'modality': 'func', 'modality_label': 'bold'}
+           {'seqtype': 'func', 'seqtype_label': 'bold'}
 
     # pdpn("bids_func_ses+_task-boo_run+") == \
     # order should not matter
     assert pdpn("bids_func_ses+_run+_task-boo") == \
            {
-               'modality': 'func',
-               # 'modality_label': 'bold',
+               'seqtype': 'func',
+               # 'seqtype_label': 'bold',
                'session': '+',
                'run': '+',
                'task': 'boo',
@@ -347,7 +347,7 @@ def test_parse_dbic_protocol_name():
            pdpn("bids_func-pace_ses-1_run-2_task-boo_acq-bu_bids-please__therest") == \
            pdpn("func-pace_ses-1_task-boo_acq-bu_bids-please_run-2") == \
            {
-               'modality': 'func', 'modality_label': 'pace',
+               'seqtype': 'func', 'seqtype_label': 'pace',
                'session': '1',
                'run': '2',
                'task': 'boo',
@@ -357,7 +357,7 @@ def test_parse_dbic_protocol_name():
 
     assert pdpn("bids_anat-scout_ses+") == \
            {
-               'modality': 'anat',
-               'modality_label': 'scout',
+               'seqtype': 'anat',
+               'seqtype_label': 'scout',
                'session': '+',
            }
