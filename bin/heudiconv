@@ -1184,20 +1184,23 @@ def prepare_for_datalad(topdir, studydir):
         ds = Dataset(curdir)
         if not ds.is_installed():
             lgr.info("Initiating %s", ds)
-            ds_ = create(curdir, force=True)
+            ds_ = create(curdir, force=True, annex_version=6)
             assert ds == ds_
         assert ds.is_installed()
 
     create_file_if_missing(
             opj(studydir, '.gitattributes'),
             """\
-*annex.largefiles = (largerthan = 100kb)
-*.json annex.largefiles = nothing
-*.txt annex.largefiles = nothing
-*.tsv annex.largefiles = nothing
+* annex.largefiles=(largerthan=100kb)
+*.json annex.largefiles=nothing
+*.txt annex.largefiles=nothing
+*.tsv annex.largefiles=nothing
 """)
-
-    ds.save
+    # so for mortals it just looks like a regular directory!
+    ds.config.add('annex.thin', 'true', where='local')
+    # Let's make it a
+    dstop = Dataset(topdir)
+    dstop.save(auto_add_changes=True, recursive=True)
 
 
 _sys_excepthook = sys.excepthook  # Just in case we ever need original one

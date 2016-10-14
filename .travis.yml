@@ -24,7 +24,10 @@ before_install:
   - echo '' > requirements.txt
   - pip install -r dev-requirements.txt
   - pip install codecov
-
+  # The ultimate one-liner setup for NeuroDebian repository
+  - bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
+  - travis_retry sudo apt-get update -qq
+  - travis_retry sudo apt-get install git-annex-standalone python-datalad
 
 script:
   # - nosetests -s -v --with-doctest --doctest-tests --with-cov --cover-package . --logging-level=INFO tests

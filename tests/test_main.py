@@ -1,8 +1,9 @@
+import os
 import pytest
 import sys
 
 from mock import patch
-from os.path import exists
+from os.path import join as opj
 from six.moves import StringIO
 
 
@@ -59,3 +60,33 @@ participant_id	age	sex	group
 sub-sub01	23	M	control
 sub-sub02	2	F	control
 """
+
+
+def test_prepare_for_datalad(tmpdir):
+    pytest.importorskip("datalad")
+    studydir = tmpdir.join("PI").join("study")
+    studydir_ = str(studydir)
+    os.makedirs(studydir_)
+    heudiconv.populate_bids_templates(studydir_)
+
+    heudiconv.prepare_for_datalad(str(tmpdir), studydir_)
+
+    from datalad.api import Dataset
+    superds = Dataset(str(tmpdir))
+
+    assert superds.is_installed()
+    assert not superds.repo.dirty
+    subdss = superds.get_subdatasets(recursive=True)
+    for ds_path in sorted(subdss):
+        ds = Dataset(opj(superds.path, ds_path))
+        assert ds.is_installed()
+        assert not ds.repo.dirty
+
+    # the last one should have been the study
+    target_files = {
+        '.gitattributes', '.datalad/config', 'dataset_description.json',
+        'CHANGES', 'README'}
+    assert set(ds.repo.get_indexed_files()) == target_files
+    # and all are under git
+    for f in target_files:
+        assert not ds.repo.is_under_annex(f)
