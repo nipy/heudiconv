@@ -16,10 +16,6 @@ env:
     - DATALAD_TESTS_SSH=1
 
 before_install:
-  # The ultimate one-liner setup for NeuroDebian repository
-  # which might be needed later for tools
-  #- bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
-  #- travis_retry sudo apt-get update -qq
   # for now even remove requirements.txt since dependencies aren't avail
   - echo '' > requirements.txt
   - pip install -r dev-requirements.txt
@@ -29,6 +25,10 @@ before_install:
   - travis_retry sudo apt-get update -qq
   - travis_retry sudo apt-get install git-annex-standalone
   - pip install datalad
+
+install:
+  - git config --global user.email "test@travis.land"
+  - git config --global user.name "Travis Almighty"
 
 script:
   # - nosetests -s -v --with-doctest --doctest-tests --with-cov --cover-package . --logging-level=INFO tests
