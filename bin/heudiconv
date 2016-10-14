@@ -1154,7 +1154,7 @@ def add_participant_record(studydir, subject, age, sex):
         # check if may be subject record already exists
         with open(participants_tsv) as f:
             f.readline()
-            known_subjects = {l.split('\t')[0] for l in f.readline()}
+            known_subjects = {l.split('\t')[0] for l in f.readlines()}
         if participant_id in known_subjects:
             # already there -- not adding
             return
