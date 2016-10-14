@@ -1062,6 +1062,7 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outputdir,
             # TODO:  probably infotoids is doomed to do more and possibly
             # split into multiple sessions!!!! but then it should be provided
             # full seqinfo with files which it would place into multiple groups
+            lgr.info("Study session for %s" % str(ids))
             study_session_info = StudySessionInfo(
                 ids.get('locator'),
                 ids.get('session', session),
@@ -1179,14 +1180,16 @@ def add_to_datalad(topdir, studydir, bids=False):
     assert not studyrelpath.startswith(os.path.pardir)  # so we are under
     # now we need to test and initiate a DataLad dataset all along the path
     curdir = topdir
+    superds = None
     for subdir in [''] + studyrelpath.split(os.path.sep):
         curdir = opj(curdir, subdir)
         ds = Dataset(curdir)
         if not ds.is_installed():
             lgr.info("Initiating %s", ds)
-            ds_ = create(curdir, force=True, annex_version=6)
+            ds_ = create(curdir, dataset=superds, force=True, annex_version=6)
             assert ds == ds_
         assert ds.is_installed()
+        superds = ds
 
     create_file_if_missing(
             opj(studydir, '.gitattributes'),
@@ -1195,11 +1198,15 @@ def add_to_datalad(topdir, studydir, bids=False):
 *.json annex.largefiles=nothing
 *.txt annex.largefiles=nothing
 *.tsv annex.largefiles=nothing
+*.nii.gz annex.largefiles=(largerthan=0kb)
+*.tgz annex.largefiles=(largerthan=0kb)
 """)
     # so for mortals it just looks like a regular directory!
     ds.config.add('annex.thin', 'true', where='local')
     # Let's make it a
     dstop = Dataset(topdir)
+    # ideally we should save from within the subdataset,
+    # so let's
     dstop.save(auto_add_changes=True, recursive=True)
 
     # TODO:  they are still appearing as native annex symlinked beasts
@@ -1373,6 +1380,8 @@ s3
 
         # TODO: --datalad  cmdline option, which would take care about initiating
         # the outputdir -> study_outputdir datasets if not yet there
+        if args.datalad:
+            add_to_datalad(outputdir, study_outputdir, bids=args.bids)
 
         convert_dicoms(
                    subject,

@@ -1,5 +1,5 @@
 import os
-
+import re
 from collections import defaultdict
 
 import logging
@@ -141,6 +141,9 @@ def infotodict(seqinfo):
             run_label = "run-" + ("%02d" % current_run
                                   if isinstance(current_run, int)
                                   else current_run)
+        else:
+            # if there is no _run -- no run label addded
+            run_label = None
 
         suffix_parts = [
             None if not regd.get('task') else "task-%s" % regd['task'],
@@ -203,9 +206,14 @@ def infotoids(seqinfos, outputdir):
     # decide on subjid and session based on patient_id
     lgr.info("Processing sequence infos to deduce study/session")
     study_description = get_unique(seqinfos, 'study_description')
-    subject = get_unique(seqinfos, 'patient_id')
+    subject = fixup_subjectid(get_unique(seqinfos, 'patient_id'))
     # TODO:  fix up subject id if missing some 0s
-    locator = study_description.replace('^', '/')
+    split = study_description.split('^', 1)
+    # split first one even more, since couldbe PI_Student
+    split = split[0].split('_', 1) + split[1:]
+
+    # locator = study_description.replace('^', '/')
+    locator = '/'.join(split)
 
     # TODO: actually check if given study is study we would care about
     # and if not -- we should throw some ???? exception
@@ -216,9 +224,9 @@ def infotoids(seqinfos, outputdir):
     # to figure out presence of sessions.
     ses_markers = [
         parse_dbic_protocol_name(s.protocol_name).get('session', None) for s in seqinfos
-        ]
+        if not s.is_derived
+    ]
     ses_markers = filter(bool, ses_markers)  # only present ones
-
     session = None
     if ses_markers:
         # we have a session or possibly more than one even
@@ -269,6 +277,11 @@ def parse_dbic_protocol_name(protocol_name):
     # We need to figure out if it is a valid bids
     split = protocol_name.split('_')
     prefix = split[0]
+
+    # Fixups
+    if prefix == 'scout':
+        prefix = split[0] = 'anat-scout'
+
     if prefix != 'bids' and '-' in prefix:
         prefix, _ = prefix.split('-', 1)
     if prefix == 'bids':
@@ -300,6 +313,11 @@ def parse_dbic_protocol_name(protocol_name):
         if value is None and key[-1] in "+=":
             value = key[-1]
             key = key[:-1]
+
+        # sanitize values, which must not have _ and - is undesirable ATM as well
+        # TODO: BIDSv2.0 -- allows "-" so replace with it instead
+        value = str(value).replace('_', 'X').replace('-', 'X')
+
         if key in ['ses', 'run', 'task', 'acq']:
             # those we care about explicitly
             regd[{'ses': 'session'}.get(key, key)] = value
@@ -320,6 +338,25 @@ def parse_dbic_protocol_name(protocol_name):
     #     }.get(regd['seqtype'], None)
 
     return regd
+
+
+def fixup_subjectid(subjectid):
+    """Just in case someone managed to miss a zero or added an extra one"""
+    reg = re.match("sid0*(\d+)$", subjectid)
+    if not reg:
+        # some completely other pattern
+        return subjectid
+    return "sid%06d" % int(reg.groups()[0])
+
+
+def test_fixupsubjectid():
+    assert fixup_subjectid("abra") == "abra"
+    assert fixup_subjectid("sub") == "sub"
+    assert fixup_subjectid("sid") == "sid"
+    assert fixup_subjectid("sid000030") == "sid000030"
+    assert fixup_subjectid("sid0000030") == "sid000030"
+    assert fixup_subjectid("sid00030") == "sid000030"
+    assert fixup_subjectid("sid30") == "sid000030"
 
 
 def test_parse_dbic_protocol_name():
