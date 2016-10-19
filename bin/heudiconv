@@ -232,6 +232,8 @@ def group_dicoms_into_seqinfos(fl, dcmfilter=None, per_studyUID=False):
                      # and how would then we deal with series numbers
                      # which would differ already
     for fidx, filename in enumerate(fl):
+        # TODO after getting a regression test check if the same behavior
+        #      with stop_before_pixels=True
         mw = ds.wrapper_from_data(dcm.read_file(filename, force=True))
 
         for f in ('iop', 'ICE_Dims', 'SequenceName'):
@@ -493,18 +495,56 @@ def compress_dicoms(dicom_list, prefix, sourcedir):
     if os.path.exists(outtar):
         raise RuntimeError("File %s already exists, will not override"
                            % outtar)
-    with tarfile.open(outtar, 'w:gz', dereference=True) as tar:
-        for filename in dicom_list:
-            outfile = os.path.join(tmpdir, os.path.basename(filename))
-            if not os.path.islink(outfile):
-                os.symlink(os.path.realpath(filename), outfile)
-            # place into archive stripping any lead directories and
-            # adding the one corresponding to prefix
-            tar.add(outfile,
-                    arcname=opj(prefix, os.path.basename(outfile)),
-                    recursive=False)
-    tar.close()
+    # tarfile encodes current time.time inside making those non-reproducible
+    # so we should choose which date to use.
+    # Solution from DataLad although ugly enough:
+
+    dicom_list = sorted(dicom_list)
+    dcm_time = get_dicom_series_time(dicom_list)
+
+    def _assign_dicom_time(ti):
+        # Reset the date to match the one of the last commit, not from the
+        # filesystem since git doesn't track those at all
+        ti.mtime = dcm_time
+        return ti
+
+    # poor man mocking since can't rely on having mock
+    try:
+        import time
+        _old_time = time.time
+        time.time = lambda: dcm_time
+        with tarfile.open(outtar, 'w:gz', dereference=True) as tar:
+            for filename in dicom_list:
+                outfile = os.path.join(tmpdir, os.path.basename(filename))
+                if not os.path.islink(outfile):
+                    os.symlink(os.path.realpath(filename), outfile)
+                # place into archive stripping any lead directories and
+                # adding the one corresponding to prefix
+                tar.add(outfile,
+                        arcname=opj(prefix, os.path.basename(outfile)),
+                        recursive=False,
+                        filter=_assign_dicom_time())
+    finally:
+        time.time = _old_time
+
     shutil.rmtree(tmpdir)
+
+
+def get_dicom_series_time(dicom_list):
+    """Get time in seconds since epoch from dicom series date and time
+
+    Primarily to be used for reproducible time stamping
+    """
+    import time
+    import calendar
+    import dicom as dcm
+
+    dcm = dcm.read_file(dicom_list[0], stop_before_pixels=True)
+    dcm_date = dcm.SeriesDate  # YYYYMMDD
+    dcm_time = dcm.SeriesTime  # HHMMSS.MICROSEC
+    dicom_time_str = dcm_date + dcm_time.split('.', 1)[0]  # YYYYMMDDHHMMSS
+    # convert to epoch
+    return calendar.timegm(time.strptime(dicom_time_str, '%Y%m%d%H%M%S'))
 
 
 def safe_copyfile(src, dest):
@@ -1186,6 +1226,7 @@ def add_to_datalad(topdir, studydir, bids=False):
         ds = Dataset(curdir)
         if not ds.is_installed():
             lgr.info("Initiating %s", ds)
+            # would require annex > 20161018 for correct operation on annex v6
             ds_ = create(curdir, dataset=superds, force=True, annex_version=6)
             assert ds == ds_
         assert ds.is_installed()
