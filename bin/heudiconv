@@ -126,8 +126,14 @@ def save_json(filename, data):
         Dictionary to save in json file.
 
     """
+    # adds trailing whitespaces due to indent
+    # see https://bugs.python.org/issue16333
+    # seems to be fixed in 3.4, for now fixing manually
+    # not only for aestetics but also to help guaranteeing the
+    # same result across versions of Python
     with open(filename, 'w') as fp:
-        json.dump(data, fp, sort_keys=True, indent=4)
+        json_str = json.dumps(data, sort_keys=True, indent=4)
+        fp.write(json_str.replace(' \n', '\n'))
 
 
 def load_json(filename):
@@ -1210,24 +1216,30 @@ def add_participant_record(studydir, subject, age, sex):
         + '\n')
 
 
-def add_to_datalad(topdir, studydir, bids=False):
+def add_to_datalad(topdir, studydir, msg=None, bids=False):
     """Do all necessary preparations (if were not done before) and save
     """
     from datalad.api import create
     from datalad.api import Dataset
+    from datalad.support.annexrepo import AnnexRepo
 
     studyrelpath = os.path.relpath(studydir, topdir)
     assert not studyrelpath.startswith(os.path.pardir)  # so we are under
     # now we need to test and initiate a DataLad dataset all along the path
-    curdir = topdir
+    curdir_ = topdir
     superds = None
-    for subdir in [''] + studyrelpath.split(os.path.sep):
-        curdir = opj(curdir, subdir)
-        ds = Dataset(curdir)
+    subdirs = [''] + studyrelpath.split(os.path.sep)
+    for isubdir, subdir in enumerate(subdirs):
+        curdir_ = opj(curdir_, subdir)
+        ds = Dataset(curdir_)
         if not ds.is_installed():
             lgr.info("Initiating %s", ds)
             # would require annex > 20161018 for correct operation on annex v6
-            ds_ = create(curdir, dataset=superds, force=True, annex_version=6)
+            ds_ = create(curdir_, dataset=superds,
+                         force=True,
+                         if_dirty='ignore',  # see https://github.com/datalad/datalad/issues/1016
+                         no_annex=True,  # need to add .gitattributes first anyways
+                         annex_version=6)
             assert ds == ds_
         assert ds.is_installed()
         superds = ds
@@ -1244,10 +1256,13 @@ def add_to_datalad(topdir, studydir, bids=False):
 """)
     # so for mortals it just looks like a regular directory!
     ds.config.add('annex.thin', 'true', where='local')
+    # initialize annex there if not yet initialized
+    AnnexRepo(ds.path, init=True)
     # Let's make it a
     dstop = Dataset(topdir)
     # ideally we should save from within the subdataset,
-    # so let's
+    # but https://github.com/datalad/datalad/pull/987 is not yet there
+    # so for now saving everything
     dstop.save(auto_add_changes=True, recursive=True)
 
     # TODO:  they are still appearing as native annex symlinked beasts
