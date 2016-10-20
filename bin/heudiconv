@@ -1,19 +1,25 @@
 #!/usr/bin/env python
 
-"""Convert DICOM TimTrio dirs based on heuristic info
+"""Convert DICOM dirs based on heuristic info
 
-This function uses DicomStack and mri_convert to convert Siemens
-TrioTim directories. It proceeds by extracting dicominfo from each
-subject and writing a config file $subject_id/$subject_id.auto.txt in
-the output directory. Users can create a copy of the file called
-$subject_id.edit.txt and modify it to change the files that are
-converted. This edited file will always overwrite the original file. If
-there is a need to revert to original state, please delete this edit.txt
-file and rerun the conversion
+This script uses DicomStack and mri_convert to convert DICOM directories.
+
+It has multiple modes of operation
+
+- If subject ID(s) is specified, it proceeds by extracting dicominfo from each
+  subject and writing a config file $subject_id/$subject_id.auto.txt in
+  the output directory. Users can create a copy of the file called
+  $subject_id.edit.txt and modify it to change the files that are
+  converted. This edited file will always overwrite the original file. If
+  there is a need to revert to original state, please delete this edit.txt
+  file and rerun the conversion
+
+- If no subject specified, all files under specified directory are scanned,
+  DICOMs are sorted based on study UID, and layed out using specified heuristic
 
 """
 
-__version__ = '0.1'
+__version__ = '0.2'
 
 import argparse
 from glob import glob
