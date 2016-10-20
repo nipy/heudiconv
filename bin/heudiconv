@@ -501,9 +501,27 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info=None, force=False):
     return niftifile, infofile
 
 
-def compress_dicoms(dicom_list, prefix, sourcedir):
+def compress_dicoms(dicom_list, out_prefix):
+    """Archives DICOMs into a tarball
+
+    Also tries to do it reproducibly, so takes the date for files
+    and target tarball based on the series time (within the first file)
+
+    Parameters
+    ----------
+    dicom_list : list of str
+      list of dicom files
+    out_prefix : str
+      output path prefix, including the portion of the output file name
+      before .dicom.tgz suffix
+
+    Returns
+    -------
+    filename : str
+      Result tarball
+    """
     tmpdir = mkdtemp(prefix='dicomtar')
-    outtar = os.path.join(sourcedir, prefix + '.dicom.tgz')
+    outtar = out_prefix + '.dicom.tgz'
     if os.path.exists(outtar):
         raise RuntimeError("File %s already exists, will not override"
                            % outtar)
@@ -533,13 +551,15 @@ def compress_dicoms(dicom_list, prefix, sourcedir):
                 # place into archive stripping any lead directories and
                 # adding the one corresponding to prefix
                 tar.add(outfile,
-                        arcname=opj(prefix, os.path.basename(outfile)),
+                        arcname=opj(basename(out_prefix),
+                                    os.path.basename(outfile)),
                         recursive=False,
-                        filter=_assign_dicom_time())
+                        filter=_assign_dicom_time)
     finally:
         time.time = _old_time
 
     shutil.rmtree(tmpdir)
+    return outtar
 
 
 def get_dicom_series_time(dicom_list):
@@ -609,8 +629,7 @@ def convert(items, symlink=True, converter=None,
                     if not os.path.exists(sourcedir_):
                         os.makedirs(sourcedir_)
                     compress_dicoms(item_dicoms,
-                                    os.path.basename(prefix),
-                                    sourcedir_)
+                                    opj(sourcedir_, os.path.basename(prefix)))
                 else:
                     dicomdir = prefix + '_dicom'
                     if os.path.exists(dicomdir):
