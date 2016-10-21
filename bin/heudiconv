@@ -849,7 +849,6 @@ def embed_metadata_into_nifti(converter, is_bids, item_dicoms, outname,
         os.chdir(cwd)
 
 
-
 def convert_dicoms(sid,
                    dicoms,
                    outdir,
@@ -860,111 +859,110 @@ def convert_dicoms(sid,
                    ses=None,
                    is_bids=False,
                    seqinfo=None):
-    if True:  # just to minimize diff for now, remove later and dedent
+    if dicoms:
+        lgr.info("Processing %d dicoms", len(dicoms))
+    elif seqinfo:
+        lgr.info("Processing %d pre-sorted seqinfo entries", len(seqinfo))
+    else:
+        raise ValueError("neither dicoms nor seqinfo dict was provided")
+
+    # in this reimplementation we can have only a single session assigned
+    # at this point
+    # dcmsessions =
+
+    #
+    # Annonimization parameters
+    #
+    if anon_sid is None:
+        anon_sid = sid
+    if anon_outdir is None:
+        anon_outdir = outdir
+
+    # Figure out where to stick supplemental info dicoms
+    idir = os.path.join(outdir, '.heudiconv', sid)
+    if is_bids and ses:
+        idir = os.path.join(idir, 'ses-%s' % str(ses))
+    # yoh: in my case if idir exists, it means that that study/subject/session
+    # is already processed
+    if anon_outdir == outdir:
+        # if all goes into a single dir, have a dedicated 'info' subdir
+        idir = os.path.join(idir, 'info')
+    if not os.path.exists(idir):
+        os.makedirs(idir)
+
+    shutil.copy(heuristic.filename, idir)
+    ses_suffix = "_ses-%s" % ses if ses is not None else ""
+    info_file = os.path.join(idir, '%s%s.auto.txt' % (sid, ses_suffix))
+    edit_file = os.path.join(idir, '%s%s.edit.txt' % (sid, ses_suffix))
+    filegroup_file = os.path.join(idir, 'filegroup%s.json' % ses_suffix)
+
+    if os.path.exists(edit_file):  # XXX may be condition on seqinfo is None
+        lgr.info("Reloading existing filegroup.json because %s exists",
+                 edit_file)
+        info = read_config(edit_file)
+        filegroup = load_json(filegroup_file)
+        # XXX Yarik finally understood why basedir was dragged along!
+        # So we could reuse the same PATHs definitions possibly consistent
+        # across re-runs... BUT that wouldn't work anyways if e.g.
+        # DICOMs dumped with SOP UUIDs thus differing across runs etc
+        # So either it would need to be brought back or reconsidered altogether
+        # (since no sample data to test on etc)
+    else:
+        # TODO -- might have been done outside already!
         if dicoms:
-            lgr.info("Processing %d dicoms", len(dicoms))
-        elif seqinfo:
-            lgr.info("Processing %d pre-sorted seqinfo entries", len(seqinfo))
-        else:
-            raise ValueError("neither dicoms nor seqinfo dict was provided")
+            seqinfo = group_dicoms_into_seqinfos(
+                dicoms,
+                dcmfilter=getattr(heuristic, 'filter_dicom', None))
+        seqinfo_list = list(seqinfo.keys())
+        filegroup = {si.series_id: x for si, x in seqinfo.items()}
 
-        # in this reimplementation we can have only a single session assigned
-        # at this point
-        # dcmsessions =
+        save_json(filegroup_file, filegroup)
+        dicominfo_file = os.path.join(idir, 'dicominfo%s.tsv' % ses_suffix)
+        with open(dicominfo_file, 'wt') as fp:
+            for seq in seqinfo_list:
+                fp.write('\t'.join([str(val) for val in seq]) + '\n')
+        lgr.debug("Calling out to %s.infodict", heuristic)
+        info = heuristic.infotodict(seqinfo_list)
+        write_config(info_file, info)
+        write_config(edit_file, info)
 
-        #
-        # Annonimization parameters
-        #
-        if anon_sid is None:
-            anon_sid = sid
-        if anon_outdir is None:
-            anon_outdir = outdir
+    #
+    # Conversion
+    #
 
-        # Figure out where to stick supplemental info dicoms
-        idir = os.path.join(outdir, '.heudiconv', sid)
-        if is_bids and ses:
-            idir = os.path.join(idir, 'ses-%s' % str(ses))
-        # yoh: in my case if idir exists, it means that that study/subject/session
-        # is already processed
-        if anon_outdir == outdir:
-            # if all goes into a single dir, have a dedicated 'info' subdir
-            idir = os.path.join(idir, 'info')
-        if not os.path.exists(idir):
-            os.makedirs(idir)
+    sourcedir = None
+    if is_bids:
+        sourcedir = os.path.join(outdir, 'sourcedata')
+        # the other portion of the path would mimic BIDS layout
+        # so we don't need to worry here about sub, ses at all
+        tdir = anon_outdir
+    else:
+        tdir = os.path.join(anon_outdir, anon_sid)
 
-        shutil.copy(heuristic.filename, idir)
-        ses_suffix = "_ses-%s" % ses if ses is not None else ""
-        info_file = os.path.join(idir, '%s%s.auto.txt' % (sid, ses_suffix))
-        edit_file = os.path.join(idir, '%s%s.edit.txt' % (sid, ses_suffix))
-        filegroup_file = os.path.join(idir, 'filegroup%s.json' % ses_suffix)
+    if converter != 'none':
+        lgr.info("Doing conversion using %s", converter)
+        cinfo = conversion_info(anon_sid, tdir, info, filegroup,
+                                ses=ses)
+        convert(cinfo,
+                converter=converter,
+                scaninfo_suffix=getattr(
+                    heuristic, 'scaninfo_suffix', '.json'),
+                custom_callable=getattr(
+                    heuristic, 'custom_callable', None),
+                with_prov=with_prov,
+                is_bids=is_bids,
+                sourcedir=sourcedir,
+                outdir=tdir)
 
-        if os.path.exists(edit_file):  # XXX may be condition on seqinfo is None
-            lgr.info("Reloading existing filegroup.json because %s exists",
-                     edit_file)
-            info = read_config(edit_file)
-            filegroup = load_json(filegroup_file)
-            # XXX Yarik finally understood why basedir was dragged along!
-            # So we could reuse the same PATHs definitions possibly consistent
-            # across re-runs... BUT that wouldn't work anyways if e.g.
-            # DICOMs dumped with SOP UUIDs thus differing across runs etc
-            # So either it would need to be brought back or reconsidered altogether
-            # (since no sample data to test on etc)
-        else:
-            # TODO -- might have been done outside already!
-            if dicoms:
-                seqinfo = group_dicoms_into_seqinfos(
-                    dicoms,
-                    dcmfilter=getattr(heuristic, 'filter_dicom', None))
-            seqinfo_list = list(seqinfo.keys())
-            filegroup = {si.series_id: x for si, x in seqinfo.items()}
-
-            save_json(filegroup_file, filegroup)
-            dicominfo_file = os.path.join(idir, 'dicominfo%s.tsv' % ses_suffix)
-            with open(dicominfo_file, 'wt') as fp:
-                for seq in seqinfo_list:
-                    fp.write('\t'.join([str(val) for val in seq]) + '\n')
-            lgr.debug("Calling out to %s.infodict", heuristic)
-            info = heuristic.infotodict(seqinfo_list)
-            write_config(info_file, info)
-            write_config(edit_file, info)
-
-        #
-        # Conversion
-        #
-
-        sourcedir = None
-        if is_bids:
-            sourcedir = os.path.join(outdir, 'sourcedata')
-            # the other portion of the path would mimic BIDS layout
-            # so we don't need to worry here about sub, ses at all
-            tdir = anon_outdir
-        else:
-            tdir = os.path.join(anon_outdir, anon_sid)
-
-        if converter != 'none':
-            lgr.info("Doing conversion using %s", converter)
-            cinfo = conversion_info(anon_sid, tdir, info, filegroup,
-                                    ses=ses)
-            convert(cinfo,
-                    converter=converter,
-                    scaninfo_suffix=getattr(
-                        heuristic, 'scaninfo_suffix', '.json'),
-                    custom_callable=getattr(
-                        heuristic, 'custom_callable', None),
-                    with_prov=with_prov,
-                    is_bids=is_bids,
-                    sourcedir=sourcedir,
-                    outdir=tdir)
-
-        if is_bids:
-            if seqinfo:
-                add_participant_record(
-                    anon_outdir,
-                    anon_sid,
-                    seqinfo.keys()[0].patient_age,
-                    seqinfo.keys()[0].patient_sex,
-                )
-            populate_bids_templates(anon_outdir)
+    if is_bids:
+        if seqinfo:
+            add_participant_record(
+                anon_outdir,
+                anon_sid,
+                seqinfo.keys()[0].patient_age,
+                seqinfo.keys()[0].patient_sex,
+            )
+        populate_bids_templates(anon_outdir)
 
 
 def get_annonimized_sid(sid, anon_sid_cmd):
