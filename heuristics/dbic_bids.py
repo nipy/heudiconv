@@ -202,7 +202,7 @@ def get_unique(seqinfos, attr):
 # TODO: might need to do groupping per each session and return here multiple
 # hits, or may be we could just somehow demarkate that it will be multisession
 # one and so then later value parsed (again) in infotodict  would be used???
-def infotoids(seqinfos, outputdir):
+def infotoids(seqinfos, outdir):
     # decide on subjid and session based on patient_id
     lgr.info("Processing sequence infos to deduce study/session")
     study_description = get_unique(seqinfos, 'study_description')
@@ -218,7 +218,7 @@ def infotoids(seqinfos, outputdir):
     # TODO: actually check if given study is study we would care about
     # and if not -- we should throw some ???? exception
 
-    # So -- use `outputdir` and locator etc to see if for a given locator/subject
+    # So -- use `outdir` and locator etc to see if for a given locator/subject
     # and possible ses+ in the sequence names, so we would provide a sequence
     # So might need to go through  parse_dbic_protocol_name(s.protocol_name)
     # to figure out presence of sessions.
@@ -250,7 +250,7 @@ def infotoids(seqinfos, outputdir):
             # TODO - I think we are doomed to go through the sequence and split
             # ... actually the same as with nonsign_vals, we just would need to figure
             # out initial one if sign ones, and should make use of knowing
-            # outputdir
+            # outdir
             #raise NotImplementedError()
             # Let's be lazy for now just to get somewhere
             session = '001'

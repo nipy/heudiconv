@@ -52,6 +52,10 @@ logging.basicConfig(
 lgr.debug("Starting the abomination")  # just to "run-test" logging
 
 
+global_options = {
+    'overwrite': False   # overwrite existing files
+}
+
 SeqInfo = namedtuple(
     'SeqInfo',
     ['total_files_till_now',  # 0
@@ -110,7 +114,8 @@ class TempDirs(object):
         lgr.info("Removing %d temporary directories", len(self.dirs))
         for t in self.dirs[:]:
             lgr.debug("Removing %s", t)
-            self.rmtree(t)
+            if self:
+                self.rmtree(t)
 
     def rmtree(self, tmpdir):
         if os.path.exists(tmpdir):
@@ -522,7 +527,7 @@ def compress_dicoms(dicom_list, out_prefix):
     """
     tmpdir = mkdtemp(prefix='dicomtar')
     outtar = out_prefix + '.dicom.tgz'
-    if os.path.exists(outtar):
+    if os.path.exists(outtar) and not global_options['overwrite']:
         raise RuntimeError("File %s already exists, will not override"
                            % outtar)
     # tarfile encodes current time.time inside making those non-reproducible
@@ -543,6 +548,9 @@ def compress_dicoms(dicom_list, out_prefix):
         import time
         _old_time = time.time
         time.time = lambda: dcm_time
+        if exists(outtar):
+            # could be under annex and forbid inplace change
+            os.unlink(outtar)
         with tarfile.open(outtar, 'w:gz', dereference=True) as tar:
             for filename in dicom_list:
                 outfile = os.path.join(tmpdir, os.path.basename(filename))
@@ -584,7 +592,7 @@ def safe_copyfile(src, dest):
     """
     if os.path.isdir(dest):
         dest = os.path.join(dest, os.path.basename(src))
-    if os.path.lexists(dest):
+    if os.path.lexists(dest) and not global_options['overwrite']:
         raise ValueError("was asked to copy %s but destination already exists: %s"
                          % (src, dest))
     shutil.copyfile(src, dest)
@@ -847,48 +855,12 @@ def convert_dicoms(sid,
                    outdir,
                    heuristic,
                    converter,
-                   queue=None,
-                   anon_sid_cmd=None, anon_outdir=None, with_prov=False,
+                   anon_sid=None, anon_outdir=None,
+                   with_prov=False,
                    ses=None,
                    is_bids=False,
                    seqinfo=None):
     if True:  # just to minimize diff for now, remove later and dedent
-        #
-        # TODO: Also better lives outside and just replicates all cmdline args?
-        #
-        if queue:
-            if seqinfo and not dicoms:
-                # flatten them all and provide into batching, which again
-                # would group them... heh
-                dicoms = sum(seqinfo.values(), [])
-                # so
-                raise NotImplementedError(
-                    "we already groupped them so need to add a switch to avoid "
-                    "any groupping, so no outdir prefix doubled etc"
-                )
-            # TODO This needs to be updated to better scale with additional args
-            progname = os.path.abspath(inspect.getfile(inspect.currentframe()))
-            convertcmd = ' '.join(['python', progname,
-                                   '-o', outdir,
-                                   '-f', heuristic.filename,
-                                   '-s', sid,
-                                   '-c', converter])
-            if ses:
-                convertcmd += " --ses '%s'" % ses
-            if with_prov:
-                convertcmd += " --with-prov"
-            if is_bids:
-                convertcmd += " --bids"
-            convertcmd += ["'%s'" % f for f in dicoms]
-
-            script_file = 'dicom-%s.sh' % sid
-            with open(script_file, 'wt') as fp:
-                fp.writelines(['#!/bin/bash\n', convertcmd])
-            outcmd = 'sbatch -J dicom-%s -p %s -N1 -c2 --mem=20G %s' \
-                     % (sid, queue, script_file)
-            os.system(outcmd)
-            return
-
         if dicoms:
             lgr.info("Processing %d dicoms", len(dicoms))
         elif seqinfo:
@@ -901,13 +873,10 @@ def convert_dicoms(sid,
         # dcmsessions =
 
         #
-        # Annonimization
+        # Annonimization parameters
         #
-        anon_sid = sid
-        if anon_sid_cmd is not None:
-            from subprocess import check_output
-            anon_sid = check_output([anon_sid_cmd, sid]).strip()
-            lgr.info("Annonimized sid %s into %s", sid, anon_sid)
+        if anon_sid is None:
+            anon_sid = sid
         if anon_outdir is None:
             anon_outdir = outdir
 
@@ -987,6 +956,25 @@ def convert_dicoms(sid,
                     sourcedir=sourcedir,
                     outdir=tdir)
 
+        if is_bids:
+            if seqinfo:
+                add_participant_record(
+                    anon_outdir,
+                    anon_sid,
+                    seqinfo.keys()[0].patient_age,
+                    seqinfo.keys()[0].patient_sex,
+                )
+            populate_bids_templates(anon_outdir)
+
+
+def get_annonimized_sid(sid, anon_sid_cmd):
+    anon_sid = sid
+    if anon_sid_cmd is not None:
+        from subprocess import check_output
+        anon_sid = check_output([anon_sid_cmd, sid]).strip()
+        lgr.info("Annonimized sid %s into %s", sid, anon_sid)
+    return anon_sid
+
 
 def get_extracted_dicoms(fl):
     """Given a list of files, possibly extract some from tarballs
@@ -1052,8 +1040,8 @@ def load_heuristic(heuristic_file):
     return mod
 
 
-def get_study_sessions(dicom_dir_template, files_opt, heuristic, outputdir,
-                       session, subjs):
+def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
+                       session, sids):
     """Given options from cmdline sort files or dicom seqinfos into
     study_sessions which put together files for a single session of a subject
     in a study
@@ -1068,13 +1056,13 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outputdir,
     if dicom_dir_template:
         dicom_dir_template = os.path.abspath(dicom_dir_template)
         assert not files_opt  # see above TODO
-        assert subjs
+        assert sids
         # expand the input template
         if '%s' not in dicom_dir_template:
             raise ValueError(
                 "dicom dir template must have '%s' as a placeholder for a "
                 "subject id.  Got %r" % dicom_dir_template)
-        for sid in subjs:
+        for sid in sids:
             sdir = dicom_dir_template % sid
             # and see what matches
             files = sorted(glob(sdir))
@@ -1094,8 +1082,8 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outputdir,
                     )] = files_
     else:
         # prep files
-        assert (files_opt)
-        assert (not subjs)
+        assert files_opt
+        assert not sids
         files = []
         for f in files_opt:
             if isdir(f):
@@ -1129,7 +1117,7 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outputdir,
             # actually probably there should be a dedicated exception for
             # heuristics to throw if they detect that the study they are given
             # is not the one they would be willing to work on
-            ids = heuristic.infotoids(seqinfo.keys(), outputdir=outputdir)
+            ids = heuristic.infotoids(seqinfo.keys(), outdir=outdir)
             # TODO:  probably infotoids is doomed to do more and possibly
             # split into multiple sessions!!!! but then it should be provided
             # full seqinfo with files which it would place into multiple groups
@@ -1288,7 +1276,7 @@ def add_to_datalad(topdir, studydir, msg=None, bids=False):
     # ideally we should save from within the subdataset,
     # but https://github.com/datalad/datalad/pull/987 is not yet there
     # so for now saving everything
-    dstop.save(auto_add_changes=True, recursive=True)
+    dstop.save(message=msg, auto_add_changes=True, recursive=True)
 
     # TODO:  they are still appearing as native annex symlinked beasts
     """
@@ -1328,14 +1316,156 @@ def setup_exceptionhook():
     sys.excepthook = _pdb_excepthook
 
 
-def main(args=None):
-    docstr = '\n'.join((__doc__,
-"""
-           Example:
+def _main(args):
+    """Given a structure of arguments from the parser perform computation"""
+    #
+    # Load heuristic -- better do it asap to make sure it loads correctly
+    #
+    heuristic = load_heuristic(os.path.realpath(args.heuristic_file))
 
-           heudiconv -d rawdata/%s -o . -f heuristic.py -s s1 s2
-s3
-"""))
+    #
+    # Deal with provided files or templates
+    #
+
+    #
+    # pre-process provided list of files and possibly sort into groups/sessions
+    #
+
+    # Group files per each study/sid/session
+
+    dicom_dir_template = args.dicom_dir_template
+    files_opt = args.files
+    session = args.session
+    subjs = args.subjs
+    outdir = os.path.abspath(args.outdir)
+
+    # TODO: Move into a function!
+    study_sessions = get_study_sessions(
+        dicom_dir_template, files_opt,
+        heuristic, outdir, session, subjs)
+    # extract tarballs, and replace their entries with expanded lists of files
+    # TODO: we might need to sort so sessions are ordered???
+    lgr.info("Need to process %d study sessions", len(study_sessions))
+
+    #
+    # processed_studydirs = set()
+
+    for (locator, session, sid), files_or_seqinfo in study_sessions.items():
+
+        if not len(files_or_seqinfo):
+            raise ValueError("nothing to process?")
+        # that is how life is ATM :-/ since we don't do sorting if subj
+        # template is provided
+        if isinstance(files_or_seqinfo, dict):
+            assert(isinstance(list(files_or_seqinfo.keys())[0], SeqInfo))
+            dicoms = None
+            seqinfo = files_or_seqinfo
+        else:
+            dicoms = files_or_seqinfo
+            seqinfo = None
+
+        if args.queue:
+            if seqinfo and not dicoms:
+                # flatten them all and provide into batching, which again
+                # would group them... heh
+                dicoms = sum(seqinfo.values(), [])
+                # so
+                raise NotImplementedError(
+                    "we already groupped them so need to add a switch to avoid "
+                    "any groupping, so no outdir prefix doubled etc"
+                )
+            # TODO This needs to be updated to better scale with additional args
+            progname = os.path.abspath(inspect.getfile(inspect.currentframe()))
+            convertcmd = ' '.join(['python', progname,
+                                   '-o', study_outdir,
+                                   '-f', heuristic.filename,
+                                   '-s', sid,
+                                   '--anon-cmd', args.anon_cmd,
+                                   '-c', args.converter])
+            if session:
+                convertcmd += " --ses '%s'" % session
+            if args.with_prov:
+                convertcmd += " --with-prov"
+            if args.bids:
+                convertcmd += " --bids"
+            convertcmd += ["'%s'" % f for f in dicoms]
+
+            script_file = 'dicom-%s.sh' % sid
+            with open(script_file, 'wt') as fp:
+                fp.writelines(['#!/bin/bash\n', convertcmd])
+            outcmd = 'sbatch -J dicom-%s -p %s -N1 -c2 --mem=20G %s' \
+                     % (sid, args.queue, script_file)
+            os.system(outcmd)
+            continue
+
+        anon_sid = get_annonimized_sid(sid, args.anon_cmd)
+
+        study_outdir = opj(outdir, locator or '')
+
+        anon_outdir = args.conv_outdir or outdir
+        anon_study_outdir = opj(anon_outdir, locator or '')
+
+        # TODO: --datalad  cmdline option, which would take care about initiating
+        # the outdir -> study_outdir datasets if not yet there
+        if args.datalad:
+            datalad_msg_suf = ' %s' % anon_sid
+            if session:
+                datalad_msg_suf += ", session %s" % session
+            if seqinfo:
+                datalad_msg_suf += ", %d sequences" % len(seqinfo)
+            datalad_msg_suf += ", %d dicoms" % (
+                len(sum(seqinfo.values(), [])) if seqinfo else len(dicoms)
+            )
+            from datalad.api import Dataset
+            ds = Dataset(anon_study_outdir)
+            if not exists(anon_outdir) or not ds.is_installed():
+                add_to_datalad(
+                    anon_outdir, anon_study_outdir,
+                    msg="Preparing for %s" % datalad_msg_suf,
+                    bids=args.bids)
+
+        convert_dicoms(
+                   sid,
+                   dicoms,
+                   study_outdir,
+                   heuristic=heuristic,
+                   converter=args.converter,
+                   anon_sid=anon_sid,
+                   anon_outdir=anon_study_outdir,
+                   with_prov=args.with_prov,
+                   ses=session,
+                   is_bids=args.bids,
+                   seqinfo=seqinfo)
+
+        if args.datalad:
+            msg = "Converted subject %s" % datalad_msg_suf
+            # TODO:  whenever propagate to supers work -- do just
+            # ds.save(msg=msg)
+            #  also in batch mode might fail since we have no locking ATM
+            #  and theoretically no need actually to save entire study
+            #  we just need that
+            add_to_datalad(outdir, study_outdir, msg=msg, bids=args.bids)
+
+    # if args.bids:
+    #     # Let's populate BIDS templates for folks to take care about
+    #     for study_outdir in processed_studydirs:
+    #         populate_bids_templates(study_outdir)
+    #
+    #         # TODO: record_collection of the sid/session although that information
+    #         # is pretty much present in .heudiconv/SUBJECT/info so we could just poke there
+
+    tempdirs.cleanup()
+
+
+def get_parser():
+    docstr = '\n'.join((__doc__,
+                        """
+                                   Example:
+
+                                   heudiconv -d rawdata/%s -o . -f
+                                   heuristic.py -s s1 s2
+                        s3
+                        """))
     parser = argparse.ArgumentParser(description=docstr)
     parser.add_argument('--version', action='version', version=__version__)
     parser.add_argument('-d', '--dicom_dir_template',
@@ -1353,17 +1483,18 @@ s3
                              'heuristic')
     parser.add_argument('-c', '--converter', dest='converter',
                         required=True,
-                        choices=('mri_convert', 'dcmstack', 'dcm2nii', 'dcm2niix',
-                                 'none'),
-                        help='''tool to use for dicom conversion. Setting to 
+                        choices=(
+                        'mri_convert', 'dcmstack', 'dcm2nii', 'dcm2niix',
+                        'none'),
+                        help='''tool to use for dicom conversion. Setting to
                         "none" disables the actual conversion step -- useful
                         for testing heuristics.''')
-    parser.add_argument('-o', '--outdir', dest='outputdir',
+    parser.add_argument('-o', '--outdir', dest='outdir',
                         default=os.getcwd(),
                         help='''output directory for conversion setup (for
                         further customization and future reference. This
                         directory will refer to non-anonymized subject IDs''')
-    parser.add_argument('-a', '--conv-outdir', dest='conv_outputdir',
+    parser.add_argument('-a', '--conv-outdir', dest='conv_outdir',
                         default=None,
                         help='''output directory for converted files. By
                         default this is identical to --outdir. This option is
@@ -1374,17 +1505,21 @@ s3
                         DICOMs to anonymmized IDs. Such command must take a
                         single argument and return a single anonymized ID.
                         Also see --conv-outdir''')
-    parser.add_argument('-f', '--heuristic', dest='heuristic_file', required=True,
+    parser.add_argument('-f', '--heuristic', dest='heuristic_file',
+                        required=True,
                         help='python script containing heuristic')
     parser.add_argument('-q', '--queue', dest='queue', default=None,
                         help='''select batch system to submit jobs to instead
                         of running the conversion serially''')
     parser.add_argument('-p', '--with-prov', dest='with_prov', action='store_true',
-                        help='''Store additional provenance information. Requires python-rdflib.''')
+                        help='''Store additional provenance information.
+                        Requires python-rdflib.''')
     parser.add_argument('-ss', '--ses', dest='session', default=None,
                         help='''session for longitudinal study_sessions, default is none''')
     parser.add_argument('-b', '--bids', dest='bids', action='store_true',
                         help='''flag for output into BIDS structure''')
+    parser.add_argument('--overwrite', dest='overwrite', action='store_true',
+                        help='''flag to allow overwrite existing files''')
     parser.add_argument('--datalad', dest='datalad', action='store_true',
                         help='''Store the entire collection as DataLad dataset(s).
                         Small files will be committed directly to git, while large to annex.
@@ -1393,15 +1528,20 @@ s3
                         (i.e. no symlinks to under .git/annex).  For now just for BIDS mode.''')
     parser.add_argument('--dbg', action='store_true', dest='debug',
                         help="do not catch exceptions and show exception traceback")
-
     parser.add_argument(
         'files',
         nargs='*',
         help="files (tarballs, dicoms) or directories containing files to "
              "process. Specify one of the --dicom_dir_template or files "
              "not both")
+    return parser
 
-    args = parser.parse_args(args)
+
+def main(argv=None):
+    """Given a list of command line arguments, parse them and pass into _main
+    """
+    parser = get_parser()
+    args = parser.parse_args(argv)
 
     # TODO:  deprecate dicom_dir_template in favor of --files-templated or
     # smth like that which could take {subject} {session} ... and process
@@ -1413,90 +1553,14 @@ s3
     if args.debug:
         setup_exceptionhook()
 
-    #
-    # Load heuristic -- better do it asap to make sure it loads correctly
-    #
-    heuristic = load_heuristic(os.path.realpath(args.heuristic_file))
-
-    #
-    # Deal with provided files or templates
-    #
-
-    #
-    # pre-process provided list of files and possibly sort into groups/sessions
-    #
-
-    # for now will be just
-    # Group files per each study/subject/session
-
-    dicom_dir_template = args.dicom_dir_template
-    files_opt = args.files
-    session = args.session
-    subjs = args.subjs
-    outputdir = os.path.abspath(args.outputdir)
-
-    # TODO: Move into a function!
-    study_sessions = get_study_sessions(dicom_dir_template, files_opt,
-                                        heuristic, outputdir, session, subjs)# extract tarballs, and replace their entries with expanded lists of files
-    # TODO: we might need to sort so sessions are ordered???
-    lgr.info("Need to process %d study sessions", len(study_sessions))
-
-    processed_studydirs = set()
-
-    for (locator, session, subject), files_or_seqinfo in study_sessions.items():
-
-        if not len(files_or_seqinfo):
-            raise ValueError("nothing to process?")
-        # that is how life is ATM :-/ since we don't do sorting if subj
-        # template is provided
-        if isinstance(files_or_seqinfo, dict):
-            assert(isinstance(list(files_or_seqinfo.keys())[0], SeqInfo))
-            files = None
-            seqinfo = files_or_seqinfo
-        else:
-            files = files_or_seqinfo
-            seqinfo = None
-
-        study_outputdir = opj(outputdir, locator or '')
-
-        # TODO: --datalad  cmdline option, which would take care about initiating
-        # the outputdir -> study_outputdir datasets if not yet there
-        if args.datalad:
-            add_to_datalad(outputdir, study_outputdir, bids=args.bids)
-
-        convert_dicoms(
-                   subject,
-                   files,
-                   study_outputdir,
-                   heuristic=heuristic,
-                   converter=args.converter,
-                   queue=args.queue,
-                   anon_sid_cmd=args.anon_cmd,
-                   anon_outdir=args.conv_outputdir,
-                   with_prov=args.with_prov,
-                   ses=session,
-                   is_bids=args.bids,
-                   seqinfo=seqinfo)
-
-        if args.bids and seqinfo:
-            add_participant_record(study_outputdir,
-                                   subject,
-                                   seqinfo.keys()[0].patient_age,
-                                   seqinfo.keys()[0].patient_sex,
-                                   )
-        processed_studydirs.add(study_outputdir)
-
-    if args.bids:
-        # Let's populate BIDS templates for folks to take care about
-        for study_outputdir in processed_studydirs:
-            populate_bids_templates(study_outputdir)
-            if args.datalad:
-                add_to_datalad(outputdir, study_outputdir, bids=args.bids)
-
-            # TODO: record_collection of the subject/session although that information
-            # is pretty much present in .heudiconv/SUBJECT/info so we could just poke there
-
-    tempdirs.cleanup()
+    orig_global_options = global_options.copy()
+    try:
+        global_options['overwrite'] = args.overwrite
+        return _main(args)
+    finally:
+        # reset back
+        for k, v in orig_global_options.items():
+            global_options[k] = v
 
 
 if __name__ == '__main__':
