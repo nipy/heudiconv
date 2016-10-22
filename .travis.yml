@@ -24,7 +24,7 @@ before_install:
   - bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
   - travis_retry sudo apt-get update -qq
   - travis_retry sudo apt-get install git-annex-standalone python-dicom python-nipype python-nibabel
-  - pip install datalad dcmstack
+  - pip install datalad git+git://github.com/moloney/dcmstack/
 
 install:
   - git config --global user.email "test@travis.land"
