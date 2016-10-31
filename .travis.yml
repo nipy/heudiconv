@@ -25,8 +25,9 @@ before_install:
   - travis_retry sudo apt-get update -qq
   - travis_retry sudo apt-get install git-annex-standalone python-dicom python-nipype python-nibabel
   - pip install datalad git+git://github.com/moloney/dcmstack/
-  # there is only dated nipype for precise from neurodebian
-  - pip install nipype
+  # there is only dated nipype for precise from neurodebian.
+  # TEMP: configparser needs to be listed manually for now: https://github.com/nipy/nipype/pull/1697
+  - pip install nipype configparser
 
 install:
   - git config --global user.email "test@travis.land"
