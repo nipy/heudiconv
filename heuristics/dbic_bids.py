@@ -264,6 +264,11 @@ def infotoids(seqinfos, outdir):
     }
 
 
+def sanitize_str(value):
+    """Remove illegal characters for BIDS from task/acq/etc.."""
+    return value.translate(None, '#!@$%^&.,:;')
+
+
 def parse_dbic_protocol_name(protocol_name):
     """Parse protocol name
     """
@@ -320,7 +325,7 @@ def parse_dbic_protocol_name(protocol_name):
 
         if key in ['ses', 'run', 'task', 'acq']:
             # those we care about explicitly
-            regd[{'ses': 'session'}.get(key, key)] = value
+            regd[{'ses': 'session'}.get(key, key)] = sanitize_str(value)
         else:
             bids_leftovers.append(s)
 
@@ -342,11 +347,19 @@ def parse_dbic_protocol_name(protocol_name):
 
 def fixup_subjectid(subjectid):
     """Just in case someone managed to miss a zero or added an extra one"""
+    # make it lowercase
+    subjectid = subjectid.lower()
     reg = re.match("sid0*(\d+)$", subjectid)
     if not reg:
         # some completely other pattern
         return subjectid
     return "sid%06d" % int(reg.groups()[0])
+
+
+def test_sanitize_str():
+    assert sanitize_str('acq-super@duper.faster') == 'acq-superduperfaster'
+    assert sanitize_str('acq-perfect') == 'acq-perfect'
+    assert sanitize_str('acq-never:use:colon:!') == 'acq-neverusecolon'
 
 
 def test_fixupsubjectid():
@@ -357,6 +370,7 @@ def test_fixupsubjectid():
     assert fixup_subjectid("sid0000030") == "sid000030"
     assert fixup_subjectid("sid00030") == "sid000030"
     assert fixup_subjectid("sid30") == "sid000030"
+    assert fixup_subjectid("SID30") == "sid000030"
 
 
 def test_parse_dbic_protocol_name():
