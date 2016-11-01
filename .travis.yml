@@ -2,9 +2,12 @@
 language: python
 python:
   - 2.7
-  - 3.3
-  - 3.4
-  - 3.5
+# For PY3 testing we should use probably conda, so TODO
+# since otherwise scipy fails to build ATM etc, see e.g.
+# https://travis-ci.org/nipy/heudiconv/jobs/172172847
+#  - 3.3
+#  - 3.4
+#  - 3.5
 
 cache:
   - apt
