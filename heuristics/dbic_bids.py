@@ -1,6 +1,7 @@
 import os
 import re
 from collections import defaultdict
+import hashlib
 
 import logging
 lgr = logging.getLogger('heudiconv')
@@ -20,11 +21,20 @@ def create_key(subdir, file_suffix, outtype=('nii.gz', 'dicom'),
     return template, outtype, annotation_classes
 
 
+def md5sum(string):
+    """Computes md5sum of as string"""
+    m = hashlib.md5(string.encode())
+    return m.hexdigest()
+
+
 # XXX: hackhackhack
 protocols2fix = {
-    'dbic^pulse_sequences': [('anat_', 'anat-'),
-                             ('run-life[0-9]', 'run+_task-life'),
-                             ('scout_run\+', 'scout')]
+    '9d148e2a05f782273f6343507733309d':
+        [('anat_', 'anat-'),
+         ('run-life[0-9]', 'run+_task-life'),
+         ('scout_run\+', 'scout')],
+    '76b36c80231b0afaf509e2d52046e964':
+        [('fmap_run\+_2mm', 'fmap_run+_acq-2mm')]
 }
 keys2replace = ['protocol_name', 'series_description']
 
@@ -34,11 +44,12 @@ def fix_dbic_protocol(seqinfo, keys=keys2replace, subsdict=protocols2fix):
 
     # get name of the study to check if we know how to fix it up
     study_descr = get_unique(seqinfo, 'study_description')
+    study_descr_hash = md5sum(study_descr)
 
-    if study_descr not in subsdict:
+    if study_descr_hash not in subsdict:
         raise ValueError("I don't know how to fix {0}".format(study_descr))
     # need to replace both protocol_name series_description
-    substitutions = subsdict[study_descr]
+    substitutions = subsdict[study_descr_hash]
     for i, s in enumerate(seqinfo):
         fixed_kwargs = dict()
         for key in keys:
@@ -395,6 +406,11 @@ def fixup_subjectid(subjectid):
     return "sid%06d" % int(reg.groups()[0])
 
 
+def test_md5sum():
+    assert md5sum('cryptonomicon') == '1cd52edfa41af887e14ae71d1db96ad1'
+    assert md5sum('mysecretmessage') == '07989808231a0c6f522f9d8e34695794'
+
+
 def test_fix_dbic_protocol():
     from collections import namedtuple
     FakeSeqInfo = namedtuple('FakeSeqInfo',
@@ -411,8 +427,9 @@ def test_fix_dbic_protocol():
     seqinfos = [seq1, seq2]
     keys = ['field1']
     subsdict = {
-        'mystudy': [('scout_run\+', 'scout'),
-                    ('run-life[0-9]', 'run+_task-life')],
+        md5sum('mystudy'):
+            [('scout_run\+', 'scout'),
+             ('run-life[0-9]', 'run+_task-life')],
     }
 
     seqinfos_ = fix_dbic_protocol(seqinfos, keys=keys, subsdict=subsdict)
