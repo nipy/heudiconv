@@ -260,7 +260,7 @@ def infotoids(seqinfos, outdir):
     # TODO:  fix up subject id if missing some 0s
     split = study_description.split('^', 1)
     # split first one even more, since couldbe PI_Student or PI-Student
-    split = re.split(split[0], '-|_', 1) + split[1:]
+    split = re.split('-|_', split[0], 1) + split[1:]
 
     # locator = study_description.replace('^', '/')
     locator = '/'.join(split)
