@@ -35,12 +35,17 @@ def fix_dbic_protocol(seqinfo):
     if study_descr == 'dbic^pulse_sequences':
         replace = [('anat_', 'anat-'),
                    ('life[0-9]', 'life')]
-        for s in seqinfo:
-            for substring, replacement in replace:
-                regex = re.compile(substring, re.IGNORECASE)
-                for key in keys2replace:
-                    new_value = regex.sub(replacement, getattr(s, key))
-                    setattr(s, key, new_value)
+        for i, s in enumerate(seqinfo):
+            fixed_kwargs = dict()
+            for key in keys2replace:
+                value = getattr(s, key)
+                # replace all I need to replace
+                for substring, replacement in replace:
+                    value = re.sub(substring, replacement, value)
+                fixed_kwargs[key] = value
+            # namedtuples are immutable
+            seqinfo[i] = s._replace(**fixed_kwargs)
+
     else:
         raise ValueError("I don't know how to fix {0}".format(study_descr))
 
