@@ -20,6 +20,33 @@ def create_key(subdir, file_suffix, outtype=('nii.gz', 'dicom'),
     return template, outtype, annotation_classes
 
 
+# XXX: hackhackhack
+protocols2fix = ['dbic^pulse_sequences']
+
+
+def fix_dbic_protocol(seqinfo):
+    """Ad-hoc fixup for existing protocols"""
+
+    # get name of the study to check if we know how to fix it up
+    study_descr = get_unique(seqinfo, 'study_description')
+
+    # need to replace both protocol_name and series_id
+    keys2replace = ['protocol_name', 'series_id']
+    if study_descr == 'dbic^pulse_sequences':
+        replace = [('anat_', 'anat-'),
+                   ('life[0-9]', 'life')]
+        for s in seqinfo:
+            for substring, replacement in replace:
+                regex = re.compile(substring, re.IGNORECASE)
+                for key in keys2replace:
+                    new_value = regex.sub(replacement, getattr(s, key))
+                    setattr(s, key, new_value)
+    else:
+        raise ValueError("I don't know how to fix {0}".format(study_descr))
+
+    return seqinfo
+
+
 # XXX we killed session indicator!  what should we do now?!!!
 # WE DON:T NEED IT -- it will be provided into conversion_info as `session`
 # So we just need subdir and file_suffix!
@@ -34,6 +61,12 @@ def infotodict(seqinfo):
     subindex: sub index within group
     session: scan index for longitudinal acq
     """
+    # XXX: ad hoc hack
+    study_description = get_unique(seqinfo, 'study_description')
+    if study_description in protocols2fix:
+        lgr.info("Fixing up protocol for {0}".format(study_description))
+        seqinfo = fix_dbic_protocol(seqinfo)
+
     lgr.info("Processing %d seqinfo entries", len(seqinfo))
     and_dicom = ('dicom', 'nii.gz')
 
