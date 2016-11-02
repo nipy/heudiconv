@@ -30,8 +30,8 @@ def fix_dbic_protocol(seqinfo):
     # get name of the study to check if we know how to fix it up
     study_descr = get_unique(seqinfo, 'study_description')
 
-    # need to replace both protocol_name and series_id
-    keys2replace = ['protocol_name', 'series_id', 'series_description']
+    # need to replace both protocol_name series_description
+    keys2replace = ['protocol_name', 'series_description']
     if study_descr == 'dbic^pulse_sequences':
         replace = [('anat_', 'anat-'),
                    ('run-life[0-9]', 'run+_task-life')]
