@@ -80,7 +80,7 @@ def infotodict(seqinfo):
     """
     # XXX: ad hoc hack
     study_description = get_unique(seqinfo, 'study_description')
-    if study_description in protocols2fix:
+    if md5sum(study_description) in protocols2fix:
         lgr.info("Fixing up protocol for {0}".format(study_description))
         seqinfo = fix_dbic_protocol(seqinfo)
 
