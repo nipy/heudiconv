@@ -31,10 +31,10 @@ def fix_dbic_protocol(seqinfo):
     study_descr = get_unique(seqinfo, 'study_description')
 
     # need to replace both protocol_name and series_id
-    keys2replace = ['protocol_name', 'series_id']
+    keys2replace = ['protocol_name', 'series_id', 'series_description']
     if study_descr == 'dbic^pulse_sequences':
         replace = [('anat_', 'anat-'),
-                   ('life[0-9]', 'life')]
+                   ('run-life[0-9]', 'run+_task-life')]
         for i, s in enumerate(seqinfo):
             fixed_kwargs = dict()
             for key in keys2replace:
