@@ -21,33 +21,34 @@ def create_key(subdir, file_suffix, outtype=('nii.gz', 'dicom'),
 
 
 # XXX: hackhackhack
-protocols2fix = ['dbic^pulse_sequences']
+protocols2fix = {
+    'dbic^pulse_sequences': [('anat_', 'anat-'),
+                             ('run-life[0-9]', 'run+_task-life'),
+                             ('scout_run\+', 'scout')]
+}
+keys2replace = ['protocol_name', 'series_description']
 
 
-def fix_dbic_protocol(seqinfo):
+def fix_dbic_protocol(seqinfo, keys=keys2replace, subsdict=protocols2fix):
     """Ad-hoc fixup for existing protocols"""
 
     # get name of the study to check if we know how to fix it up
     study_descr = get_unique(seqinfo, 'study_description')
 
-    # need to replace both protocol_name series_description
-    keys2replace = ['protocol_name', 'series_description']
-    if study_descr == 'dbic^pulse_sequences':
-        replace = [('anat_', 'anat-'),
-                   ('run-life[0-9]', 'run+_task-life')]
-        for i, s in enumerate(seqinfo):
-            fixed_kwargs = dict()
-            for key in keys2replace:
-                value = getattr(s, key)
-                # replace all I need to replace
-                for substring, replacement in replace:
-                    value = re.sub(substring, replacement, value)
-                fixed_kwargs[key] = value
-            # namedtuples are immutable
-            seqinfo[i] = s._replace(**fixed_kwargs)
-
-    else:
+    if study_descr not in subsdict:
         raise ValueError("I don't know how to fix {0}".format(study_descr))
+    # need to replace both protocol_name series_description
+    substitutions = subsdict[study_descr]
+    for i, s in enumerate(seqinfo):
+        fixed_kwargs = dict()
+        for key in keys:
+            value = getattr(s, key)
+            # replace all I need to replace
+            for substring, replacement in substitutions:
+                value = re.sub(substring, replacement, value)
+            fixed_kwargs[key] = value
+        # namedtuples are immutable
+        seqinfo[i] = s._replace(**fixed_kwargs)
 
     return seqinfo
 
@@ -392,6 +393,43 @@ def fixup_subjectid(subjectid):
         # some completely other pattern
         return subjectid
     return "sid%06d" % int(reg.groups()[0])
+
+
+def test_fix_dbic_protocol():
+    from collections import namedtuple
+    FakeSeqInfo = namedtuple('FakeSeqInfo',
+                             ['study_description', 'field1', 'field2'])
+
+    seq1 = FakeSeqInfo('mystudy',
+                       '02-anat-scout_run+_MPR_sag',
+                       '11-func_run-life2_acq-2mm692')
+    seq2 = FakeSeqInfo('mystudy',
+                       'nochangeplease',
+                       'nochangeeither')
+
+
+    seqinfos = [seq1, seq2]
+    keys = ['field1']
+    subsdict = {
+        'mystudy': [('scout_run\+', 'scout'),
+                    ('run-life[0-9]', 'run+_task-life')],
+    }
+
+    seqinfos_ = fix_dbic_protocol(seqinfos, keys=keys, subsdict=subsdict)
+    assert(seqinfos[1] == seqinfos_[1])
+    # field2 shouldn't have changed since I didn't pass it
+    assert(seqinfos_[0] == FakeSeqInfo('mystudy',
+                                       '02-anat-scout_MPR_sag',
+                                       seq1.field2))
+
+    # change also field2 please
+    keys = ['field1', 'field2']
+    seqinfos_ = fix_dbic_protocol(seqinfos, keys=keys, subsdict=subsdict)
+    assert(seqinfos[1] == seqinfos_[1])
+    # now everything should have changed
+    assert(seqinfos_[0] == FakeSeqInfo('mystudy',
+                                       '02-anat-scout_MPR_sag',
+                                       '11-func_run+_task-life_acq-2mm692'))
 
 
 def test_sanitize_str():
