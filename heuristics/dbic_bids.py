@@ -53,8 +53,8 @@ def fix_canceled_runs(seqinfo, accession2run=fix_accession2run):
 
 
 # dictionary containing fixes, keys are md5sum of study_description from
-# dicoms, in the form of PI^Experimenter; values are list of tuples in the form
-# (regex_pattern, substitution)
+# dicoms, in the form of PI-Experimenter^protocolname
+# values are list of tuples in the form (regex_pattern, substitution)
 protocols2fix = {
     '9d148e2a05f782273f6343507733309d':
         [('anat_', 'anat-'),
