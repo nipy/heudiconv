@@ -18,7 +18,7 @@ tests_datadir = opj(dirname(__file__), 'data')
 def test_reproducibility(tmpdir):
     #heudiconv.compress_dicoms(dicom_list, prefix, sourcedir)
     prefix = str(tmpdir.join("precious"))
-    args = [glob(opj(tests_datadir, 'fmap_acq-3mm', '*')), prefix]
+    args = [glob(opj(tests_datadir, '01-fmap_acq-3mm', '*')), prefix]
     tarball = heudiconv.compress_dicoms(*args)
     md5 = md5sum(tarball)
     assert tarball
