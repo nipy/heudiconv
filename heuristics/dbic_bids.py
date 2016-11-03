@@ -224,11 +224,12 @@ def infotodict(seqinfo):
                 # sequences -- e.g. one for magnitude(s) and other ones for
                 # phases.  In those we must not increment run!
                 if image_data_type == 'P':
-                    # XXX: check that study description is not one of the first one;
-                    # this is needed because at the beginning only
-                    # phasediff was acquired
-                    if prev_image_data_type != 'M' and \
-                            md5sum(s.study_description) != '9d148e2a05f782273f6343507733309d':
+                    if prev_image_data_type != 'M':
+                        # XXX: check that study description is not one of the first one;
+                        # this is needed because at the beginning only phasediff was acquired
+                        # and we want to save both anyway
+                        if md5sum(s.study_description) == '9d148e2a05f782273f6343507733309d':
+                            current_run += 1
                         raise RuntimeError("Was expecting phase image to follow magnitude image, but previous one was %r", prev_image_data_type)
                     # else we do nothing special
                 else:  # and otherwise we go to the next run
