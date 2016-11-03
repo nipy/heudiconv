@@ -28,8 +28,10 @@ def md5sum(string):
 
 
 # dictionary from accession-number to runs that need to be marked as bad
+# NOTE: even if filename has number that is 0-padded, internally no padding
+# is done
 fix_accession2run = {
-        'A000067': ['^.9-']
+        'A000067': ['^9-']
 }
 
 
