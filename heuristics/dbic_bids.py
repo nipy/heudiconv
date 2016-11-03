@@ -46,6 +46,16 @@ protocols2fix = {
 keys2replace = ['protocol_name', 'series_description']
 
 
+def filter_files(fn):
+    """Return True if a file should be kept, else False.
+    We're using it to filter out files that do not start with a number."""
+
+    split = fn.split('/')
+    sequence_dir = split[-2]
+
+    return True if re.match('^[0-9]+-', sequence_dir) else False
+
+
 def create_key(subdir, file_suffix, outtype=('nii.gz', 'dicom'),
                annotation_classes=None, prefix=''):
     if not subdir:
