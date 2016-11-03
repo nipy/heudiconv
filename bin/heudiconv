@@ -1110,6 +1110,7 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
         #import pdb; pdb.set_trace()
         seqinfo_dict = group_dicoms_into_seqinfos(
             files_,
+            flfilter=getattr(heuristic, 'filter_files', None),
             dcmfilter=getattr(heuristic, 'filter_dicom', None),
             per_studyUID=True)
 
