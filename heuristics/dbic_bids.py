@@ -83,8 +83,7 @@ def fix_canceled_runs(seqinfo, accession2run=fix_accession2run):
         badruns = accession2run[accession_number]
         badruns_pattern = '|'.join(badruns)
         for i, s in enumerate(seqinfo):
-            match = re.match(badruns_pattern, s.series_id)
-            if match:
+            if re.match(badruns_pattern, s.series_id):
                 lgr.info('Fixing bad run {0}'.format(s.series_id))
                 fixedkwargs = dict()
                 for key in keys2replace:
