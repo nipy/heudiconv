@@ -27,12 +27,14 @@ def md5sum(string):
     return m.hexdigest()
 
 
-def fix_canceled_runs(seqinfo):
+# dictionary from accession-number to runs that need to be marked as bad
+fix_accession2run = {
+        'A000067': ['^09-']
+}
+
+
+def fix_canceled_runs(seqinfo, accession2run=fix_accession2run):
     """Function that adds cancelme_ to known bad runs which were forgotten"""
-    # dictionary from accession-number to runs that need to be erased
-    accession2run = {
-       'A000067': ['^09-']
-    }
     accession_number = get_unique(seqinfo, 'accession_number')
     if accession_number in accession2run:
         badruns = accession2run[accession_number]
@@ -436,15 +438,50 @@ def test_md5sum():
     assert md5sum('mysecretmessage') == '07989808231a0c6f522f9d8e34695794'
 
 
+def test_fix_canceled_runs():
+    from collections import namedtuple
+    FakeSeqInfo = namedtuple('FakeSeqInfo',
+                             ['accession_number', 'series_id',
+                              'protocol_name', 'series_description'])
+
+    seqinfo = []
+    runname = 'func_run+'
+    for i in range(1, 6):
+        seqinfo.append(
+            FakeSeqInfo('accession1',
+                        '{0:02d}-'.format(i) + runname,
+                        runname, runname)
+        )
+
+    fake_accession2run = {
+        'accession1': ['^01-', '^03-']
+    }
+
+    seqinfo_ = fix_canceled_runs(seqinfo, fake_accession2run)
+
+    for i, s in enumerate(seqinfo_, 1):
+        output = runname
+        if i == 1 or i == 3:
+            output = 'cancelme_' + output
+        for key in ['series_description', 'protocol_name']:
+            value = getattr(s, key)
+            assert(value == output)
+        # check we didn't touch series_id
+        assert(s.series_id == '{0:02d}-'.format(i) + runname)
+
+
 def test_fix_dbic_protocol():
     from collections import namedtuple
     FakeSeqInfo = namedtuple('FakeSeqInfo',
-                             ['study_description', 'field1', 'field2'])
-
-    seq1 = FakeSeqInfo('mystudy',
+                             ['accession_number', 'study_description',
+                              'field1', 'field2'])
+    accession_number = 'A003'
+    seq1 = FakeSeqInfo(accession_number,
+                       'mystudy',
                        '02-anat-scout_run+_MPR_sag',
                        '11-func_run-life2_acq-2mm692')
-    seq2 = FakeSeqInfo('mystudy',
+    seq2 = FakeSeqInfo(accession_number,
+                       'mystudy',
                        'nochangeplease',
                        'nochangeeither')
 
@@ -460,7 +497,8 @@ def test_fix_dbic_protocol():
     seqinfos_ = fix_dbic_protocol(seqinfos, keys=keys, subsdict=subsdict)
     assert(seqinfos[1] == seqinfos_[1])
     # field2 shouldn't have changed since I didn't pass it
-    assert(seqinfos_[0] == FakeSeqInfo('mystudy',
+    assert(seqinfos_[0] == FakeSeqInfo(accession_number,
+                                       'mystudy',
                                        '02-anat-scout_MPR_sag',
                                        seq1.field2))
 
@@ -469,7 +507,8 @@ def test_fix_dbic_protocol():
     seqinfos_ = fix_dbic_protocol(seqinfos, keys=keys, subsdict=subsdict)
     assert(seqinfos[1] == seqinfos_[1])
     # now everything should have changed
-    assert(seqinfos_[0] == FakeSeqInfo('mystudy',
+    assert(seqinfos_[0] == FakeSeqInfo(accession_number,
+                                       'mystudy',
                                        '02-anat-scout_MPR_sag',
                                        '11-func_run+_task-life_acq-2mm692'))
 
