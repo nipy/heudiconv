@@ -6,6 +6,45 @@ import hashlib
 import logging
 lgr = logging.getLogger('heudiconv')
 
+# dictionary from accession-number to runs that need to be marked as bad
+# NOTE: even if filename has number that is 0-padded, internally no padding
+# is done
+fix_accession2run = {
+    'A000067': ['^9-'],
+    # duplicate files -- use only those that start with numbers
+    'A000006': ['^[A-Za-z]']
+}
+
+# dictionary containing fixes, keys are md5sum of study_description from
+# dicoms, in the form of PI-Experimenter^protocolname
+# values are list of tuples in the form (regex_pattern, substitution)
+protocols2fix = {
+    '9d148e2a05f782273f6343507733309d':
+        [('anat_', 'anat-'),
+         ('run-life[0-9]', 'run+_task-life'),
+         ('scout_run\+', 'scout'),
+         # substitutions for old protocol names
+         ('AAHead_Scout_32ch-head-coil', 'anat-scout'),
+         ('MPRAGE', 'anat-T1w_acq-MPRAGE_run+'),
+         ('gre_field_mapping_2mm', 'fmap_acq-2mm'),
+         ('epi_bold_sms_p2_s4_2mm_life1_748',
+            'func_run+_task-life_acq-2mm748'),
+         ('epi_bold_sms_p2_s4_2mm_life2_692',
+            'func_run+_task-life_acq-2mm692'),
+         ('epi_bold_sms_p2_s4_2mm_life3_754',
+            'func_run+_task-life_acq-2mm754'),
+         ('epi_bold_sms_p2_s4_2mm_life4_824',
+            'func_run+_task-life_acq-2mm824'),
+         ('t2_space_sag_p4_iso', 'anat-T2w'),
+         ('gre_field_mapping_2.4mm', 'fmap_acq-2.4mm'),
+         ('rest_p2_sms4_2.4mm_64sl_1000tr_32te_600dyn',
+            'func_run+_task-rest_acq-2.4mm64sl1000tr32te600dyn'),
+         ('DTI_30', 'dwi_run+_acq-30')],
+    '76b36c80231b0afaf509e2d52046e964':
+        [('fmap_run\+_2mm', 'fmap_run+_acq-2mm')]
+}
+keys2replace = ['protocol_name', 'series_description']
+
 
 def create_key(subdir, file_suffix, outtype=('nii.gz', 'dicom'),
                annotation_classes=None, prefix=''):
@@ -27,14 +66,6 @@ def md5sum(string):
     return m.hexdigest()
 
 
-# dictionary from accession-number to runs that need to be marked as bad
-# NOTE: even if filename has number that is 0-padded, internally no padding
-# is done
-fix_accession2run = {
-        'A000067': ['^9-']
-}
-
-
 def fix_canceled_runs(seqinfo, accession2run=fix_accession2run):
     """Function that adds cancelme_ to known bad runs which were forgotten"""
     accession_number = get_unique(seqinfo, 'accession_number')
@@ -50,20 +81,6 @@ def fix_canceled_runs(seqinfo, accession2run=fix_accession2run):
                     fixedkwargs[key] = 'cancelme_' + getattr(s, key)
                 seqinfo[i] = s._replace(**fixedkwargs)
     return seqinfo
-
-
-# dictionary containing fixes, keys are md5sum of study_description from
-# dicoms, in the form of PI-Experimenter^protocolname
-# values are list of tuples in the form (regex_pattern, substitution)
-protocols2fix = {
-    '9d148e2a05f782273f6343507733309d':
-        [('anat_', 'anat-'),
-         ('run-life[0-9]', 'run+_task-life'),
-         ('scout_run\+', 'scout')],
-    '76b36c80231b0afaf509e2d52046e964':
-        [('fmap_run\+_2mm', 'fmap_run+_acq-2mm')]
-}
-keys2replace = ['protocol_name', 'series_description']
 
 
 def fix_dbic_protocol(seqinfo, keys=keys2replace, subsdict=protocols2fix):
