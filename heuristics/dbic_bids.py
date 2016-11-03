@@ -26,7 +26,7 @@ protocols2fix = {
          # substitutions for old protocol names
          ('AAHead_Scout_32ch-head-coil', 'anat-scout'),
          ('MPRAGE', 'anat-T1w_acq-MPRAGE_run+'),
-         ('gre_field_mapping_2mm', 'fmap_acq-2mm'),
+         ('gre_field_mapping_2mm', 'fmap_run+_acq-2mm'),
          ('epi_bold_sms_p2_s4_2mm_life1_748',
             'func_run+_task-life_acq-2mm748'),
          ('epi_bold_sms_p2_s4_2mm_life2_692',
@@ -36,7 +36,7 @@ protocols2fix = {
          ('epi_bold_sms_p2_s4_2mm_life4_824',
             'func_run+_task-life_acq-2mm824'),
          ('t2_space_sag_p4_iso', 'anat-T2w'),
-         ('gre_field_mapping_2.4mm', 'fmap_acq-2.4mm'),
+         ('gre_field_mapping_2.4mm', 'fmap_run+_acq-2.4mm'),
          ('rest_p2_sms4_2.4mm_64sl_1000tr_32te_600dyn',
             'func_run+_task-rest_acq-2.4mm64sl1000tr32te600dyn'),
          ('DTI_30', 'dwi_run+_acq-30')],
