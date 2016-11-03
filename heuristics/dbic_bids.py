@@ -220,21 +220,24 @@ def infotodict(seqinfo):
         if run is not None:
             # so we have an indicator for a run
             if run == '+':
-                # some sequences, e.g.  fmap, would generate two (or more?)
-                # sequences -- e.g. one for magnitude(s) and other ones for
-                # phases.  In those we must not increment run!
-                if image_data_type == 'P':
-                    if prev_image_data_type != 'M':
-                        # XXX: check that study description is not one of the first one;
-                        # this is needed because at the beginning only phasediff was acquired
-                        # and we want to save both anyway
-                        if md5sum(s.study_description) == '9d148e2a05f782273f6343507733309d':
-                            current_run += 1
-                        else:
-                            raise RuntimeError("Was expecting phase image to follow magnitude image, but previous one was %r", prev_image_data_type)
-                    # else we do nothing special
-                else:  # and otherwise we go to the next run
-                    current_run += 1
+                # XXX if we have a known earlier study, we need to always
+                # increase the run counter for phasediff because magnitudes
+                # were not acquired
+                if md5sum(s.study_description) == '9d148e2a05f782273f6343507733309d':
+                    if image_data_type == 'P' and prev_image_data_type != 'M':
+                        current_run += 1
+                else:
+                    # some sequences, e.g.  fmap, would generate two (or more?)
+                    # sequences -- e.g. one for magnitude(s) and other ones for
+                    # phases.  In those we must not increment run!
+                    if image_data_type == 'P':
+                        if prev_image_data_type != 'M':
+                            raise RuntimeError(
+                                "Was expecting phase image to follow magnitude "
+                                "image, but previous one was %r", prev_image_data_type)
+                        # else we do nothing special
+                    else:  # and otherwise we go to the next run
+                        current_run += 1
             elif run == '=':
                 if not current_run:
                     current_run = 1
