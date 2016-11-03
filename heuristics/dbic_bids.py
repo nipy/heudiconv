@@ -27,7 +27,30 @@ def md5sum(string):
     return m.hexdigest()
 
 
-# XXX: hackhackhack
+def fix_canceled_runs(seqinfo):
+    """Function that adds cancelme_ to known bad runs which were forgotten"""
+    # dictionary from accession-number to runs that need to be erased
+    accession2run = {
+       'A000067': ['^09-']
+    }
+    accession_number = get_unique(seqinfo, 'accession_number')
+    if accession_number in accession2run:
+        badruns = accession2run[accession_number]
+        badruns_pattern = '|'.join(badruns)
+        for i, s in enumerate(seqinfo):
+            match = re.match(badruns_pattern, s.series_id)
+            if match:
+                lgr.info('Fixing bad run {0}'.format(s.series_id))
+                fixedkwargs = dict()
+                for key in keys2replace:
+                    fixedkwargs[key] = 'cancelme_' + getattr(s, key)
+                seqinfo[i] = s._replace(**fixedkwargs)
+    return seqinfo
+
+
+# dictionary containing fixes, keys are md5sum of study_description from
+# dicoms, in the form of PI^Experimenter; values are list of tuples in the form
+# (regex_pattern, substitution)
 protocols2fix = {
     '9d148e2a05f782273f6343507733309d':
         [('anat_', 'anat-'),
@@ -41,6 +64,8 @@ keys2replace = ['protocol_name', 'series_description']
 
 def fix_dbic_protocol(seqinfo, keys=keys2replace, subsdict=protocols2fix):
     """Ad-hoc fixup for existing protocols"""
+    # add cancelme to known bad runs
+    seqinfo = fix_canceled_runs(seqinfo)
 
     # get name of the study to check if we know how to fix it up
     study_descr = get_unique(seqinfo, 'study_description')
