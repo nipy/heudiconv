@@ -49,6 +49,16 @@ protocols2fix = {
 }
 keys2replace = ['protocol_name', 'series_description']
 
+# list containing StudyInstanceID to skip -- hopefully doesn't happen too often
+dicoms2skip = [
+    '1.3.12.2.1107.5.2.43.66112.30000016110117002435700000001'
+]
+
+
+def filter_dicom(dcmdata):
+    """Return True if a DICOM dataset should be filtered out, else False"""
+    return True if dcmdata.StudyInstanceUID in dicoms2skip else False
+
 
 def filter_files(fn):
     """Return True if a file should be kept, else False.
