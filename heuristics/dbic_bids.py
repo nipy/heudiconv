@@ -11,6 +11,11 @@ lgr = logging.getLogger('heudiconv')
 # is done
 fix_accession2run = {
     'A000067': ['^9-'],
+    'A000072': ['^5-'],
+    'A000081': ['^5-'],
+    'A000082': ['^5-'],
+    'A000088': ['^9-'],
+    'A000090': ['^5-'],
 }
 
 # dictionary containing fixes, keys are md5sum of study_description from
