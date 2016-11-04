@@ -84,7 +84,8 @@ def filter_files(fn):
     split = os.path.split(fn)
     split2 = os.path.split(split[0])
     sequence_dir = split2[1]
-    accession_number = os.path.split(split2[0])
+    split3 = os.path.split(split2[0])
+    accession_number = split3[0]
     if accession_number == 'A000043':
         # crazy one that got copied for some runs but not for others,
         # so we are going to discard those that got copied and let heudiconv
