@@ -10,6 +10,8 @@ lgr = logging.getLogger('heudiconv')
 # NOTE: even if filename has number that is 0-padded, internally no padding
 # is done
 fix_accession2run = {
+    'A000005': ['^1-'],
+    'A000035': ['^8-', '^9-'],
     'A000067': ['^9-'],
     'A000072': ['^5-'],
     'A000081': ['^5-'],
@@ -31,6 +33,7 @@ protocols2fix = {
          ('AAHead_Scout_32ch-head-coil', 'anat-scout'),
          ('MPRAGE', 'anat-T1w_acq-MPRAGE_run+'),
          ('gre_field_mapping_2mm', 'fmap_run+_acq-2mm'),
+         ('gre_field_mapping_3mm', 'fmap_run+_acq-3mm'),
          ('epi_bold_sms_p2_s4_2mm_life1_748',
             'func_run+_task-life_acq-2mm748'),
          ('epi_bold_sms_p2_s4_2mm_life2_692',
@@ -39,13 +42,23 @@ protocols2fix = {
             'func_run+_task-life_acq-2mm754'),
          ('epi_bold_sms_p2_s4_2mm_life4_824',
             'func_run+_task-life_acq-2mm824'),
+         ('epi_bold_p2_3mm_nofs_life1_374',
+            'func_run+_task-life_acq-3mmnofs374'),
+         ('epi_bold_p2_3mm_nofs_life2_346',
+          'func_run+_task-life_acq-3mmnofs346'),
+         ('epi_bold_p2_3mm_nofs_life3_377',
+          'func_run+_task-life_acq-3mmnofs377'),
+         ('epi_bold_p2_3mm_nofs_life4_412',
+          'func_run+_task-life_acq-3mmnofs412'),
          ('t2_space_sag_p4_iso', 'anat-T2w_run+'),
          ('gre_field_mapping_2.4mm', 'fmap_run+_acq-2.4mm'),
          ('rest_p2_sms4_2.4mm_64sl_1000tr_32te_600dyn',
             'func_run+_task-rest_acq-2.4mm64sl1000tr32te600dyn'),
          ('DTI_30', 'dwi_run+_acq-30')],
     '76b36c80231b0afaf509e2d52046e964':
-        [('fmap_run\+_2mm', 'fmap_run+_acq-2mm')]
+        [('fmap_run\+_2mm', 'fmap_run+_acq-2mm')],
+    'c6d8fbccc72990bee61d28e73b2618a4':
+        [('run=', 'run+')]
 }
 keys2replace = ['protocol_name', 'series_description']
 
@@ -64,11 +77,23 @@ def filter_files(fn):
     """Return True if a file should be kept, else False.
     We're using it to filter out files that do not start with a number."""
 
+    # do not check for these accession numbers because they haven't been
+    # recopied with the initial number
+    donotfilter = ['A000012', 'A000013', 'A000041']
+
     split = os.path.split(fn)
     split2 = os.path.split(split[0])
     sequence_dir = split2[1]
-
-    return True if re.match('^[0-9]+-', sequence_dir) else False
+    accession_number = os.path.split(split2[0])
+    if accession_number == 'A000043':
+        # crazy one that got copied for some runs but not for others,
+        # so we are going to discard those that got copied and let heudiconv
+        # figure out the rest
+        return False if re.match('^[0-9]+-', sequence_dir) else True
+    elif accession_number in donotfilter:
+        return True
+    else:
+        return True if re.match('^[0-9]+-', sequence_dir) else False
 
 
 def create_key(subdir, file_suffix, outtype=('nii.gz', 'dicom'),
