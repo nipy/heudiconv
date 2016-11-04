@@ -11,8 +11,6 @@ lgr = logging.getLogger('heudiconv')
 # is done
 fix_accession2run = {
     'A000067': ['^9-'],
-    # duplicate files -- use only those that start with numbers
-    'A000006': ['^[A-Za-z]']
 }
 
 # dictionary containing fixes, keys are md5sum of study_description from
@@ -23,6 +21,7 @@ protocols2fix = {
         [('anat_', 'anat-'),
          ('run-life[0-9]', 'run+_task-life'),
          ('scout_run\+', 'scout'),
+         ('T2w', 'T2w_run+'),
          # substitutions for old protocol names
          ('AAHead_Scout_32ch-head-coil', 'anat-scout'),
          ('MPRAGE', 'anat-T1w_acq-MPRAGE_run+'),
@@ -35,7 +34,7 @@ protocols2fix = {
             'func_run+_task-life_acq-2mm754'),
          ('epi_bold_sms_p2_s4_2mm_life4_824',
             'func_run+_task-life_acq-2mm824'),
-         ('t2_space_sag_p4_iso', 'anat-T2w'),
+         ('t2_space_sag_p4_iso', 'anat-T2w_run+'),
          ('gre_field_mapping_2.4mm', 'fmap_run+_acq-2.4mm'),
          ('rest_p2_sms4_2.4mm_64sl_1000tr_32te_600dyn',
             'func_run+_task-rest_acq-2.4mm64sl1000tr32te600dyn'),
