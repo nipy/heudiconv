@@ -50,8 +50,9 @@ def filter_files(fn):
     """Return True if a file should be kept, else False.
     We're using it to filter out files that do not start with a number."""
 
-    split = fn.split('/')
-    sequence_dir = split[-2]
+    split = os.path.split(fn)
+    split2 = os.path.split(split[0])
+    sequence_dir = split2[1]
 
     return True if re.match('^[0-9]+-', sequence_dir) else False
 
@@ -468,6 +469,11 @@ def fixup_subjectid(subjectid):
         # some completely other pattern
         return subjectid
     return "sid%06d" % int(reg.groups()[0])
+
+
+def test_filter_files():
+    assert(filter_files('/home/mvdoc/dbic/09-run_func_meh/0123432432.dcm'))
+    assert(not filter_files('/home/mvdoc/dbic/run_func_meh/012343143.dcm'))
 
 
 def test_md5sum():
