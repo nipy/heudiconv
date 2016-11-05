@@ -62,9 +62,10 @@ protocols2fix = {
 }
 keys2replace = ['protocol_name', 'series_description']
 
-# list containing StudyInstanceID to skip -- hopefully doesn't happen too often
+# list containing StudyInstanceUID to skip -- hopefully doesn't happen too often
 dicoms2skip = [
-    '1.3.12.2.1107.5.2.43.66112.30000016110117002435700000001'
+    '1.3.12.2.1107.5.2.43.66112.30000016110117002435700000001',
+    '1.3.12.2.1107.5.2.43.66112.30000016102813152550600000004',  # double scout
 ]
 
 
