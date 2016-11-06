@@ -194,6 +194,10 @@ def infotodict(seqinfo):
     run_label = None   # run-
     image_data_type = None
     for s in seqinfo:
+        # XXX: skip derived sequences, we don't store them to avoid polluting
+        # the directory
+        if s.is_derived:
+            continue
         template = None
         suffix = ''
         seq = []
@@ -235,17 +239,18 @@ def infotodict(seqinfo):
                 "Deduced seqtype to be %s from DICOM, but got %s out of %s",
                 image_type_seqtype, seqtype, protocol_name_tuned)
 
-        if s.is_derived:
-            # Let's for now stash those close to original images
-            # TODO: we might want a separate tree for all of this!?
-            # so more of a parameter to the create_key
-            #seqtype += '/derivative'
-            # just keep it lower case and without special characters
-            # XXXX what for???
-            #seq.append(s.series_description.lower())
-            prefix = os.path.join('derivatives', 'scanner')
-        else:
-            prefix = ''
+        # if s.is_derived:
+        #     # Let's for now stash those close to original images
+        #     # TODO: we might want a separate tree for all of this!?
+        #     # so more of a parameter to the create_key
+        #     #seqtype += '/derivative'
+        #     # just keep it lower case and without special characters
+        #     # XXXX what for???
+        #     #seq.append(s.series_description.lower())
+        #     prefix = os.path.join('derivatives', 'scanner')
+        # else:
+        #     prefix = ''
+        prefix = ''
 
         # analyze s.protocol_name (series_id is based on it) for full name mapping etc
         if seqtype == 'func' and not seqtype_label:
@@ -285,10 +290,7 @@ def infotodict(seqinfo):
                                 "image, but previous one was %r", prev_image_data_type)
                         # else we do nothing special
                 else:  # and otherwise we go to the next run
-                    # increase run number only if it's not derived,
-                    # so we avoid having a ludicrous number of runs
-                    if not s.is_derived:
-                        current_run += 1
+                    current_run += 1
             elif run == '=':
                 if not current_run:
                     current_run = 1
