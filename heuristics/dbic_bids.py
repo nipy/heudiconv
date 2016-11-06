@@ -92,6 +92,10 @@ def filter_files(fn):
         # so we are going to discard those that got copied and let heudiconv
         # figure out the rest
         return False if re.match('^[0-9]+-', sequence_dir) else True
+    elif accession_number == 'unknown':
+        # this one had some stuff without study description, filter stuff before
+        # collecting info, so it doesn't crash completely
+        return False if re.match('^[34][07-9]-sn', sequence_dir) else True
     elif accession_number in donotfilter:
         return True
     else:
