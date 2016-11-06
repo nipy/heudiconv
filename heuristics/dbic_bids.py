@@ -197,6 +197,8 @@ def infotodict(seqinfo):
         # XXX: skip derived sequences, we don't store them to avoid polluting
         # the directory
         if s.is_derived:
+            skipped.append(s.series_id)
+            lgr.debug("Ignoring derived data %s", s.series_id)
             continue
         template = None
         suffix = ''
