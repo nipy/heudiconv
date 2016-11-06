@@ -54,7 +54,8 @@ protocols2fix = {
          ('gre_field_mapping_2.4mm', 'fmap_run+_acq-2.4mm'),
          ('rest_p2_sms4_2.4mm_64sl_1000tr_32te_600dyn',
             'func_run+_task-rest_acq-2.4mm64sl1000tr32te600dyn'),
-         ('DTI_30', 'dwi_run+_acq-30')],
+         ('DTI_30', 'dwi_run+_acq-30'),
+         ('t1_space_sag_p2_iso', 'anat-T1w_acq-060mm_run+')],
     '76b36c80231b0afaf509e2d52046e964':
         [('fmap_run\+_2mm', 'fmap_run+_acq-2mm')],
     'c6d8fbccc72990bee61d28e73b2618a4':
