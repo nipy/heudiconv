@@ -257,6 +257,10 @@ def infotodict(seqinfo):
                 'P': 'phasediff'
             }[image_data_type]
 
+        # label for dwi as well
+        if seqtype == 'dwi' and not seqtype_label:
+            seqtype_label = 'dwi'
+
         run = regd.get('run')
         if run is not None:
             # so we have an indicator for a run
