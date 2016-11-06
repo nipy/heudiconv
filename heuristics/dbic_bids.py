@@ -285,7 +285,10 @@ def infotodict(seqinfo):
                                 "image, but previous one was %r", prev_image_data_type)
                         # else we do nothing special
                 else:  # and otherwise we go to the next run
-                    current_run += 1
+                    # increase run number only if it's not derived,
+                    # so we avoid having a ludicrous number of runs
+                    if not s.is_derived:
+                        current_run += 1
             elif run == '=':
                 if not current_run:
                     current_run = 1
