@@ -231,7 +231,7 @@ def infotodict(seqinfo):
         regd = parse_dbic_protocol_name(protocol_name_tuned)
 
         if image_data_type.startswith('MIP'):
-            regd['acq'] = regd.get('acq', '') + image_data_type
+            regd['acq'] = regd.get('acq', '') + sanitize_str(image_data_type)
 
         if not regd:
             skipped_unknown.append(s.series_id)
@@ -344,6 +344,7 @@ def infotodict(seqinfo):
         #     suffix += 'seq-%s' % ('+'.join(seq))
 
         # some are ok to skip and not to whine
+
         if "_Scout" in s.series_description or \
                 (seqtype == 'anat' and seqtype_label == 'scout'):
             skipped.append(s.series_id)
@@ -440,7 +441,7 @@ def infotoids(seqinfos, outdir):
 
 def sanitize_str(value):
     """Remove illegal characters for BIDS from task/acq/etc.."""
-    return value.translate(None, '#!@$%^&.,:;')
+    return value.translate(None, '#!@$%^&.,:;_-')
 
 
 def parse_dbic_protocol_name(protocol_name):
