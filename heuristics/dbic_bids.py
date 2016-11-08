@@ -99,6 +99,9 @@ def filter_files(fn):
         return False if re.match('^[34][07-9]-sn', sequence_dir) else True
     elif accession_number in donotfilter:
         return True
+    elif accession_number.startswith('phantom-'):
+        # Accessions on phantoms, e.g. in dartmouth-phantoms/bids_test4-20161014
+        return True
     else:
         return True if re.match('^[0-9]+-', sequence_dir) else False
 
@@ -523,7 +526,8 @@ def fixup_subjectid(subjectid):
     reg = re.match("sid0*(\d+)$", subjectid)
     if not reg:
         # some completely other pattern
-        return subjectid
+        # just filter out possible _- in it
+        return re.sub('[-_]', '', subjectid)
     return "sid%06d" % int(reg.groups()[0])
 
 
