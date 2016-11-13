@@ -381,6 +381,7 @@ def infotoids(seqinfos, outdir):
     # decide on subjid and session based on patient_id
     lgr.info("Processing sequence infos to deduce study/session")
     study_description = get_unique(seqinfos, 'study_description')
+    study_description_hash = md5sum(study_description)
     subject = fixup_subjectid(get_unique(seqinfos, 'patient_id'))
     # TODO:  fix up subject id if missing some 0s
     split = study_description.split('^', 1)
@@ -429,6 +430,9 @@ def infotoids(seqinfos, outdir):
             #raise NotImplementedError()
             # Let's be lazy for now just to get somewhere
             session = '001'
+
+    if study_description_hash == '9d148e2a05f782273f6343507733309':
+        session = 'siemens1'
 
     return {
         # TODO: request info on study from the JedCap
