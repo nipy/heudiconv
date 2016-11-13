@@ -433,6 +433,7 @@ def infotoids(seqinfos, outdir):
 
     if study_description_hash == '9d148e2a05f782273f6343507733309':
         session = 'siemens1'
+        lgr.info('Imposing session {0}'.format(session))
 
     return {
         # TODO: request info on study from the JedCap
