@@ -431,7 +431,7 @@ def infotoids(seqinfos, outdir):
             # Let's be lazy for now just to get somewhere
             session = '001'
 
-    if study_description_hash == '9d148e2a05f782273f6343507733309':
+    if study_description_hash == '9d148e2a05f782273f6343507733309d':
         session = 'siemens1'
         lgr.info('Imposing session {0}'.format(session))
 
