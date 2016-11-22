@@ -359,6 +359,16 @@ def infotodict(seqinfo):
     if skipped_unknown:
         lgr.warning("Could not figure out where to stick %d sequences: %s" %
                     (len(skipped_unknown), skipped_unknown))
+    # analyze for "cancelled" runs, if run number was explicitly specified and
+    # thus we ended up with multiple entries which would mean that older ones
+    #  were "cancelled"
+    for template in info:
+        series_ids = info[template]
+        if len(series_ids) > 1:
+            lgr.warning("Detected %d canceled run(s) for template %s: %s",
+                        len(series_ids)-1, template[0], series_ids[:-1])
+            info[template] = series_ids[-1:]
+        assert len(info[template]) == 1
     return info
 
 
