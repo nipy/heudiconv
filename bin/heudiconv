@@ -51,7 +51,6 @@ logging.basicConfig(
 )
 lgr.debug("Starting the abomination")  # just to "run-test" logging
 
-
 global_options = {
     'overwrite': False   # overwrite existing files
 }
@@ -111,7 +110,7 @@ class TempDirs(object):
         self.cleanup()
 
     def cleanup(self):
-        lgr.info("Removing %d temporary directories", len(self.dirs))
+        lgr.debug("Removing %d temporary directories", len(self.dirs))
         for t in self.dirs[:]:
             lgr.debug("Removing %s", t)
             if self:
@@ -610,25 +609,43 @@ def safe_copyfile(src, dest):
 def convert(items, symlink=True, converter=None,
         scaninfo_suffix='.json', custom_callable=None, with_prov=False,
         is_bids=False, sourcedir=None, outdir=None):
+    """Performs actual convertion (calls to converter etc) given info from
+    heuristic's `infotodict`
+
+    Parameters
+    ----------
+    items
+    symlink
+    converter
+    scaninfo_suffix
+    custom_callable
+    with_prov
+    is_bids
+    sourcedir
+    outdir
+
+    Returns
+    -------
+    None
+    """
     prov_files = []
     tmpdir = mkdtemp(prefix='heudiconvtmp')
     for item_idx, item in enumerate(items):
-        if isinstance(item[1], (list, tuple)):
-            outtypes = item[1]
-        else:
-            outtypes = [item[1]]
-        prefix = item[0]
+        prefix, outtypes, item_dicoms = item[:3]
+        if not isinstance(outtypes, (list, tuple)):
+            outtypes = [outtypes]
+
         prefix_dirname = os.path.dirname(prefix + '.ext')
         prov_file = None
         outname_bids = prefix + '.json'
         outname_bids_files = []  # actual bids files since dcm2niix might generate multiple ATM
-        lgr.info('Converting %s -> %s . Converter: %s',
-                 prefix, prefix_dirname, converter)
+        lgr.info('Converting %s (%d DICOMs) -> %s . '
+                 'Converter: %s . Output types: %s',
+                 prefix, len(item_dicoms), prefix_dirname, converter, outtypes)
         if not os.path.exists(prefix_dirname):
             os.makedirs(prefix_dirname)
         for outtype in outtypes:
-            item_dicoms = item[2]
-            lgr.info("Processing %d dicoms for output type %s",
+            lgr.debug("Processing %d dicoms for output type %s",
                      len(item_dicoms), outtype)
             lgr.log(1, " those dicoms are: %s", item_dicoms)
 
@@ -777,7 +794,6 @@ def convert(items, symlink=True, converter=None,
                                               scaninfo, tmpdir, with_prov)
                 os.chmod(outname, 0o0440)
 
-
         if custom_callable is not None:
             custom_callable(*item)
     shutil.rmtree(tmpdir)
@@ -806,7 +822,7 @@ def tuneup_bids_json_files(json_files):
             # TODO: we might want to reorder them since ATM
             # the one for shorter TE is the 2nd one!
             # For now just save truthfully by loading magnitude files
-            lgr.info("Placing EchoTime fields into phasediff file")
+            lgr.debug("Placing EchoTime fields into phasediff file")
             for i in 1, 2:
                 json_['EchoTime%d' % i] = \
                     json.load(open(json_basename + '_magnitude%d.json' % i))[
