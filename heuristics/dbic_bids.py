@@ -362,7 +362,7 @@ def infotodict(seqinfo):
         lgr.warning("Could not figure out where to stick %d sequences: %s" %
                     (len(skipped_unknown), skipped_unknown))
 
-    info = get_dups_marked(info)  # mark duplicate ones with __dup0x suffix
+    info = get_dups_marked(info)  # mark duplicate ones with __dup-0x suffix
 
     info = dict(info)  # convert to dict since outside functionality depends on it being a basic dict
     return info
@@ -382,7 +382,7 @@ def get_dups_marked(info):
             # copy the duplicate ones into separate ones
             for dup_series_id in series_ids[:-1]:
                 dup_id += 1
-                dup_template = ('%s__dup%02d' % (
+                dup_template = ('%s__dup-%02d' % (
                 template[0], dup_id),) + template[1:]
                 # There must have not been such a beast before!
                 assert dup_template not in info

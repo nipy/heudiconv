@@ -15,11 +15,11 @@ def test_get_dups_marked():
             (('smth2',), ['a', 'b', 'c'])
         ])) == \
         {
-            ('bu__dup01', 'du'): [1],
+            ('bu__dup-01', 'du'): [1],
             ('bu', 'du'): [2],
             ('smth',): [3],
-            ('smth2__dup02',): ['a'],
-            ('smth2__dup03',): ['b'],
+            ('smth2__dup-02',): ['a'],
+            ('smth2__dup-03',): ['b'],
             ('smth2',): ['c']
         }
 

@@ -556,8 +556,7 @@ def compress_dicoms(dicom_list, out_prefix):
         import time
         _old_time = time.time
         time.time = lambda: dcm_time
-        if exists(outtar):
-            # could be under annex and forbid inplace change
+        if os.path.lexists(outtar):
             os.unlink(outtar)
         with tarfile.open(outtar, 'w:gz', dereference=True) as tar:
             for filename in dicom_list:
@@ -600,9 +599,13 @@ def safe_copyfile(src, dest):
     """
     if os.path.isdir(dest):
         dest = os.path.join(dest, os.path.basename(src))
-    if os.path.lexists(dest) and not global_options['overwrite']:
-        raise ValueError("was asked to copy %s but destination already exists: %s"
-                         % (src, dest))
+    if os.path.lexists(dest):
+        if not global_options['overwrite']:
+            raise ValueError("was asked to copy %s but destination already exists: %s"
+                             % (src, dest))
+        else:
+            # to make sure we can write there ... still fail if it is entire directory ;)
+            os.unlink(dest)
     shutil.copyfile(src, dest)
 
 
