@@ -81,7 +81,7 @@ def filter_files(fn):
 
     # do not check for these accession numbers because they haven't been
     # recopied with the initial number
-    donotfilter = ['A000012', 'A000013', 'A000041']
+    donotfilter = ['A000012', 'A000013', 'A000020', 'A000041']
 
     split = os.path.split(fn)
     split2 = os.path.split(split[0])
