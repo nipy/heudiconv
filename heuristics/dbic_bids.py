@@ -1,6 +1,6 @@
 import os
 import re
-from collections import defaultdict
+from collections import OrderedDict
 import hashlib
 
 import logging
@@ -192,7 +192,7 @@ def infotodict(seqinfo):
     lgr.info("Processing %d seqinfo entries", len(seqinfo))
     and_dicom = ('dicom', 'nii.gz')
 
-    info = defaultdict(list)
+    info = OrderedDict()
     skipped, skipped_unknown = [], []
     current_run = 0
     run_label = None   # run-
@@ -351,22 +351,42 @@ def infotodict(seqinfo):
             lgr.debug("Ignoring %s", s.series_id)
         else:
             template = create_key(seqtype, suffix, prefix=prefix)
+            # we wanted ordered dict for consistent demarcation of dups
+            if template not in info:
+                info[template] = []
             info[template].append(s.series_id)
 
-    info = dict(info)  # convert to dict since outside functionality depends on it being a basic dict
     if skipped:
         lgr.info("Skipped %d sequences: %s" % (len(skipped), skipped))
     if skipped_unknown:
         lgr.warning("Could not figure out where to stick %d sequences: %s" %
                     (len(skipped_unknown), skipped_unknown))
+
+    info = get_dups_marked(info)  # mark duplicate ones with __dup0x suffix
+
+    info = dict(info)  # convert to dict since outside functionality depends on it being a basic dict
+    return info
+
+
+def get_dups_marked(info):
     # analyze for "cancelled" runs, if run number was explicitly specified and
     # thus we ended up with multiple entries which would mean that older ones
     #  were "cancelled"
+    info = info.copy()
+    dup_id = 0
     for template in info:
         series_ids = info[template]
         if len(series_ids) > 1:
-            lgr.warning("Detected %d canceled run(s) for template %s: %s",
-                        len(series_ids)-1, template[0], series_ids[:-1])
+            lgr.warning("Detected %d duplicated run(s) for template %s: %s",
+                        len(series_ids) - 1, template[0], series_ids[:-1])
+            # copy the duplicate ones into separate ones
+            for dup_series_id in series_ids[:-1]:
+                dup_id += 1
+                dup_template = ('%s__dup%02d' % (
+                template[0], dup_id),) + template[1:]
+                # There must have not been such a beast before!
+                assert dup_template not in info
+                info[dup_template] = [dup_series_id]
             info[template] = series_ids[-1:]
         assert len(info[template]) == 1
     return info
