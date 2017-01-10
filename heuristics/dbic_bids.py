@@ -661,9 +661,9 @@ def test_fix_dbic_protocol():
 
 
 def test_sanitize_str():
-    assert sanitize_str('acq-super@duper.faster') == 'acq-superduperfaster'
-    assert sanitize_str('acq-perfect') == 'acq-perfect'
-    assert sanitize_str('acq-never:use:colon:!') == 'acq-neverusecolon'
+    assert sanitize_str('super@duper.faster') == 'superduperfaster'
+    assert sanitize_str('perfect') == 'perfect'
+    assert sanitize_str('never:use:colon:!') == 'neverusecolon'
 
 
 def test_fixupsubjectid():
