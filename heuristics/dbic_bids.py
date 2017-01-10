@@ -18,6 +18,9 @@ fix_accession2run = {
     'A000082': ['^5-'],
     'A000088': ['^9-'],
     'A000090': ['^5-'],
+    'A000127': ['^21-'],
+    'A000130': ['^15-'],
+    'A000137': ['^9-', '^11-'],
 }
 
 # dictionary containing fixes, keys are md5sum of study_description from
@@ -382,8 +385,9 @@ def get_dups_marked(info):
             # copy the duplicate ones into separate ones
             for dup_series_id in series_ids[:-1]:
                 dup_id += 1
-                dup_template = ('%s__dup-%02d' % (
-                template[0], dup_id),) + template[1:]
+                dup_template = (
+                    '%s__dup-%02d' % (template[0], dup_id),
+                    ) + template[1:]
                 # There must have not been such a beast before!
                 assert dup_template not in info
                 info[dup_template] = [dup_series_id]
