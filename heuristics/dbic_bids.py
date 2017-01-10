@@ -133,6 +133,8 @@ def fix_canceled_runs(seqinfo, accession2run=fix_accession2run):
     """Function that adds cancelme_ to known bad runs which were forgotten"""
     accession_number = get_unique(seqinfo, 'accession_number')
     if accession_number in accession2run:
+        lgr.info("Considering some runs possibly marked to be "
+                 "canceled for accession %s", accession_number)
         badruns = accession2run[accession_number]
         badruns_pattern = '|'.join(badruns)
         for i, s in enumerate(seqinfo):
@@ -147,9 +149,6 @@ def fix_canceled_runs(seqinfo, accession2run=fix_accession2run):
 
 def fix_dbic_protocol(seqinfo, keys=keys2replace, subsdict=protocols2fix):
     """Ad-hoc fixup for existing protocols"""
-    # add cancelme to known bad runs
-    seqinfo = fix_canceled_runs(seqinfo)
-
     # get name of the study to check if we know how to fix it up
     study_descr = get_unique(seqinfo, 'study_description')
     study_descr_hash = md5sum(study_descr)
@@ -188,6 +187,10 @@ def infotodict(seqinfo):
     """
     # XXX: ad hoc hack
     study_description = get_unique(seqinfo, 'study_description')
+
+    # add cancelme to known bad runs
+    seqinfo = fix_canceled_runs(seqinfo)
+
     if md5sum(study_description) in protocols2fix:
         lgr.info("Fixing up protocol for {0}".format(study_description))
         seqinfo = fix_dbic_protocol(seqinfo)
