@@ -480,8 +480,12 @@ def sanitize_str(value):
 
 
 def parse_dbic_protocol_name(protocol_name):
-    """Parse protocol name
+    """Parse protocol name according to our convention with minimal set of fixups
     """
+
+    # Since Yarik didn't know better place to put it in, but could migrate outside
+    # at some point
+    protocol_name = protocol_name.replace("anat_T1w", "anat-T1w")
 
     # Parse the name according to our convention
     # https://docs.google.com/document/d/1R54cgOe481oygYVZxI7NHrifDyFUZAjOBwCTu7M7y48/edit?usp=sharing
@@ -707,4 +711,12 @@ def test_parse_dbic_protocol_name():
                'seqtype': 'anat',
                'seqtype_label': 'scout',
                'session': '+',
+           }
+
+    assert pdpn("anat_T1w_acq-MPRAGE_run+") == \
+           {
+                'seqtype': 'anat',
+                'run': '+',
+                'acq': 'MPRAGE',
+                'seqtype_label': 'T1w'
            }
