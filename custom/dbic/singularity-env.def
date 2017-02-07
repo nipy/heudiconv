@@ -34,11 +34,18 @@ MirrorURL: http://ftp.us.debian.org/debian/
 %post
     echo "Configuring the environment"
     apt-get update
-    apt-get -y install vim eatmydata wget strace time
+    apt-get -y install vim eatmydata wget strace time ncdu
     wget -q -O/tmp/nd-configurerepo https://raw.githubusercontent.com/neurodebian/neurodebian/4d26c8f30433145009aa3f74516da12f560a5a13/tools/nd-configurerepo
     bash /tmp/nd-configurerepo
+    chmod a+r -R /etc/apt
     eatmydata apt-get -y install datalad python-nipype virtualenv dcm2niix
     apt-get clean
+
     # and wipe out apt lists since not to be used RW for further tuning
-    rm /var/lib/apt/lists/*
+    # find /var/lib/apt/lists/ -type f -delete
+    # /usr/bin/find /var/lib/apt/lists/ -type f -name \*Packages\* -o -name \*Contents\*
+    # complicates later interrogation - thus disabled
+
+    # Create some bind mount directories present on rolando
+    mkdir -p /afs /inbox
 
