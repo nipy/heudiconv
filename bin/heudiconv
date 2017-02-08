@@ -31,6 +31,7 @@ import sys
 from tempfile import mkdtemp
 import tarfile
 
+from copy import deepcopy
 from collections import namedtuple
 from collections import defaultdict
 from collections import OrderedDict as ordereddict
@@ -144,6 +145,49 @@ def save_json(filename, data):
     with open(filename, 'w') as fp:
         json_str = json.dumps(data, sort_keys=True, indent=4)
         fp.write(json_str.replace(' \n', '\n'))
+
+
+def slim_down_info(j):
+    """Given an aggregated info structure, removes excessive details
+
+    such as Csa fields, and SourceImageSequence which on Siemens files could be
+    huge and not providing any additional immediately usable information.
+    If needed, could be recovered from stored DICOMs
+    """
+    j = deepcopy(j)  # we will do in-place modification on a copy
+    dicts = []
+    # poor man programming for now
+    if 'const' in j.get('global', {}):
+        dicts.append(j['global']['const'])
+    if 'samples' in j.get('time', {}):
+        dicts.append(j['time']['samples'])
+    for d in dicts:
+        for k in list(d.keys()):
+            if k.startswith('Csa') or k.lower() in {'sourceimagesequence'}:
+                del d[k]
+    return j
+
+
+def json_dumps_pretty(j, indent=2, sort_keys=True):
+    """Given a json structure, pretty print it by colliding numeric arrays into a line
+
+    If resultant structure differs from original -- throws exception
+    """
+    import re
+    js = json.dumps(j, indent=indent, sort_keys=sort_keys)
+    # trim away \n and spaces between entries of numbers
+    js_ = re.sub(
+        '[\n ]+("?[-+.0-9e]+"?,?) *\n(?= *"?[-+.0-9e]+"?)', r' \1',
+        js, flags=re.MULTILINE)
+    # uniform no spaes before ]
+    js_ = re.sub(" *\]", "]", js_)
+    # uniform spacing before numbers
+    js_ = re.sub('  *("?[-+.0-9e]+"?)[ \n]*', r' \1', js_)
+    # no spaces after [
+    js_ = re.sub('\[ ', '[', js_)
+    j_ = json.loads(js_)
+    assert(j == j_)
+    return js_
 
 
 def load_json(filename):
@@ -485,6 +529,29 @@ def conversion_info(subject, outdir, info, filegroup, ses=None):
 
 
 def embed_nifti(dcmfiles, niftifile, infofile, bids_info=None, force=False):
+    """
+
+    If `niftifile` doesn't exist, it gets created out of the `dcmfiles` stack,
+    and json representation of its meta_ext is returned (bug since should return
+    both niftifile and infofile?)
+
+    if `niftifile` exists, its affine's orientation information is used while
+    establishing new `NiftiImage` out of dicom stack and together with `bids_info`
+    (if provided) is dumped into json `infofile`
+
+    Parameters
+    ----------
+    dcmfiles
+    niftifile
+    infofile
+    bids_info
+    force
+
+    Returns
+    -------
+    niftifile, infofile
+
+    """
     import dcmstack as ds
     import nibabel as nb
     import os
@@ -792,9 +859,12 @@ def convert(items, symlink=True, converter=None,
                         "For now not embedding BIDS and info generated .nii.gz itself since sequence produced multiple files")
                 else:
                     #if not is_bids or converter != 'dcm2niix': ##uses dcm2niix's infofile
-                    embed_metadata_into_nifti(converter, is_bids, item_dicoms,
-                                              outname, outname_bids, prov_file,
-                                              scaninfo, tmpdir, with_prov)
+                    embed_metadata_from_dicoms(converter, is_bids, item_dicoms,
+                                               outname, outname_bids, prov_file,
+                                               scaninfo, tmpdir, with_prov)
+                if exists(scaninfo):
+                    lgr.info("Post-treating %s file", scaninfo)
+                    treat_infofile(scaninfo)
                 os.chmod(outname, 0o0440)
 
         if custom_callable is not None:
@@ -841,9 +911,28 @@ def tuneup_bids_json_files(json_files):
         # place them into phasediff
 
 
-def embed_metadata_into_nifti(converter, is_bids, item_dicoms, outname,
-                              outname_bids, prov_file, scaninfo, tmpdir,
-                              with_prov):
+def embed_metadata_from_dicoms(converter, is_bids, item_dicoms, outname,
+                               outname_bids, prov_file, scaninfo, tmpdir,
+                               with_prov):
+    """
+    Enhance sidecar information file with more information from DICOMs
+
+    Parameters
+    ----------
+    converter
+    is_bids
+    item_dicoms
+    outname
+    outname_bids
+    prov_file
+    scaninfo
+    tmpdir
+    with_prov
+
+    Returns
+    -------
+
+    """
     from nipype import Node, Function
     embedfunc = Node(Function(input_names=['dcmfiles',
                                            'niftifile',
@@ -873,8 +962,26 @@ def embed_metadata_into_nifti(converter, is_bids, item_dicoms, outname,
                     format='turtle')
             g.serialize(prov_file, format='turtle')
             os.chmod(prov_file, 0o0440)
-    except:
+    except Exception as exc:
+        lgr.error("Embedding failed: %s", str(exc))
         os.chdir(cwd)
+
+
+def treat_infofile(filename):
+    """Tune up generated .json file (slim down, pretty-print for humans).
+
+    Was difficult to do within embed_nifti since it has no access to our functions
+    """
+    with open(filename) as f:
+        j = json.load(f)
+
+    j_slim = j # slim_down_info(j)
+    j_pretty = json_dumps_pretty(j_slim, indent=2, sort_keys=True)
+
+    os.chmod(filename, 0o0660)
+    with open(filename, 'wt') as fp:
+        fp.write(j_pretty)
+    os.chmod(filename, 0o0440)
 
 
 def convert_dicoms(sid,
