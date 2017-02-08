@@ -105,6 +105,10 @@ def filter_files(fn):
     elif accession_number.startswith('phantom-'):
         # Accessions on phantoms, e.g. in dartmouth-phantoms/bids_test4-20161014
         return True
+    elif accession_number.startswith('heudiconvdcm'):
+        # we were given some tarball with dicoms which was extracted so we
+        # better obey
+        return True
     else:
         return True if re.match('^[0-9]+-', sequence_dir) else False
 

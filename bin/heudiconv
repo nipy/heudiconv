@@ -679,7 +679,7 @@ def safe_copyfile(src, dest):
 def convert(items, symlink=True, converter=None,
         scaninfo_suffix='.json', custom_callable=None, with_prov=False,
         is_bids=False, sourcedir=None, outdir=None):
-    """Performs actual convertion (calls to converter etc) given info from
+    """Perform actual conversion (calls to converter etc) given info from
     heuristic's `infotodict`
 
     Parameters
@@ -699,7 +699,7 @@ def convert(items, symlink=True, converter=None,
     None
     """
     prov_files = []
-    tmpdir = mkdtemp(prefix='heudiconvtmp')
+    tmpdir = mkdtemp(prefix='heudiconvdcm')
     for item_idx, item in enumerate(items):
         prefix, outtypes, item_dicoms = item[:3]
         if not isinstance(outtypes, (list, tuple)):
@@ -975,7 +975,7 @@ def treat_infofile(filename):
     with open(filename) as f:
         j = json.load(f)
 
-    j_slim = j # slim_down_info(j)
+    j_slim = slim_down_info(j)
     j_pretty = json_dumps_pretty(j_slim, indent=2, sort_keys=True)
 
     os.chmod(filename, 0o0660)
@@ -1126,7 +1126,7 @@ def get_extracted_dicoms(fl):
     # are unique, or at least in a unqiue subdir per session
     # strategy: extract everything in a temp dir and assemble a list
     # of all files in all tarballs
-    tmpdir = tempdirs(prefix='heudiconvtmp')
+    tmpdir = tempdirs(prefix='heudiconvdcm')
 
     sessions = defaultdict(list)
     session = 0
@@ -1474,6 +1474,15 @@ def _main(args):
     subjs = args.subjs
     outdir = os.path.abspath(args.outdir)
 
+    if args.command:
+        # custom mode of operation
+        if args.command == 'treat_json':
+            for f in files_opt:
+                treat_infofile(f)
+        else:
+            raise ValueError("Unknown command %s", args.command)
+        return
+
     # TODO: Move into a function!
     study_sessions = get_study_sessions(
         dicom_dir_template, files_opt,
@@ -1617,7 +1626,7 @@ def get_parser():
                              'first be "sorted" and subject IDs deduced by the '
                              'heuristic')
     parser.add_argument('-c', '--converter', dest='converter',
-                        required=True,
+                        default='dcm2niix',
                         choices=(
                         'mri_convert', 'dcmstack', 'dcm2nii', 'dcm2niix',
                         'none'),
@@ -1663,6 +1672,10 @@ def get_parser():
                         (i.e. no symlinks to under .git/annex).  For now just for BIDS mode.''')
     parser.add_argument('--dbg', action='store_true', dest='debug',
                         help="do not catch exceptions and show exception traceback")
+    parser.add_argument('--command', dest='command',
+                        choices=('treat_json',),
+                        help='''custom actions to be performed on provided files instead of
+                        regular operation.''')
     parser.add_argument(
         'files',
         nargs='*',
