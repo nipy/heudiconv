@@ -1453,10 +1453,6 @@ def setup_exceptionhook():
 
 def _main(args):
     """Given a structure of arguments from the parser perform computation"""
-    #
-    # Load heuristic -- better do it asap to make sure it loads correctly
-    #
-    heuristic = load_heuristic(os.path.realpath(args.heuristic_file))
 
     #
     # Deal with provided files or templates
@@ -1482,6 +1478,11 @@ def _main(args):
         else:
             raise ValueError("Unknown command %s", args.command)
         return
+
+    #
+    # Load heuristic -- better do it asap to make sure it loads correctly
+    #
+    heuristic = load_heuristic(os.path.realpath(args.heuristic_file))
 
     # TODO: Move into a function!
     study_sessions = get_study_sessions(
