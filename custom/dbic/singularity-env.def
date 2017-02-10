@@ -48,4 +48,4 @@ MirrorURL: http://ftp.us.debian.org/debian/
 
     # Create some bind mount directories present on rolando
     mkdir -p /afs /inbox
-
+    chmod a+rX /afs /inbox
