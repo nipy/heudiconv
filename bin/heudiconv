@@ -1273,7 +1273,7 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
             lgr.info("Study session for %s" % str(ids))
             study_session_info = StudySessionInfo(
                 ids.get('locator'),
-                ids.get('session', session),
+                ids.get('session', session) or session,
                 ids.get('subject', None))
             if study_session_info in study_sessions:
                 raise ValueError(
