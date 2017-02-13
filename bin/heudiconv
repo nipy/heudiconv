@@ -661,6 +661,20 @@ def get_dicom_series_time(dicom_list):
     return calendar.timegm(time.strptime(dicom_time_str, '%Y%m%d%H%M%S'))
 
 
+def prep_task_file(taskname):
+    TODO = "TODO"
+    {
+        "RepetitionTime": 1.56,
+        "TaskName": taskname,
+        "EchoTime": TODO,
+        "FlipAngle": TODO,
+        "SliceTiming": TODO,
+        "Manufacturer": "Siemens",
+        "ManufacturerModelName": "TODO",
+        "MagneticFieldStrength": 3.0,
+        "CogAtlasID": "TODO"
+    }
+
 def safe_copyfile(src, dest):
     """Copy file but blow if destination name already exists
     """
