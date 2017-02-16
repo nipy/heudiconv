@@ -179,7 +179,7 @@ def json_dumps_pretty(j, indent=2, sort_keys=True):
     js_ = re.sub(
         '[\n ]+("?[-+.0-9e]+"?,?) *\n(?= *"?[-+.0-9e]+"?)', r' \1',
         js, flags=re.MULTILINE)
-    # uniform no spaes before ]
+    # uniform no spaces before ]
     js_ = re.sub(" *\]", "]", js_)
     # uniform spacing before numbers
     js_ = re.sub('  *("?[-+.0-9e]+"?)[ \n]*', r' \1', js_)
@@ -968,6 +968,23 @@ def embed_metadata_from_dicoms(converter, is_bids, item_dicoms, outname,
     embedfunc.base_dir = tmpdir
     cwd = os.getcwd()
     try:
+        """
+        Ran into
+INFO: Executing node embedder in dir: /tmp/heudiconvdcm2W3UQ7/embedder
+ERROR: Embedding failed: [Errno 13] Permission denied: '/inbox/BIDS/tmp/test2-jessie/Wheatley/Beau/1007_personality/sub-sid000138/fmap/sub-sid000138_3mm_run-01_phasediff.json'
+while
+HEUDICONV_LOGLEVEL=WARNING time bin/heudiconv -f heuristics/dbic_bids.py -c dcm2niix -o /inbox/BIDS/tmp/test2-jessie --bids --datalad /inbox/DICOM/2017/01/28/A000203
+
+so it seems that there is a filename collision so it tries to save into the same file name
+and there was a screw up for that A
+
+/mnt/btrfs/dbic/inbox/DICOM/2017/01/28/A000203
+        StudySessionInfo(locator='Wheatley/Beau/1007_personality', session=None, subject='sid000138') 16 sequences
+        StudySessionInfo(locator='Wheatley/Beau/1007_personality', session=None, subject='a000203') 2 sequences
+
+
+in that one though
+        """
         res = embedfunc.run()
         os.chmod(scaninfo, 0o0440)
         if with_prov:
