@@ -661,20 +661,6 @@ def get_dicom_series_time(dicom_list):
     return calendar.timegm(time.strptime(dicom_time_str, '%Y%m%d%H%M%S'))
 
 
-def prep_task_file(taskname):
-    TODO = "TODO"
-    {
-        "RepetitionTime": 1.56,
-        "TaskName": taskname,
-        "EchoTime": TODO,
-        "FlipAngle": TODO,
-        "SliceTiming": TODO,
-        "Manufacturer": "Siemens",
-        "ManufacturerModelName": "TODO",
-        "MagneticFieldStrength": 3.0,
-        "CogAtlasID": "TODO"
-    }
-
 def safe_copyfile(src, dest):
     """Copy file but blow if destination name already exists
     """
@@ -1129,7 +1115,10 @@ def convert_dicoms(sid,
                 seqinfo.keys()[0].patient_age,
                 seqinfo.keys()[0].patient_sex,
             )
-        populate_bids_templates(anon_outdir)
+        populate_bids_templates(
+            anon_outdir,
+            getattr(heuristic, 'DEFAULT_FIELDS', {})
+        )
 
 
 def get_annonimized_sid(sid, anon_sid_cmd):
@@ -1320,17 +1309,18 @@ def create_file_if_missing(filename, content):
     return True
 
 
-def populate_bids_templates(path):
+def populate_bids_templates(path, defaults={}):
     # dataset descriptor
+    lgr.info("Populating template files under %s", path)
     descriptor = opj(path, 'dataset_description.json')
-    if not exists(descriptor):
+    if True:  # not exists(descriptor):
         save_json(descriptor,
               ordereddict([
                   ('Name', "TODO: name of the dataset"),
                   ('BIDSVersion', "1.0.1"),
-                  ('License', "TODO: choose a license, e.g. PDDL (http://opendatacommons.org/licenses/pddl/)"),
-                  ('Authors', ["TODO:", "First1 Last1", "First2 Last2", "..."]),
-                  ('Acknowledgements', "We thank Terry Sacket and the rest of the DBIC (Dartmouth Brain Imaging Center) personnel for assistance in data collection. TODO: more"),
+                  ('License', defaults.get('License', "TODO: choose a license, e.g. PDDL (http://opendatacommons.org/licenses/pddl/)")),
+                  ('Authors', defaults.get('Authors', ["TODO:", "First1 Last1", "First2 Last2", "..."])),
+                  ('Acknowledgements', defaults.get('Acknowledgements', 'TODO: whom you want to acknowledge')),
                   ('HowToAcknowledge', "TODO: describe how to acknowledge -- either cite a corresponding paper, or just in acknowledgement section"),
                   ('Funding', ["TODO", "GRANT #1", "GRANT #2"]),
                   ('ReferencesAndLinks', ["TODO", "List of papers or websites"]),
@@ -1367,6 +1357,40 @@ TODOs:
 TODO: Provide description for the dataset -- basic details about the study,
 possibly pointing to pre-registration (if public or embargoed)
 """)
+
+    # TODO: collect all task- .json files for func files to
+    tasks = {}
+    # way too many -- let's just collect all which are the same!
+    # FIELDS_TO_TRACK = {'RepetitionTime', 'FlipAngle', 'EchoTime', 'Manufacturer', 'SliceTiming', ''}
+    for fpath in find_files('.*_task-.*\_bold\.json', topdir=path,
+                        exclude_vcs=True, exclude="/\.(datalad|heudiconv)/"):
+        task = re.sub('.*_(task-[^_\.]*(_acq-[^_\.]*)?)_.*', r'\1', fpath)
+        j = load_json(fpath)
+        if task not in tasks:
+            tasks[task] = j
+        else:
+            rec = tasks[task]
+            # let's retain only those fields which have the same value
+            for field in sorted(rec):
+                if field not in j or j[field] != rec[field]:
+                    del rec[field]
+
+        # create a stub onsets file for each one of those
+        suf = '_bold.json'
+        assert fpath.endswith(suf)
+        events_file = fpath[:-len(suf)] + '_events.tsv'
+        lgr.debug("Generating %s", events_file)
+        with open(events_file, 'w') as f:
+            f.write("onset\tduration\ttrial_type\tTODO -- fill in rows and add more tab-separated columns if desired")
+
+    # - extract tasks files stubs
+    for task_acq, fields in tasks.items():
+        task_file = opj(path, task_acq + '_bold.json')
+        lgr.debug("Generating %s", task_file)
+        fields["TaskName"] = "TODO: full task name for %s" % task_acq.split('_')[0].split('-')[1]
+        fields["CogAtlasID"] = "TODO"
+        with open(task_file, 'w') as f:
+            f.write(json_dumps_pretty(fields, indent=2, sort_keys=True))
 
 
 def add_participant_record(studydir, subject, age, sex):
@@ -1503,7 +1527,7 @@ def _main(args):
 
     if args.command:
         # custom mode of operation
-        if args.command == 'treat_json':
+        if args.command == 'treat-json':
             for f in files_opt:
                 treat_infofile(f)
         elif args.command == 'ls':
@@ -1515,6 +1539,13 @@ def _main(args):
                 print(f)
                 for study_session, sequences in study_sessions.items():
                     print("\t%s %d sequences" % (str(study_session), len(sequences)))
+        elif args.command == 'populate-templates':
+            heuristic = load_heuristic(os.path.realpath(args.heuristic_file))
+            for f in files_opt:
+                populate_bids_templates(
+                    f,
+                    getattr(heuristic, 'DEFAULT_FIELDS', {})
+                )
         else:
             raise ValueError("Unknown command %s", args.command)
         return
@@ -1714,7 +1745,7 @@ def get_parser():
     parser.add_argument('--dbg', action='store_true', dest='debug',
                         help="do not catch exceptions and show exception traceback")
     parser.add_argument('--command', dest='command',
-                        choices=('treat_json', 'ls'),
+                        choices=('treat-json', 'ls', 'populate-templates'),
                         help='''custom actions to be performed on provided files instead of
                         regular operation.''')
     parser.add_argument(

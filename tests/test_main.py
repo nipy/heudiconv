@@ -36,10 +36,13 @@ def test_create_file_if_missing(tmpdir):
 
 
 def test_populate_bids_templates(tmpdir):
-    heudiconv.populate_bids_templates(str(tmpdir))
+    heudiconv.populate_bids_templates(
+        str(tmpdir),
+        defaults={'Acknowledgements': 'something'})
     for f in "README", "dataset_description.json", "CHANGES":
         # Just test that we have created them and they all have stuff TODO
         assert "TODO" in tmpdir.join(f).read()
+    assert "something" in tmpdir.join('dataset_description.json').read()
 
 
 def test_add_participant_record(tmpdir):

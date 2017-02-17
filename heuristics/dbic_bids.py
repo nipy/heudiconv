@@ -72,6 +72,17 @@ dicoms2skip = [
     '1.3.12.2.1107.5.2.43.66112.30000016102813152550600000004',  # double scout
 ]
 
+DEFAULT_FIELDS = {
+    # Let it just be in each json file extracted
+    #'Manufacturer': "Siemens",
+    #'ManufacturersModelName': "Prisma",
+    "Acknowledgements":
+        "We thank Terry Sacket and the rest of the DBIC (Dartmouth Brain Imaging "
+        "Center) personnel for assistance in data collection, and "
+        "Yaroslav Halchenko and Matteo Visconti for preparing BIDS dataset. "
+        "TODO: more",
+}
+
 
 def filter_dicom(dcmdata):
     """Return True if a DICOM dataset should be filtered out, else False"""
