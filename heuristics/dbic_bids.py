@@ -129,6 +129,8 @@ def create_key(subdir, file_suffix, outtype=('nii.gz', 'dicom'),
 
 def md5sum(string):
     """Computes md5sum of as string"""
+    if not string:
+        return ""  # not None so None was not compared to strings
     m = hashlib.md5(string.encode())
     return m.hexdigest()
 
@@ -425,12 +427,15 @@ def infotoids(seqinfos, outdir):
     study_description_hash = md5sum(study_description)
     subject = fixup_subjectid(get_unique(seqinfos, 'patient_id'))
     # TODO:  fix up subject id if missing some 0s
-    split = study_description.split('^', 1)
-    # split first one even more, since couldbe PI_Student or PI-Student
-    split = re.split('-|_', split[0], 1) + split[1:]
+    if study_description:
+	split = study_description.split('^', 1)
+	# split first one even more, since couldbe PI_Student or PI-Student
+	split = re.split('-|_', split[0], 1) + split[1:]
 
-    # locator = study_description.replace('^', '/')
-    locator = '/'.join(split)
+	# locator = study_description.replace('^', '/')
+	locator = '/'.join(split)
+    else:
+        locator = 'unknown'
 
     # TODO: actually check if given study is study we would care about
     # and if not -- we should throw some ???? exception

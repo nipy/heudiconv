@@ -433,15 +433,15 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, per_studyUID=F
             'MoCo' in dcminfo.SeriesDescription,
             # New ones by us
             'derived' in [x.lower() for x in dcminfo.get('ImageType', [])],
-            dcminfo.PatientID,
-            dcminfo.StudyDescription,
-            dcminfo.ReferringPhysicianName,
-            dcminfo.SeriesDescription,
+            dcminfo.get('PatientID'),
+            dcminfo.get('StudyDescription'),
+            dcminfo.get('ReferringPhysicianName'),
+            dcminfo.get('SeriesDescription'),
             tuple(dcminfo.ImageType),
-            dcminfo.AccessionNumber,
+            dcminfo.get('AccessionNumber'),
             # For demographics to populate BIDS participants.tsv
-            dcminfo.PatientsAge,
-            dcminfo.PatientsSex,
+            dcminfo.get('PatientsAge'),
+            dcminfo.get('PatientsSex'),
         )
         # candidates
         # dcminfo.AccessionNumber
@@ -1276,9 +1276,11 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
                 ids.get('session', session) or session,
                 ids.get('subject', None))
             if study_session_info in study_sessions:
-                raise ValueError(
+                #raise ValueError(
+                lgr.warning(
                     "We already have a study session with the same value %s"
                     % repr(study_session_info))
+                continue # skip for now
             study_sessions[study_session_info] = seqinfo
 
     return study_sessions
