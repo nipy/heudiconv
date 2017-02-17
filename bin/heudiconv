@@ -99,8 +99,10 @@ StudySessionInfo = namedtuple(
 class TempDirs(object):
     """A helper to centralize handling and cleanup of dirs"""
 
+
     def __init__(self):
         self.dirs = []
+        self.exists = os.path.exists
 
     def __call__(self, prefix=None):
         tmpdir = mkdtemp(prefix=prefix)
@@ -108,7 +110,11 @@ class TempDirs(object):
         return tmpdir
 
     def __del__(self):
-        self.cleanup()
+        try:
+            self.cleanup()
+        except AttributeError:
+            # we are too late to the show
+            pass
 
     def cleanup(self):
         lgr.debug("Removing %d temporary directories", len(self.dirs))
@@ -116,9 +122,10 @@ class TempDirs(object):
             lgr.debug("Removing %s", t)
             if self:
                 self.rmtree(t)
+        self.dirs = []
 
     def rmtree(self, tmpdir):
-        if os.path.exists(tmpdir):
+        if self.exists(tmpdir):
             shutil.rmtree(tmpdir)
         if tmpdir in self.dirs:
             self.dirs.remove(tmpdir)
