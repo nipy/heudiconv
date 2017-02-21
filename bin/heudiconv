@@ -1541,13 +1541,20 @@ def _main(args):
                 treat_infofile(f)
         elif args.command == 'ls':
             heuristic = load_heuristic(os.path.realpath(args.heuristic_file))
+            heuristic_ls = getattr(heuristic, 'ls', None)
             for f in files_opt:
                 study_sessions = get_study_sessions(
                     dicom_dir_template, [f],
                     heuristic, None, session, subjs)
                 print(f)
                 for study_session, sequences in study_sessions.items():
-                    print("\t%s %d sequences" % (str(study_session), len(sequences)))
+                    suf = ''
+                    if heuristic_ls:
+                        suf += heuristic_ls(study_session, sequences)
+                    print(
+                        "\t%s %d sequences%s"
+                        % (str(study_session), len(sequences), suf)
+                    )
         elif args.command == 'populate-templates':
             heuristic = load_heuristic(os.path.realpath(args.heuristic_file))
             for f in files_opt:

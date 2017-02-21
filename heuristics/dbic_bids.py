@@ -21,6 +21,7 @@ fix_accession2run = {
     'A000127': ['^21-'],
     'A000130': ['^15-'],
     'A000137': ['^9-', '^11-'],
+    'A000297': ['^12-'],
 }
 
 # dictionary containing fixes, keys are md5sum of study_description from
@@ -102,6 +103,7 @@ def filter_files(fn):
     sequence_dir = split2[1]
     split3 = os.path.split(split2[0])
     accession_number = split3[1]
+    return True
     if accession_number == 'A000043':
         # crazy one that got copied for some runs but not for others,
         # so we are going to discard those that got copied and let heudiconv
@@ -187,6 +189,14 @@ def fix_dbic_protocol(seqinfo, keys=keys2replace, subsdict=protocols2fix):
 
     return seqinfo
 
+
+def ls(study_session, seqinfo):
+    """Additional ls output for a seqinfo"""
+    #assert len(sequences) <= 1  # expecting only a single study here
+    #seqinfo = sequences.keys()[0]
+    study_descr = get_unique(seqinfo, 'study_description')
+    study_descr_hash = md5sum(study_descr)
+    return ' study hash: %s' % study_descr_hash
 
 # XXX we killed session indicator!  what should we do now?!!!
 # WE DON:T NEED IT -- it will be provided into conversion_info as `session`
