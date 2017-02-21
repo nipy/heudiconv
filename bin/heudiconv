@@ -1422,7 +1422,7 @@ def add_participant_record(studydir, subject, age, sex):
     with open(participants_tsv, 'a') as f:
         f.write('\t'.join(map(str, [
             participant_id,
-            age.lstrip('0').rstrip('Y'),
+            age.lstrip('0').rstrip('Y') if age else 'N/A',
             sex,
             'control']))
         + '\n')
@@ -1595,6 +1595,10 @@ def _main(args):
         else:
             dicoms = files_or_seqinfo
             seqinfo = None
+        
+        if locator == 'unknown':
+            lgr.warning("Skipping  unknown  locator dataset")
+            continue
 
         if args.queue:
             if seqinfo and not dicoms:
