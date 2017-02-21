@@ -21,6 +21,7 @@ fix_accession2run = {
     'A000127': ['^21-'],
     'A000130': ['^15-'],
     'A000137': ['^9-', '^11-'],
+    'A000297': ['^12-'],
 }
 
 # dictionary containing fixes, keys are md5sum of study_description from
