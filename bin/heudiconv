@@ -484,7 +484,7 @@ def convert(items, symlink=True, converter=None,
                         if converter == 'dcm2nii':
                             convertnode.inputs.gzip_output = outtype == 'nii.gz'
                         else:
-                            convertnode.inputs.out_filename = os.path.basename(dirname)
+                            convertnode.inputs.out_filename = os.path.basename(dirname +'_%e')
                         convertnode.inputs.terminal_output = 'allatonce'
                         res = convertnode.run()
                         if isinstance(res.outputs.converted_files, list):
@@ -492,7 +492,8 @@ def convert(items, symlink=True, converter=None,
                                 "Following series likely has multiple orientations: ",
                                 item_dicoms
                             )
-                            for idx, fl in enumerate(res.outputs.converted_files):
+                            for fl in res.outputs.converted_files:
+                                idx = fl.split('_')[-1][0:-7] # get echo number, remove .nii.gz
                                 outname = prefix + '-' + str(idx) + '.' + outtype
                                 shutil.copyfile(fl, outname)
                         else:
@@ -506,11 +507,14 @@ def convert(items, symlink=True, converter=None,
                         if converter == 'dcm2niix' \
                                 and isdefined(res.outputs.bids):
                             ### extract bids
-                            try:
+                            if isinstance(res.outputs.bids, list):
+                                lgr.warning("There was someone catching lists!") 
+                                for fl in res.outputs.bids:
+                                    idx = fl.split('_')[-1][0:-5] # get echo number, remove .json
+                                    outname = prefix + '_' + str(idx) + '.json'
+                                    shutil.copyfile(fl, outname)
+                            else:
                                 shutil.copyfile(res.outputs.bids, outname_bids)
-                            except TypeError:  ##catch lists
-                                lgr.warning("There was someone catching lists!")
-                                continue
 
                     if with_prov:
                         prov_file = prefix + '_prov.ttl'
