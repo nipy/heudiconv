@@ -22,7 +22,10 @@
 #      grep -l loop /proc/*/mountinfo | sed -e 's,/proc/\(.*\)/.*,\1,g' | while read pid; do sudo kill $pid; done
 
 BootStrap: debootstrap
-OSVersion: stable
+#OSVersion: stable
+# needs nipype 0.12.1 but that one didn't build for stable since needs python-prov...
+# so trying stretch
+OSVersion: stretch
 MirrorURL: http://ftp.us.debian.org/debian/
 
 # so if image is executed we just enter the environment
@@ -34,11 +37,21 @@ MirrorURL: http://ftp.us.debian.org/debian/
 %post
     echo "Configuring the environment"
     apt-get update
-    apt-get -y install vim eatmydata wget strace time ncdu
+    apt-get -y install eatmydata 
+    eatmydata apt-get -y install vim wget strace time ncdu gnupg curl procps
     wget -q -O/tmp/nd-configurerepo https://raw.githubusercontent.com/neurodebian/neurodebian/4d26c8f30433145009aa3f74516da12f560a5a13/tools/nd-configurerepo
     bash /tmp/nd-configurerepo
     chmod a+r -R /etc/apt
-    eatmydata apt-get -y install datalad python-nipype virtualenv dcm2niix
+    eatmydata apt-get -y install datalad python-nipype virtualenv dcm2niix python-dcmstack python-configparser python-funcsigs python-pytest
+
+    # for bids-validator
+    curl -sL https://deb.nodesource.com/setup_6.x | bash - && \
+       eatmydata apt-get install -y nodejs
+    npm install -g bids-validator@0.20.0
+    chmod a+rX -R /usr/lib/node_modules/
+
+    chmod a+rX -R /etc/apt/sources.list.d
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
     apt-get clean
 
     # and wipe out apt lists since not to be used RW for further tuning
