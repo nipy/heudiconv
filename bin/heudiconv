@@ -459,7 +459,14 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, per_studyUID=F
         #   len(dcminfo.ReferencedImageSequence)
         #   len(dcminfo.SourceImageSequence)
         # FOR demographics
-        lgr.debug("%30s %27s %27s %5s nref=%-2d nsrc=%-2d %s" % (
+        if per_studyUID:
+            key = studyUID.split('.')[-1]
+        elif per_accession_number:
+            key = accession_number
+        else:
+            key = ''
+        lgr.debug("%30s %30s %27s %27s %5s nref=%-2d nsrc=%-2d %s" % (
+            key,
             info.series_id,
             dcminfo.SeriesDescription,
             dcminfo.ProtocolName,
