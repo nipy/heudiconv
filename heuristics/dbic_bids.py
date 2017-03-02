@@ -449,12 +449,12 @@ def infotoids(seqinfos, outdir):
     subject = fixup_subjectid(get_unique(seqinfos, 'patient_id'))
     # TODO:  fix up subject id if missing some 0s
     if study_description:
-	split = study_description.split('^', 1)
-	# split first one even more, since couldbe PI_Student or PI-Student
-	split = re.split('-|_', split[0], 1) + split[1:]
+        split = study_description.split('^', 1)
+        # split first one even more, since couldbe PI_Student or PI-Student
+        split = re.split('-|_', split[0], 1) + split[1:]
 
-	# locator = study_description.replace('^', '/')
-	locator = '/'.join(split)
+        # locator = study_description.replace('^', '/')
+        locator = '/'.join(split)
     else:
         locator = 'unknown'
 
