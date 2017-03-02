@@ -262,7 +262,8 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False)
 find_files.__doc__ %= (_VCS_REGEX,)
 
 
-def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, per_studyUID=False):
+def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, per_studyUID=False,
+                               per_accession_number=False):
     """Process list of dicoms and return seqinfo and file group
 
     `seqinfo` contains per-sequence extract of fields from DICOMs which
@@ -281,6 +282,8 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, per_studyUID=F
     per_studyUID : bool, optional
       Then would add a StudyInstanceUID into study id.  So it would not then
       generalize across re-runs on new data.
+    per_accession_number : bool, optional
+      If True, group according to accession number instead of study id
 
     Returns
     -------
@@ -413,6 +416,7 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, per_studyUID=F
         if per_studyUID:
             studyUID = series_id[2]
             series_id = series_id[:2]
+        accession_number = dcminfo.get('AccessionNumber')
 
         series_id = '-'.join(map(str, series_id))
 
@@ -445,7 +449,7 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, per_studyUID=F
             dcminfo.get('ReferringPhysicianName'),
             dcminfo.get('SeriesDescription'),
             tuple(dcminfo.ImageType),
-            dcminfo.get('AccessionNumber'),
+            accession_number,
             # For demographics to populate BIDS participants.tsv
             dcminfo.get('PatientsAge'),
             dcminfo.get('PatientsSex'),
@@ -468,11 +472,18 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, per_studyUID=F
             if studyUID not in seqinfo:
                 seqinfo[studyUID] = ordereddict()
             seqinfo[studyUID][info] = files
+        elif per_accession_number:
+            if accession_number not in seqinfo:
+                seqinfo[accession_number] = ordereddict()
+            seqinfo[accession_number][info] = files
         else:
             seqinfo[info] = files
 
     if per_studyUID:
         lgr.info("Generated sequence info for %d studies with %d entries total",
+                 len(seqinfo), sum(map(len, seqinfo.values())))
+    elif per_accession_number:
+        lgr.info("Generated sequence info for %d accession numbers with %d entries total",
                  len(seqinfo), sum(map(len, seqinfo.values())))
     else:
         lgr.info("Generated sequence info with %d entries", len(seqinfo))
@@ -1265,7 +1276,8 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
             files_,
             flfilter=getattr(heuristic, 'filter_files', None),
             dcmfilter=getattr(heuristic, 'filter_dicom', None),
-            per_studyUID=True)
+            #per_studyUID=True,
+            per_accession_number=True)
 
         if not getattr(heuristic, 'infotoids', None):
             raise NotImplementedError(
