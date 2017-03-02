@@ -28,6 +28,19 @@ fix_accession2run = {
 # dicoms, in the form of PI-Experimenter^protocolname
 # values are list of tuples in the form (regex_pattern, substitution)
 protocols2fix = {
+    # QA
+    '43b67d9139e8c7274578b7451ab21123':
+        [
+         #('anat-scout.*', 'anat-scout_ses-{date}'),
+         ('anat-scout.*', 'anat-scout'),
+         ('BOLD_p2_s4(_3\.5mm)?', 'func_run+_task-rest_acq-p2s4'),
+         ('BOLD_p2', 'func_run+_task-rest_acq-p2'),
+         ('BOLD_', 'func_run+_task-rest'),
+         ('DTI_30_p2_s4(_3\.5mm)?', 'dwi_run+_acq-30p2s4'),
+         ('DTI_30_p2', 'dwi_run+_acq-30p2'),
+         ('_p2_s4(_3\.5mm)?', '_acq-p2s4'),
+         ('_p2', '_acq-p2'),
+        ],
     '9d148e2a05f782273f6343507733309d':
         [('anat_', 'anat-'),
          ('run-life[0-9]', 'run+_task-life'),
@@ -237,6 +250,11 @@ def infotodict(seqinfo):
             skipped.append(s.series_id)
             lgr.debug("Ignoring derived data %s", s.series_id)
             continue
+
+        # possibly apply present formatting in the series_description or protocol name
+        for f in 'series_description', 'protocol_name':
+            s = s._replace(**{f: getattr(s, f).format(**s._asdict())})
+
         template = None
         suffix = ''
         seq = []
@@ -379,7 +397,7 @@ def infotodict(seqinfo):
         # some are ok to skip and not to whine
 
         if "_Scout" in s.series_description or \
-                (seqtype == 'anat' and seqtype_label == 'scout'):
+                (seqtype == 'anat' and seqtype_label.startswith('scout')):
             skipped.append(s.series_id)
             lgr.debug("Ignoring %s", s.series_id)
         else:
@@ -449,12 +467,12 @@ def infotoids(seqinfos, outdir):
     subject = fixup_subjectid(get_unique(seqinfos, 'patient_id'))
     # TODO:  fix up subject id if missing some 0s
     if study_description:
-	split = study_description.split('^', 1)
-	# split first one even more, since couldbe PI_Student or PI-Student
-	split = re.split('-|_', split[0], 1) + split[1:]
+        split = study_description.split('^', 1)
+        # split first one even more, since couldbe PI_Student or PI-Student
+        split = re.split('-|_', split[0], 1) + split[1:]
 
-	# locator = study_description.replace('^', '/')
-	locator = '/'.join(split)
+        # locator = study_description.replace('^', '/')
+        locator = '/'.join(split)
     else:
         locator = 'unknown'
 

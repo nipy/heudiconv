@@ -78,6 +78,7 @@ SeqInfo = namedtuple(
      'accession_number',
      'patient_age',
      'patient_sex',
+     'date'
      ]
 )
 
@@ -449,6 +450,7 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, per_studyUID=F
             # For demographics to populate BIDS participants.tsv
             dcminfo.get('PatientsAge'),
             dcminfo.get('PatientsSex'),
+            dcminfo.get('AcquisitionDate'),
         )
         # candidates
         # dcminfo.AccessionNumber
