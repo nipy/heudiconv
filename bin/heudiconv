@@ -263,7 +263,7 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False)
 find_files.__doc__ %= (_VCS_REGEX,)
 
 
-def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, per_studyUID=False):
+def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, grouping='studyUID'):
     """Process list of dicoms and return seqinfo and file group
 
     `seqinfo` contains per-sequence extract of fields from DICOMs which
@@ -279,9 +279,8 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, per_studyUID=F
     dcmfilter : callable, optional
       If called on dcm_data and returns True, it is used to set
       series_id
-    per_studyUID : bool, optional
-      Then would add a StudyInstanceUID into study id.  So it would not then
-      generalize across re-runs on new data.
+    grouping : str ('studyUID', 'accession_number')
+        what to group by: studyUID or accession_number
 
     Returns
     -------
@@ -291,6 +290,11 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, per_studyUID=F
     filegrp : dict
       `filegrp` is a dictionary with files groupped per each sequence
     """
+    allowed_groupings = ['studyUID', 'accession_number']
+    if grouping not in allowed_groupings:
+        raise ValueError('I do not know how to group by {0}'.format(grouping))
+    per_studyUID = grouping == 'studyUID'
+    per_accession_number = grouping == 'accession_number'
     lgr.info("Analyzing %d dicoms", len(fl))
     import dcmstack as ds
     import dicom as dcm
@@ -336,7 +340,7 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, per_studyUID=F
                 # verify that we are working with a single study
                 if studyUID is None:
                     studyUID = studyUID_
-                else:
+                elif not per_accession_number:
                     assert studyUID == studyUID_
         except AttributeError as exc:
             lgr.warning('Ignoring %s since not quite a "normal" DICOM: %s',
@@ -414,6 +418,7 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, per_studyUID=F
         if per_studyUID:
             studyUID = series_id[2]
             series_id = series_id[:2]
+        accession_number = dcminfo.get('AccessionNumber')
 
         series_id = '-'.join(map(str, series_id))
 
@@ -446,7 +451,7 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, per_studyUID=F
             dcminfo.get('ReferringPhysicianName'),
             dcminfo.get('SeriesDescription'),
             tuple(dcminfo.ImageType),
-            dcminfo.get('AccessionNumber'),
+            accession_number,
             # For demographics to populate BIDS participants.tsv
             dcminfo.get('PatientsAge'),
             dcminfo.get('PatientsSex'),
@@ -457,7 +462,14 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, per_studyUID=F
         #   len(dcminfo.ReferencedImageSequence)
         #   len(dcminfo.SourceImageSequence)
         # FOR demographics
-        lgr.debug("%30s %27s %27s %5s nref=%-2d nsrc=%-2d %s" % (
+        if per_studyUID:
+            key = studyUID.split('.')[-1]
+        elif per_accession_number:
+            key = accession_number
+        else:
+            key = ''
+        lgr.debug("%30s %30s %27s %27s %5s nref=%-2d nsrc=%-2d %s" % (
+            key,
             info.series_id,
             dcminfo.SeriesDescription,
             dcminfo.ProtocolName,
@@ -470,11 +482,18 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, per_studyUID=F
             if studyUID not in seqinfo:
                 seqinfo[studyUID] = ordereddict()
             seqinfo[studyUID][info] = files
+        elif per_accession_number:
+            if accession_number not in seqinfo:
+                seqinfo[accession_number] = ordereddict()
+            seqinfo[accession_number][info] = files
         else:
             seqinfo[info] = files
 
     if per_studyUID:
         lgr.info("Generated sequence info for %d studies with %d entries total",
+                 len(seqinfo), sum(map(len, seqinfo.values())))
+    elif per_accession_number:
+        lgr.info("Generated sequence info for %d accession numbers with %d entries total",
                  len(seqinfo), sum(map(len, seqinfo.values())))
     else:
         lgr.info("Generated sequence info with %d entries", len(seqinfo))
@@ -1204,7 +1223,7 @@ def load_heuristic(heuristic_file):
 
 
 def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
-                       session, sids):
+                       session, sids, grouping='studyUID'):
     """Given options from cmdline sort files or dicom seqinfos into
     study_sessions which put together files for a single session of a subject
     in a study
@@ -1267,7 +1286,7 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
             files_,
             flfilter=getattr(heuristic, 'filter_files', None),
             dcmfilter=getattr(heuristic, 'filter_dicom', None),
-            per_studyUID=True)
+            grouping=grouping)
 
         if not getattr(heuristic, 'infotoids', None):
             raise NotImplementedError(
@@ -1535,6 +1554,7 @@ def _main(args):
     session = args.session
     subjs = args.subjs
     outdir = os.path.abspath(args.outdir)
+    grouping = args.grouping
 
     if args.command:
         # custom mode of operation
@@ -1547,7 +1567,7 @@ def _main(args):
             for f in files_opt:
                 study_sessions = get_study_sessions(
                     dicom_dir_template, [f],
-                    heuristic, None, session, subjs)
+                    heuristic, None, session, subjs, grouping=grouping)
                 print(f)
                 for study_session, sequences in study_sessions.items():
                     suf = ''
@@ -1576,7 +1596,8 @@ def _main(args):
     # TODO: Move into a function!
     study_sessions = get_study_sessions(
         dicom_dir_template, files_opt,
-        heuristic, outdir, session, subjs)
+        heuristic, outdir, session, subjs,
+        grouping=grouping)
     # extract tarballs, and replace their entries with expanded lists of files
     # TODO: we might need to sort so sessions are ordered???
     lgr.info("Need to process %d study sessions", len(study_sessions))
@@ -1770,6 +1791,10 @@ def get_parser():
                         choices=('treat-json', 'ls', 'populate-templates'),
                         help='''custom actions to be performed on provided files instead of
                         regular operation.''')
+    parser.add_argument('-g', '--grouping',
+                        default='studyUID',
+                        choices=('studyUID', 'accession_number'),
+                        help='''How to group dicoms (default: by studyUID)''')
     parser.add_argument(
         'files',
         nargs='*',

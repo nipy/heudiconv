@@ -501,6 +501,8 @@ def infotoids(seqinfos, outdir):
                 " We will process until the end of the first session"
             )
         if nonsign_vals:
+            # get only unique values
+            ses_markers = list(set(ses_markers))
             if set(ses_markers).intersection('+='):
                 raise NotImplementedError(
                     "Should not mix hardcoded session markers with incremental ones (+=)"
