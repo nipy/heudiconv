@@ -52,6 +52,23 @@ logging.basicConfig(
 )
 lgr.debug("Starting the abomination")  # just to "run-test" logging
 
+# for nipype, we would like to lower level unless we are at debug level
+try:
+    import nipype
+    for l in nipype.logging.loggers.values():
+        if lgr.getEffectiveLevel() > 10:
+            l.setLevel(logging.WARN)
+except ImportError:
+    pass
+
+try:
+    # Set datalad's logger to our handler
+    import datalad
+    datalad_lgr = logging.getLogger('datalad')
+    datalad_lgr.handlers = lgr.handlers
+except ImportError:
+    pass
+
 global_options = {
     'overwrite': False   # overwrite existing files
 }
