@@ -525,6 +525,7 @@ def parse_dbic_protocol_name(protocol_name):
     # Since Yarik didn't know better place to put it in, but could migrate outside
     # at some point
     protocol_name = protocol_name.replace("anat_T1w", "anat-T1w")
+    protocol_name = protocol_name.replace("hardi_64", "dwi_acq-hardi64")
 
     # Parse the name according to our convention
     # https://docs.google.com/document/d/1R54cgOe481oygYVZxI7NHrifDyFUZAjOBwCTu7M7y48/edit?usp=sharing
