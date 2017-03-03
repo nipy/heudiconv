@@ -999,6 +999,10 @@ and there was a screw up for that A
 
 in that one though
         """
+        if global_options['overwrite'] and lexists(scaninfo):
+            # TODO: handle annexed file case
+            if not os.path.islink(scaninfo):
+                os.chmod(scaninfo, 0o0660)
         res = embedfunc.run()
         os.chmod(scaninfo, 0o0440)
         if with_prov:
@@ -1472,6 +1476,7 @@ def add_to_datalad(topdir, studydir, msg=None, bids=False):
                          force=True,
                          if_dirty='ignore',  # see https://github.com/datalad/datalad/issues/1016
                          no_annex=True,  # need to add .gitattributes first anyways
+                         shared_access='all',
                          annex_version=6)
             assert ds == ds_
         assert ds.is_installed()
@@ -1488,7 +1493,8 @@ def add_to_datalad(topdir, studydir, msg=None, bids=False):
 *.tgz annex.largefiles=(largerthan=0kb)
 """)
     # so for mortals it just looks like a regular directory!
-    ds.config.add('annex.thin', 'true', where='local')
+    if not ds.config.get('annex.thin'):
+        ds.config.add('annex.thin', 'true', where='local')
     # initialize annex there if not yet initialized
     AnnexRepo(ds.path, init=True)
     # Let's make it a
