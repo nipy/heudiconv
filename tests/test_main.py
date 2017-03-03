@@ -36,10 +36,13 @@ def test_create_file_if_missing(tmpdir):
 
 
 def test_populate_bids_templates(tmpdir):
-    heudiconv.populate_bids_templates(str(tmpdir))
+    heudiconv.populate_bids_templates(
+        str(tmpdir),
+        defaults={'Acknowledgements': 'something'})
     for f in "README", "dataset_description.json", "CHANGES":
         # Just test that we have created them and they all have stuff TODO
         assert "TODO" in tmpdir.join(f).read()
+    assert "something" in tmpdir.join('dataset_description.json').read()
 
 
 def test_add_participant_record(tmpdir):
@@ -90,3 +93,11 @@ def test_prepare_for_datalad(tmpdir):
     # and all are under git
     for f in target_files:
         assert not ds.repo.is_under_annex(f)
+
+def test_json_dumps_pretty():
+    pretty = heudiconv.json_dumps_pretty
+    assert pretty({}) == "{}"
+    assert pretty({"a": -1, "b": "123", "c": [1, 2, 3], "d": ["1.0", "2.0"]}) \
+        == '{\n  "a": -1, \n  "b": "123", \n  "c": [1, 2, 3], \n  "d": ["1.0", "2.0"]\n}'
+    assert pretty({'a': ["0.3", "-1.9128906358217845e-12", "0.2"]}) \
+        == '{\n  "a": ["0.3", "-1.9128906358217845e-12", "0.2"]\n}'

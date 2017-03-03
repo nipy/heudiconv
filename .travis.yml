@@ -38,7 +38,7 @@ install:
 
 script:
   # - nosetests -s -v --with-doctest --doctest-tests --with-cov --cover-package . --logging-level=INFO tests
-  - coverage run `which py.test` -s -v tests
+  - coverage run `which py.test` -s -v tests heuristics
 
 after_success:
   - codecov
