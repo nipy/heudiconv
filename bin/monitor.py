@@ -57,6 +57,16 @@ def monitor(topdir='/tmp/new_dir', check_ptrn='/20../../..'):
         process(paths2process)
 
 
+def parse_args():
+    import argparse
+    parser = argparse.ArgumentParser(prog='monitor.py', description='Small monitoring script to detect new directories and process them', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('path', help='Which directory to monitor')
+    parser.add_argument('--check_ptrn', '-p', help='regexp pattern for which subdirectories to check', default='/20../../..')
+
+    return parser.parse_args()
+
+
 if __name__ == '__main__':
     _configure_logging()
-    monitor()
+    parsed = parse_args()
+    monitor(parsed.path, parsed.check_ptrn)
