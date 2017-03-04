@@ -34,6 +34,7 @@ protocols2fix = {
          #('anat-scout.*', 'anat-scout_ses-{date}'),
          ('anat-scout.*', 'anat-scout'),
          ('BOLD_p2_s4(_3\.5mm)?', 'func_run+_task-rest_acq-p2s4'),
+         ('BOLD_p2_noprescannormalize', 'func_run+_task-rest_acq-p2noprescannormalize'),
          ('BOLD_p2', 'func_run+_task-rest_acq-p2'),
          ('BOLD_', 'func_run+_task-rest'),
          ('DTI_30_p2_s4(_3\.5mm)?', 'dwi_run+_acq-30p2s4'),
@@ -397,7 +398,7 @@ def infotodict(seqinfo):
         # some are ok to skip and not to whine
 
         if "_Scout" in s.series_description or \
-                (seqtype == 'anat' and seqtype_label.startswith('scout')):
+                (seqtype == 'anat' and seqtype_label and seqtype_label.startswith('scout')):
             skipped.append(s.series_id)
             lgr.debug("Ignoring %s", s.series_id)
         else:
