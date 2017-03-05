@@ -4,6 +4,7 @@ import os
 import re
 import subprocess
 import time
+import json
 
 from collections import deque, OrderedDict
 from datetime import date
@@ -41,7 +42,7 @@ def run_heudiconv(cmd):
     # get info on what we run
     stdout = proc.communicate()[0].decode('utf-8')
     match = re.match('INFO: PROCESSING STARTS: (.*)', stdout)
-    info_dict_ = eval(match.group(1) if match else '')
+    info_dict_ = json.loads(match.group(1) if match else '{}')
     info_dict.update(info_dict_)
     return stdout, info_dict
     
