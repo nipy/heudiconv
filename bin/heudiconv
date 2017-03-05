@@ -1708,7 +1708,8 @@ def _main(args):
                     anon_outdir, anon_study_outdir,
                     msg="Preparing for %s" % datalad_msg_suf,
                     bids=args.bids)
-
+        lgr.info("PROCESSING STARTS: {0}".format(
+            str(dict(subject=sid, outdir=study_outdir, session=session))))
         convert_dicoms(
                    sid,
                    dicoms,
@@ -1721,6 +1722,8 @@ def _main(args):
                    ses=session,
                    is_bids=args.bids,
                    seqinfo=seqinfo)
+        lgr.info("PROCESSING DONE: {0}".format(
+            str(dict(subject=sid, outdir=study_outdir, session=session))))
 
         if args.datalad:
             msg = "Converted subject %s" % datalad_msg_suf
