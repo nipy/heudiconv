@@ -50,7 +50,7 @@ def test_monitor(capsys):
     (None, 1),
     (CalledProcessError('mycmd', 1), 0)
 ])
-def test_process_success(tmpdir, capsys, side_effect, success):
+def test_process(tmpdir, capsys, side_effect, success):
     db_fn = tmpdir.join('database.json')
     db = TinyDB(db_fn.strpath)
     paths2process = {'/my/path': 42} 
