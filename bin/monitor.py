@@ -19,20 +19,20 @@ MASK_NEWDIR = (IN_CREATE | IN_ISDIR)
 WAIT_TIME = 10  # in seconds
 
 
-def _configure_logging():
-    _LOGGER.setLevel(logging.DEBUG)
-    ch = logging.StreamHandler()
-    formatter = logging.Formatter(_DEFAULT_LOG_FORMAT)
-    ch.setFormatter(formatter)
-    _LOGGER.addHandler(ch)
+#def _configure_logging():
+_LOGGER.setLevel(logging.DEBUG)
+ch = logging.StreamHandler()
+formatter = logging.Formatter(_DEFAULT_LOG_FORMAT)
+ch.setFormatter(formatter)
+_LOGGER.addHandler(ch)
 
 
-def process(paths2process, db):
+def process(paths2process, db, wait=WAIT_TIME):
     cmd = 'echo heudiconv {0}'
     #if paths2process and time.time() - os.path.getmtime(paths2process[0]) > WAIT_TIME:
     processed = []
     for path, mod_time in paths2process.items():
-        if time.time() - mod_time > WAIT_TIME:
+        if time.time() - mod_time > wait:
             #process_me = paths2process.popleft().decode('utf-8')
             process_me = path
             cmd_ = cmd.format(process_me)
@@ -99,5 +99,5 @@ if __name__ == '__main__':
     _configure_logging()
     parsed = parse_args()
     # open database
-    db = TinyDB(parsed.database)
+    db = TinyDB(parsed.database, default_table='heudiconv')
     monitor(parsed.path, parsed.check_ptrn, db)
