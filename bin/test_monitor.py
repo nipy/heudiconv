@@ -1,4 +1,5 @@
 from collections import namedtuple
+import os
 import pytest
 from mock import patch
 from monitor import monitor, process, run_heudiconv, MASK_NEWDIR
@@ -53,7 +54,8 @@ def test_monitor(capsys):
 def test_process(tmpdir, capsys, side_effect, success):
     db_fn = tmpdir.join('database.json')
     db = TinyDB(db_fn.strpath)
-    paths2process = {'/my/path': 42} 
+    process_me = '/my/path/A12345'
+    paths2process = {process_me: 42} 
     with patch('subprocess.Popen') as mocked_popen:
         mocked_popen_instance = mocked_popen.return_value
         mocked_popen_instance.side_effect = side_effect
@@ -69,14 +71,16 @@ def test_process(tmpdir, capsys, side_effect, success):
         assert db_fn.check()
         # dictionary should be empty
         assert not paths2process
-        assert out == 'Time to process /my/path\n' 
+        assert out == 'Time to process {0}\n'.format(process_me)
 
         # check what we have in the database
         Path = Query()
-        query = db.get(Path.input_path == '/my/path')
+        query = db.get(Path.input_path == process_me)
         assert len(db) == 1
         assert query
         assert query['success'] == success
+        assert query['accession_number'] == os.path.basename(process_me)
+        assert query['just'] == 'a test'
 
 
 def test_run_heudiconv():

@@ -53,7 +53,7 @@ def process(paths2process, db, wait=WAIT_TIME):
             #process_me = paths2process.popleft().decode('utf-8')
             process_me = path
             cmd_ = cmd.format(process_me)
-            process_dict = {'input_path': process_me}
+            process_dict = {'input_path': process_me, 'accession_number': os.path.basename(process_me)}
             print("Time to process {0}".format(process_me))
             run_dict = run_heudiconv(cmd_)
             process_dict.update(run_dict)
