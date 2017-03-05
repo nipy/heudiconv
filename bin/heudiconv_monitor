@@ -48,7 +48,7 @@ def run_heudiconv(cmd):
     
 
 def process(paths2process, db, wait=WAIT_TIME, logdir='log'):
-    cmd = 'echo heudiconv {0}'
+    cmd = 'ls -l {0}'
     #if paths2process and time.time() - os.path.getmtime(paths2process[0]) > WAIT_TIME:
     processed = []
     for path, mod_time in paths2process.items():
@@ -112,7 +112,7 @@ def parse_args():
     parser.add_argument('path', help='Which directory to monitor')
     parser.add_argument('--check_ptrn', '-p', help='regexp pattern for which subdirectories to check', default='/20../../..')
     parser.add_argument('--database', '-d', help='database location', default='database.json')
-    parser.add_argument('--wait_time', '-w', help='After how long should we start processing datasets? (in seconds)', default=86400)
+    parser.add_argument('--wait_time', '-w', help='After how long should we start processing datasets? (in seconds)', default=86400, type=float)
     parser.add_argument('--logdir', '-l', help='Where should we save the logs?', default='log')
 
 
@@ -121,6 +121,7 @@ def parse_args():
 
 if __name__ == '__main__':
     parsed = parse_args()
+    print('Got {0}'.format(parsed))
     # open database
     db = TinyDB(parsed.database, default_table='heudiconv')
     monitor(parsed.path, parsed.check_ptrn, db, wait=parsed.wait_time, logdir=parsed.logdir)
