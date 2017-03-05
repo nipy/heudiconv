@@ -1,7 +1,7 @@
 from collections import namedtuple
 import pytest
 from mock import patch
-from monitor import monitor, process, MASK_NEWDIR
+from monitor import monitor, process, run_heudiconv, MASK_NEWDIR
 from os.path import exists
 from tinydb import TinyDB, Query
 from subprocess import CalledProcessError
@@ -54,13 +54,18 @@ def test_process(tmpdir, capsys, side_effect, success):
     db_fn = tmpdir.join('database.json')
     db = TinyDB(db_fn.strpath)
     paths2process = {'/my/path': 42} 
-    # test 1: everything ok
-    with patch('subprocess.check_call') as mocked_call:
-        mocked_call.side_effect = side_effect
+    with patch('subprocess.Popen') as mocked_popen:
+        mocked_popen_instance = mocked_popen.return_value
+        mocked_popen_instance.side_effect = side_effect
+        mocked_popen_instance.communicate.return_value = (b"INFO: PROCESSING STARTS: {'just': 'a test'}", )
+        # set return value for wait
+        mocked_popen_instance.wait.return_value = 1 - success
+        # mock also communicate to get the supposed stdout
+        # mocked_popen.communicate = lambda: (b"INFO: PROCESSING STARTS: {'just': 'a test'}", )
         process(paths2process, db, wait=-30)
         out, err = capsys.readouterr()
 
-        mocked_call.assert_called_once()
+        mocked_popen.assert_called_once()
         assert db_fn.check()
         # dictionary should be empty
         assert not paths2process
@@ -72,3 +77,11 @@ def test_process(tmpdir, capsys, side_effect, success):
         assert len(db) == 1
         assert query
         assert query['success'] == success
+
+
+def test_run_heudiconv():
+    # echo should succeed always
+    mydict = {'key1': 'value1', 'key2': 'value2', 'success': 1}
+    cmd = "echo INFO: PROCESSING STARTS: {0}".format(str(mydict))
+    out = run_heudiconv(cmd)
+    assert out == mydict

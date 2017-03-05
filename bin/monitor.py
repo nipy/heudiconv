@@ -27,6 +27,23 @@ ch.setFormatter(formatter)
 _LOGGER.addHandler(ch)
 
 
+def run_heudiconv(cmd):
+    info_dict = dict()
+    proc = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    return_code = proc.wait()
+    if return_code == 0:
+        _LOGGER.info("Done running {0}".format(cmd))
+        info_dict['success'] = 1
+    else:   
+        _LOGGER.error("{0} failed".format(cmd))
+        info_dict['success'] = 0
+    # get info on what we run
+    match = re.match('INFO: PROCESSING STARTS: (.*)', proc.communicate()[0].decode('utf-8'))
+    info_dict_ = eval(match.group(1) if match else '')
+    info_dict.update(info_dict_)
+    return info_dict
+    
+
 def process(paths2process, db, wait=WAIT_TIME):
     cmd = 'echo heudiconv {0}'
     #if paths2process and time.time() - os.path.getmtime(paths2process[0]) > WAIT_TIME:
@@ -36,23 +53,15 @@ def process(paths2process, db, wait=WAIT_TIME):
             #process_me = paths2process.popleft().decode('utf-8')
             process_me = path
             cmd_ = cmd.format(process_me)
-            try:
-                print("Time to process {0}".format(process_me))
-                subprocess.check_call(cmd_.split())
-                _LOGGER.info("Done running {0}".format(cmd_))
-                # here we should inspect output and then store additional info
-                db.insert({'input_path': process_me, 'success': 1, 'subject_id': 'TODO', 'output_path': 'TODO'})
-            except subprocess.CalledProcessError:
-                _LOGGER.error("{0} failed".format(cmd_))
-                db.insert({'input_path': process_me, 'success': 0})
+            process_dict = {'input_path': process_me}
+            print("Time to process {0}".format(process_me))
+            run_dict = run_heudiconv(cmd_)
+            process_dict.update(run_dict)
+            db.insert(process_dict)
             # if we processed it, or it failed, we need to remove it to avoid running it again
             processed.append(path)
     for processed_path in processed:
         del paths2process[processed_path]
-
-
-def inspect_heudiconv_output(heudiconv_output):
-    pass
 
 
 def monitor(topdir='/tmp/new_dir', check_ptrn='/20../../..', db=None):
