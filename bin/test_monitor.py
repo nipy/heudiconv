@@ -53,21 +53,27 @@ def test_monitor(capsys):
 ])
 def test_process(tmpdir, capsys, side_effect, success):
     db_fn = tmpdir.join('database.json')
+    log_dir = tmpdir.mkdir('log')
     db = TinyDB(db_fn.strpath)
     process_me = '/my/path/A12345'
+    accession_number = os.path.basename(process_me)
     paths2process = {process_me: 42} 
     with patch('subprocess.Popen') as mocked_popen:
+        stdout = b"INFO: PROCESSING STARTS: {'just': 'a test'}"
         mocked_popen_instance = mocked_popen.return_value
         mocked_popen_instance.side_effect = side_effect
-        mocked_popen_instance.communicate.return_value = (b"INFO: PROCESSING STARTS: {'just': 'a test'}", )
+        mocked_popen_instance.communicate.return_value = (stdout, )
         # set return value for wait
         mocked_popen_instance.wait.return_value = 1 - success
         # mock also communicate to get the supposed stdout
         # mocked_popen.communicate = lambda: (b"INFO: PROCESSING STARTS: {'just': 'a test'}", )
-        process(paths2process, db, wait=-30)
+        process(paths2process, db, wait=-30, logdir=log_dir.strpath)
         out, err = capsys.readouterr()
-
+        log_fn = log_dir.join(accession_number + '.log')
+        
         mocked_popen.assert_called_once()
+        assert log_fn.check()
+        assert log_fn.read() == stdout.decode('utf-8')
         assert db_fn.check()
         # dictionary should be empty
         assert not paths2process
@@ -87,5 +93,6 @@ def test_run_heudiconv():
     # echo should succeed always
     mydict = {'key1': 'value1', 'key2': 'value2', 'success': 1}
     cmd = "echo INFO: PROCESSING STARTS: {0}".format(str(mydict))
-    out = run_heudiconv(cmd)
-    assert out == mydict
+    stdout, info_dict = run_heudiconv(cmd)
+    assert info_dict == mydict
+    assert "echo " + stdout.strip() == cmd

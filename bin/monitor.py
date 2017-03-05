@@ -9,6 +9,7 @@ from collections import deque, OrderedDict
 from datetime import date
 import inotify.adapters
 from inotify.constants import IN_MODIFY, IN_CREATE, IN_ISDIR
+from py.path import local as localpath
 from tinydb import TinyDB
 
 _DEFAULT_LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -16,7 +17,7 @@ _LOGGER = logging.getLogger(__name__)
 
 MASK = (IN_MODIFY | IN_CREATE)
 MASK_NEWDIR = (IN_CREATE | IN_ISDIR)
-WAIT_TIME = 10  # in seconds
+WAIT_TIME = 86400  # in seconds
 
 
 #def _configure_logging():
@@ -38,13 +39,14 @@ def run_heudiconv(cmd):
         _LOGGER.error("{0} failed".format(cmd))
         info_dict['success'] = 0
     # get info on what we run
-    match = re.match('INFO: PROCESSING STARTS: (.*)', proc.communicate()[0].decode('utf-8'))
+    stdout = proc.communicate()[0].decode('utf-8')
+    match = re.match('INFO: PROCESSING STARTS: (.*)', stdout)
     info_dict_ = eval(match.group(1) if match else '')
     info_dict.update(info_dict_)
-    return info_dict
+    return stdout, info_dict
     
 
-def process(paths2process, db, wait=WAIT_TIME):
+def process(paths2process, db, wait=WAIT_TIME, logdir='log'):
     cmd = 'echo heudiconv {0}'
     #if paths2process and time.time() - os.path.getmtime(paths2process[0]) > WAIT_TIME:
     processed = []
@@ -55,16 +57,20 @@ def process(paths2process, db, wait=WAIT_TIME):
             cmd_ = cmd.format(process_me)
             process_dict = {'input_path': process_me, 'accession_number': os.path.basename(process_me)}
             print("Time to process {0}".format(process_me))
-            run_dict = run_heudiconv(cmd_)
+            stdout, run_dict = run_heudiconv(cmd_)
             process_dict.update(run_dict)
             db.insert(process_dict)
+            # save log
+            logdir = localpath(logdir)
+            log = logdir.join(process_dict['accession_number'] + '.log')
+            log.write(stdout)
             # if we processed it, or it failed, we need to remove it to avoid running it again
             processed.append(path)
     for processed_path in processed:
         del paths2process[processed_path]
 
 
-def monitor(topdir='/tmp/new_dir', check_ptrn='/20../../..', db=None):
+def monitor(topdir='/tmp/new_dir', check_ptrn='/20../../..', db=None, wait=WAIT_TIME):
     #paths2process = deque()
     paths2process = OrderedDict()
     # watch only today's folder
@@ -91,7 +97,7 @@ def monitor(topdir='/tmp/new_dir', check_ptrn='/20../../..', db=None):
                     print("Updating {0}: {1}".format(path, paths2process[path]))
                 
         # check if there's anything to process
-        process(paths2process, db)
+        process(paths2process, db, wait=wait)
 
 
 def parse_args():
@@ -100,6 +106,7 @@ def parse_args():
     parser.add_argument('path', help='Which directory to monitor')
     parser.add_argument('--check_ptrn', '-p', help='regexp pattern for which subdirectories to check', default='/20../../..')
     parser.add_argument('--database', '-d', help='database location', default='database.json')
+    parser.add_argument('--wait_time', '-w', help='After how long should we start processing datasets? (in seconds)', default=86400)
 
     return parser.parse_args()
 
@@ -109,4 +116,4 @@ if __name__ == '__main__':
     parsed = parse_args()
     # open database
     db = TinyDB(parsed.database, default_table='heudiconv')
-    monitor(parsed.path, parsed.check_ptrn, db)
+    monitor(parsed.path, parsed.check_ptrn, db, wait=parsed.wait_time)
