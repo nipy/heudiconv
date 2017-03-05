@@ -119,7 +119,6 @@ def parse_args():
 
 
 if __name__ == '__main__':
-    _configure_logging()
     parsed = parse_args()
     # open database
     db = TinyDB(parsed.database, default_table='heudiconv')
