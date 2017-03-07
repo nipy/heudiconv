@@ -42,7 +42,7 @@ MirrorURL: http://ftp.us.debian.org/debian/
     wget -q -O/tmp/nd-configurerepo https://raw.githubusercontent.com/neurodebian/neurodebian/4d26c8f30433145009aa3f74516da12f560a5a13/tools/nd-configurerepo
     bash /tmp/nd-configurerepo
     chmod a+r -R /etc/apt
-    eatmydata apt-get -y install datalad python-nipype virtualenv dcm2niix python-dcmstack python-configparser python-funcsigs python-pytest
+    eatmydata apt-get -y install datalad python-nipype virtualenv dcm2niix python-dcmstack python-configparser python-funcsigs python-pytest dcmtk
 
     # for bids-validator
     curl -sL https://deb.nodesource.com/setup_6.x | bash - && \
