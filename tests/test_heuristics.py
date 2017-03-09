@@ -16,9 +16,23 @@ def test_smoke_converall(tmpdir):
     )
 
 
-def test_dbic_bids_largely_smoke(tmpdir):
-    args = ("-f heuristics/dbic_bids.py -c dcm2niix -o %s -b "
-            "--datalad tests/data" % tmpdir).split(' ');
+@pytest.mark.parametrize('heuristic', [ 'dbic_bids', 'convertall' ])
+@pytest.mark.parametrize(
+    'invocation', [
+        "tests/data",    # our new way with automated groupping
+        "-d tests/data/%s/* -s 01-fmap_acq-3mm" # "old" way specifying subject
+        # should produce the same results
+    ])
+def test_dbic_bids_largely_smoke(tmpdir, heuristic, invocation):
+    args = (
+        ("-f heuristics/%s.py -c dcm2niix -o %s -b --datalad "  % (heuristic, tmpdir))
+        + invocation
+    ).split(' ')
+    if heuristic != 'dbic_bids' and invocation == 'tests/data':
+        # none other heuristic has mighty infotoids atm
+        with pytest.raises(NotImplementedError):
+            heudiconv.main(args)
+        return
     heudiconv.main(args)
     ds = Dataset(str(tmpdir))
     assert ds.is_installed()
@@ -26,8 +40,13 @@ def test_dbic_bids_largely_smoke(tmpdir):
     head = ds.repo.get_hexsha()
 
     # and if we rerun -- should fail
-    with pytest.raises(RuntimeError):
+    if heuristic != 'dbic_bids' and invocation != 'tests/data':
+        # those guys -- they just plow through it ATM without failing, i.e.
+        # the logic is to reprocess
         heudiconv.main(args)
+    else:
+        with pytest.raises(RuntimeError):
+            heudiconv.main(args)
     # but there should be nothing new
     assert not ds.repo.dirty
     assert head == ds.repo.get_hexsha()
