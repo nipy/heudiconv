@@ -561,7 +561,7 @@ def convert(items, symlink=True, converter=None,
 
 def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
                    queue=None, anon_sid_cmd=None, anon_outdir=None, with_prov=False,
-                   ses=None, is_bids=False):
+                   ses=None, is_bids=False, sbatch_args='-N1 -c2 --mem=20G -t 02:00:00'):
     for sid in subjs:
         tmpdir = None
         if queue:
@@ -579,7 +579,7 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
             script_file = 'dicom-%s.sh' % sid
             with open(script_file, 'wt') as fp:
                 fp.writelines(['#!/bin/bash\n', convertcmd])
-            outcmd = 'sbatch -J dicom-%s -p %s -N1 -c2 --mem=20G -t 02:00:00 %s' % (sid, queue, script_file)
+            outcmd = 'sbatch -J dicom-%s -p %s %s %s' % (sid, queue, sbatch_args, script_file)
             os.system(outcmd)
             continue
 
@@ -828,6 +828,8 @@ s3
                         help='''flag for output into BIDS structure''')
     parser.add_argument('--dbg', action='store_true', dest='debug',
                         help="do not catch exceptions and show exception traceback")
+    parser.add_argument('--sbargs', dest='sbatch_args', default='-N1 -c2 --mem=20G -t 02:00:00',
+                        help="Additional sbatch arguments if running with queue arg")
     args = parser.parse_args(args)
 
     if args.debug:
@@ -842,7 +844,8 @@ s3
                    anon_outdir=args.conv_outputdir,
                    with_prov=args.with_prov,
                    ses=args.session,
-                   is_bids=args.bids)
+                   is_bids=args.bids,
+                   sbatch_args=args.sbatch_args)
 
 
 if __name__ == '__main__':
