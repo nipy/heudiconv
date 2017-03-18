@@ -400,7 +400,7 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info=None, force=False):
 def compress_dicoms(dicom_list, prefix, sourcedir):
     tmpdir = mkdtemp(prefix='dicomtar')
     outtar = os.path.join(sourcedir, prefix + '.dicom.tgz')
-    with tarfile.open(outtar, 'w:gz') as tar:
+    with tarfile.open(outtar, 'w:gz', dereference=True) as tar:
         for filename in dicom_list:
             outfile = os.path.join(tmpdir, os.path.basename(filename))
             if not os.path.islink(outfile):
@@ -794,7 +794,7 @@ s3
                         type=str, nargs='+', help='list of subjects')
     parser.add_argument('-c', '--converter', dest='converter',
                         required=True,
-                        choices=('mri_convert', 'dcmstack', 'dcm2nii', 'dcm2niix',
+                        choices=('dcm2niix',
                                  'none'),
                         help='''tool to use for dicom conversion. Setting to 
                         "none" disables the actual conversion step -- useful
