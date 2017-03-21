@@ -2,8 +2,8 @@
 
 """Convert DICOM TimTrio dirs based on heuristic info
 
-This function uses DicomStack and mri_convert to convert Siemens
-TrioTim directories. It proceeds by extracting dicominfo from each
+This function uses DicomStack and Dcm2niix to convert Siemens
+TrioTim/Prisma directories. It proceeds by extracting dicominfo from each
 subject and writing a config file $subject_id/$subject_id.auto.txt in
 the output directory. Users can create a copy of the file called
 $subject_id.edit.txt and modify it to change the files that are
@@ -561,7 +561,7 @@ def convert(items, symlink=True, converter=None,
 
 def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
                    queue=None, anon_sid_cmd=None, anon_outdir=None, with_prov=False,
-                   ses=None, is_bids=False, sbatch_args='-N1 -c2 --mem=20G -t 02:00:00'):
+                   ses=None, is_bids=False, sbatch_args='-N1 -c2 --mem=20G -t 01:00:00'):
     for sid in subjs:
         tmpdir = None
         if queue:
@@ -828,7 +828,7 @@ s3
                         help='''flag for output into BIDS structure''')
     parser.add_argument('--dbg', action='store_true', dest='debug',
                         help="do not catch exceptions and show exception traceback")
-    parser.add_argument('--sbargs', dest='sbatch_args', default='-N1 -c2 --mem=20G -t 02:00:00',
+    parser.add_argument('--sbargs', dest='sbatch_args', default='-N1 -c2 --mem=20G -t 01:00:00',
                         help="Additional sbatch arguments if running with queue arg")
     args = parser.parse_args(args)
 

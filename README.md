@@ -31,12 +31,7 @@ as long as the following dependencies are in your path you can use the script
 - dcmstack
 - nipype
 - nibabel
-
-One of the following:
-- dcm2niix (preferred)
-- dcm2nii
-- mri_convert
-- dcmstack
+- dcm2niix
 
 ## How it works (in some more detail)
 
