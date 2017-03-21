@@ -2,8 +2,8 @@
 
 """Convert DICOM TimTrio dirs based on heuristic info
 
-This function uses DicomStack and mri_convert to convert Siemens
-TrioTim directories. It proceeds by extracting dicominfo from each
+This function uses DicomStack and Dcm2niix to convert Siemens
+TrioTim/Prisma directories. It proceeds by extracting dicominfo from each
 subject and writing a config file $subject_id/$subject_id.auto.txt in
 the output directory. Users can create a copy of the file called
 $subject_id.edit.txt and modify it to change the files that are
