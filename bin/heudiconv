@@ -159,7 +159,7 @@ def process_dicoms(fl, dcmsession=None, basedir=None, dcmfilter=None):
     Returns
     -------
     seqinfo, filegrp : list of list, dict
-      `seqinfo` is a list of info entries per each sequence (some entry 
+      `seqinfo` is a list of info entries per each sequence (some entry
       there defines a key for `filegrp`)
       `filegrp` is a dictionary with files groupped per each sequence.
     """
@@ -367,29 +367,39 @@ def conversion_info(subject, outdir, info, filegroup, basedir=None, ses=None):
     return convert_info
 
 
-def embed_nifti(dcmfiles, niftifile, infofile, bids_info=None, force=False):
-    import dcmstack as ds
+def embed_nifti(dcmfiles, niftifile, infofile, bids_info=None, force=False, min_meta=False):
     import nibabel as nb
     import os
     import json
-    stack = ds.parse_and_stack(dcmfiles, force=force).values()
-    if len(stack) > 1:
-        raise ValueError('Found multiple series')
-    stack = stack[0]
-    #Create the nifti image using the data array
-    if not os.path.exists(niftifile):
-        nifti_image = stack.to_nifti(embed_meta=True)
-        nifti_image.to_filename(niftifile)
-        return ds.NiftiWrapper(nifti_image).meta_ext.to_json()
-    orig_nii = nb.load(niftifile)
-    aff = orig_nii.get_affine()
-    ornt = nb.orientations.io_orientation(aff)
-    axcodes = nb.orientations.ornt2axcodes(ornt)
-    new_nii = stack.to_nifti(voxel_order=''.join(axcodes), embed_meta=True)
-    meta = ds.NiftiWrapper(new_nii).meta_ext.to_json()
-    meta_info = json.loads(meta)
+    import dcmstack as ds
+    if not min_meta:
+        stack = ds.parse_and_stack(dcmfiles, force=force).values()
+        if len(stack) > 1:
+            raise ValueError('Found multiple series')
+        stack = stack[0]
+        #Create the nifti image using the data array
+        if not os.path.exists(niftifile):
+            nifti_image = stack.to_nifti(embed_meta=True)
+            nifti_image.to_filename(niftifile)
+            return ds.NiftiWrapper(nifti_image).meta_ext.to_json()
+        orig_nii = nb.load(niftifile)
+        aff = orig_nii.get_affine()
+        ornt = nb.orientations.io_orientation(aff)
+        axcodes = nb.orientations.ornt2axcodes(ornt)
+        new_nii = stack.to_nifti(voxel_order=''.join(axcodes), embed_meta=True)
+        meta = ds.NiftiWrapper(new_nii).meta_ext.to_json()
+        meta_info = json.loads(meta)
     if bids_info:
-        meta_info = dict(meta_info.items() + bids_info.items())
+        if min_meta:
+            meta_info = bids_info
+        else:
+            meta_info = dict(meta_info.items() + bids_info.items())
+        # Look
+        try:
+            task = re.search('(?<=_task-)\w+', os.path.basename(s)).group(0).split('_')[0]
+            meta_info['TaskName'] = task
+        except AttributeError:
+            lgr.warn('Task is not accurately defined in heuristic template')
     with open(infofile, 'wt') as fp:
         json.dump(meta_info, fp, indent=0, sort_keys=True)
     return niftifile, infofile
@@ -410,7 +420,7 @@ def compress_dicoms(dicom_list, prefix, sourcedir):
 
 def convert(items, symlink=True, converter=None,
         scaninfo_suffix='.json', custom_callable=None, with_prov=False,
-        is_bids=False, sourcedir=None):
+        is_bids=False, sourcedir=None, min_meta=False):
     prov_files = []
     tmpdir = mkdtemp(prefix='heudiconvtmp')
     for item in items:
@@ -459,7 +469,9 @@ def convert(items, symlink=True, converter=None,
                     from nipype import Function, Node
                     from nipype.interfaces.base import isdefined
                     print(converter)
+                    # deprecated
                     if converter == 'mri_convert':
+                        lgr.warn('Deprecated - use dcm2niix for future conversions')
                         from nipype.interfaces.freesurfer.preprocess import MRIConvert
                         convertnode = Node(MRIConvert(), name='convert')
                         convertnode.base_dir = tmpdir
@@ -506,13 +518,15 @@ def convert(items, symlink=True, converter=None,
                                 and isdefined(res.outputs.bids):
                             ### extract bids
                             if isinstance(res.outputs.bids, list):
-                                lgr.warning("There was someone catching lists!") 
+                                lgr.warning("There was someone catching lists!")
                                 for fl in res.outputs.bids:
                                     idx = fl.split('_')[-1][0:-5] # get echo number, remove .json
                                     outname = prefix + '_' + str(idx) + '.json'
                                     shutil.copyfile(fl, outname)
                             else:
                                 shutil.copyfile(res.outputs.bids, outname_bids)
+                                # if functional, add Taskname
+                                if
 
                     if with_prov:
                         prov_file = prefix + '_prov.ttl'
@@ -521,14 +535,14 @@ def convert(items, symlink=True, converter=None,
                                                     'provenance.ttl'),
                                         prov_file)
                         prov_files.append(prov_file)
-                        
-                    #if not is_bids or converter != 'dcm2niix': ##uses dcm2niix's infofile
+
                 from nipype import Node, Function
                 embedfunc = Node(Function(input_names=['dcmfiles',
                                                        'niftifile',
                                                        'infofile',
                                                        'bids_info',
-                                                       'force'],
+                                                       'force',
+                                                       'min_meta'],
                                           output_names=['outfile',
                                                         'meta'],
                                          function=embed_nifti),
@@ -536,10 +550,9 @@ def convert(items, symlink=True, converter=None,
                 embedfunc.inputs.dcmfiles = item_dicoms
                 embedfunc.inputs.niftifile = os.path.abspath(outname)
                 embedfunc.inputs.infofile = os.path.abspath(scaninfo)
+                embedfunc.inputs.min_meta = min_meta
                 if is_bids and (converter == 'dcm2niix'):
                     embedfunc.inputs.bids_info = load_json(os.path.abspath(outname_bids))
-                else:
-                    embedfunc.inputs.bids_info = None
                 embedfunc.inputs.force = True
                 embedfunc.base_dir = tmpdir
                 cwd = os.getcwd()
@@ -563,7 +576,8 @@ def convert(items, symlink=True, converter=None,
 
 def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
                    queue=None, anon_sid_cmd=None, anon_outdir=None, with_prov=False,
-                   ses=None, is_bids=False, sbatch_args='-N1 -c2 --mem=20G -t 01:00:00'):
+                   ses=None, is_bids=False, sbatch_args='-N1 -c2 --mem=20G -t 01:00:00',
+                   min_meta=False):
     for sid in subjs:
         tmpdir = None
         if queue:
@@ -668,8 +682,18 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
         if anon_outdir is None:
             anon_outdir = outdir
 
+        if is_bids and not sid.isalnum(): # alphanumeric only
+            old_sid = sid
+            cleaner = lambda y: ''.join([x for x in y if x.isalnum()])
+            sid = cleaner(sid) #strip out
+            lgr.warn('{0} contained nonalphanumeric character(s), subject '
+                     'ID was cleaned to be {1}'.format(old_sid, sid))
+
         # Figure out where to stick supplemental info files
-        idir = os.path.join(outdir, sid)
+        if is_bids and not sid.startswith('sub-'):
+            idir = os.path.join(outdir, 'sub-' + sid)
+        else:
+            idir = os.path.join(outdir, sid)
         if is_bids and ses:
             idir = os.path.join(idir, 'ses-%s' % str(ses))
         if anon_outdir == outdir:
@@ -731,7 +755,8 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
                         mod, 'custom_callable', None),
                     with_prov=with_prov,
                     is_bids=is_bids,
-                    sourcedir=sourcedir)
+                    sourcedir=sourcedir,
+                    min_meta=min_meta)
 
         #
         # Cleanup
@@ -799,7 +824,7 @@ s3
                         required=True,
                         choices=('dcm2niix',
                                  'none'),
-                        help='''tool to use for dicom conversion. Setting to 
+                        help='''tool to use for dicom conversion. Setting to
                         "none" disables the actual conversion step -- useful
                         for testing heuristics.''')
     parser.add_argument('-o', '--outdir', dest='outputdir',
@@ -833,6 +858,8 @@ s3
                         help="do not catch exceptions and show exception traceback")
     parser.add_argument('--sbargs', dest='sbatch_args', default='-N1 -c2 --mem=20G -t 01:00:00',
                         help="Additional sbatch arguments if running with queue arg")
+    parser.add_argument('--minmeta', dest='min_meta', action='store_true',
+                        help="Exclude dcmstack's meta information in sidecar jsons")
     args = parser.parse_args(args)
 
     if args.debug:
@@ -848,7 +875,8 @@ s3
                    with_prov=args.with_prov,
                    ses=args.session,
                    is_bids=args.bids,
-                   sbatch_args=args.sbatch_args)
+                   sbatch_args=args.sbatch_args,
+                   min_meta=args.minmeta)
 
 
 if __name__ == '__main__':
