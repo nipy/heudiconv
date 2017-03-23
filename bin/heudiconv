@@ -525,8 +525,6 @@ def convert(items, symlink=True, converter=None,
                                     shutil.copyfile(fl, outname)
                             else:
                                 shutil.copyfile(res.outputs.bids, outname_bids)
-                                # if functional, add Taskname
-                                if
 
                     if with_prov:
                         prov_file = prefix + '_prov.ttl'
