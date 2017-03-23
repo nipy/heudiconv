@@ -743,7 +743,7 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
         if anon_sid_cmd:
             tdir = os.path.join(anon_outdir, anon_sid)
         else:
-            tdir = idir
+            tdir = os.path.dirname(idir)
 
         if converter != 'none':
             lgr.info("Doing conversion using %s", converter)
