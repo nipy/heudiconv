@@ -669,16 +669,6 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
                 "atm we support processing only 1 subject/session at a time"
             sess, sid = session_subject_ids.pop()
 
-        #
-        # Annonimization
-        #
-        anon_sid = sid
-        if anon_sid_cmd is not None:
-            from subprocess import check_output
-            anon_sid = check_output([anon_sid_cmd, sid]).strip()
-            lgr.info("Annonimized sid %s into %s", sid, anon_sid)
-        if anon_outdir is None:
-            anon_outdir = outdir
 
         if is_bids and not sid.isalnum(): # alphanumeric only
             old_sid = sid
@@ -694,11 +684,21 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
             idir = os.path.join(outdir, sid)
         if is_bids and ses:
             idir = os.path.join(idir, 'ses-%s' % str(ses))
-        if anon_outdir == outdir:
-            # if all goes into a single dir, have a dedicated 'info' subdir
-            idir = os.path.join(idir, 'info')
+        # all heudiconv stuff in info folder
+        idir = os.path.join(idir, 'info')
         if not os.path.exists(idir):
             os.makedirs(idir)
+
+        #
+        # Anonymization
+        #
+        anon_sid = sid
+        if anon_sid_cmd is not None:
+            from subprocess import check_output
+            anon_sid = check_output([anon_sid_cmd, sid]).strip()
+            lgr.info("Annonimized sid %s into %s", sid, anon_sid)
+        else:
+            anon_outdir = idir
 
         shutil.copy(heuristic_file, idir)
         path, fname = os.path.split(heuristic_file)
@@ -739,7 +739,12 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
             if ses:
                 sourcedir = os.path.join(sourcedir, 'ses-%s' % str(ses))
 
-        tdir = os.path.join(anon_outdir, anon_sid)
+        #tdir = os.path.join(anon_outdir, anon_sid)
+        if anon_sid_cmd:
+            tdir = os.path.join(anon_outdir, anon_sid)
+        else:
+            tdir = idir
+
         if converter != 'none':
             lgr.info("Doing conversion using %s", converter)
             cinfo = conversion_info(anon_sid, tdir, info, filegroup,
@@ -856,13 +861,12 @@ s3
                         help="do not catch exceptions and show exception traceback")
     parser.add_argument('--sbargs', dest='sbatch_args', default='-N1 -c2 --mem=20G -t 01:00:00',
                         help="Additional sbatch arguments if running with queue arg")
-    parser.add_argument('--minmeta', dest='min_meta', action='store_true',
+    parser.add_argument('--minmeta', dest='minmeta', action='store_true',
                         help="Exclude dcmstack's meta information in sidecar jsons")
     args = parser.parse_args(args)
 
     if args.debug:
         setup_exceptionhook()
-
     convert_dicoms(args.subjs, os.path.abspath(args.dicom_dir_template),
                    os.path.abspath(args.outputdir),
                    heuristic_file=os.path.realpath(args.heuristic_file),
