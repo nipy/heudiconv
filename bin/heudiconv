@@ -371,9 +371,9 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info=None, force=False, min_
     import nibabel as nb
     import os
     import json
-    import dcmstack as ds
     import re
     if not min_meta:
+        import dcmstack as ds
         stack = ds.parse_and_stack(dcmfiles, force=force).values()
         if len(stack) > 1:
             raise ValueError('Found multiple series')
@@ -400,7 +400,7 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info=None, force=False, min_
         except AttributeError: # not BIDS functional
             pass
     with open(infofile, 'wt') as fp:
-        json.dump(meta_info, fp, indent=0, sort_keys=True)
+        json.dump(meta_info, fp, indent=3, sort_keys=True)
     return niftifile, infofile
 
 def compress_dicoms(dicom_list, prefix, sourcedir):
