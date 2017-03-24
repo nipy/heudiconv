@@ -372,19 +372,19 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info=None, force=False, min_
     import os
     import json
     import dcmstack as ds
+    import re
     if not min_meta:
         stack = ds.parse_and_stack(dcmfiles, force=force).values()
         if len(stack) > 1:
             raise ValueError('Found multiple series')
         stack = stack[0]
-        #Create the nifti image using the data array
+        # Create the nifti image using the data array
         if not os.path.exists(niftifile):
             nifti_image = stack.to_nifti(embed_meta=True)
             nifti_image.to_filename(niftifile)
             return ds.NiftiWrapper(nifti_image).meta_ext.to_json()
         orig_nii = nb.load(niftifile)
-        aff = orig_nii.get_affine()
-        ornt = nb.orientations.io_orientation(aff)
+        ornt = nb.orientations.io_orientation(orig_nii.affine)
         axcodes = nb.orientations.ornt2axcodes(ornt)
         new_nii = stack.to_nifti(voxel_order=''.join(axcodes), embed_meta=True)
         meta = ds.NiftiWrapper(new_nii).meta_ext.to_json()
@@ -394,16 +394,14 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info=None, force=False, min_
             meta_info = bids_info
         else:
             meta_info = dict(meta_info.items() + bids_info.items())
-        # Look
         try:
-            task = re.search('(?<=_task-)\w+', os.path.basename(s)).group(0).split('_')[0]
+            task = re.search('(?<=_task-)\w+', os.path.basename(infofile)).group(0).split('_')[0]
             meta_info['TaskName'] = task
-        except AttributeError:
-            lgr.warn('Task is not accurately defined in heuristic template')
+        except AttributeError: # not BIDS functional
+            pass
     with open(infofile, 'wt') as fp:
         json.dump(meta_info, fp, indent=0, sort_keys=True)
     return niftifile, infofile
-
 
 def compress_dicoms(dicom_list, prefix, sourcedir):
     tmpdir = mkdtemp(prefix='dicomtar')
@@ -431,7 +429,6 @@ def convert(items, symlink=True, converter=None,
         prefix = item[0]
         print('Converting %s' % prefix)
         dirname = os.path.dirname(prefix + '.ext')
-        outname_bids = prefix + '.json'
         print(dirname)
         if not os.path.exists(dirname):
             os.makedirs(dirname)
@@ -521,10 +518,10 @@ def convert(items, symlink=True, converter=None,
                                 lgr.warning("There was someone catching lists!")
                                 for fl in res.outputs.bids:
                                     idx = fl.split('_')[-1][0:-5] # get echo number, remove .json
-                                    outname = prefix + '_' + str(idx) + '.json'
-                                    shutil.copyfile(fl, outname)
+                                    scaninfo = prefix + '_' + str(idx) + '.json'
+                                    shutil.copyfile(fl, scaninfo)
                             else:
-                                shutil.copyfile(res.outputs.bids, outname_bids)
+                                shutil.copyfile(res.outputs.bids, scaninfo)
 
                     if with_prov:
                         prov_file = prefix + '_prov.ttl'
@@ -550,7 +547,7 @@ def convert(items, symlink=True, converter=None,
                 embedfunc.inputs.infofile = os.path.abspath(scaninfo)
                 embedfunc.inputs.min_meta = min_meta
                 if is_bids and (converter == 'dcm2niix'):
-                    embedfunc.inputs.bids_info = load_json(os.path.abspath(outname_bids))
+                    embedfunc.inputs.bids_info = load_json(os.path.abspath(scaninfo))
                 embedfunc.inputs.force = True
                 embedfunc.base_dir = tmpdir
                 cwd = os.getcwd()
@@ -590,6 +587,8 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
                 convertcmd += " --with-prov"
             if is_bids:
                 convertcmd += " --bids"
+            if min_meta:
+                convertcmd += " --minmeta"
             script_file = 'dicom-%s.sh' % sid
             with open(script_file, 'wt') as fp:
                 fp.writelines(['#!/bin/bash\n', convertcmd])
