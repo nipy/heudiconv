@@ -77,7 +77,14 @@ protocols2fix = {
     '76b36c80231b0afaf509e2d52046e964':
         [('fmap_run\+_2mm', 'fmap_run+_acq-2mm')],
     'c6d8fbccc72990bee61d28e73b2618a4':
-        [('run=', 'run+')]
+        [('run=', 'run+')],
+    'a751cc977f1e354fcafcb0ea2de123bd':
+        [
+          ('_unlabeled', '_task-unlabeled'),
+          ('_mSense', '_acq-mSense'),
+          ('_p1_sms4_2.5mm', '_acq-p1-sms4-2.5mm'),
+          ('_p1_sms4_3mm', '_acq-p1-sms4-3mm'),
+	],
 }
 keys2replace = ['protocol_name', 'series_description']
 
