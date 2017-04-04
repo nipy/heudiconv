@@ -455,6 +455,9 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, grouping='stud
         except AttributeError:
             TE = -1
 
+        image_type = tuple(dcminfo.ImageType)
+        motion_corrected = 'MoCo' in dcminfo.SeriesDescription \
+                           or 'MOCO' in image_type
         info = SeqInfo(
             total,
             os.path.split(files[0])[1],
@@ -463,14 +466,14 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, grouping='stud
             size[0], size[1], size[2], size[3],
             TR, TE,
             dcminfo.ProtocolName,
-            'MoCo' in dcminfo.SeriesDescription,
+            motion_corrected,
             # New ones by us
             'derived' in [x.lower() for x in dcminfo.get('ImageType', [])],
             dcminfo.get('PatientID'),
             dcminfo.get('StudyDescription'),
             dcminfo.get('ReferringPhysicianName'),
             dcminfo.get('SeriesDescription'),
-            tuple(dcminfo.ImageType),
+            image_type,
             accession_number,
             # For demographics to populate BIDS participants.tsv
             dcminfo.get('PatientsAge'),

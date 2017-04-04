@@ -38,13 +38,16 @@ protocols2fix = {
         [
          #('anat-scout.*', 'anat-scout_ses-{date}'),
          ('anat-scout.*', 'anat-scout'),
-         ('BOLD_p2_s4(_3\.5mm)?', 'func_run+_task-rest_acq-p2s4'),
-         ('BOLD_p2_noprescannormalize', 'func_run+_task-rest_acq-p2noprescannormalize'),
-         ('BOLD_p2', 'func_run+_task-rest_acq-p2'),
-         ('BOLD_', 'func_run+_task-rest'),
-         ('DTI_30_p2_s4(_3\.5mm)?', 'dwi_run+_acq-30p2s4'),
-         ('DTI_30_p2', 'dwi_run+_acq-30p2'),
-         ('_p2_s4(_3\.5mm)?', '_acq-p2s4'),
+         ('BOLD_p2_s4_3\.5mm', 'func_task-rest_acq-p2-s4-3.5mm'),
+         ('BOLD_p2_s4',        'func_task-rest_acq-p2-s4'),
+         ('BOLD_p2_noprescannormalize', 'func-bold_task-rest_acq-p2noprescannormalize'),
+         ('BOLD_p2',                    'func-bold_task-rest_acq-p2'),
+         ('BOLD_', 'func_task-rest'),
+         ('DTI_30_p2_s4_3\.5mm', 'dwi_acq-DTI-30-p2-s4-3.5mm'),
+         ('DTI_30_p2_s4',        'dwi_acq-DTI-30-p2-s4'),
+         ('DTI_30_p2',           'dwi_acq-DTI-30-p2'),
+         ('_p2_s4_3\.5mm', '_acq-p2-s4-3.5mm'),
+         ('_p2_s4',        '_acq-p2-s4'),
          ('_p2', '_acq-p2'),
         ],
     '9d148e2a05f782273f6343507733309d':
@@ -387,9 +390,15 @@ def infotodict(seqinfo):
             # if there is no _run -- no run label addded
             run_label = None
 
+        if s.is_motion_corrected and 'rec-' in regd.get('bids', ''):
+            raise NotImplementedError("want to add _acq-moco but there is _acq- already")
+
         suffix_parts = [
             None if not regd.get('task') else "task-%s" % regd['task'],
             None if not regd.get('acq') else "acq-%s" % regd['acq'],
+            # But we want to add an indicator in case it was motion corrected
+            # in the magnet. ref sample  /2017/01/03/qa
+            None if not s.is_motion_corrected else 'rec-moco',
             regd.get('bids'),
             run_label,
             seqtype_label,
