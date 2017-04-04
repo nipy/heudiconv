@@ -22,6 +22,11 @@ fix_accession2run = {
     'A000130': ['^15-'],
     'A000137': ['^9-', '^11-'],
     'A000297': ['^12-'],
+    'A000376': ['^15-'],
+    'A000384': ['^8-', '^11-'],
+    'A000467': ['^15-'],
+    'A000490': ['^15-'],
+    'A000511': ['^15-'],
 }
 
 # dictionary containing fixes, keys are md5sum of study_description from
@@ -84,6 +89,10 @@ protocols2fix = {
           ('_mSense', '_acq-mSense'),
           ('_p1_sms4_2.5mm', '_acq-p1-sms4-2.5mm'),
           ('_p1_sms4_3mm', '_acq-p1-sms4-3mm'),
+	],
+    'd160113cf5ea8c5d0cbbbe14ef625e76':
+        [
+          ('_run0', '_run-0'),
 	],
 }
 keys2replace = ['protocol_name', 'series_description']
