@@ -500,10 +500,17 @@ def infotoids(seqinfos, outdir):
     # and possible ses+ in the sequence names, so we would provide a sequence
     # So might need to go through  parse_dbic_protocol_name(s.protocol_name)
     # to figure out presence of sessions.
-    ses_markers = [
-        parse_dbic_protocol_name(s.protocol_name).get('session', None) for s in seqinfos
-        if not s.is_derived
-    ]
+    ses_markers = []
+    for s in seqinfos:
+        if s.is_derived:
+            continue
+        session_ = parse_dbic_protocol_name(s.protocol_name).get('session', None)
+        if session_ and '{' in session_:
+            # there was a marker for something we could provide from our seqinfo
+            # e.g. {date}
+            session_ = session_.format(**s._asdict())
+        ses_markers.append(session_)
+
     ses_markers = filter(bool, ses_markers)  # only present ones
     session = None
     if ses_markers:
