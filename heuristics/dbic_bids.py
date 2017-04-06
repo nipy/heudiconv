@@ -3,6 +3,8 @@ import re
 from collections import OrderedDict
 import hashlib
 
+from glob import glob
+
 import logging
 lgr = logging.getLogger('heudiconv')
 
@@ -92,11 +94,16 @@ protocols2fix = {
           ('_mSense', '_acq-mSense'),
           ('_p1_sms4_2.5mm', '_acq-p1-sms4-2.5mm'),
           ('_p1_sms4_3mm', '_acq-p1-sms4-3mm'),
-	],
+        ],
     'd160113cf5ea8c5d0cbbbe14ef625e76':
         [
           ('_run0', '_run-0'),
-	],
+        ],
+    '1bd62e10672fe0b435a9aa8d75b45425':
+        [
+            # need to add incrementing session -- study should have 2
+            ('scout_run\+$', 'scout_run+_ses+'),
+        ],
 }
 keys2replace = ['protocol_name', 'series_description']
 
@@ -181,8 +188,15 @@ def md5sum(string):
     return m.hexdigest()
 
 
+def get_study_hash(seqinfo):
+    # XXX: ad hoc hack
+    study_description = get_unique(seqinfo, 'study_description')
+    return md5sum(study_description)
+
+
 def fix_canceled_runs(seqinfo, accession2run=fix_accession2run):
-    """Function that adds cancelme_ to known bad runs which were forgotten"""
+    """Function that adds cancelme_ to known bad runs which were forgotten
+    """
     accession_number = get_unique(seqinfo, 'accession_number')
     if accession_number in accession2run:
         lgr.info("Considering some runs possibly marked to be "
@@ -200,15 +214,15 @@ def fix_canceled_runs(seqinfo, accession2run=fix_accession2run):
 
 
 def fix_dbic_protocol(seqinfo, keys=keys2replace, subsdict=protocols2fix):
-    """Ad-hoc fixup for existing protocols"""
-    # get name of the study to check if we know how to fix it up
-    study_descr = get_unique(seqinfo, 'study_description')
-    study_descr_hash = md5sum(study_descr)
+    """Ad-hoc fixup for existing protocols
+    """
+    study_hash = get_study_hash(seqinfo)
 
-    if study_descr_hash not in subsdict:
-        raise ValueError("I don't know how to fix {0}".format(study_descr))
+    if study_hash not in subsdict:
+        raise ValueError("I don't know how to fix {0}".format(study_hash))
+
     # need to replace both protocol_name series_description
-    substitutions = subsdict[study_descr_hash]
+    substitutions = subsdict[study_hash]
     for i, s in enumerate(seqinfo):
         fixed_kwargs = dict()
         for key in keys:
@@ -223,13 +237,24 @@ def fix_dbic_protocol(seqinfo, keys=keys2replace, subsdict=protocols2fix):
     return seqinfo
 
 
+def fix_seqinfo(seqinfo):
+    """Just a helper on top of both fixers
+    """
+    # add cancelme to known bad runs
+    seqinfo = fix_canceled_runs(seqinfo)
+    study_hash = get_study_hash(seqinfo)
+    if study_hash in protocols2fix:
+        lgr.info("Fixing up protocol for {0}".format(study_hash))
+        seqinfo = fix_dbic_protocol(seqinfo)
+    return seqinfo
+
+
 def ls(study_session, seqinfo):
     """Additional ls output for a seqinfo"""
     #assert len(sequences) <= 1  # expecting only a single study here
     #seqinfo = sequences.keys()[0]
-    study_descr = get_unique(seqinfo, 'study_description')
-    study_descr_hash = md5sum(study_descr)
-    return ' study hash: %s' % study_descr_hash
+    return ' study hash: %s' % get_study_hash(seqinfo)
+
 
 # XXX we killed session indicator!  what should we do now?!!!
 # WE DON:T NEED IT -- it will be provided into conversion_info as `session`
@@ -245,16 +270,8 @@ def infotodict(seqinfo):
     subindex: sub index within group
     session: scan index for longitudinal acq
     """
-    # XXX: ad hoc hack
-    study_description = get_unique(seqinfo, 'study_description')
 
-    # add cancelme to known bad runs
-    seqinfo = fix_canceled_runs(seqinfo)
-
-    if md5sum(study_description) in protocols2fix:
-        lgr.info("Fixing up protocol for {0}".format(study_description))
-        seqinfo = fix_dbic_protocol(seqinfo)
-
+    seqinfo = fix_seqinfo(seqinfo)
     lgr.info("Processing %d seqinfo entries", len(seqinfo))
     and_dicom = ('dicom', 'nii.gz')
 
@@ -510,6 +527,11 @@ def infotoids(seqinfos, outdir):
     # So might need to go through  parse_dbic_protocol_name(s.protocol_name)
     # to figure out presence of sessions.
     ses_markers = []
+
+    # there might be fixups needed so we could deduce session etc
+    # this copy is not replacing original one, so the same fix_seqinfo
+    # might be called later
+    seqinfos = fix_seqinfo(seqinfos)
     for s in seqinfos:
         if s.is_derived:
             continue
@@ -548,8 +570,23 @@ def infotoids(seqinfos, outdir):
             # out initial one if sign ones, and should make use of knowing
             # outdir
             #raise NotImplementedError()
-            # Let's be lazy for now just to get somewhere
-            session = '001'
+            # we need to look at what sessions we already have
+            sessions_dir = os.path.join(outdir, locator, 'sub-' + subject)
+            prior_sessions = sorted(glob(os.path.join(sessions_dir, 'ses-*')))
+            # TODO: more complicated logic
+            # For now just increment session if + and keep the same number if =
+            # and otherwise just give it 001
+            # Note: this disables our safety blanket which would refuse to process
+            # what was already processed before since it would try to override,
+            # BUT there is no other way besides only if heudiconv was storing
+            # its info based on some UID
+            if ses_markers == ['+']:
+                session = '%03d' % (len(prior_sessions) + 1)
+            elif ses_markers == ['=']:
+                session = os.path.basename(prior_sessions[-1])[4:] if prior_sessions else '001'
+            else:
+                session = '001'
+
 
     if study_description_hash == '9d148e2a05f782273f6343507733309d':
         session = 'siemens1'

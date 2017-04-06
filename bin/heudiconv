@@ -1022,7 +1022,7 @@ and there was a screw up for that A
 
 in that one though
         """
-        if global_options['overwrite'] and lexists(scaninfo):
+        if global_options['overwrite'] and os.path.lexists(scaninfo):
             # TODO: handle annexed file case
             if not os.path.islink(scaninfo):
                 os.chmod(scaninfo, 0o0664)
@@ -1087,6 +1087,7 @@ def convert_dicoms(sid,
 
     # Figure out where to stick supplemental info dicoms
     idir = os.path.join(outdir, '.heudiconv', sid)
+    # THAT IS WHERE WE MUST KNOW ABOUT SESSION ALREADY!
     if is_bids and ses:
         idir = os.path.join(idir, 'ses-%s' % str(ses))
     # yoh: in my case if idir exists, it means that that study/subject/session
