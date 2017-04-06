@@ -1487,6 +1487,9 @@ def add_to_datalad(topdir, studydir, msg=None, bids=False):
     from datalad.api import Dataset
     from datalad.support.annexrepo import AnnexRepo
 
+    from datalad.support.external_versions import external_versions
+    assert external_versions['datalad'] >= '0.5.1', "Need datalad >= 0.5.1"
+
     studyrelpath = os.path.relpath(studydir, topdir)
     assert not studyrelpath.startswith(os.path.pardir)  # so we are under
     # now we need to test and initiate a DataLad dataset all along the path
@@ -1501,7 +1504,6 @@ def add_to_datalad(topdir, studydir, msg=None, bids=False):
             # would require annex > 20161018 for correct operation on annex v6
             ds_ = create(curdir_, dataset=superds,
                          force=True,
-                         if_dirty='ignore',  # see https://github.com/datalad/datalad/issues/1016
                          no_annex=True,  # need to add .gitattributes first anyways
                          shared_access='all',
                          annex_version=6)
@@ -1524,12 +1526,20 @@ def add_to_datalad(topdir, studydir, msg=None, bids=False):
         ds.config.add('annex.thin', 'true', where='local')
     # initialize annex there if not yet initialized
     AnnexRepo(ds.path, init=True)
-    # Let's make it a
-    dstop = Dataset(topdir)
-    # ideally we should save from within the subdataset,
-    # but https://github.com/datalad/datalad/pull/987 is not yet there
-    # so for now saving everything
-    dstop.save(message=msg, auto_add_changes=True, recursive=True)
+    # ds might have memories of having ds.repo GitRepo
+    superds = None
+    del ds
+    ds = Dataset(studydir)
+    # ha -- TODO: we actually want 'auto_add_files' feature in datalad ;)
+    add_files = filter(os.path.exists,
+                       glob(os.path.join(ds.path, '*'))
+                       + [os.path.join(ds.path, f)
+                          for f in ('.datalad', '.heudiconv', '.gitattributes')
+                      ])
+    if add_files:
+        ds.add(add_files, recursive=True, save=False)
+    ds.save(message=msg, recursive=True, super_datasets=True)
+    assert not ds.repo.dirty
 
     # TODO:  they are still appearing as native annex symlinked beasts
     """
