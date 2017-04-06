@@ -1530,14 +1530,15 @@ def add_to_datalad(topdir, studydir, msg=None, bids=False):
     superds = None
     del ds
     ds = Dataset(studydir)
-    # ha -- TODO: we actually want 'auto_add_files' feature in datalad ;)
-    add_files = filter(os.path.exists,
-                       glob(os.path.join(ds.path, '*'))
-                       + [os.path.join(ds.path, f)
-                          for f in ('.datalad', '.heudiconv', '.gitattributes')
-                      ])
-    if add_files:
-        ds.add(add_files, recursive=True, save=False)
+    # Add doesn't have all the options of save such as msg and supers
+    ds.add('.gitattributes', to_git=True, save=False)
+    if os.path.lexists(os.path.join(ds.path, '.heudiconv')):
+        ds.add('.heudiconv', to_git=True, save=False)
+    ds.add('.', recursive=True, save=False,
+           # not in effect! ?
+           #annex_add_opts=['--include-dotfiles']
+           )
+
     ds.save(message=msg, recursive=True, super_datasets=True)
     assert not ds.repo.dirty
 

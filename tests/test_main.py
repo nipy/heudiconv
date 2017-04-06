@@ -95,6 +95,7 @@ def test_prepare_for_datalad(tmpdir):
     # and all are under git
     for f in target_files:
         assert not ds.repo.is_under_annex(f)
+    assert not ds.repo.is_under_annex('.gitattributes')
 
 def test_json_dumps_pretty():
     pretty = heudiconv.json_dumps_pretty
