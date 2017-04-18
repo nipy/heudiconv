@@ -11,15 +11,22 @@ upstreamver = $(shell echo $(debver) | cut -d '-' -f 1,1 )
 gitver = $(shell [ -x /usr/bin/git ] && git describe --tags --match 'v[0-9].*' $$(git merge-base -a HEAD master) | sed -e 's/^v//' -e 's/-/+git/')
 
 export DH_VERBOSE = 1
-export PREFIX = /usr
+export PYBUILD_NAME = heudiconv
 
 # one ring to rule them all ...
 %:
-	dh $@ --buildsystem=makefile
+	dh $@ --buildsystem=pybuild
 
-clean:
+override_dh_auto_install:
+	help2man -n 'DICOM converter for organizing brain imaging data into structured directory layouts' \
+		-N --no-discard-stderr bin/heudiconv > build/heudiconv.1
+	dh_auto_install
+
+clean::
 	dh_clean
-	find . -name '*.pyc' -delete
+	# Ahhhhhhh!
+	rm -rf .pybuild build
+	-rm -rf heudiconv.egg-info/
 
 # make orig tarball from repository content
 get-orig-source:

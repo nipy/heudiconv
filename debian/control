@@ -4,8 +4,13 @@ Uploaders: Michael Hanke <mih@debian.org>
 Section: science
 Priority: optional
 Build-Depends: debhelper (>= 9),
-               help2man
-Standards-Version: 3.9.6
+               dh-python,
+               python-all,
+               python-setuptools,
+               python-six,
+               python-nose,
+               help2man,
+Standards-Version: 3.9.8
 Homepage: https://github.com/nipy/heudiconv
 
 Package: heudiconv
@@ -17,7 +22,8 @@ Depends: ${misc:Depends},
          python-nibabel,
          python-numpy,
          python-nipype,
-Recommends: mricron
+Recommends: mricron,
+            dcm2niix,
 Description: DICOM converter with support for structure heuristics
  This is a flexible dicom converter for organizing brain imaging data into
  structured directory layouts. It allows for flexible directory layouts and
