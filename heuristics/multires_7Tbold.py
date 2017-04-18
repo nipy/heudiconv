@@ -2,10 +2,11 @@ import os
 
 scaninfo_suffix = '.json'
 
+
 def create_key(template, outtype=('nii.gz',), annotation_classes=None):
     if template is None or not template:
         raise ValueError('Template must be a valid format string')
-    return (template, outtype, annotation_classes)
+    return template, outtype, annotation_classes
 
 
 def filter_dicom(dcmdata):
@@ -19,7 +20,7 @@ def filter_dicom(dcmdata):
 
 
 def extract_moco_params(basename, outypes, dicoms):
-    if not '_rec-dico' in basename:
+    if '_rec-dico' not in basename:
         return
     from dicom import read_file as dcm_read
     # get acquisition time for all dicoms
@@ -56,7 +57,7 @@ def infotodict(seqinfo):
     }
     info = {}
     for s in seqinfo:
-        if not '_bold_' in s[12]:
+        if '_bold_' not in s[12]:
             continue
         if not '_coverage'in s[12]:
             label = 'orientation%s_run-{item:02d}'
@@ -74,7 +75,7 @@ def infotodict(seqinfo):
 
         key = create_key(templ)
 
-        if not key in info:
+        if key not in info:
             info[key] = []
         info[key].append(s[2])
 

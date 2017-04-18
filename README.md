@@ -1,20 +1,41 @@
-# HeuDiConv
+# HeuDiConv - Heuristic DICOM Converter
 
-This is a flexible dicom converter for organizing brain imaging data into
+This is a flexible DICOM converter for organizing brain imaging data into
 structured directory layouts.
 
 - it allows flexible directory layouts and naming schemes through
   customizable heuristics implementations
-- it only converts the necessary dicoms, not everything in a directory
-- you can keep links to dicom files in the participant layout
-- it's faster than parsesdicomdir or mri_convert if you use dcm2nii option
-- it tracks the provenance of the conversion from dicom to nifti in w3c
-  prov format
-- the example shows a conversion to openfmri layout structure
+- it only converts the necessary DICOMs, not everything in a directory
+- you can keep links to DICOM files in the participant layout
+- it's faster than parsesdicomdir or mri_convert if you use dcm2niix option
+- it tracks the provenance of the conversion from DICOM to NIfTI in W3C
+  PROV format
+- the cmrr_heuristic example shows a conversion to [BIDS](http://bids.neuroimaging.io) 
+  layout structure
+
+## Install
+
+You can clone this directory and do a `make install`
+
+or you can download the `heudiconv` script from the bin directory
+
+```
+curl -O https://raw.githubusercontent.com/nipy/heudiconv/master/bin/heudiconv
+chmod +x heudiconv
+```
+as long as the following dependencies are in your path you can use the script
+
+## Dependencies
+
+- pydicom
+- dcmstack
+- nipype
+- nibabel
+- dcm2niix
 
 ## How it works (in some more detail)
 
-Call heudiconv like this:
+Call `heudiconv` like this:
 
     heudiconv -d '%s*.tar*' -s xx05 -f ~/myheuristics/convertall.py
 
@@ -25,7 +46,7 @@ subject ID for the conversion (this could be a list of multiple IDs), and
 `-f ~/myheuristics/convertall.py` identifies a heuristic implementation for this
 conversion (see below) for details.
 
-This call will located the DICOMs (in any number of matching tarballs), extract
+This call will locate the DICOMs (in any number of matching tarballs), extract
 them to a temporary directory, search for any DICOM series it can find, and
 attempts a conversion storing output in the current directory. The output
 directory will contain a subdirectory per subject, which in turn contains an
@@ -45,3 +66,69 @@ participant directory.
 soon you'll be able to:
 - add more tags to the metadata representation of the files
 - and push the metadata to a provenance store
+
+## The heuristic file
+
+The heuristic file controls how information about the dicoms is used to convert
+to a file system layout (e.g., BIDS). This is a python file that must have the 
+function `infotodict`, which takes a single argument `seqinfo`.  
+
+### `seqinfo` and the `s` variable
+
+Each item in `seqinfo` contains the following ordered elements.
+
+```
+[total_files_till_now, example_dcm_file, series_number, unspecified, unspecified, 
+unspecified, dim1, dim2, dim3,  dim4, TR, TE, SeriesDescription, MotionCorrectedOrNot]
+
+128     125000-1-1.dcm  1       -       -       
+-       160     160     128     1       0.00315 1.37    AAHScout        False
+```
+
+### The dictionary returned by `infotodict`
+ 
+This dictionary contains as keys a 3-tuple `(template, a tuple of output types,
+ annotation classes)`.
+
+template - how the file should be relative to the base directory
+tuple of output types - what format of output should be created - nii.gz, dicom, 
+ etc.,.
+annotation classes - unused
+
+```
+Example: ('func/sub-{subject}_task-face_run-{item:02d}_acq-PA_bold', ('nii.gz', 
+        'dicom'), None)
+```
+
+A few fields are defined by default and can be used in the template:
+
+- item: index within category 
+- subject: participant id 
+- seqitem: run number during scanning
+- subindex: sub index within group
+- session: session info for multi-session studies and when session has been 
+  defined as a parameter for heudiconv
+
+Additional variables may be added and can be returned in the value of the 
+dictionary returned from the function.
+
+`info[some_3-tuple] = [12, 14, 16]` would assign dicom sequence groups 12, 14 
+and 16 to be converted using the template specified in `some_3-tuple`.
+
+if the template contained a non-sanctioned variable, it would have to be 
+provided in the values for that key.
+
+```
+some_3_tuple = ('func/sub-{subject}_task-face_run-{item:02d}_acq-{acq}_bold', ('nii.gz', 
+        'dicom'), None)
+```
+
+In the above example `{acq}` is not a standard variable. In this case, values 
+for this variable needs to be added.
+
+```
+info[some_3-tuple] = [{'item': 12, 'acq': 'AP'},
+                      {'item': 14, 'acq': 'AP'},
+                      {'item': 16, 'acq': 'PA'}]
+```
+
