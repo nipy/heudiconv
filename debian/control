@@ -6,6 +6,7 @@ Priority: optional
 Build-Depends: debhelper (>= 9),
                dh-python,
                python-all,
+               python-mock,
                python-setuptools,
                python-six,
                python-nose,
