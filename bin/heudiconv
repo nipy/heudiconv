@@ -573,6 +573,12 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
                    queue=None, anon_sid_cmd=None, anon_outdir=None, with_prov=False,
                    ses=None, is_bids=False, sbatch_args='-N1 -c2 --mem=20G -t 01:00:00',
                    min_meta=False):
+    
+    if '%s' in dicom_dir_template:
+        raise ValueError("Formatting DICOM search pattern with '%s' is "
+                         "deprecated. Please indicate participant ID with "
+                         "'{subject}' and (optionally) timepoint with '{session}'.")
+    
     for sid in subjs:
         tmpdir = None
         if queue:
