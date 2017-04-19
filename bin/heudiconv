@@ -816,7 +816,7 @@ s3
                         dest='dicom_dir_template',
                         required=True,
                         help='''location of dicomdir that can be indexed with
-                        subject id {participant} and session {session}. 
+                        subject id {subject} and session {session}.
                         Tarballs (can be compressed) are supported
                         in addition to directory. All matching tarballs for a
                         subject are extracted and their content processed in
