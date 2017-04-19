@@ -599,7 +599,7 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
         # TODO: RF into a function
         # expand the input template
         if sid:
-            sdir = dicom_dir_template.format(participant=sid, session=ses)
+            sdir = dicom_dir_template.format(subject=sid, session=ses)
             # and see what matches
             fl = sorted(glob(sdir))
         else:

@@ -37,10 +37,10 @@ as long as the following dependencies are in your path you can use the script
 
 Call `heudiconv` like this:
 
-    heudiconv -d '{participant}*.tar*' -s xx05 -f ~/myheuristics/convertall.py
+    heudiconv -d '{subject}*.tar*' -s xx05 -f ~/myheuristics/convertall.py
 
-where `-d '{participant}*tar*'` is an expression used to find DICOM files
-(`{participant}` expands to a subject ID so that the expression will match any
+where `-d '{subject}*tar*'` is an expression used to find DICOM files
+(`{subject}` expands to a subject ID so that the expression will match any
 `.tar` files, compressed or not that start with the subject ID in their name).
 An additional flag for session (`{session}`) can be included in the expression
 as well. `-s od05` specifies a subject ID for the conversion (this could be a
