@@ -573,6 +573,12 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
                    queue=None, anon_sid_cmd=None, anon_outdir=None, with_prov=False,
                    ses=None, is_bids=False, sbatch_args='-N1 -c2 --mem=20G -t 01:00:00',
                    min_meta=False):
+    
+    if '%s' in dicom_dir_template:
+        raise ValueError("Formatting DICOM search pattern with '%s' is "
+                         "deprecated. Please indicate participant ID with "
+                         "'{subject}' and (optionally) timepoint with '{session}'.")
+    
     for sid in subjs:
         tmpdir = None
         if queue:
@@ -599,7 +605,7 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
         # TODO: RF into a function
         # expand the input template
         if sid:
-            sdir = dicom_dir_template % sid
+            sdir = dicom_dir_template.format(subject=sid, session=ses)
             # and see what matches
             fl = sorted(glob(sdir))
         else:
@@ -695,7 +701,7 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
         if anon_sid_cmd is not None:
             from subprocess import check_output
             anon_sid = check_output([anon_sid_cmd, sid]).strip()
-            lgr.info("Annonimized sid %s into %s", sid, anon_sid)
+            lgr.info("Anonymized sid %s into %s", sid, anon_sid)
         else:
             anon_outdir = idir
 
@@ -816,8 +822,9 @@ s3
                         dest='dicom_dir_template',
                         required=True,
                         help='''location of dicomdir that can be indexed with
-                        subject id. Tarballs (can be compressed) are supported
-                        in additions to directory. All matching tarballs for a
+                        subject id {subject} and session {session}.
+                        Tarballs (can be compressed) are supported
+                        in addition to directory. All matching tarballs for a
                         subject are extracted and their content processed in
                         a single pass''')
     parser.add_argument('-s', '--subjects', dest='subjs', required=True,
