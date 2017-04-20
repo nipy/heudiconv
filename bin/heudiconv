@@ -41,7 +41,7 @@ lgr.debug("Starting the abomination")  # just to "run-test" logging
 seqinfo_fields = ['total_files_till_now',  # 0
                   'example_dcm_file',      # 1
                   'series_number',         # 2
-                  'unspecified1',          # 3
+                  'dcm_dir_name',          # 3
                   'unspecified2',          # 4
                   'unspecified3',          # 5
                   'dim1', 'dim2', 'dim3', 'dim4', # 6, 7, 8, 9
@@ -273,7 +273,8 @@ def process_dicoms(fl, dcmsession=None, basedir=None, dcmfilter=None):
             total,
             os.path.split(files[0])[1],
             series,
-            '-', '-', '-',
+            os.path.basename(os.path.dirname(files[0])),
+            '-', '-',
             size[0], size[1], size[2], size[3],
             TR, TE,
             dcminfo.ProtocolName,
