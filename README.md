@@ -103,7 +103,6 @@ function `infotodict`, which takes a single argument `seqinfo`.
 * image_type
 
 ```
-
 128     125000-1-1.dcm  1       -       -       
 -       160     160     128     1       0.00315 1.37    AAHScout        False
 ```
