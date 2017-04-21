@@ -33,6 +33,9 @@ as long as the following dependencies are in your path you can use the script
 - nibabel
 - dcm2niix
 
+## Example conversion using Docker
+[Slides here](http://nipy.org/workshops/2017-03-boston/lectures/bids-heudiconv/#1)
+
 ## How it works (in some more detail)
 
 Call `heudiconv` like this:
@@ -76,12 +79,30 @@ function `infotodict`, which takes a single argument `seqinfo`.
 
 ### `seqinfo` and the `s` variable
 
-Each item in `seqinfo` contains the following ordered elements.
+`seqinfo` is a list of namedtuple objects, each containing the following fields:
+
+* total_files_till_now
+* example_dcm_file
+* series_number
+* dcm_dir_name
+* unspecified2
+* unspecified3
+* dim1
+* dim2
+* dim3
+* dim4
+* TR
+* TE
+* protocol_name
+* is_motion_corrected
+* is_derived
+* patient_id
+* study_description
+* referring_physician_name
+* series_description
+* image_type
 
 ```
-[total_files_till_now, example_dcm_file, series_number, unspecified, unspecified,
-unspecified, dim1, dim2, dim3,  dim4, TR, TE, SeriesDescription, MotionCorrectedOrNot]
-
 128     125000-1-1.dcm  1       -       -       
 -       160     160     128     1       0.00315 1.37    AAHScout        False
 ```
