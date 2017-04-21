@@ -84,7 +84,7 @@ function `infotodict`, which takes a single argument `seqinfo`.
 * total_files_till_now
 * example_dcm_file
 * series_number
-* unspecified1
+* dcm_dir_name
 * unspecified2
 * unspecified3
 * dim1
