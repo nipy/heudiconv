@@ -24,6 +24,7 @@ fix_accession2run = {
     'A000130': ['^15-'],
     'A000137': ['^9-', '^11-'],
     'A000297': ['^12-'],
+    'A000326': ['^15-'],
     'A000376': ['^15-'],
     'A000384': ['^8-', '^11-'],
     'A000467': ['^15-'],
@@ -103,6 +104,13 @@ protocols2fix = {
         [
             # need to add incrementing session -- study should have 2
             ('scout_run\+$', 'scout_run+_ses+'),
+        ],
+    'da218a66de902adb3ad9407d514e3639':
+        [
+            # those sequences renamed later to include DTI- in their acq-
+            # so fot consistency
+            ('hardi_64',  'dwi_acq-DTI-hardi64'),
+            ('acq-hardi', 'acq-DTI-hardi'),
         ],
 }
 keys2replace = ['protocol_name', 'series_description']
