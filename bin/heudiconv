@@ -1611,7 +1611,7 @@ def _main(args):
             for f in files_opt:
                 study_sessions = get_study_sessions(
                     dicom_dir_template, [f],
-                    heuristic, None, session, subjs, grouping=grouping)
+                    heuristic, outdir, session, subjs, grouping=grouping)
                 print(f)
                 for study_session, sequences in study_sessions.items():
                     suf = ''
