@@ -40,7 +40,8 @@ protocols2fix = {
     '43b67d9139e8c7274578b7451ab21123':
         [
          #('anat-scout.*', 'anat-scout_ses-{date}'),
-         ('anat-scout.*', 'anat-scout'),
+         # do not change it so we retain _ses-{date}
+         #('anat-scout.*', 'anat-scout'),
          ('BOLD_p2_s4_3\.5mm', 'func_task-rest_acq-p2-s4-3.5mm'),
          ('BOLD_p2_s4',        'func_task-rest_acq-p2-s4'),
          ('BOLD_p2_noprescannormalize', 'func-bold_task-rest_acq-p2noprescannormalize'),
