@@ -196,11 +196,14 @@ def md5sum(string):
     m = hashlib.md5(string.encode())
     return m.hexdigest()
 
+def get_study_description(seqinfo):
+    # Centralized so we could fix/override
+    v = get_unique(seqinfo, 'study_description')
+    return v
 
 def get_study_hash(seqinfo):
     # XXX: ad hoc hack
-    study_description = get_unique(seqinfo, 'study_description')
-    return md5sum(study_description)
+    return md5sum(get_study_description(seqinfo))
 
 
 def fix_canceled_runs(seqinfo, accession2run=fix_accession2run):
@@ -385,7 +388,7 @@ def infotodict(seqinfo):
                         # XXX if we have a known earlier study, we need to always
                         # increase the run counter for phasediff because magnitudes
                         # were not acquired
-                        if md5sum(s.study_description) == '9d148e2a05f782273f6343507733309d':
+                        if get_study_hash([s]) == '9d148e2a05f782273f6343507733309d':
                             current_run += 1
                         else:
                             raise RuntimeError(
@@ -514,7 +517,7 @@ def get_unique(seqinfos, attr):
 def infotoids(seqinfos, outdir):
     # decide on subjid and session based on patient_id
     lgr.info("Processing sequence infos to deduce study/session")
-    study_description = get_unique(seqinfos, 'study_description')
+    study_description = get_study_description(seqinfos)
     study_description_hash = md5sum(study_description)
     subject = fixup_subjectid(get_unique(seqinfos, 'patient_id'))
     # TODO:  fix up subject id if missing some 0s
