@@ -574,12 +574,12 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
                    queue=None, anon_sid_cmd=None, anon_outdir=None, with_prov=False,
                    ses=None, is_bids=False, sbatch_args='-N1 -c2 --mem=20G -t 01:00:00',
                    min_meta=False):
-    
+
     if '%s' in dicom_dir_template:
         raise ValueError("Formatting DICOM search pattern with '%s' is "
                          "deprecated. Please indicate participant ID with "
                          "'{subject}' and (optionally) timepoint with '{session}'.")
-    
+
     for sid in subjs:
         tmpdir = None
         if queue:
@@ -589,14 +589,17 @@ def convert_dicoms(subjs, dicom_dir_template, outdir, heuristic_file, converter,
                                    '-o', outdir, '-f', heuristic_file, '-s', sid,
                                    '-c', converter])
             if ses:
-                convertcmd += " --ses " + str(ses)
+                convertcmd += " --ses {}".format(ses)
             if with_prov:
                 convertcmd += " --with-prov"
             if is_bids:
                 convertcmd += " --bids"
             if min_meta:
                 convertcmd += " --minmeta"
-            script_file = 'dicom-%s.sh' % sid
+            if ses:
+                script_file = 'dicom-{}_ses-{}.sh'.format(sid, ses)
+            else:
+                script_file = 'dicom-{}.sh'.format(sid)
             with open(script_file, 'wt') as fp:
                 fp.writelines(['#!/bin/bash\n', convertcmd])
             outcmd = 'sbatch -J dicom-%s -p %s %s %s' % (sid, queue, sbatch_args, script_file)
