@@ -931,6 +931,13 @@ def tuneup_bids_json_files(json_files):
     # Harmonize generic .json formatting
     for jsonfile in json_files:
         json_ = json.load(open(jsonfile))
+        # sanitize
+        for f in ['AcquisitionDateTime', 'AcquisitionDate']:
+            json_.pop(f, None)
+        if 'Date' in str(json_):
+            # Let's hope no word 'Date' comes within a study name or smth like
+            # that
+            raise ValueError("There must be no dates in .json sidecar")
         json.dump(json_, open(jsonfile, 'w'), indent=2)
 
     # Load the beast
@@ -1628,6 +1635,8 @@ def _main(args):
                     f,
                     getattr(heuristic, 'DEFAULT_FIELDS', {})
                 )
+        elif args.command == 'sanitize-jsons':
+            tuneup_bids_json_files(files_opt)
         else:
             raise ValueError("Unknown command %s", args.command)
         return
@@ -1856,6 +1865,11 @@ def main(argv=None):
     """
     parser = get_parser()
     args = parser.parse_args(argv)
+
+    # TODO: assign   distribution-restrictions=sensitive
+
+    # TODO(privat): entirety of .heudiconv/ should get under annex and be marked
+    # as sensitive since date incorporated in the path might leak
 
     # TODO:  deprecate dicom_dir_template in favor of --files-templated or
     # smth like that which could take {subject} {session} ... and process
