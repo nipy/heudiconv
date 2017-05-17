@@ -931,9 +931,11 @@ def tuneup_bids_json_files(json_files):
     # Harmonize generic .json formatting
     for jsonfile in json_files:
         json_ = json.load(open(jsonfile))
-        # sanitize
+        # sanitize!
         for f in ['AcquisitionDateTime', 'AcquisitionDate']:
             json_.pop(f, None)
+        # TODO:  should actually be placed into series file which must
+        #        go under annex (not under git) and marked as sensitive
         if 'Date' in str(json_):
             # Let's hope no word 'Date' comes within a study name or smth like
             # that
