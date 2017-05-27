@@ -268,6 +268,10 @@ def process_dicoms(fl, dcmsession=None, basedir=None, dcmfilter=None):
             TE = float(dcminfo.EchoTime)
         except AttributeError:
             TE = -1
+        try:
+            refphys = dcminfo.ReferringPhysicianName
+        except AttributeError:
+            refphys = '-'
 
         info = SeqInfo(
             total,
@@ -283,7 +287,7 @@ def process_dicoms(fl, dcmsession=None, basedir=None, dcmfilter=None):
             'derived' in [x.lower() for x in dcminfo.get('ImageType', [])],
             dcminfo.PatientID,
             dcminfo.StudyDescription,
-            dcminfo.ReferringPhysicianName,
+            refphys,
             dcminfo.SeriesDescription,
             dcminfo.ImageType,
         )
