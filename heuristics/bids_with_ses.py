@@ -37,38 +37,38 @@ def infotodict(seqinfo):
     last_run = len(seqinfo)
     for s in seqinfo:
         if (s.dim3 == 176 or s.dim3 == 352) and (s.dim4 == 1) and ('MEMPRAGE' in s.protocol_name):
-            info[t1] = [s.series_number]
+            info[t1] = [s.series_id]
         elif (s.dim4 == 1) and ('MEMPRAGE' in s.protocol_name):
-            info[t1] = [s.series_number]
+            info[t1] = [s.series_id]
         elif (s.dim3 == 176 or s.dim3 == 352) and (s.dim4 == 1) and ('T2_SPACE' in s.protocol_name):
-            info[t2] = [s.series_number]
+            info[t2] = [s.series_id]
         elif ('field_mapping_diffusion' in s.protocol_name):
-            info[fm_diff].append([s.series_number])
+            info[fm_diff].append([s.series_id])
         elif (s.dim4 >= 70) and ('DIFFUSION_HighRes_AP' in s.protocol_name):
-            info[dwi_ap].append([s.series_number])
+            info[dwi_ap].append([s.series_id])
         elif ('DIFFUSION_HighRes_PA' in s.protocol_name):
-            info[dwi_pa].append([s.series_number])
+            info[dwi_pa].append([s.series_id])
         elif ('field_mapping_resting' in s.protocol_name):
-            info[fm_rest].append([s.series_number])
+            info[fm_rest].append([s.series_id])
         elif (s.dim4 == 144) and ('resting' in s.protocol_name):
             if not s.is_motion_corrected:
-                info[rs].append([(s.series_number)])
+                info[rs].append([(s.series_id)])
         elif (s.dim4 == 183 or s.dim4 == 366) and ('localizer' in s.protocol_name):
             if not s.is_motion_corrected:
-                info[boldt1].append([s.series_number])
+                info[boldt1].append([s.series_id])
         elif (s.dim4 == 227 or s.dim4 == 454) and ('transfer1' in s.protocol_name):
             if not s.is_motion_corrected:
-                info[boldt2].append([s.series_number])
+                info[boldt2].append([s.series_id])
         elif (s.dim4 == 227 or s.dim4 == 454) and ('transfer2' in s.protocol_name):
             if not s.is_motion_corrected:
-                info[boldt3].append([s.series_number])
+                info[boldt3].append([s.series_id])
         elif (('run1' in s.protocol_name) or ('run6' in s.protocol_name)) and (s.dim4 == 159):
             if not s.is_motion_corrected:
-               info[nofb_task].append([s.series_number])
+               info[nofb_task].append([s.series_id])
         elif (('run2' in s.protocol_name) or ('run3' in s.protocol_name) or ('run4' in s.protocol_name)
                 or ('run5' in s.protocol_name)) and (s.dim4 == 159):
             if not s.is_motion_corrected:
-                info[fb_task].append([s.series_number])
+                info[fb_task].append([s.series_id])
         else:
             pass
     return info

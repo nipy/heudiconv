@@ -28,7 +28,7 @@ def infotodict(seqinfo):
 
         * total_files_till_now
         * example_dcm_file
-        * series_number
+        * series_id
         * dcm_dir_name
         * unspecified2
         * unspecified3
@@ -48,5 +48,5 @@ def infotodict(seqinfo):
         * image_type
         """
 
-        info[data].append(s.series_number)
+        info[data].append(s.series_id)
     return info

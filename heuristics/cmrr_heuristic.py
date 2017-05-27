@@ -31,41 +31,41 @@ def infotodict(seqinfo):
 
     for idx, s in enumerate(seqinfo):
         if (s.dim3 == 208) and (s.dim4 == 1) and ('T1w' in s.protocol_name):
-            info[t1] = [s.series_number]
+            info[t1] = [s.series_id]
         if (s.dim3 == 208) and ('T2w' in s.protocol_name):
-            info[t2] = [s.series_number]
+            info[t2] = [s.series_id]
         if (s.dim4 >= 99) and (('dMRI_dir98_AP' in s.protocol_name) or ('dMRI_dir99_AP' in s.protocol_name)):
             acq = s.protocol_name.split('dMRI_')[1].split('_')[0] + 'AP'
-            info[dwi].append({'item': s.series_number, 'acq': acq})
+            info[dwi].append({'item': s.series_id, 'acq': acq})
         if (s.dim4 >= 99) and (('dMRI_dir98_PA' in s.protocol_name) or ('dMRI_dir99_PA' in s.protocol_name)):
             acq = s.protocol_name.split('dMRI_')[1].split('_')[0] + 'PA'
-            info[dwi].append({'item': s.series_number, 'acq': acq})
+            info[dwi].append({'item': s.series_id, 'acq': acq})
         if (s.dim4 == 1) and (('dMRI_dir98_AP' in s.protocol_name) or ('dMRI_dir99_AP' in s.protocol_name)):
             acq = s.protocol_name.split('dMRI_')[1].split('_')[0]
-            info[fmap_dwi].append({'item': s.series_number, 'dir': 'AP', 'acq': acq})
+            info[fmap_dwi].append({'item': s.series_id, 'dir': 'AP', 'acq': acq})
         if (s.dim4 == 1) and (('dMRI_dir98_PA' in s.protocol_name) or ('dMRI_dir99_PA' in s.protocol_name)):
             acq = s.protocol_name.split('dMRI_')[1].split('_')[0]
-            info[fmap_dwi].append({'item': s.series_number, 'dir': 'PA', 'acq': acq})
+            info[fmap_dwi].append({'item': s.series_id, 'dir': 'PA', 'acq': acq})
         if (s.dim4 == 420) and ('rfMRI_REST_AP' in s.protocol_name):
-            info[rest].append({'item': s.series_number, 'acq': 'AP'})
+            info[rest].append({'item': s.series_id, 'acq': 'AP'})
         if (s.dim4 == 420) and ('rfMRI_REST_PA' in s.protocol_name):
-            info[rest].append({'item': s.series_number, 'acq': 'PA'})
+            info[rest].append({'item': s.series_id, 'acq': 'PA'})
         if (s.dim4 == 1) and ('rfMRI_REST_AP' in s.protocol_name):
             if seqinfo[idx + 1][9] != 420:
                 continue
-            info[fmap_rest].append({'item': s.series_number, 'dir': 'AP', 'acq': ''})
+            info[fmap_rest].append({'item': s.series_id, 'dir': 'AP', 'acq': ''})
         if (s.dim4 == 1) and ('rfMRI_REST_PA' in s.protocol_name):
-            info[fmap_rest].append({'item': s.series_number, 'dir': 'PA', 'acq': ''})
+            info[fmap_rest].append({'item': s.series_id, 'dir': 'PA', 'acq': ''})
         if (s.dim4 == 346) and ('tfMRI_faceMatching_AP' in s.protocol_name):
-            info[face].append({'item': s.series_number, 'acq': 'AP'})
+            info[face].append({'item': s.series_id, 'acq': 'AP'})
         if (s.dim4 == 346) and ('tfMRI_faceMatching_PA' in s.protocol_name):
-            info[face].append({'item': s.series_number, 'acq': 'PA'})
+            info[face].append({'item': s.series_id, 'acq': 'PA'})
         if (s.dim4 == 288) and ('tfMRI_conflict_AP' in s.protocol_name):
-            info[conflict].append({'item': s.series_number, 'acq': 'AP'})
+            info[conflict].append({'item': s.series_id, 'acq': 'AP'})
         if (s.dim4 == 288) and ('tfMRI_conflict_PA' in s.protocol_name):
-            info[conflict].append({'item': s.series_number, 'acq': 'PA'})
+            info[conflict].append({'item': s.series_id, 'acq': 'PA'})
         if (s.dim4 == 223) and ('tfMRI_gambling_AP' in (s.protocol_name)):
-            info[gamble].append({'item': s.series_number, 'acq': 'AP'})
+            info[gamble].append({'item': s.series_id, 'acq': 'AP'})
         if (s.dim4 == 223) and ('tfMRI_gambling_PA' in s.protocol_name):
-            info[gamble].append({'item': s.series_number, 'acq': 'PA'})
+            info[gamble].append({'item': s.series_id, 'acq': 'PA'})
     return info

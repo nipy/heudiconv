@@ -38,9 +38,9 @@ def infotodict(seqinfo):
     for idx, s in enumerate(seqinfo):
         # T1 and T2 scans
         if (s.dim3 == 208) and (s.dim4 == 1) and ('T1w' in s.protocol_name):
-            info[t1] = [s.series_number]
+            info[t1] = [s.series_id]
         if (s.dim3 == 208) and ('T2w' in s.protocol_name):
-            info[t2] = [s.series_number]
+            info[t2] = [s.series_id]
         # diffusion scans
         if ('dMRI_dir9' in s.protocol_name):
             key = None
@@ -49,7 +49,7 @@ def infotodict(seqinfo):
             elif (s.dim4 == 1) and ('SBRef' in s.series_description):
                 key = dwi_sbref
             if key:
-                info[key].append({'item': s.series_number})
+                info[key].append({'item': s.series_id})
         # functional scans
         if ('fMRI' in s.protocol_name):
             tasktype = s.protocol_name.split('fMRI')[1].split('_')[1]
@@ -65,10 +65,10 @@ def infotodict(seqinfo):
                 if 'conflict' in tasktype: key = conflict_sbref
                 if 'gambling' in tasktype: key = gamble_sbref
             if key:
-                info[key].append({'item': s.series_number})
+                info[key].append({'item': s.series_id})
         if (s.dim4 == 3) and ('SpinEchoFieldMap' in s.protocol_name):
             dirtype = s.protocol_name.split('_')[-1]
-            info[fmap].append({'item': s.series_number, 'dir': dirtype})
+            info[fmap].append({'item': s.series_id, 'dir': dirtype})
 
     # You can even put checks in place for your protocol
     msg = []
