@@ -492,7 +492,10 @@ def convert(items, symlink=True, converter=None,
                         if converter == 'dcm2nii':
                             convertnode.inputs.gzip_output = outtype == 'nii.gz'
                         else:
-                            convertnode.inputs.out_filename = os.path.basename(dirname +'_%e')
+                            if not is_bids:
+                                convertnode.inputs.bids_format = False
+                            convertnode.inputs.out_filename = os.path.basename(
+                                                                 dirname +'_%e')
                         convertnode.inputs.terminal_output = 'allatonce'
                         res = convertnode.run()
                         if isinstance(res.outputs.converted_files, list):
