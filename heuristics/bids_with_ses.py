@@ -9,16 +9,15 @@ def create_key(template, outtype=('nii.gz',), annotation_classes=None):
 
 def infotodict(seqinfo):
     """Heuristic evaluator for determining which runs belong where
-    
-    allowed template fields - follow python string module: 
-    
-    item: index within category 
-    subject: participant id 
+
+    allowed template fields - follow python string module:
+
+    item: index within category
+    subject: participant id
     seqitem: run number during scanning
     subindex: sub index within group
     session: scan index for longitudinal acq
     """
-    print seqinfo
     and_dicom = ('dicom', 'nii.gz')
 
     t1 = create_key('{session}/anat/sub-{subject}_T1w', outtype=and_dicom)
@@ -33,44 +32,43 @@ def infotodict(seqinfo):
     boldt3 = create_key('{session}/func/sub-{subject}_task-letter2back_run-{item:02d}_bold', outtype=and_dicom)
     nofb_task=create_key('{session}/func/sub-{subject}_task-nofb_run-{item:02d}_bold', outtype=and_dicom)
     fb_task=create_key('{session}/func/sub-{subject}_task-fb_run-{item:02d}_bold', outtype=and_dicom)
-    info = {t1: [], t2:[], fm_diff:[], dwi_ap:[], dwi_pa:[], fm_rest:[], rs:[], 
+    info = {t1: [], t2:[], fm_diff:[], dwi_ap:[], dwi_pa:[], fm_rest:[], rs:[],
             boldt1:[], boldt2:[], boldt3:[], nofb_task:[], fb_task:[]}
     last_run = len(seqinfo)
     for s in seqinfo:
-        x,y,sl,nt = (s[6], s[7], s[8], s[9])
-        if (sl == 176 or sl == 352) and (nt == 1) and ('MEMPRAGE' in s[12]):
-            info[t1] = [s[2]]
-        elif (nt == 1) and ('MEMPRAGE' in s[12]):
-            info[t1] = [s[2]]
-        elif (sl == 176 or sl == 352) and (nt == 1) and ('T2_SPACE' in s[12]):
-            info[t2] = [s[2]]
-        elif ('field_mapping_diffusion' in s[12]):
-            info[fm_diff].append([s[2]])
-        elif (nt >= 70) and ('DIFFUSION_HighRes_AP' in s[12]):
-            info[dwi_ap].append([s[2]])
-        elif ('DIFFUSION_HighRes_PA' in s[12]):
-            info[dwi_pa].append([s[2]])
-        elif ('field_mapping_resting' in s[12]):
-            info[fm_rest].append([s[2]])
-        elif (nt == 144) and ('resting' in s[12]):
-            if not s[13]:
-                info[rs].append([(s[2])])
-        elif (nt == 183 or nt == 366) and ('localizer' in s[12]):
-            if not s[13]:
-                info[boldt1].append([s[2]])
-        elif (nt == 227 or nt == 454) and ('transfer1' in s[12]):
-            if not s[13]:
-                info[boldt2].append([s[2]])
-        elif (nt == 227 or nt == 454) and ('transfer2' in s[12]):
-            if not s[13]:
-                info[boldt3].append([s[2]])
-        elif (('run1' in s[12]) or ('run6' in s[12])) and (nt == 159):
-            if not s[13]:
-               info[nofb_task].append([s[2]])
-        elif (('run2' in s[12]) or ('run3' in s[12]) or ('run4' in s[12])
-                or ('run5' in s[12])) and (nt == 159):
-            if not s[13]:
-                info[fb_task].append([s[2]])
+        if (s.dim3 == 176 or s.dim3 == 352) and (s.dim4 == 1) and ('MEMPRAGE' in s.protocol_name):
+            info[t1] = [s.series_number]
+        elif (s.dim4 == 1) and ('MEMPRAGE' in s.protocol_name):
+            info[t1] = [s.series_number]
+        elif (s.dim3 == 176 or s.dim3 == 352) and (s.dim4 == 1) and ('T2_SPACE' in s.protocol_name):
+            info[t2] = [s.series_number]
+        elif ('field_mapping_diffusion' in s.protocol_name):
+            info[fm_diff].append([s.series_number])
+        elif (s.dim4 >= 70) and ('DIFFUSION_HighRes_AP' in s.protocol_name):
+            info[dwi_ap].append([s.series_number])
+        elif ('DIFFUSION_HighRes_PA' in s.protocol_name):
+            info[dwi_pa].append([s.series_number])
+        elif ('field_mapping_resting' in s.protocol_name):
+            info[fm_rest].append([s.series_number])
+        elif (s.dim4 == 144) and ('resting' in s.protocol_name):
+            if not s.is_motion_corrected:
+                info[rs].append([(s.series_number)])
+        elif (s.dim4 == 183 or s.dim4 == 366) and ('localizer' in s.protocol_name):
+            if not s.is_motion_corrected:
+                info[boldt1].append([s.series_number])
+        elif (s.dim4 == 227 or s.dim4 == 454) and ('transfer1' in s.protocol_name):
+            if not s.is_motion_corrected:
+                info[boldt2].append([s.series_number])
+        elif (s.dim4 == 227 or s.dim4 == 454) and ('transfer2' in s.protocol_name):
+            if not s.is_motion_corrected:
+                info[boldt3].append([s.series_number])
+        elif (('run1' in s.protocol_name) or ('run6' in s.protocol_name)) and (s.dim4 == 159):
+            if not s.is_motion_corrected:
+               info[nofb_task].append([s.series_number])
+        elif (('run2' in s.protocol_name) or ('run3' in s.protocol_name) or ('run4' in s.protocol_name)
+                or ('run5' in s.protocol_name)) and (s.dim4 == 159):
+            if not s.is_motion_corrected:
+                info[fb_task].append([s.series_number])
         else:
             pass
     return info

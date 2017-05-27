@@ -9,20 +9,44 @@ def create_key(template, outtype=('nii.gz',), annotation_classes=None):
 
 def infotodict(seqinfo):
     """Heuristic evaluator for determining which runs belong where
-    
-    allowed template fields - follow python string module: 
-    
-    item: index within category 
-    subject: participant id 
+
+    allowed template fields - follow python string module:
+
+    item: index within category
+    subject: participant id
     seqitem: run number during scanning
     subindex: sub index within group
     """
-    
-    data = create_key('run{item:03d}', outtype=('nii.gz',))
+
+    data = create_key('run{item:03d}')
     info = {data: []}
     last_run = len(seqinfo)
+
     for s in seqinfo:
-        # TODO: clean it up -- unused stuff laying around
-        x, y, sl, nt = (s[6], s[7], s[8], s[9])
-        info[data].append(s[2])
+        """
+        The namedtuple `s` contains the following fields:
+
+        * total_files_till_now
+        * example_dcm_file
+        * series_number
+        * dcm_dir_name
+        * unspecified2
+        * unspecified3
+        * dim1
+        * dim2
+        * dim3
+        * dim4
+        * TR
+        * TE
+        * protocol_name
+        * is_motion_corrected
+        * is_derived
+        * patient_id
+        * study_description
+        * referring_physician_name
+        * series_description
+        * image_type
+        """
+
+        info[data].append(s.series_number)
     return info
