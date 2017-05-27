@@ -12,7 +12,7 @@ from datalad.api import Dataset
 def test_smoke_converall(tmpdir):
     heudiconv.main(
         ("-f heuristics/convertall.py -c dcm2niix -o %s -b --datalad "
-         "-s fmap_acq-3mm -d tests/data/%%s/*" % tmpdir).split(' ')
+         "-s fmap_acq-3mm -d tests/data/{subject}/*" % tmpdir).split(' ')
     )
 
 
@@ -20,7 +20,7 @@ def test_smoke_converall(tmpdir):
 @pytest.mark.parametrize(
     'invocation', [
         "tests/data",    # our new way with automated groupping
-        "-d tests/data/%s/* -s 01-fmap_acq-3mm" # "old" way specifying subject
+        "-d tests/data/{subject}/* -s 01-fmap_acq-3mm" # "old" way specifying subject
         # should produce the same results
     ])
 def test_dbic_bids_largely_smoke(tmpdir, heuristic, invocation):

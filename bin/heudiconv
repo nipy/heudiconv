@@ -119,7 +119,6 @@ StudySessionInfo = namedtuple(
 class TempDirs(object):
     """A helper to centralize handling and cleanup of dirs"""
 
-
     def __init__(self):
         self.dirs = []
         self.exists = os.path.exists
@@ -480,8 +479,8 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, grouping='stud
             image_type,
             accession_number,
             # For demographics to populate BIDS participants.tsv
-            dcminfo.get('PatientsAge'),
-            dcminfo.get('PatientsSex'),
+            dcminfo.get('PatientAge'),
+            dcminfo.get('PatientSex'),
             dcminfo.get('AcquisitionDate'),
         )
         # candidates
@@ -1287,12 +1286,12 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
         assert not files_opt  # see above TODO
         assert sids
         # expand the input template
-        if '%s' not in dicom_dir_template:
+        if '{subject}' not in dicom_dir_template:
             raise ValueError(
-                "dicom dir template must have '%s' as a placeholder for a "
+                "dicom dir template must have {subject} as a placeholder for a "
                 "subject id.  Got %r" % dicom_dir_template)
         for sid in sids:
-            sdir = dicom_dir_template % sid
+            sdir = dicom_dir_template.format(subject=sid, session=session)
             # and see what matches
             files = sorted(glob(sdir))
             for session_, files_ in get_extracted_dicoms(files):
@@ -1784,7 +1783,7 @@ def get_parser():
                         """
                                    Example:
 
-                                   heudiconv -d rawdata/%s -o . -f
+                                   heudiconv -d rawdata/{subject} -o . -f
                                    heuristic.py -s s1 s2
                         s3
                         """))
