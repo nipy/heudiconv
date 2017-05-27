@@ -2,10 +2,31 @@ FROM continuumio/miniconda
 
 MAINTAINER <satra@mit.edu>
 
-RUN apt-get update && apt-get upgrade -y && apt-get install -y g++ && apt-get clean -y && apt-get autoclean -y && apt-get autoremove -y
-RUN cd /tmp && git clone https://github.com/neurolabusc/dcm2niix.git && cd dcm2niix/console/ && git checkout e262240bb27e8f4c9440d6b1a97dfd98ef0f9939 && g++ -O3 -I. main_console.cpp nii_dicom.cpp jpg_0XC3.cpp ujpeg.cpp nifti1_io_core.cpp nii_ortho.cpp nii_dicom_batch.cpp  -o dcm2niix -DmyDisableOpenJPEG -DmyDisableJasper && cp dcm2niix /usr/local/bin/ 
-RUN conda install -y -c conda-forge nipype && pip install https://github.com/moloney/dcmstack/archive/c12d27d2c802d75a33ad70110124500a83e851ee.zip && pip install https://github.com/nipy/nipype/archive/dd1ed4f0d5735c69c1743f29875acf09d23a62e0.zip
-RUN curl -O https://raw.githubusercontent.com/nipy/heudiconv/master/bin/heudiconv && chmod +x heudiconv && cp heudiconv /usr/local/bin/
-RUN curl -O https://raw.githubusercontent.com/nipy/heudiconv/master/heuristics/convertall.py && chmod +x convertall.py
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y g++ pkg-config make && \
+    apt-get clean -y && apt-get autoclean -y && apt-get autoremove -y
+RUN (wget -O- http://neuro.debian.net/lists/jessie.us-nh.full | tee /etc/apt/sources.list.d/neurodebian.sources.list) && \
+    apt-key adv --recv-keys --keyserver hkp://pool.sks-keyservers.net:80 0xA5D32F012649A5A9 && \
+    apt-get update -qq && apt-get install -y git-annex-standalone && \
+    apt-get clean -y && apt-get autoclean -y && apt-get autoremove -y
+RUN conda install -y -c conda-forge nipype && \
+    conda install cmake && \
+    pip install https://github.com/moloney/dcmstack/archive/c12d27d2c802d75a33ad70110124500a83e851ee.zip && \
+    pip install datalad && \
+    conda clean -tipsy && rm -rf ~/.pip/
+RUN cd /tmp && git clone https://github.com/neurolabusc/dcm2niix.git && \
+    cd dcm2niix && \
+    git checkout 19be415ba68c0bc52e13729c6de9e5ff9c3ab443 && \
+    mkdir build && cd build && cmake -DBATCH_VERSION=ON .. && \
+    make && make install && \
+    cd / && rm -rf /tmp/dcm2niix
+
+COPY bin/heudiconv /usr/local/bin/heudiconv
+RUN chmod +x /usr/local/bin/heudiconv
+RUN mkdir /heuristics
+COPY heuristics/convertall.py /heuristics
+RUN chmod +x /heuristics/convertall.py
+RUN git config --global user.email "test@docker.land" && \
+    git config --global user.name "Docker Almighty"
 
 ENTRYPOINT ["/usr/local/bin/heudiconv"]
