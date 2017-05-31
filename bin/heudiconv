@@ -952,9 +952,13 @@ def tuneup_bids_json_files(json_files):
             # For now just save truthfully by loading magnitude files
             lgr.debug("Placing EchoTime fields into phasediff file")
             for i in 1, 2:
-                json_['EchoTime%d' % i] = \
-                    json.load(open(json_basename + '_magnitude%d.json' % i))[
-                        'EchoTime']
+                try:
+                    json_['EchoTime%d' % i] = \
+                        json.load(open(json_basename + '_magnitude%d.json' % i))[
+                            'EchoTime']
+                except IOError as exc:
+                    lgr.error("Failed to open magnitude file: %s", exc)
+
             # might have been made R/O already
             os.chmod(json_phasediffname, 0o0664)
             json.dump(json_, open(json_phasediffname, 'w'), indent=2)
