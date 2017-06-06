@@ -1,5 +1,4 @@
 pydicom
 # This is a dcmstack branch with changes for Python 3
 git+git://github.com/ghisvail/dcmstack@master
-rdflib
 nipype
