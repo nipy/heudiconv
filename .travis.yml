@@ -26,9 +26,6 @@ before_install:
   - virtualenv --python=python venv
   - source venv/bin/activate
   - python --version # just to check
-  # Have to install dcmstack from git
-  # This is a branch with changes for Python 3
-  - pip install git+git://github.com/ghisvail/dcmstack@master
   - pip install -r dev-requirements.txt
   - pip install datalad
   - pip install codecov pytest
