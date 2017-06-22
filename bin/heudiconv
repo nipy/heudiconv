@@ -16,7 +16,6 @@ It has multiple modes of operation
 
 - If no subject specified, all files under specified directory are scanned,
   DICOMs are sorted based on study UID, and layed out using specified heuristic
-
 """
 
 __version__ = '0.2'
@@ -26,8 +25,9 @@ from glob import glob
 import inspect
 import json
 import os
-import shutil
 import sys
+import re
+import shutil
 from tempfile import mkdtemp
 import tarfile
 
@@ -120,7 +120,6 @@ StudySessionInfo = namedtuple(
 class TempDirs(object):
     """A helper to centralize handling and cleanup of dirs"""
 
-
     def __init__(self):
         self.dirs = []
         self.exists = os.path.exists
@@ -154,6 +153,21 @@ class TempDirs(object):
 tempdirs = TempDirs()
 
 
+def _canonical_dumps(json_obj, **kwargs):
+    """ Dump `json_obj` to string, allowing for Python newline bug
+
+    Runs ``json.dumps(json_obj, \*\*kwargs), then removes trailing whitespaces
+    added when doing indent in some Python versions. See
+    https://bugs.python.org/issue16333. Bug seems to be fixed in 3.4, for now
+    fixing manually not only for aestetics but also to guarantee the same
+    result across versions of Python.
+    """
+    out = json.dumps(json_obj, **kwargs)
+    if 'indent' in kwargs:
+        out = out.replace(' \n', '\n')
+    return out
+
+
 def save_json(filename, data):
     """Save data to a json file
 
@@ -165,14 +179,8 @@ def save_json(filename, data):
         Dictionary to save in json file.
 
     """
-    # adds trailing whitespaces due to indent
-    # see https://bugs.python.org/issue16333
-    # seems to be fixed in 3.4, for now fixing manually
-    # not only for aestetics but also to help guaranteeing the
-    # same result across versions of Python
     with open(filename, 'w') as fp:
-        json_str = json.dumps(data, sort_keys=True, indent=4)
-        fp.write(json_str.replace(' \n', '\n'))
+        fp.write(_canonical_dumps(data, sort_keys=True, indent=4))
 
 
 def slim_down_info(j):
@@ -201,8 +209,7 @@ def json_dumps_pretty(j, indent=2, sort_keys=True):
 
     If resultant structure differs from original -- throws exception
     """
-    import re
-    js = json.dumps(j, indent=indent, sort_keys=sort_keys)
+    js = _canonical_dumps(j, indent=indent, sort_keys=sort_keys)
     # trim away \n and spaces between entries of numbers
     js_ = re.sub(
         '[\n ]+("?[-+.0-9e]+"?,?) *\n(?= *"?[-+.0-9e]+"?)', r' \1',
@@ -244,7 +251,6 @@ def load_json(filename):
 #  find_files utility copied/borrowed from DataLad (Copyright 2016 DataLad developers, MIT license)
 #
 
-import re
 from os.path import sep as dirsep
 from os.path import curdir
 from os.path import join as opj
@@ -328,7 +334,7 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, grouping='stud
                      # which would differ already
     if flfilter:
         nfl_before = len(fl)
-        fl = filter(flfilter, fl)
+        fl = list(filter(flfilter, fl))
         nfl_after = len(fl)
         lgr.info('Filtering out {0} dicoms based on their filename'.format(
             nfl_before-nfl_after))
@@ -454,6 +460,10 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, grouping='stud
             TE = float(dcminfo.EchoTime)
         except AttributeError:
             TE = -1
+        try:
+            refphys = str(dcminfo.ReferringPhysicianName)
+        except AttributeError:
+            refphys = '-'
 
         image_type = tuple(dcminfo.ImageType)
         motion_corrected = 'MoCo' in dcminfo.SeriesDescription \
@@ -462,7 +472,8 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, grouping='stud
             total,
             os.path.split(files[0])[1],
             series_id,
-            '-', '-', '-',
+            os.path.basename(os.path.dirname(files[0])),
+            '-', '-',
             size[0], size[1], size[2], size[3],
             TR, TE,
             dcminfo.ProtocolName,
@@ -471,13 +482,13 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, grouping='stud
             'derived' in [x.lower() for x in dcminfo.get('ImageType', [])],
             dcminfo.get('PatientID'),
             dcminfo.get('StudyDescription'),
-            dcminfo.get('ReferringPhysicianName'),
+            refphys,
             dcminfo.get('SeriesDescription'),
             image_type,
             accession_number,
             # For demographics to populate BIDS participants.tsv
-            dcminfo.get('PatientsAge'),
-            dcminfo.get('PatientsSex'),
+            dcminfo.get('PatientAge'),
+            dcminfo.get('PatientSex'),
             dcminfo.get('AcquisitionDate'),
         )
         # candidates
@@ -579,7 +590,7 @@ def conversion_info(subject, outdir, info, filegroup, ses=None):
     return convert_info
 
 
-def embed_nifti(dcmfiles, niftifile, infofile, bids_info=None, force=False):
+def embed_nifti(dcmfiles, niftifile, infofile, bids_info=None, force=False, min_meta=False):
     """
 
     If `niftifile` doesn't exist, it gets created out of the `dcmfiles` stack,
@@ -597,38 +608,49 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info=None, force=False):
     infofile
     bids_info
     force
+    min_meta
 
     Returns
     -------
     niftifile, infofile
 
     """
-    import dcmstack as ds
     import nibabel as nb
     import os
     import json
-    stack = ds.parse_and_stack(dcmfiles, force=force).values()
-    if len(stack) > 1:
-        raise ValueError('Found multiple series')
-    stack = stack[0]
+    meta_info = {}
+    if not min_meta:
+        import dcmstack as ds
+        stack = ds.parse_and_stack(dcmfiles, force=force).values()
+        if len(stack) > 1:
+            raise ValueError('Found multiple series')
+        stack = stack[0]
 
-    #Create the nifti image using the data array
-    if not os.path.exists(niftifile):
-        nifti_image = stack.to_nifti(embed_meta=True)
-        nifti_image.to_filename(niftifile)
-        return ds.NiftiWrapper(nifti_image).meta_ext.to_json()
+        #Create the nifti image using the data array
+        if not os.path.exists(niftifile):
+            nifti_image = stack.to_nifti(embed_meta=True)
+            nifti_image.to_filename(niftifile)
+            return ds.NiftiWrapper(nifti_image).meta_ext.to_json()
 
-    orig_nii = nb.load(niftifile)
-    aff = orig_nii.get_affine()
-    ornt = nb.orientations.io_orientation(aff)
-    axcodes = nb.orientations.ornt2axcodes(ornt)
-    new_nii = stack.to_nifti(voxel_order=''.join(axcodes), embed_meta=True)
-    meta = ds.NiftiWrapper(new_nii).meta_ext.to_json()
-    meta_info = json.loads(meta)
+        orig_nii = nb.load(niftifile)
+        aff = orig_nii.get_affine()
+        ornt = nb.orientations.io_orientation(aff)
+        axcodes = nb.orientations.ornt2axcodes(ornt)
+        new_nii = stack.to_nifti(voxel_order=''.join(axcodes), embed_meta=True)
+        meta = ds.NiftiWrapper(new_nii).meta_ext.to_json()
+        meta_info = json.loads(meta)
     if bids_info:
-        meta_info = dict(meta_info.items() + bids_info.items())
+        if min_meta:
+            meta_info = bids_info
+        else:
+            meta_info = dict(meta_info.items() + bids_info.items())
+        try:
+            task = re.search('(?<=_task-)\w+', os.path.basename(infofile)).group(0).split('_')[0]
+            meta_info['TaskName'] = task
+        except AttributeError: # not BIDS functional
+            pass
     with open(infofile, 'wt') as fp:
-        json.dump(meta_info, fp, indent=0, sort_keys=True)
+        json.dump(meta_info, fp, indent=3, sort_keys=True)
     return niftifile, infofile
 
 
@@ -729,7 +751,7 @@ def safe_copyfile(src, dest):
 
 def convert(items, symlink=True, converter=None,
         scaninfo_suffix='.json', custom_callable=None, with_prov=False,
-        is_bids=False, sourcedir=None, outdir=None):
+        is_bids=False, sourcedir=None, outdir=None, min_meta=False):
     """Perform actual conversion (calls to converter etc) given info from
     heuristic's `infotodict`
 
@@ -744,6 +766,7 @@ def convert(items, symlink=True, converter=None,
     is_bids
     sourcedir
     outdir
+    min_meta
 
     Returns
     -------
@@ -806,31 +829,18 @@ def convert(items, symlink=True, converter=None,
                         config.enable_provenance()
                     from nipype import Function, Node
                     from nipype.interfaces.base import isdefined
-                    if converter == 'mri_convert':
-                        from nipype.interfaces.freesurfer.preprocess import MRIConvert
-                        convertnode = Node(MRIConvert(), name='convert')
-                        convertnode.base_dir = tmpdir
-                        if outtype == 'nii.gz':
-                            convertnode.inputs.out_type = 'niigz'
-                        convertnode.inputs.in_file = item_dicoms[0]
-                        convertnode.inputs.out_file = os.path.abspath(outname)
-                        #cmd = 'mri_convert %s %s' % (item[2][0], outname)
-                        #print(cmd)
-                        #os.system(cmd)
-                        res = convertnode.run()
-                    elif converter in {'dcm2nii', 'dcm2niix'}:
+                    if converter == 'dcm2niix':
                         from nipype.interfaces.dcm2nii import Dcm2nii, Dcm2niix
-                        convertnode = Node(
-                            {'dcm2nii': Dcm2nii,
-                             'dcm2niix': Dcm2niix}[converter](),
-                            name='convert')
+                        convertnode = Node(Dcm2niix(), name='convert')
                         convertnode.base_dir = tmpdir
                         # need to be abspaths!
-                        item_dicoms = map(os.path.abspath, item_dicoms)
+                        item_dicoms = list(map(os.path.abspath, item_dicoms))
                         convertnode.inputs.source_names = item_dicoms
                         if converter == 'dcm2nii':
                             convertnode.inputs.gzip_output = outtype == 'nii.gz'
                         else:
+                            if not is_bids:
+                                convertnode.inputs.bids_format = False
                             convertnode.inputs.out_filename = os.path.basename(prefix_dirname)
                         convertnode.inputs.terminal_output = 'allatonce'
                         res = convertnode.run()
@@ -912,11 +922,12 @@ def convert(items, symlink=True, converter=None,
                     #if not is_bids or converter != 'dcm2niix': ##uses dcm2niix's infofile
                     embed_metadata_from_dicoms(converter, is_bids, item_dicoms,
                                                outname, outname_bids, prov_file,
-                                               scaninfo, tmpdir, with_prov)
+                                               scaninfo, tmpdir, with_prov,
+                                               min_meta)
                 if exists(scaninfo):
                     lgr.info("Post-treating %s file", scaninfo)
                     treat_infofile(scaninfo)
-                os.chmod(outname, 0o0444)
+                os.chmod(outname, 0o0440)
 
         if custom_callable is not None:
             custom_callable(*item)
@@ -957,9 +968,13 @@ def tuneup_bids_json_files(json_files):
             # For now just save truthfully by loading magnitude files
             lgr.debug("Placing EchoTime fields into phasediff file")
             for i in 1, 2:
-                json_['EchoTime%d' % i] = \
-                    json.load(open(json_basename + '_magnitude%d.json' % i))[
-                        'EchoTime']
+                try:
+                    json_['EchoTime%d' % i] = \
+                        json.load(open(json_basename + '_magnitude%d.json' % i))[
+                            'EchoTime']
+                except IOError as exc:
+                    lgr.error("Failed to open magnitude file: %s", exc)
+
             # might have been made R/O already
             os.chmod(json_phasediffname, 0o0664)
             json.dump(json_, open(json_phasediffname, 'w'), indent=2)
@@ -973,7 +988,7 @@ def tuneup_bids_json_files(json_files):
 
 def embed_metadata_from_dicoms(converter, is_bids, item_dicoms, outname,
                                outname_bids, prov_file, scaninfo, tmpdir,
-                               with_prov):
+                               with_prov, min_meta):
     """
     Enhance sidecar information file with more information from DICOMs
 
@@ -988,6 +1003,7 @@ def embed_metadata_from_dicoms(converter, is_bids, item_dicoms, outname,
     scaninfo
     tmpdir
     with_prov
+    min_meta
 
     Returns
     -------
@@ -998,7 +1014,8 @@ def embed_metadata_from_dicoms(converter, is_bids, item_dicoms, outname,
                                            'niftifile',
                                            'infofile',
                                            'bids_info',
-                                           'force'],
+                                           'force',
+                                           'min_meta'],
                               output_names=['outfile',
                                             'meta'],
                               function=embed_nifti),
@@ -1006,6 +1023,7 @@ def embed_metadata_from_dicoms(converter, is_bids, item_dicoms, outname,
     embedfunc.inputs.dcmfiles = item_dicoms
     embedfunc.inputs.niftifile = os.path.abspath(outname)
     embedfunc.inputs.infofile = os.path.abspath(scaninfo)
+    embedfunc.inputs.min_meta = min_meta
     if is_bids and (converter == 'dcm2niix'):
         embedfunc.inputs.bids_info = load_json(os.path.abspath(outname_bids))
     else:
@@ -1034,7 +1052,7 @@ in that one though
         if global_options['overwrite'] and os.path.lexists(scaninfo):
             # TODO: handle annexed file case
             if not os.path.islink(scaninfo):
-                os.chmod(scaninfo, 0o0664)
+                os.chmod(scaninfo, 0o0660)
         res = embedfunc.run()
         os.chmod(scaninfo, 0o0444)
         if with_prov:
@@ -1042,7 +1060,7 @@ in that one though
             g.parse(prov_file,
                     format='turtle')
             g.serialize(prov_file, format='turtle')
-            os.chmod(prov_file, 0o0444)
+            os.chmod(prov_file, 0o0440)
     except Exception as exc:
         lgr.error("Embedding failed: %s", str(exc))
         os.chdir(cwd)
@@ -1074,7 +1092,8 @@ def convert_dicoms(sid,
                    with_prov=False,
                    ses=None,
                    is_bids=False,
-                   seqinfo=None):
+                   seqinfo=None,
+                   min_meta=False):
     if dicoms:
         lgr.info("Processing %d dicoms", len(dicoms))
     elif seqinfo:
@@ -1085,6 +1104,13 @@ def convert_dicoms(sid,
     # in this reimplementation we can have only a single session assigned
     # at this point
     # dcmsessions =
+
+    if is_bids and not sid.isalnum(): # alphanumeric only
+        old_sid = sid
+        cleaner = lambda y: ''.join([x for x in y if x.isalnum()])
+        sid = cleaner(sid) #strip out
+        lgr.warning('{0} contained nonalphanumeric character(s), subject '
+                 'ID was cleaned to be {1}'.format(old_sid, sid))
 
     #
     # Annonimization parameters
@@ -1177,11 +1203,12 @@ def convert_dicoms(sid,
 
     if is_bids:
         if seqinfo:
+            keys = list(seqinfo)
             add_participant_record(
                 anon_outdir,
                 anon_sid,
-                seqinfo.keys()[0].patient_age,
-                seqinfo.keys()[0].patient_sex,
+                keys[0].patient_age,
+                keys[0].patient_sex,
             )
         populate_bids_templates(
             anon_outdir,
@@ -1280,12 +1307,12 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
         assert not files_opt  # see above TODO
         assert sids
         # expand the input template
-        if '%s' not in dicom_dir_template:
+        if '{subject}' not in dicom_dir_template:
             raise ValueError(
-                "dicom dir template must have '%s' as a placeholder for a "
+                "dicom dir template must have {subject} as a placeholder for a "
                 "subject id.  Got %r" % dicom_dir_template)
         for sid in sids:
-            sdir = dicom_dir_template % sid
+            sdir = dicom_dir_template.format(subject=sid, session=session)
             # and see what matches
             files = sorted(glob(sdir))
             for session_, files_ in get_extracted_dicoms(files):
@@ -1358,7 +1385,6 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
             study_sessions[study_session_info] = seqinfo
 
     return study_sessions
-
 
 #
 # Additional handlers
@@ -1750,7 +1776,8 @@ def _main(args):
                    with_prov=args.with_prov,
                    ses=session,
                    is_bids=args.bids,
-                   seqinfo=seqinfo)
+                   seqinfo=seqinfo,
+                   min_meta=args.minmeta)
         lgr.info("PROCESSING DONE: {0}".format(
             str(dict(subject=sid, outdir=study_outdir, session=session))))
 
@@ -1779,7 +1806,7 @@ def get_parser():
                         """
                                    Example:
 
-                                   heudiconv -d rawdata/%s -o . -f
+                                   heudiconv -d rawdata/{subject} -o . -f
                                    heuristic.py -s s1 s2
                         s3
                         """))
@@ -1789,8 +1816,9 @@ def get_parser():
                         dest='dicom_dir_template',
                         required=False,
                         help='''location of dicomdir that can be indexed with
-                        subject id. Tarballs (can be compressed) are supported
-                        in additions to directory. All matching tarballs for a
+                        subject id {subject} and session {session}.
+                        Tarballs (can be compressed) are supported
+                        in addition to directory. All matching tarballs for a
                         subject are extracted and their content processed in
                         a single pass''')
     parser.add_argument('-s', '--subjects', dest='subjs',
@@ -1800,9 +1828,7 @@ def get_parser():
                              'heuristic')
     parser.add_argument('-c', '--converter', dest='converter',
                         default='dcm2niix',
-                        choices=(
-                        'mri_convert', 'dcmstack', 'dcm2nii', 'dcm2niix',
-                        'none'),
+                        choices=('dcm2niix', 'none'),
                         help='''tool to use for dicom conversion. Setting to
                         "none" disables the actual conversion step -- useful
                         for testing heuristics.''')
@@ -1859,6 +1885,8 @@ def get_parser():
         help="files (tarballs, dicoms) or directories containing files to "
              "process. Specify one of the --dicom_dir_template or files "
              "not both")
+    parser.add_argument('--minmeta', dest='minmeta', action='store_true',
+                        help="Exclude dcmstack's meta information in sidecar jsons")
     return parser
 
 

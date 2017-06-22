@@ -2,7 +2,6 @@ import os
 import re
 from collections import OrderedDict
 import hashlib
-
 from glob import glob
 
 import logging
@@ -132,6 +131,15 @@ DEFAULT_FIELDS = {
         "Yaroslav Halchenko and Matteo Visconti for preparing BIDS dataset. "
         "TODO: more",
 }
+
+
+def _delete_chars(from_str, deletechars):
+    """ Delete characters from string allowing for Python 2 / 3 difference
+    """
+    try:
+        return from_str.translate(None, deletechars)
+    except TypeError:
+        return from_str.translate(str.maketrans('', '', deletechars))
 
 
 def filter_dicom(dcmdata):
@@ -480,8 +488,7 @@ def get_dups_marked(info):
     #  were "cancelled"
     info = info.copy()
     dup_id = 0
-    for template in info:
-        series_ids = info[template]
+    for template, series_ids in list(info.items()):
         if len(series_ids) > 1:
             lgr.warning("Detected %d duplicated run(s) for template %s: %s",
                         len(series_ids) - 1, template[0], series_ids[:-1])
@@ -615,7 +622,7 @@ def infotoids(seqinfos, outdir):
 
 def sanitize_str(value):
     """Remove illegal characters for BIDS from task/acq/etc.."""
-    return value.translate(None, '#!@$%^&.,:;_-')
+    return _delete_chars(value, '#!@$%^&.,:;_-')
 
 
 def parse_dbic_protocol_name(protocol_name):
