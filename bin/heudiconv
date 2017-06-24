@@ -618,6 +618,7 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info=None, force=False, min_
     import nibabel as nb
     import os
     import json
+    import re
     meta_info = {}
     if not min_meta:
         import dcmstack as ds
