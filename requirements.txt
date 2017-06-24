@@ -1,6 +1,6 @@
 pydicom
 # This is a dcmstack branch with changes for Python 3
-git+git://github.com/ghisvail/dcmstack@master
+git+git://github.com/mvdoc/dcmstack@bf/importsys
 nipype
 inotify
 datalad
