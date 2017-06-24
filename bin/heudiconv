@@ -42,7 +42,7 @@ from datetime import datetime
 from os.path import isdir
 from os.path import basename
 from os.path import dirname
-from os.path import exists
+from os.path import lexists, exists
 from os.path import join as pjoin
 
 from random import sample
@@ -946,7 +946,18 @@ def convert(items, symlink=True, converter=None,
     shutil.rmtree(tmpdir)
 
 
-def get_formatted_scans_key_row(item, outname_bids_files):
+def get_formatted_scans_key_row(item):
+    """
+    Parameters
+    ----------
+    item
+
+    Returns
+    -------
+    row: list
+        [ISO acquisition time, performing physician name, random string]
+
+    """
     dcm_fn = item[-1][0]
     mw = ds.wrapper_from_data(dcm.read_file(dcm_fn, stop_before_pixels=True))
     # we need to store filenames and acquisition times
@@ -961,16 +972,60 @@ def get_formatted_scans_key_row(item, outname_bids_files):
     return row
 
 
+def add_rows_to_scans_keys_file(fn, newrows):
+    """
+    Add new rows to file fn for scans key filename
+
+    Parameters
+    ----------
+    fn: filename
+    newrows: extra rows to add
+        dict fn: [acquisition time, referring physician, random string]
+    """
+    if lexists(fn):
+        with open(fn, 'r') as csvfile:
+            reader = csv.reader(csvfile, delimiter='\t')
+            existing_rows = [row[0] for row in reader]
+        # skip header
+        fnames2info = {row[0]: row[1:] for row in existing_rows[1:]}
+
+        newrows_key = newrows.key()
+        newrows_toadd = list(set(newrows_key) - set(fnames2info.keys()))
+        for key_toadd in newrows_toadd:
+            fnames2info[key_toadd] = newrows[key_toadd]
+        header = []
+        # remove
+        os.unlink(fn)
+    else:
+        header = ['filename', 'acq_time', 'operator', 'randstr']
+        fnames2info = newrows
+
+    # save
+    with open(fn, 'a') as csvfile:
+        writer = csv.writer(csvfile, delimiter='\t')
+        if header:
+            writer.writerow(header)
+        for key in sorted(fnames2info.keys()):
+            writer.writerow([key] + fnames2info[key])
+
+
 def save_scans_key(items, outname_bids_files):
-    header = ['filename', 'acq_time', 'operator', 'randstr']
-    rows = []
+    """
+    Parameters
+    ----------
+    items:
+    outname_bids_files:
+
+    Returns
+    -------
+
+    """
+    rows = dict()
     for item, outname_bids_file in zip(items, outname_bids_files):
         # get filenames
         f_name = '/'.join(outname_bids_file.split('/')[-2:])
         f_name = f_name.replace('json', 'nii.gz')
-        rows.append(
-            [f_name] + get_formatted_scans_key_row(item, outname_bids_file)
-        )
+        rows[f_name] = get_formatted_scans_key_row(item)
     # where should we store it?
     output_dir = dirname(dirname(outname_bids_file))
     # get subject info
@@ -980,10 +1035,9 @@ def save_scans_key(items, outname_bids_files):
     subj = subj[0]
 
     # save
-    with open(pjoin(output_dir, '{0}_scans.tsv'.format(subj)), 'w') as csvfile:
-        writer = csv.writer(csvfile, delimiter='\t')
-        writer.writerow(header)
-        writer.writerows(rows)
+    add_rows_to_scans_keys_file(
+        pjoin(output_dir, '{0}_scans.tsv'.format(subj)),
+        rows)
 
 
 def tuneup_bids_json_files(json_files):
