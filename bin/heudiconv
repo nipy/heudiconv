@@ -954,8 +954,8 @@ def save_scans_key(items, outname_bids_files):
         # parse date and time and get it into isoformat
         date = mw.dcm_data.AcquisitionDate
         time = mw.dcm_data.AcquisitionTime.split('.')[0]
-        dt = time + date
-        acq_time = datetime.strptime(dt, '%H%M%S%Y%m%d').isoformat()
+        td = time + date
+        acq_time = datetime.strptime(td, '%H%M%S%Y%m%d').isoformat()
         # get filenames
         f_name = '/'.join(outname_bids_file.split('/')[-2:])
         f_name = f_name.replace('json', 'nii.gz')
