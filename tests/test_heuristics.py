@@ -24,9 +24,13 @@ def test_smoke_converall(tmpdir):
         # should produce the same results
     ])
 def test_dbic_bids_largely_smoke(tmpdir, heuristic, invocation):
+    is_bids = True if heuristic == 'dbic_bids' else False
+    arg = "-f heuristics/%s.py -c dcm2niix -o %s" % (heuristic, tmpdir)
+    if is_bids:
+        arg += " -b"
+    arg += " --datalad "
     args = (
-        ("-f heuristics/%s.py -c dcm2niix -o %s -b --datalad "  % (heuristic, tmpdir))
-        + invocation
+        arg + invocation
     ).split(' ')
     if heuristic != 'dbic_bids' and invocation == 'tests/data':
         # none other heuristic has mighty infotoids atm
