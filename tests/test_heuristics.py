@@ -84,8 +84,8 @@ def test_scans_keys_dbic_bids(tmpdir, invocation):
         reader = csv.reader(f, delimiter='\t')
         for i, row in enumerate(reader):
             if i == 0:
-                assert(row == ['filename', 'acq_time', 'operator'])
-            assert(len(row) == 3)
+                assert(row == ['filename', 'acq_time', 'operator', 'randstr'])
+            assert(len(row) == 4)
             if i != 0:
                 assert(os.path.exists(pjoin(dirname(scans_keys[0]), row[0])))
                 assert(re.match(

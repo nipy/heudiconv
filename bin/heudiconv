@@ -43,6 +43,8 @@ from os.path import dirname
 from os.path import exists
 from os.path import join as pjoin
 
+from random import sample
+
 PY3 = sys.version_info[0] >= 3
 
 import logging
@@ -945,7 +947,7 @@ def convert(items, symlink=True, converter=None,
 def save_scans_key(items, outname_bids_files):
     import dicom as dcm
     import dcmstack as ds
-    header = ['filename', 'acq_time', 'operator']
+    header = ['filename', 'acq_time', 'operator', 'randstr']
     rows = []
     for item, outname_bids_file in zip(items, outname_bids_files):
         dcm_fn = item[-1][0]
@@ -960,7 +962,10 @@ def save_scans_key(items, outname_bids_files):
         f_name = '/'.join(outname_bids_file.split('/')[-2:])
         f_name = f_name.replace('json', 'nii.gz')
         # store it
-        rows.append((f_name, acq_time, mw.dcm_data.PerformingPhysicianName))
+        randstr = ''.join(map(chr, sample(k=8, population=range(33, 127))))
+        rows.append(
+            (f_name, acq_time, mw.dcm_data.PerformingPhysicianName, randstr)
+        )
     # where should we store it?
     output_dir = dirname(dirname(outname_bids_file))
     # get subject info
