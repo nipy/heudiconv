@@ -1515,6 +1515,30 @@ def add_participant_record(studydir, subject, age, sex):
         + '\n')
 
 
+def mark_sensitive(ds, path_glob=None):
+    """
+    
+    Parameters
+    ----------
+    ds : Dataset to operate on
+    path_glob : str, optional
+      glob of the paths within dataset to work on
+
+    Returns
+    -------
+    None
+    """
+    sens_kwargs = dict(
+        init=[('distribution-restrictions', 'sensitive')]
+    )
+    if path_glob:
+        paths = glob(opj(ds.path, path_glob))
+        if not paths:
+            return
+        sens_kwargs['path'] = paths
+    ds.metadata(**sens_kwargs)
+
+
 def add_to_datalad(topdir, studydir, msg=None, bids=False):
     """Do all necessary preparations (if were not done before) and save
     """
@@ -1547,14 +1571,15 @@ def add_to_datalad(topdir, studydir, msg=None, bids=False):
         superds = ds
 
     create_file_if_missing(
-            opj(studydir, '.gitattributes'),
-            """\
+        opj(studydir, '.gitattributes'),
+        """\
 * annex.largefiles=(largerthan=100kb)
 *.json annex.largefiles=nothing
 *.txt annex.largefiles=nothing
 *.tsv annex.largefiles=nothing
-*.nii.gz annex.largefiles=(largerthan=0kb)
-*.tgz annex.largefiles=(largerthan=0kb)
+*.nii.gz annex.largefiles=anything
+*.tgz annex.largefiles=anything
+*_scans.tsv annex.largefiles=anything
 """)
     # so for mortals it just looks like a regular directory!
     if not ds.config.get('annex.thin'):
@@ -1567,16 +1592,39 @@ def add_to_datalad(topdir, studydir, msg=None, bids=False):
     ds = Dataset(studydir)
     # Add doesn't have all the options of save such as msg and supers
     ds.add('.gitattributes', to_git=True, save=False)
+    dsh = None
     if os.path.lexists(os.path.join(ds.path, '.heudiconv')):
-        ds.add('.heudiconv', to_git=True, save=False)
+        dsh = Dataset(opj(ds.path, '.heudiconv'))
+        if not dsh.is_installed():
+            # we need to create it first
+            dsh = ds.create(path='.heudiconv',
+                            force=True,
+                            shared_access='all')
+        # Since .heudiconv could contain sensitive information
+        # we place all files under annex and then add
+        create_file_if_missing(
+            opj(dsh.path, '.gitattributes'),
+            """* annex.largefiles=anything
+            """)
+        dsh.add('.gitattributes', message="Added gitattributes to place all content under annex")
     ds.add('.', recursive=True, save=False,
            # not in effect! ?
            #annex_add_opts=['--include-dotfiles']
            )
 
+    # Provide metadata for sensitive information
+    mark_sensitive(ds, 'sourcedata')
+    mark_sensitive(ds, '*_scans.tsv')  # top level
+    mark_sensitive(ds, '*/*_scans.tsv')  # within subj
+    mark_sensitive(ds, '*/anat')  # within subj
+    mark_sensitive(ds, '*/*/anat')  # within subj/ses
+    if dsh:
+        mark_sensitive(dsh)  # entire .heudiconv!
+        # import pdb; pdb.set_trace()
+        dsh.save(message=msg)
     ds.save(message=msg, recursive=True, super_datasets=True)
-    assert not ds.repo.dirty
 
+    assert not ds.repo.dirty
     # TODO:  they are still appearing as native annex symlinked beasts
     """
     TODOs:
