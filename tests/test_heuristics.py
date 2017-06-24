@@ -4,6 +4,11 @@ import os
 from mock import patch
 from six.moves import StringIO
 
+from glob import glob
+from os.path import join as pjoin, dirname
+import csv
+import re
+
 import pytest
 
 from datalad.api import Dataset
@@ -62,6 +67,30 @@ def test_dbic_bids_largely_smoke(tmpdir, heuristic, invocation):
     assert ds.is_installed()
     assert not ds.repo.dirty
     assert head == ds.repo.get_hexsha()
+
+
+@pytest.mark.parametrize(
+    'invocation', [
+        "tests/data",    # our new way with automated groupping
+    ])
+def test_scans_keys_dbic_bids(tmpdir, invocation):
+    args = "-f heuristics/dbic_bids.py -c dcm2niix -o %s -b " % tmpdir
+    args += invocation
+    heudiconv.main(args.split())
+    # for now check it exists
+    scans_keys = glob(pjoin(tmpdir.strpath, '*/*/*/*/*.tsv'))
+    assert(len(scans_keys) == 1)
+    with open(scans_keys[0]) as f:
+        reader = csv.reader(f, delimiter='\t')
+        for i, row in enumerate(reader):
+            if i == 0:
+                assert(row == ['filename', 'acq_time', 'operator'])
+            assert(len(row) == 3)
+            if i != 0:
+                assert(os.path.exists(pjoin(dirname(scans_keys[0]), row[0])))
+                assert(re.match(
+                    '^[\d]{4}-[\d]{2}-[\d]{2}T[\d]{2}:[\d]{2}:[\d]{2}$',
+                    row[1]))
 
 
 @patch('sys.stdout', new_callable=StringIO)

@@ -22,6 +22,7 @@ __version__ = '0.2'
 
 import argparse
 from glob import glob
+import csv
 import inspect
 import json
 import os
@@ -35,10 +36,12 @@ from copy import deepcopy
 from collections import namedtuple
 from collections import defaultdict
 from collections import OrderedDict as ordereddict
+from datetime import datetime
 from os.path import isdir
 from os.path import basename
 from os.path import dirname
 from os.path import exists
+from os.path import join as pjoin
 
 PY3 = sys.version_info[0] >= 3
 
@@ -899,6 +902,10 @@ def convert(items, symlink=True, converter=None,
                                     )
                                     continue
 
+                        # save acquisition time information if it's BIDS
+                        # at this point we still have acquisition date
+                        if is_bids:
+                            save_scans_key(items, outname_bids_files)
                         # Fix up and unify BIDS files
                         tuneup_bids_json_files(outname_bids_files)
                         # we should provide specific handling for fmap,
@@ -933,6 +940,44 @@ def convert(items, symlink=True, converter=None,
         if custom_callable is not None:
             custom_callable(*item)
     shutil.rmtree(tmpdir)
+
+
+def save_scans_key(items, outname_bids_files):
+    import dicom as dcm
+    import dcmstack as ds
+    header = ['filename', 'acq_time', 'operator']
+    rows = []
+    for item, outname_bids_file in zip(items, outname_bids_files):
+        dcm_fn = item[-1][0]
+        mw = ds.wrapper_from_data(dcm.read_file(dcm_fn, force=True))
+        # we need to store filenames and acquisition times
+        time = mw.dcm_data.AcquisitionTime
+        hms = time.split('.')[0]
+        time = [int(hms[sl]) for sl in [slice(2),
+                                        slice(2, 4),
+                                        slice(4, len(hms))]]
+        date = mw.dcm_data.AcquisitionDate
+        date = [int(date[sl]) for sl in [slice(4),
+                                         slice(4, 6),
+                                         slice(6, len(date))]]
+        dt = datetime(date[0], date[1], date[2], time[0], time[1])
+        acq_time = dt.isoformat()
+        f_name = '/'.join(outname_bids_file.split('/')[-2:])
+        f_name = f_name.replace('json', 'nii.gz')
+        rows.append((f_name, acq_time, mw.dcm_data.PerformingPhysicianName))
+    # where should we store it?
+    output_dir = dirname(dirname(outname_bids_file))
+    # get subject info
+    subj_pattern = re.compile('(sub-[a-zA-Z0-9]*)')
+    subj = subj_pattern.findall(f_name)
+    assert(len(subj) >= 1)
+    subj = subj[0]
+
+    # save
+    with open(pjoin(output_dir, '{0}_scans.tsv'.format(subj)), 'w') as csvfile:
+        writer = csv.writer(csvfile, delimiter='\t')
+        writer.writerow(header)
+        writer.writerows(rows)
 
 
 def tuneup_bids_json_files(json_files):
