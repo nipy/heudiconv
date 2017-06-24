@@ -22,6 +22,9 @@ __version__ = '0.2'
 
 import argparse
 from glob import glob
+import csv
+import dicom as dcm
+import dcmstack as ds
 import inspect
 import json
 import os
@@ -35,10 +38,14 @@ from copy import deepcopy
 from collections import namedtuple
 from collections import defaultdict
 from collections import OrderedDict as ordereddict
+from datetime import datetime
 from os.path import isdir
 from os.path import basename
 from os.path import dirname
-from os.path import exists
+from os.path import lexists, exists
+from os.path import join as pjoin
+
+from random import sample
 
 PY3 = sys.version_info[0] >= 3
 
@@ -618,6 +625,7 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info=None, force=False, min_
     import nibabel as nb
     import os
     import json
+    import re
     meta_info = {}
     if not min_meta:
         import dcmstack as ds
@@ -898,6 +906,10 @@ def convert(items, symlink=True, converter=None,
                                     )
                                     continue
 
+                        # save acquisition time information if it's BIDS
+                        # at this point we still have acquisition date
+                        if is_bids:
+                            save_scans_key(items, outname_bids_files)
                         # Fix up and unify BIDS files
                         tuneup_bids_json_files(outname_bids_files)
                         # we should provide specific handling for fmap,
@@ -932,6 +944,100 @@ def convert(items, symlink=True, converter=None,
         if custom_callable is not None:
             custom_callable(*item)
     shutil.rmtree(tmpdir)
+
+
+def get_formatted_scans_key_row(item):
+    """
+    Parameters
+    ----------
+    item
+
+    Returns
+    -------
+    row: list
+        [ISO acquisition time, performing physician name, random string]
+
+    """
+    dcm_fn = item[-1][0]
+    mw = ds.wrapper_from_data(dcm.read_file(dcm_fn, stop_before_pixels=True))
+    # we need to store filenames and acquisition times
+    # parse date and time and get it into isoformat
+    date = mw.dcm_data.AcquisitionDate
+    time = mw.dcm_data.AcquisitionTime.split('.')[0]
+    td = time + date
+    acq_time = datetime.strptime(td, '%H%M%S%Y%m%d').isoformat()
+    # add random string
+    randstr = ''.join(map(chr, sample(k=8, population=range(33, 127))))
+    row = [acq_time, mw.dcm_data.PerformingPhysicianName, randstr]
+    return row
+
+
+def add_rows_to_scans_keys_file(fn, newrows):
+    """
+    Add new rows to file fn for scans key filename
+
+    Parameters
+    ----------
+    fn: filename
+    newrows: extra rows to add
+        dict fn: [acquisition time, referring physician, random string]
+    """
+    if lexists(fn):
+        with open(fn, 'r') as csvfile:
+            reader = csv.reader(csvfile, delimiter='\t')
+            existing_rows = [row[0] for row in reader]
+        # skip header
+        fnames2info = {row[0]: row[1:] for row in existing_rows[1:]}
+
+        newrows_key = newrows.key()
+        newrows_toadd = list(set(newrows_key) - set(fnames2info.keys()))
+        for key_toadd in newrows_toadd:
+            fnames2info[key_toadd] = newrows[key_toadd]
+        header = []
+        # remove
+        os.unlink(fn)
+    else:
+        header = ['filename', 'acq_time', 'operator', 'randstr']
+        fnames2info = newrows
+
+    # save
+    with open(fn, 'a') as csvfile:
+        writer = csv.writer(csvfile, delimiter='\t')
+        if header:
+            writer.writerow(header)
+        for key in sorted(fnames2info.keys()):
+            writer.writerow([key] + fnames2info[key])
+
+
+def save_scans_key(items, outname_bids_files):
+    """
+    Parameters
+    ----------
+    items:
+    outname_bids_files:
+
+    Returns
+    -------
+
+    """
+    rows = dict()
+    for item, outname_bids_file in zip(items, outname_bids_files):
+        # get filenames
+        f_name = '/'.join(outname_bids_file.split('/')[-2:])
+        f_name = f_name.replace('json', 'nii.gz')
+        rows[f_name] = get_formatted_scans_key_row(item)
+    # where should we store it?
+    output_dir = dirname(dirname(outname_bids_file))
+    # get subject info
+    subj_pattern = re.compile('(sub-[a-zA-Z0-9]*)')
+    subj = subj_pattern.findall(f_name)
+    assert(len(subj) >= 1)
+    subj = subj[0]
+
+    # save
+    add_rows_to_scans_keys_file(
+        pjoin(output_dir, '{0}_scans.tsv'.format(subj)),
+        rows)
 
 
 def tuneup_bids_json_files(json_files):
@@ -1721,7 +1827,6 @@ def _main(args):
     # Load heuristic -- better do it asap to make sure it loads correctly
     #
     heuristic = load_heuristic(os.path.realpath(args.heuristic_file))
-
     # TODO: Move into a function!
     study_sessions = get_study_sessions(
         dicom_dir_template, files_opt,
