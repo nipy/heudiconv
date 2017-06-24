@@ -964,7 +964,6 @@ def get_formatted_scans_key_row(item, outname_bids_files):
 def save_scans_key(items, outname_bids_files):
     header = ['filename', 'acq_time', 'operator', 'randstr']
     rows = []
-    import pdb; pdb.set_trace()
     for item, outname_bids_file in zip(items, outname_bids_files):
         # get filenames
         f_name = '/'.join(outname_bids_file.split('/')[-2:])
