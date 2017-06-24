@@ -951,19 +951,15 @@ def save_scans_key(items, outname_bids_files):
         dcm_fn = item[-1][0]
         mw = ds.wrapper_from_data(dcm.read_file(dcm_fn, force=True))
         # we need to store filenames and acquisition times
-        time = mw.dcm_data.AcquisitionTime
-        hms = time.split('.')[0]
-        time = [int(hms[sl]) for sl in [slice(2),
-                                        slice(2, 4),
-                                        slice(4, len(hms))]]
+        # parse date and time and get it into isoformat
         date = mw.dcm_data.AcquisitionDate
-        date = [int(date[sl]) for sl in [slice(4),
-                                         slice(4, 6),
-                                         slice(6, len(date))]]
-        dt = datetime(date[0], date[1], date[2], time[0], time[1])
-        acq_time = dt.isoformat()
+        time = mw.dcm_data.AcquisitionTime.split('.')[0]
+        dt = time + date
+        acq_time = datetime.strptime(dt, '%H%M%S%Y%m%d').isoformat()
+        # get filenames
         f_name = '/'.join(outname_bids_file.split('/')[-2:])
         f_name = f_name.replace('json', 'nii.gz')
+        # store it
         rows.append((f_name, acq_time, mw.dcm_data.PerformingPhysicianName))
     # where should we store it?
     output_dir = dirname(dirname(outname_bids_file))
