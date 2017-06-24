@@ -34,6 +34,7 @@ requires = {
     'core': [
         'nibabel',
         'pydicom',
+        'nipype'
     ],
     'tests': [
         'six',
