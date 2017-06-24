@@ -560,8 +560,7 @@ def infotoids(seqinfos, outdir):
             # e.g. {date}
             session_ = session_.format(**s._asdict())
         ses_markers.append(session_)
-
-    ses_markers = filter(bool, ses_markers)  # only present ones
+    ses_markers = list(filter(bool, ses_markers))  # only present ones
     session = None
     if ses_markers:
         # we have a session or possibly more than one even
@@ -628,7 +627,6 @@ def sanitize_str(value):
 def parse_dbic_protocol_name(protocol_name):
     """Parse protocol name according to our convention with minimal set of fixups
     """
-
     # Since Yarik didn't know better place to put it in, but could migrate outside
     # at some point
     protocol_name = protocol_name.replace("anat_T1w", "anat-T1w")

@@ -1725,7 +1725,6 @@ def _main(args):
     # Load heuristic -- better do it asap to make sure it loads correctly
     #
     heuristic = load_heuristic(os.path.realpath(args.heuristic_file))
-
     # TODO: Move into a function!
     study_sessions = get_study_sessions(
         dicom_dir_template, files_opt,
