@@ -23,6 +23,8 @@ __version__ = '0.2'
 import argparse
 from glob import glob
 import csv
+import dicom as dcm
+import dcmstack as ds
 import inspect
 import json
 import os
@@ -944,27 +946,31 @@ def convert(items, symlink=True, converter=None,
     shutil.rmtree(tmpdir)
 
 
+def get_formatted_scans_key_row(item, outname_bids_files):
+    dcm_fn = item[-1][0]
+    mw = ds.wrapper_from_data(dcm.read_file(dcm_fn, stop_before_pixels=True))
+    # we need to store filenames and acquisition times
+    # parse date and time and get it into isoformat
+    date = mw.dcm_data.AcquisitionDate
+    time = mw.dcm_data.AcquisitionTime.split('.')[0]
+    td = time + date
+    acq_time = datetime.strptime(td, '%H%M%S%Y%m%d').isoformat()
+    # add random string
+    randstr = ''.join(map(chr, sample(k=8, population=range(33, 127))))
+    row = [acq_time, mw.dcm_data.PerformingPhysicianName, randstr]
+    return row
+
+
 def save_scans_key(items, outname_bids_files):
-    import dicom as dcm
-    import dcmstack as ds
     header = ['filename', 'acq_time', 'operator', 'randstr']
     rows = []
+    import pdb; pdb.set_trace()
     for item, outname_bids_file in zip(items, outname_bids_files):
-        dcm_fn = item[-1][0]
-        mw = ds.wrapper_from_data(dcm.read_file(dcm_fn, force=True))
-        # we need to store filenames and acquisition times
-        # parse date and time and get it into isoformat
-        date = mw.dcm_data.AcquisitionDate
-        time = mw.dcm_data.AcquisitionTime.split('.')[0]
-        td = time + date
-        acq_time = datetime.strptime(td, '%H%M%S%Y%m%d').isoformat()
         # get filenames
         f_name = '/'.join(outname_bids_file.split('/')[-2:])
         f_name = f_name.replace('json', 'nii.gz')
-        # store it
-        randstr = ''.join(map(chr, sample(k=8, population=range(33, 127))))
         rows.append(
-            (f_name, acq_time, mw.dcm_data.PerformingPhysicianName, randstr)
+            [f_name] + get_formatted_scans_key_row(item, outname_bids_file)
         )
     # where should we store it?
     output_dir = dirname(dirname(outname_bids_file))

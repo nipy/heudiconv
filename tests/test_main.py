@@ -97,6 +97,7 @@ def test_prepare_for_datalad(tmpdir):
         assert not ds.repo.is_under_annex(f)
     assert not ds.repo.is_under_annex('.gitattributes')
 
+
 def test_json_dumps_pretty():
     pretty = heudiconv.json_dumps_pretty
     assert pretty({}) == "{}"
@@ -104,3 +105,21 @@ def test_json_dumps_pretty():
         == '{\n  "a": -1,\n  "b": "123",\n  "c": [1, 2, 3],\n  "d": ["1.0", "2.0"]\n}'
     assert pretty({'a': ["0.3", "-1.9128906358217845e-12", "0.2"]}) \
         == '{\n  "a": ["0.3", "-1.9128906358217845e-12", "0.2"]\n}'
+
+
+def test_get_formatted_scans_key_row():
+    item = [
+        ('tests/data/01-fmap_acq-3mm/1.3.12.2.1107.5.2.43.66112.2016101409263663466202201.dcm',
+         ('nii.gz', 'dicom'),
+         ['tests/data/01-fmap_acq-3mm/1.3.12.2.1107.5.2.43.66112.2016101409263663466202201.dcm'])
+    ]
+    outname_bids_file = '/a/path/Halchenko/Yarik/950_bids_test4/sub-phantom1sid1/fmap/sub-phantom1sid1_acq-3mm_phasediff.json'
+
+    row = heudiconv.get_formatted_scans_key_row(item, outname_bids_file)
+    assert(len(row) == 3)
+    assert(row[0] == '2016-10-14T09:26:34')
+    assert(row[1] == '')
+    randstr1 = row[2]
+    row = heudiconv.get_formatted_scans_key_row(item, outname_bids_file)
+    randstr2 = row[2]
+    assert(randstr1 != randstr2)
