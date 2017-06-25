@@ -985,26 +985,24 @@ def add_rows_to_scans_keys_file(fn, newrows):
     if lexists(fn):
         with open(fn, 'r') as csvfile:
             reader = csv.reader(csvfile, delimiter='\t')
-            existing_rows = [row[0] for row in reader]
+            existing_rows = [row for row in reader]
         # skip header
         fnames2info = {row[0]: row[1:] for row in existing_rows[1:]}
 
-        newrows_key = newrows.key()
+        newrows_key = newrows.keys()
         newrows_toadd = list(set(newrows_key) - set(fnames2info.keys()))
         for key_toadd in newrows_toadd:
             fnames2info[key_toadd] = newrows[key_toadd]
-        header = []
         # remove
         os.unlink(fn)
     else:
-        header = ['filename', 'acq_time', 'operator', 'randstr']
         fnames2info = newrows
 
+    header = ['filename', 'acq_time', 'operator', 'randstr']
     # save
     with open(fn, 'a') as csvfile:
         writer = csv.writer(csvfile, delimiter='\t')
-        if header:
-            writer.writerow(header)
+        writer.writerow(header)
         for key in sorted(fnames2info.keys()):
             writer.writerow([key] + fnames2info[key])
 
