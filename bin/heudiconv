@@ -484,12 +484,12 @@ def group_dicoms_into_seqinfos(
 
         if dcminfo.get([0x18,0x24], None):
             # GE and Philips scanners
-            SequenceName = dcminfo[0x18,0x24].value
+            sequence_name = dcminfo[0x18,0x24].value
         elif dcminfo.get([0x19, 0x109c], None):
             # Siemens scanners
-            SequenceName = dcminfo[0x19, 0x109c].value
+            sequence_name = dcminfo[0x19, 0x109c].value
         else:
-            SequenceName = 'Not found'
+            sequence_name = 'Not found'
 
         info = SeqInfo(
             total,
@@ -507,7 +507,7 @@ def group_dicoms_into_seqinfos(
             dcminfo.get('StudyDescription'),
             refphys,
             dcminfo.get('SeriesDescription'),
-            SequenceName,
+            sequence_name,
             image_type,
             accession_number,
             # For demographics to populate BIDS participants.tsv
