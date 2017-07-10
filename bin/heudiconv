@@ -1708,16 +1708,17 @@ def add_to_datalad(topdir, studydir, msg=None, bids=False):
                             shared_access='all')
         # Since .heudiconv could contain sensitive information
         # we place all files under annex and then add
-        create_file_if_missing(
+        if create_file_if_missing(
             opj(dsh.path, '.gitattributes'),
             """* annex.largefiles=anything
-            """)
-        dsh.add('.gitattributes', message="Added gitattributes to place all content under annex")
+            """):
+            dsh.add('.gitattributes', message="Added gitattributes to place all content under annex")
     ds.add('.', recursive=True, save=False,
            # not in effect! ?
            #annex_add_opts=['--include-dotfiles']
            )
 
+    # TODO: filter for only changed files?
     # Provide metadata for sensitive information
     mark_sensitive(ds, 'sourcedata')
     mark_sensitive(ds, '*_scans.tsv')  # top level
@@ -1738,7 +1739,6 @@ def add_to_datalad(topdir, studydir, msg=None, bids=False):
     - unlock  (thin will be in effect)
     - save/commit (does modechange 120000 => 100644
 
-    - we should mark dicoms and anatomicals as distribution-restricted
     - could potentially somehow automate that all:
       http://git-annex.branchable.com/tips/automatically_adding_metadata/
     - possibly even make separate sub-datasets for originaldata, derivatives ?
