@@ -35,7 +35,6 @@ install:
   - git config --global user.name "Travis Almighty"
 
 script:
-  # - nosetests -s -v --with-doctest --doctest-tests --with-cov --cover-package . --logging-level=INFO tests
   - coverage run `which py.test` -s -v tests heuristics
 
 after_success:

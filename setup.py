@@ -34,10 +34,11 @@ requires = {
     'core': [
         'nibabel',
         'pydicom',
+        'nipype',
     ],
     'tests': [
         'six',
-        'nose',
+        'pytest',
     ],
     'monitor': [
         'inotify',
