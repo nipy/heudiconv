@@ -1,3 +1,4 @@
+import csv
 import os
 import pytest
 import sys
@@ -134,5 +135,25 @@ def test_add_rows_to_scans_keys_file(tmpdir):
     }
     heudiconv.add_rows_to_scans_keys_file(fn, rows)
 
-    #with open(fn, 'r') as csvfile:
+    def _check_rows(fn, rows):
+        with open(fn, 'r') as csvfile:
+            reader = csv.reader(csvfile, delimiter='\t')
+            rows_loaded = []
+            for row in reader:
+                rows_loaded.append(row)
+        for i, row_ in enumerate(rows_loaded):
+            if i == 0:
+                assert(row_ == ['filename', 'acq_time', 'operator', 'randstr'])
+            else:
+                assert(rows[row_[0]] == row_[1:])
+
+    _check_rows(fn, rows)
+    # add a new one
+    extra_rows = {
+        'a_new_file.nii.gz': ['2016adsfasd23', '', 'fasadfasdf'],
+        'my_file.nii.gz': ['2016adsfasd', '', 'fasadfasdf'],
+        'another_file.nii.gz': ['2018xxxxx', '', 'fasadfasdf']
+    }
+    heudiconv.add_rows_to_scans_keys_file(fn, extra_rows)
+    _check_rows(fn, extra_rows)
 
