@@ -1,3 +1,4 @@
+
 FROM continuumio/miniconda
 
 MAINTAINER <satra@mit.edu>
@@ -16,7 +17,7 @@ RUN conda install -y -c conda-forge nipype && \
     conda clean -tipsy && rm -rf ~/.pip/
 RUN cd /tmp && git clone https://github.com/neurolabusc/dcm2niix.git && \
     cd dcm2niix && \
-    git checkout 19be415ba68c0bc52e13729c6de9e5ff9c3ab443 && \
+    git checkout 60bab318ee738b644ebb1396bbb8cbe1b006218f && \
     mkdir build && cd build && cmake -DBATCH_VERSION=ON .. && \
     make && make install && \
     cd / && rm -rf /tmp/dcm2niix
