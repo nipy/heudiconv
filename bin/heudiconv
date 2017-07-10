@@ -2,7 +2,9 @@
 
 """Convert DICOM dirs based on heuristic info
 
-This script uses DicomStack and mri_convert to convert DICOM directories.
+This script uses the dcmstack package and dcm2niix tool to convert DICOM
+directories or tarballs into collections of NIfTI files following pre-defined
+heuristic(s).
 
 It has multiple modes of operation
 
@@ -18,7 +20,7 @@ It has multiple modes of operation
   DICOMs are sorted based on study UID, and layed out using specified heuristic
 """
 
-__version__ = '0.2'
+__version__ = '0.3'
 
 import argparse
 from glob import glob
@@ -124,6 +126,8 @@ StudySessionInfo = namedtuple(
 )
 
 
+# TODO: RF to avoid package-level global structure, and be more friendly in
+# case of refactoring of heudiconv into a proper Python package/module
 class TempDirs(object):
     """A helper to centralize handling and cleanup of dirs"""
 
@@ -296,7 +300,9 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False)
 find_files.__doc__ %= (_VCS_REGEX,)
 
 
-def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, grouping='studyUID'):
+def group_dicoms_into_seqinfos(
+        files, file_filter=None, dcmfilter=None, grouping='studyUID'
+):
     """Process list of dicoms and return seqinfo and file group
 
     `seqinfo` contains per-sequence extract of fields from DICOMs which
@@ -304,15 +310,14 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, grouping='stud
 
     Parameters
     ----------
-    fl : list of str
+    files : list of str
       List of files to consider
-    flfilter : callable, optional
-      Applied to each of fl. Should return True if file needs to be kept,
-      False otherwise. Used to filter fl
+    file_filter : callable, optional
+      Applied to each item of filenames. Should return True if file needs to be
+      kept, False otherwise.
     dcmfilter : callable, optional
-      If called on dcm_data and returns True, it is used to set
-      series_id
-    grouping : str ('studyUID', 'accession_number') or None, optional
+      If called on dcm_data and returns True, it is used to set series_id
+    grouping : {'studyUID', 'accession_number', None}, optional
         what to group by: studyUID or accession_number
 
     Returns
@@ -328,24 +333,25 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, grouping='stud
         raise ValueError('I do not know how to group by {0}'.format(grouping))
     per_studyUID = grouping == 'studyUID'
     per_accession_number = grouping == 'accession_number'
-    lgr.info("Analyzing %d dicoms", len(fl))
+    lgr.info("Analyzing %d dicoms", len(files))
     import dcmstack as ds
     import dicom as dcm
 
     groups = [[], []]
     mwgroup = []
 
-    studyUID = None  # for sanity check that all DICOMs came from the same
-                     # "study".  If not -- what is the use-case? (interrupted acquisition?)
-                     # and how would then we deal with series numbers
-                     # which would differ already
-    if flfilter:
-        nfl_before = len(fl)
-        fl = list(filter(flfilter, fl))
-        nfl_after = len(fl)
+    studyUID = None
+    # for sanity check that all DICOMs came from the same
+    # "study".  If not -- what is the use-case? (interrupted acquisition?)
+    # and how would then we deal with series numbers
+    # which would differ already
+    if file_filter:
+        nfl_before = len(files)
+        files = list(filter(file_filter, files))
+        nfl_after = len(files)
         lgr.info('Filtering out {0} dicoms based on their filename'.format(
             nfl_before-nfl_after))
-    for fidx, filename in enumerate(fl):
+    for fidx, filename in enumerate(files):
         # TODO after getting a regression test check if the same behavior
         #      with stop_before_pixels=True
         mw = ds.wrapper_from_data(dcm.read_file(filename, force=True))
@@ -357,30 +363,29 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, grouping='stud
                 pass
 
         try:
-            studyUID_ = mw.dcm_data.StudyInstanceUID
+            file_studyUID = mw.dcm_data.StudyInstanceUID
         except AttributeError:
-            #import pdb; pdb.set_trace()
             lgr.info("File %s is missing any StudyInstanceUID" % filename)
-            studyUID_ = None
+            file_studyUID = None
             #continue
 
         try:
             series_id = (int(mw.dcm_data.SeriesNumber),
                          mw.dcm_data.ProtocolName)
-            studyUID_ = mw.dcm_data.StudyInstanceUID
+            file_studyUID = mw.dcm_data.StudyInstanceUID
 
             if not per_studyUID:
                 # verify that we are working with a single study
                 if studyUID is None:
-                    studyUID = studyUID_
+                    studyUID = file_studyUID
                 elif not per_accession_number:
-                    assert studyUID == studyUID_
+                    assert studyUID == file_studyUID
         except AttributeError as exc:
             lgr.warning('Ignoring %s since not quite a "normal" DICOM: %s',
                         filename, exc)
             # not a normal DICOM -> ignore
             series_id = (-1, 'none')
-            studyUID_ = None
+            file_studyUID = None
 
         if not series_id[0] < 0:
             if dcmfilter is not None and dcmfilter(mw.dcm_data):
@@ -403,7 +408,7 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, grouping='stud
             series_id = (-1, mw.dcm_data.ProtocolName)
 
         if per_studyUID:
-            series_id = series_id + (studyUID_,)
+            series_id = series_id + (file_studyUID,)
 
 
         #print fidx, N, filename
@@ -413,13 +418,13 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, grouping='stud
             #print idx, same, groups[idx][0]
             if same:
                 # the same series should have the same study uuid
-                assert mwgroup[idx].dcm_data.get('StudyInstanceUID', None) == studyUID_
+                assert mwgroup[idx].dcm_data.get('StudyInstanceUID', None) == file_studyUID
                 ingrp = True
                 if series_id[0] >= 0:
                     series_id = (mwgroup[idx].dcm_data.SeriesNumber,
                                  mwgroup[idx].dcm_data.ProtocolName)
                     if per_studyUID:
-                        series_id = series_id + (studyUID_,)
+                        series_id = series_id + (file_studyUID,)
                 groups[0].append(series_id)
                 groups[1].append(idx)
 
@@ -445,7 +450,7 @@ def group_dicoms_into_seqinfos(fl, flfilter=None, dcmfilter=None, grouping='stud
             # nothing to see here, just move on
             continue
         dcminfo = mw.dcm_data
-        files = [fl[i] for i, s in enumerate(groups[0]) if s == series_id]
+        files = [files[i] for i, s in enumerate(groups[0]) if s == series_id]
         # turn the series_id into a human-readable string -- string is needed
         # for JSON storage later on
         if per_studyUID:
@@ -1261,7 +1266,7 @@ def convert_dicoms(sid,
         if dicoms:
             seqinfo = group_dicoms_into_seqinfos(
                 dicoms,
-                flfilter=getattr(heuristic, 'filter_files', None),
+                file_filter=getattr(heuristic, 'filter_files', None),
                 dcmfilter=getattr(heuristic, 'filter_dicom', None),
                 grouping=None,  # no groupping
             )
@@ -1454,10 +1459,9 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
 
         # sort all DICOMS using heuristic
         # TODO:  this one is not groupping by StudyUID but may be we should!
-        #import pdb; pdb.set_trace()
         seqinfo_dict = group_dicoms_into_seqinfos(
             files_,
-            flfilter=getattr(heuristic, 'filter_files', None),
+            file_filter=getattr(heuristic, 'filter_files', None),
             dcmfilter=getattr(heuristic, 'filter_dicom', None),
             grouping=grouping)
 
@@ -1727,7 +1731,6 @@ def add_to_datalad(topdir, studydir, msg=None, bids=False):
     mark_sensitive(ds, '*/*/anat')  # within subj/ses
     if dsh:
         mark_sensitive(dsh)  # entire .heudiconv!
-        # import pdb; pdb.set_trace()
         dsh.save(message=msg)
     ds.save(message=msg, recursive=True, super_datasets=True)
 
