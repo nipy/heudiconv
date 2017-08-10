@@ -157,3 +157,8 @@ def test_add_rows_to_scans_keys_file(tmpdir):
     heudiconv.add_rows_to_scans_keys_file(fn, extra_rows)
     _check_rows(fn, extra_rows)
 
+def test__find_subj_ses():
+    assert heudiconv._find_subj_ses('950_bids_test4/sub-phantom1sid1/fmap/sub-phantom1sid1_acq-3mm_phasediff.json') == ('phantom1sid1', None)
+    assert heudiconv._find_subj_ses('sub-s1/ses-s1/fmap/sub-s1_ses-s1_acq-3mm_phasediff.json') == ('s1', 's1')
+    assert heudiconv._find_subj_ses('sub-s1/ses-s1/fmap/sub-s1_ses-s1_acq-3mm_phasediff.json') == ('s1', 's1')
+    assert heudiconv._find_subj_ses('fmap/sub-01-fmap_acq-3mm_acq-3mm_phasediff.nii.gz') == ('01', None)

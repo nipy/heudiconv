@@ -1015,6 +1015,15 @@ def add_rows_to_scans_keys_file(fn, newrows):
             writer.writerow([key] + fnames2info[key])
 
 
+def _find_subj_ses(f_name):
+    """Given a path to the bids formatted filename parse out subject/session"""
+    # we will allow the match at either directories or within filename
+    # assuming that bids layout is "correct"
+    regex = re.compile('sub-(?P<subj>[a-zA-Z0-9]*)([/_]ses-(?P<ses>[a-zA-Z0-9]*))?')
+    res = regex.search(f_name).groupdict()
+    return res.get('subj'), res.get('ses', None)
+
+
 def save_scans_key(items, outname_bids_files):
     """
     Parameters
@@ -1027,23 +1036,38 @@ def save_scans_key(items, outname_bids_files):
 
     """
     rows = dict()
+    # we will need to deduce subject and session from the bids_filename
+    # and if there is a conflict, we would just blow since this function
+    # should be invoked only on a result of a single item conversion as far
+    # as I see it, so should have the same subject/session
+    subj, ses = None, None
+
     for item, outname_bids_file in zip(items, outname_bids_files):
         # get filenames
         f_name = '/'.join(outname_bids_file.split('/')[-2:])
         f_name = f_name.replace('json', 'nii.gz')
         rows[f_name] = get_formatted_scans_key_row(item)
+        subj_, ses_ = _find_subj_ses(f_name)
+        if subj and subj_ != subj:
+            raise ValueError(
+                "We found before subject %s but now deduced %s from %s"
+                % (subj, subj_, f_name)
+            )
+        subj = subj_
+        if ses and ses_ != ses:
+            raise ValueError(
+                "We found before session %s but now deduced %s from %s"
+                % (ses, ses_, f_name)
+            )
+        ses = ses_
     # where should we store it?
     output_dir = dirname(dirname(outname_bids_file))
-    # get subject info
-    subj_pattern = re.compile('(sub-[a-zA-Z0-9]*)')
-    subj = subj_pattern.findall(f_name)
-    assert(len(subj) >= 1)
-    subj = subj[0]
-
     # save
+    ses = '_ses-%s' % ses if ses else ''
     add_rows_to_scans_keys_file(
-        pjoin(output_dir, '{0}_scans.tsv'.format(subj)),
-        rows)
+        pjoin(output_dir, '{0}{1}_scans.tsv'.format(subj, ses)),
+        rows
+    )
 
 
 def tuneup_bids_json_files(json_files):
