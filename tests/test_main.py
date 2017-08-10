@@ -119,7 +119,7 @@ def test_get_formatted_scans_key_row():
     row = heudiconv.get_formatted_scans_key_row(item)
     assert(len(row) == 3)
     assert(row[0] == '2016-10-14T09:26:34')
-    assert(row[1] == '')
+    assert(row[1] == 'n/a')
     randstr1 = row[2]
     row = heudiconv.get_formatted_scans_key_row(item)
     randstr2 = row[2]

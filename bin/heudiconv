@@ -974,6 +974,9 @@ def get_formatted_scans_key_row(item):
     # add random string
     randstr = ''.join(map(chr, sample(k=8, population=range(33, 127))))
     row = [acq_time, mw.dcm_data.PerformingPhysicianName, randstr]
+    # empty entries should be 'n/a'
+    # https://github.com/dartmouth-pbs/heudiconv/issues/32
+    row = ['n/a' if not str(e) else e for e in row]
     return row
 
 
