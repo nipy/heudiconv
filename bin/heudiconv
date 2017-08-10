@@ -1725,8 +1725,9 @@ def add_to_datalad(topdir, studydir, msg=None, bids=False):
     mark_sensitive(ds, 'sourcedata')
     mark_sensitive(ds, '*_scans.tsv')  # top level
     mark_sensitive(ds, '*/*_scans.tsv')  # within subj
+    mark_sensitive(ds, '*/*/*_scans.tsv')  # within sess/subj
     mark_sensitive(ds, '*/anat')  # within subj
-    mark_sensitive(ds, '*/*/anat')  # within subj/ses
+    mark_sensitive(ds, '*/*/anat')  # within ses/subj
     if dsh:
         mark_sensitive(dsh)  # entire .heudiconv!
         dsh.save(message=msg)
