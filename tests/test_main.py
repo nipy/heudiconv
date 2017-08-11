@@ -67,7 +67,7 @@ sub-sub02	2	F	control
 
 
 def test_prepare_for_datalad(tmpdir):
-    pytest.importorskip("datalad")
+    pytest.importorskip("datalad", minversion=heudiconv.MIN_VERSIONS['datalad'])
     studydir = tmpdir.join("PI").join("study")
     studydir_ = str(studydir)
     os.makedirs(studydir_)
@@ -80,7 +80,7 @@ def test_prepare_for_datalad(tmpdir):
 
     assert superds.is_installed()
     assert not superds.repo.dirty
-    subdss = superds.get_subdatasets(recursive=True)
+    subdss = superds.subdatasets(recursive=True, result_xfm='relpaths')
     for ds_path in sorted(subdss):
         ds = Dataset(opj(superds.path, ds_path))
         assert ds.is_installed()
@@ -97,6 +97,35 @@ def test_prepare_for_datalad(tmpdir):
     for f in target_files:
         assert not ds.repo.is_under_annex(f)
     assert not ds.repo.is_under_annex('.gitattributes')
+
+    # Above call to add_to_datalad does not create .heudiconv subds since
+    # directory does not exist (yet).
+    # Let's first check that it is safe to call it again
+    heudiconv.add_to_datalad(str(tmpdir), studydir_)
+    assert not ds.repo.dirty
+
+    old_hexsha = ds.repo.get_hexsha()
+    # Now let's check that if we had previously converted data so that
+    # .heudiconv was not a submodule, we still would not fail
+    dsh_path = os.path.join(ds.path, '.heudiconv')
+    dummy_path = os.path.join(dsh_path, 'dummy.nii.gz')
+
+    heudiconv.create_file_if_missing(dummy_path, '')
+    ds.add(dummy_path, message="added a dummy file")
+    # next call must not fail, should just issue a warning
+    heudiconv.add_to_datalad(str(tmpdir), studydir_)
+    ds.repo.is_under_annex(dummy_path)
+    assert not ds.repo.dirty
+    assert '.heudiconv/dummy.nii.gz' in ds.repo.get_files()
+
+    # Let's now roll back and make it a proper submodule
+    ds.repo._git_custom_command([], ['git', 'reset', '--hard', old_hexsha])
+    # now we do not add dummy to git
+    heudiconv.create_file_if_missing(dummy_path, '')
+    heudiconv.add_to_datalad(str(tmpdir), studydir_)
+    assert '.heudiconv' in ds.subdatasets(result_xfm='relpaths')
+    assert not ds.repo.dirty
+    assert '.heudiconv/dummy.nii.gz' not in ds.repo.get_files()
 
 
 def test_json_dumps_pretty():
@@ -156,6 +185,7 @@ def test_add_rows_to_scans_keys_file(tmpdir):
     }
     heudiconv.add_rows_to_scans_keys_file(fn, extra_rows)
     _check_rows(fn, extra_rows)
+
 
 def test__find_subj_ses():
     assert heudiconv._find_subj_ses('950_bids_test4/sub-phantom1sid1/fmap/sub-phantom1sid1_acq-3mm_phasediff.json') == ('phantom1sid1', None)
