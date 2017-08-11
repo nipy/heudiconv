@@ -117,9 +117,9 @@ def test_get_formatted_scans_key_row():
     outname_bids_file = '/a/path/Halchenko/Yarik/950_bids_test4/sub-phantom1sid1/fmap/sub-phantom1sid1_acq-3mm_phasediff.json'
 
     row = heudiconv.get_formatted_scans_key_row(item)
-    assert(len(row) == 3)
-    assert(row[0] == '2016-10-14T09:26:34')
-    assert(row[1] == 'n/a')
+    assert len(row) == 3
+    assert row[0] == '2016-10-14T09:26:36'
+    assert row[1] == 'n/a'
     randstr1 = row[2]
     row = heudiconv.get_formatted_scans_key_row(item)
     randstr2 = row[2]
