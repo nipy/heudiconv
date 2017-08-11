@@ -1065,7 +1065,7 @@ def save_scans_key(items, outname_bids_files):
     # save
     ses = '_ses-%s' % ses if ses else ''
     add_rows_to_scans_keys_file(
-        pjoin(output_dir, '{0}{1}_scans.tsv'.format(subj, ses)),
+        pjoin(output_dir, 'sub-{0}{1}_scans.tsv'.format(subj, ses)),
         rows
     )
 
