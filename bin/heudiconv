@@ -914,7 +914,7 @@ def convert(items, symlink=True, converter=None,
                         # save acquisition time information if it's BIDS
                         # at this point we still have acquisition date
                         if is_bids:
-                            save_scans_key(items, outname_bids_files)
+                            save_scans_key(item, outname_bids_files)
                         # Fix up and unify BIDS files
                         tuneup_bids_json_files(outname_bids_files)
                         # we should provide specific handling for fmap,
@@ -967,8 +967,8 @@ def get_formatted_scans_key_row(item):
     mw = ds.wrapper_from_data(dcm.read_file(dcm_fn, stop_before_pixels=True))
     # we need to store filenames and acquisition times
     # parse date and time and get it into isoformat
-    date = mw.dcm_data.SeriesDate
-    time = mw.dcm_data.SeriesTime.split('.')[0]
+    date = mw.dcm_data.ContentDate
+    time = mw.dcm_data.ContentTime.split('.')[0]
     td = time + date
     acq_time = datetime.strptime(td, '%H%M%S%Y%m%d').isoformat()
     # add random string
@@ -1024,27 +1024,27 @@ def _find_subj_ses(f_name):
     return res.get('subj'), res.get('ses', None)
 
 
-def save_scans_key(items, outname_bids_files):
+def save_scans_key(item, bids_files):
     """
     Parameters
     ----------
     items:
-    outname_bids_files:
+    bids_files: str or list
 
     Returns
     -------
 
     """
     rows = dict()
+    assert bids_files, "we do expect some files since it was called"
     # we will need to deduce subject and session from the bids_filename
     # and if there is a conflict, we would just blow since this function
     # should be invoked only on a result of a single item conversion as far
     # as I see it, so should have the same subject/session
     subj, ses = None, None
-
-    for item, outname_bids_file in zip(items, outname_bids_files):
+    for bids_file in bids_files:
         # get filenames
-        f_name = '/'.join(outname_bids_file.split('/')[-2:])
+        f_name = '/'.join(bids_file.split('/')[-2:])
         f_name = f_name.replace('json', 'nii.gz')
         rows[f_name] = get_formatted_scans_key_row(item)
         subj_, ses_ = _find_subj_ses(f_name)
@@ -1061,7 +1061,7 @@ def save_scans_key(items, outname_bids_files):
             )
         ses = ses_
     # where should we store it?
-    output_dir = dirname(dirname(outname_bids_file))
+    output_dir = dirname(dirname(bids_file))
     # save
     ses = '_ses-%s' % ses if ses else ''
     add_rows_to_scans_keys_file(
