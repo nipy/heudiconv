@@ -914,7 +914,7 @@ def convert(items, symlink=True, converter=None,
                         # save acquisition time information if it's BIDS
                         # at this point we still have acquisition date
                         if is_bids:
-                            save_scans_key(items, outname_bids_files)
+                            save_scans_key(item, outname_bids_files)
                         # Fix up and unify BIDS files
                         tuneup_bids_json_files(outname_bids_files)
                         # we should provide specific handling for fmap,
@@ -967,13 +967,16 @@ def get_formatted_scans_key_row(item):
     mw = ds.wrapper_from_data(dcm.read_file(dcm_fn, stop_before_pixels=True))
     # we need to store filenames and acquisition times
     # parse date and time and get it into isoformat
-    date = mw.dcm_data.AcquisitionDate
-    time = mw.dcm_data.AcquisitionTime.split('.')[0]
+    date = mw.dcm_data.ContentDate
+    time = mw.dcm_data.ContentTime.split('.')[0]
     td = time + date
     acq_time = datetime.strptime(td, '%H%M%S%Y%m%d').isoformat()
     # add random string
     randstr = ''.join(map(chr, sample(k=8, population=range(33, 127))))
     row = [acq_time, mw.dcm_data.PerformingPhysicianName, randstr]
+    # empty entries should be 'n/a'
+    # https://github.com/dartmouth-pbs/heudiconv/issues/32
+    row = ['n/a' if not str(e) else e for e in row]
     return row
 
 
@@ -1012,35 +1015,59 @@ def add_rows_to_scans_keys_file(fn, newrows):
             writer.writerow([key] + fnames2info[key])
 
 
-def save_scans_key(items, outname_bids_files):
+def _find_subj_ses(f_name):
+    """Given a path to the bids formatted filename parse out subject/session"""
+    # we will allow the match at either directories or within filename
+    # assuming that bids layout is "correct"
+    regex = re.compile('sub-(?P<subj>[a-zA-Z0-9]*)([/_]ses-(?P<ses>[a-zA-Z0-9]*))?')
+    res = regex.search(f_name).groupdict()
+    return res.get('subj'), res.get('ses', None)
+
+
+def save_scans_key(item, bids_files):
     """
     Parameters
     ----------
     items:
-    outname_bids_files:
+    bids_files: str or list
 
     Returns
     -------
 
     """
     rows = dict()
-    for item, outname_bids_file in zip(items, outname_bids_files):
+    assert bids_files, "we do expect some files since it was called"
+    # we will need to deduce subject and session from the bids_filename
+    # and if there is a conflict, we would just blow since this function
+    # should be invoked only on a result of a single item conversion as far
+    # as I see it, so should have the same subject/session
+    subj, ses = None, None
+    for bids_file in bids_files:
         # get filenames
-        f_name = '/'.join(outname_bids_file.split('/')[-2:])
+        f_name = '/'.join(bids_file.split('/')[-2:])
         f_name = f_name.replace('json', 'nii.gz')
         rows[f_name] = get_formatted_scans_key_row(item)
+        subj_, ses_ = _find_subj_ses(f_name)
+        if subj and subj_ != subj:
+            raise ValueError(
+                "We found before subject %s but now deduced %s from %s"
+                % (subj, subj_, f_name)
+            )
+        subj = subj_
+        if ses and ses_ != ses:
+            raise ValueError(
+                "We found before session %s but now deduced %s from %s"
+                % (ses, ses_, f_name)
+            )
+        ses = ses_
     # where should we store it?
-    output_dir = dirname(dirname(outname_bids_file))
-    # get subject info
-    subj_pattern = re.compile('(sub-[a-zA-Z0-9]*)')
-    subj = subj_pattern.findall(f_name)
-    assert(len(subj) >= 1)
-    subj = subj[0]
-
+    output_dir = dirname(dirname(bids_file))
     # save
+    ses = '_ses-%s' % ses if ses else ''
     add_rows_to_scans_keys_file(
-        pjoin(output_dir, '{0}_scans.tsv'.format(subj)),
-        rows)
+        pjoin(output_dir, 'sub-{0}{1}_scans.tsv'.format(subj, ses)),
+        rows
+    )
 
 
 def tuneup_bids_json_files(json_files):
@@ -1052,8 +1079,9 @@ def tuneup_bids_json_files(json_files):
     for jsonfile in json_files:
         json_ = json.load(open(jsonfile))
         # sanitize!
-        for f in ['AcquisitionDateTime', 'AcquisitionDate']:
-            json_.pop(f, None)
+        for f1 in ['Acquisition', 'Study', 'Series']:
+            for f2 in ['DateTime', 'Date']:
+                json_.pop(f1 + f2, None)
         # TODO:  should actually be placed into series file which must
         #        go under annex (not under git) and marked as sensitive
         if 'Date' in str(json_):
@@ -1725,8 +1753,9 @@ def add_to_datalad(topdir, studydir, msg=None, bids=False):
     mark_sensitive(ds, 'sourcedata')
     mark_sensitive(ds, '*_scans.tsv')  # top level
     mark_sensitive(ds, '*/*_scans.tsv')  # within subj
+    mark_sensitive(ds, '*/*/*_scans.tsv')  # within sess/subj
     mark_sensitive(ds, '*/anat')  # within subj
-    mark_sensitive(ds, '*/*/anat')  # within subj/ses
+    mark_sensitive(ds, '*/*/anat')  # within ses/subj
     if dsh:
         mark_sensitive(dsh)  # entire .heudiconv!
         dsh.save(message=msg)

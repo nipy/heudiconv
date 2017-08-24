@@ -117,9 +117,9 @@ def test_get_formatted_scans_key_row():
     outname_bids_file = '/a/path/Halchenko/Yarik/950_bids_test4/sub-phantom1sid1/fmap/sub-phantom1sid1_acq-3mm_phasediff.json'
 
     row = heudiconv.get_formatted_scans_key_row(item)
-    assert(len(row) == 3)
-    assert(row[0] == '2016-10-14T09:26:34')
-    assert(row[1] == '')
+    assert len(row) == 3
+    assert row[0] == '2016-10-14T09:26:36'
+    assert row[1] == 'n/a'
     randstr1 = row[2]
     row = heudiconv.get_formatted_scans_key_row(item)
     randstr2 = row[2]
@@ -157,3 +157,8 @@ def test_add_rows_to_scans_keys_file(tmpdir):
     heudiconv.add_rows_to_scans_keys_file(fn, extra_rows)
     _check_rows(fn, extra_rows)
 
+def test__find_subj_ses():
+    assert heudiconv._find_subj_ses('950_bids_test4/sub-phantom1sid1/fmap/sub-phantom1sid1_acq-3mm_phasediff.json') == ('phantom1sid1', None)
+    assert heudiconv._find_subj_ses('sub-s1/ses-s1/fmap/sub-s1_ses-s1_acq-3mm_phasediff.json') == ('s1', 's1')
+    assert heudiconv._find_subj_ses('sub-s1/ses-s1/fmap/sub-s1_ses-s1_acq-3mm_phasediff.json') == ('s1', 's1')
+    assert heudiconv._find_subj_ses('fmap/sub-01-fmap_acq-3mm_acq-3mm_phasediff.nii.gz') == ('01', None)
