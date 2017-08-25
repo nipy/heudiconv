@@ -103,6 +103,7 @@ SeqInfo = namedtuple(
      'study_description',
      'referring_physician_name',
      'series_description',
+     'sequence_name',
      'image_type',
      'accession_number',
      'patient_age',
@@ -480,6 +481,16 @@ def group_dicoms_into_seqinfos(
         image_type = tuple(dcminfo.ImageType)
         motion_corrected = 'MoCo' in dcminfo.SeriesDescription \
                            or 'MOCO' in image_type
+
+        if dcminfo.get([0x18,0x24], None):
+            # GE and Philips scanners
+            sequence_name = dcminfo[0x18,0x24].value
+        elif dcminfo.get([0x19, 0x109c], None):
+            # Siemens scanners
+            sequence_name = dcminfo[0x19, 0x109c].value
+        else:
+            sequence_name = 'Not found'
+
         info = SeqInfo(
             total,
             os.path.split(series_files[0])[1],
@@ -496,6 +507,7 @@ def group_dicoms_into_seqinfos(
             dcminfo.get('StudyDescription'),
             refphys,
             dcminfo.get('SeriesDescription'),
+            sequence_name,
             image_type,
             accession_number,
             # For demographics to populate BIDS participants.tsv
