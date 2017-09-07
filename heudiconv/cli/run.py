@@ -4,6 +4,7 @@ import logging
 from argparse import ArgumentParser
 
 # import processing pipeline
+from .utils import (is_interactive, setup_exceptionhook, process_extra_commands)
 
 # TODO: set up logger
 
@@ -44,17 +45,14 @@ def get_parser():
                         """))
     parser = ArgumentParser(description=docstr)
     parser.add_argument('--version', action='version', version=__version__)
-    parser.add_argument('-d', '--dicom_dir_template',
-                        dest='dicom_dir_template',
-                        required=False,
+    parser.add_argument('-d', '--dicom_dir_template', dest='dicom_dir_template',
                         help='''location of dicomdir that can be indexed with
                         subject id {subject} and session {session}.
                         Tarballs (can be compressed) are supported
                         in addition to directory. All matching tarballs for a
                         subject are extracted and their content processed in
                         a single pass''')
-    parser.add_argument('-s', '--subjects', dest='subjs',
-                        type=str, nargs='*',
+    parser.add_argument('-s', '--subjects', dest='subjs', type=str, nargs='*',
                         help='list of subjects. If not provided, DICOMS would '
                              'first be "sorted" and subject IDs deduced by the '
                              'heuristic')
@@ -107,8 +105,7 @@ def get_parser():
                         choices=('treat-json', 'ls', 'populate-templates'),
                         help='''custom actions to be performed on provided
                         files instead of regular operation.''')
-    parser.add_argument('-g', '--grouping',
-                        default='studyUID',
+    parser.add_argument('-g', '--grouping', default='studyUID',
                         choices=('studyUID', 'accession_number'),
                         help='''How to group dicoms (default: by studyUID)''')
     parser.add_argument('files', nargs='*',
@@ -134,56 +131,19 @@ def process_args(args):
 
     # Group files per each study/sid/session
 
-    dicom_dir_template = args.dicom_dir_template
-    files_opt = args.files
-    session = args.session
-    subjs = args.subjs
     outdir = os.path.abspath(args.outdir)
-    grouping = args.grouping
 
     if args.command:
-        # custom mode of operation
-        if args.command == 'treat-json':
-            for f in files_opt:
-                treat_infofile(f)
-        elif args.command == 'ls':
-            heuristic = load_heuristic(os.path.realpath(args.heuristic_file))
-            heuristic_ls = getattr(heuristic, 'ls', None)
-            for f in files_opt:
-                study_sessions = get_study_sessions(
-                    dicom_dir_template, [f],
-                    heuristic, outdir, session, subjs, grouping=grouping)
-                print(f)
-                for study_session, sequences in study_sessions.items():
-                    suf = ''
-                    if heuristic_ls:
-                        suf += heuristic_ls(study_session, sequences)
-                    print(
-                        "\t%s %d sequences%s"
-                        % (str(study_session), len(sequences), suf)
-                    )
-        elif args.command == 'populate-templates':
-            heuristic = load_heuristic(os.path.realpath(args.heuristic_file))
-            for f in files_opt:
-                populate_bids_templates(
-                    f,
-                    getattr(heuristic, 'DEFAULT_FIELDS', {})
-                )
-        elif args.command == 'sanitize-jsons':
-            tuneup_bids_json_files(files_opt)
-        else:
-            raise ValueError("Unknown command %s", args.command)
-        return
+        process_extra_commands(outdir, args)
 
     #
     # Load heuristic -- better do it asap to make sure it loads correctly
     #
     heuristic = load_heuristic(os.path.realpath(args.heuristic_file))
-    # TODO: Move into a function!
-    study_sessions = get_study_sessions(
-        dicom_dir_template, files_opt,
-        heuristic, outdir, session, subjs,
-        grouping=grouping)
+
+    study_sessions = get_study_sessions(args.dicom_dir_template, args.files,
+                                        heuristic, outdir, args.session,
+                                        args.subjs, grouping=args.grouping)
     # extract tarballs, and replace their entries with expanded lists of files
     # TODO: we might need to sort so sessions are ordered???
     lgr.info("Need to process %d study sessions", len(study_sessions))
