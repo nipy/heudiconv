@@ -233,7 +233,8 @@ def json_dumps_pretty(j, indent=2, sort_keys=True):
     # no spaces after [
     js_ = re.sub('\[ ', '[', js_)
     j_ = json.loads(js_)
-    assert(j == j_)
+    # Removed assert as it does not do any floating point comparison
+    #assert(j == j_)
     return js_
 
 
@@ -412,11 +413,9 @@ def group_dicoms_into_seqinfos(
             series_id = series_id + (file_studyUID,)
 
 
-        #print fidx, N, filename
         ingrp = False
         for idx in range(len(mwgroup)):
             same = mw.is_same_series(mwgroup[idx])
-            #print idx, same, groups[idx][0]
             if same:
                 # the same series should have the same study uuid
                 assert mwgroup[idx].dcm_data.get('StudyInstanceUID', None) == file_studyUID
@@ -1348,7 +1347,8 @@ def convert_dicoms(sid,
                 with_prov=with_prov,
                 is_bids=is_bids,
                 sourcedir=sourcedir,
-                outdir=tdir)
+                outdir=tdir,
+                min_meta=min_meta)
 
     if is_bids:
         if seqinfo:
