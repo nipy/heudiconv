@@ -15,7 +15,10 @@ RUN conda install -y -c conda-forge nipype && \
     pip install https://github.com/moloney/dcmstack/archive/c12d27d2c802d75a33ad70110124500a83e851ee.zip && \
     pip install datalad && \
     conda clean -tipsy && rm -rf ~/.pip/
-RUN cd /tmp && git clone https://github.com/neurolabusc/dcm2niix.git && \
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y pigz && \
+    apt-get clean -y && apt-get autoclean -y && apt-get autoremove -y && \
+    cd /tmp && git clone https://github.com/neurolabusc/dcm2niix.git && \
     cd dcm2niix && \
     git checkout 0dc154d9aab4679e487abeaee1759c61559fc7a8 && \
     mkdir build && cd build && cmake -DBATCH_VERSION=ON .. && \
