@@ -17,7 +17,7 @@ RUN conda install -y -c conda-forge nipype && \
     conda clean -tipsy && rm -rf ~/.pip/
 RUN cd /tmp && git clone https://github.com/neurolabusc/dcm2niix.git && \
     cd dcm2niix && \
-    git checkout 60bab318ee738b644ebb1396bbb8cbe1b006218f && \
+    git checkout 0dc154d9aab4679e487abeaee1759c61559fc7a8 && \
     mkdir build && cd build && cmake -DBATCH_VERSION=ON .. && \
     make && make install && \
     cd / && rm -rf /tmp/dcm2niix
