@@ -20,7 +20,7 @@ RUN apt-get update && apt-get upgrade -y && \
     apt-get clean -y && apt-get autoclean -y && apt-get autoremove -y && \
     cd /tmp && git clone https://github.com/neurolabusc/dcm2niix.git && \
     cd dcm2niix && \
-    git checkout 0dc154d9aab4679e487abeaee1759c61559fc7a8 && \
+    git checkout 6ba27b9befcbae925209664bb8acbb00e266114a && \
     mkdir build && cd build && cmake -DBATCH_VERSION=ON .. && \
     make && make install && \
     cd / && rm -rf /tmp/dcm2niix
