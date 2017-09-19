@@ -1,12 +1,90 @@
 import os
 import os.path as op
-import logging
 from argparse import ArgumentParser
 
 # import processing pipeline
-from .utils import (is_interactive, setup_exceptionhook, process_extra_commands)
+from ..info import __version__, __packagename__
 
-# TODO: set up logger
+import logging
+lgr = logging.getLogger('cli')
+
+INIT_MSG = "Running {packname} version {version}".format
+
+def is_interactive():
+   """Return True if all in/outs are tty"""
+   # TODO: check on windows if hasattr check would work correctly and add value:
+   return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
+
+def setup_exceptionhook():
+    """
+    Overloads default sys.excepthook with our exceptionhook handler.
+
+    If interactive, our exceptionhook handler will invoke pdb.post_mortem;
+    if not interactive, then invokes default handler.
+    """
+    def _pdb_excepthook(type, value, tb):
+        if is_interactive():
+            import traceback
+            import pdb
+            traceback.print_exception(type, value, tb)
+            # print()
+            pdb.post_mortem(tb)
+        else:
+            lgr.warn(
+              "We cannot setup exception hook since not in interactive mode")
+            _sys_excepthook(type, value, tb)
+
+    sys.excepthook = _pdb_excepthook
+
+def load_heuristic(heuristic_file):
+    """Load heuristic from the file, return the module
+    """
+    path, fname = op.split(heuristic_file)
+    sys.path.append(path)
+    mod = __import__(fname.split('.')[0])
+    mod.filename = heuristic_file
+    return mod
+
+def process_extra_commands(outdir, args):
+    """
+    Perform custom command instead of regular operations. Supported commands:
+    ['treat-json', 'ls', 'populate-templates']
+
+    Parameters
+    ----------
+    outdir : String
+        Output directory
+    args : Namespace
+        arguments
+    """
+    if args.command == 'treat-json':
+        for f in args.files:
+            treat_infofile(f)
+    elif args.command == 'ls':
+        heuristic = load_heuristic(op.realpath(args.heuristic_file))
+        heuristic_ls = getattr(heuristic, 'ls', None)
+        for f in args.files:
+            study_sessions = get_study_sessions(
+                args.dicom_dir_template, [f], heuristic, outdir,
+                args.session, args.subjs, grouping=args.grouping)
+            # print(f)
+            for study_session, sequences in study_sessions.items():
+                suf = ''
+                if heuristic_ls:
+                    suf += heuristic_ls(study_session, sequences)
+                print(
+                    "\t%s %d sequences%s"
+                    % (str(study_session), len(sequences), suf)
+                )
+    elif args.command == 'populate-templates':
+        heuristic = load_heuristic(op.realpath(args.heuristic_file))
+        for f in args.files:
+            populate_bids_templates(f, getattr(heuristic, 'DEFAULT_FIELDS', {}))
+    elif args.command == 'sanitize-jsons':
+        tuneup_bids_json_files(args.files)
+    else:
+        raise ValueError("Unknown command %s", args.command)
+    return
 
 
 def main():
@@ -21,7 +99,7 @@ def main():
     if args.debug:
         setup_exceptionhook()
 
-    # MG - why not just use args.overwrite
+    # MG QUESTION - why not just use args.overwrite
 
     # orig_global_options = global_options.copy()
     # try:
@@ -121,17 +199,14 @@ def get_parser():
 def process_args(args):
     """Given a structure of arguments from the parser perform computation"""
 
-    #
     # Deal with provided files or templates
-    #
-
-    #
     # pre-process provided list of files and possibly sort into groups/sessions
-    #
-
     # Group files per each study/sid/session
 
-    outdir = os.path.abspath(args.outdir)
+    lgr.info(INIT_MSG(packname=__packagename__,
+                      version=__version__))
+
+    outdir = op.abspath(args.outdir)
 
     if args.command:
         process_extra_commands(outdir, args)
@@ -139,16 +214,16 @@ def process_args(args):
     #
     # Load heuristic -- better do it asap to make sure it loads correctly
     #
-    heuristic = load_heuristic(os.path.realpath(args.heuristic_file))
+    heuristic = load_heuristic(op.realpath(args.heuristic_file))
 
     study_sessions = get_study_sessions(args.dicom_dir_template, args.files,
                                         heuristic, outdir, args.session,
                                         args.subjs, grouping=args.grouping)
+
     # extract tarballs, and replace their entries with expanded lists of files
     # TODO: we might need to sort so sessions are ordered???
     lgr.info("Need to process %d study sessions", len(study_sessions))
 
-    #
     # processed_studydirs = set()
 
     for (locator, session, sid), files_or_seqinfo in study_sessions.items():
@@ -166,7 +241,7 @@ def process_args(args):
             seqinfo = None
 
         if locator == 'unknown':
-            lgr.warning("Skipping  unknown  locator dataset")
+            lgr.warning("Skipping unknown locator dataset")
             continue
 
         if args.queue:
@@ -180,7 +255,7 @@ def process_args(args):
                     "any groupping, so no outdir prefix doubled etc"
                 )
             # TODO This needs to be updated to better scale with additional args
-            progname = os.path.abspath(inspect.getfile(inspect.currentframe()))
+            progname = op.abspath(inspect.getfile(inspect.currentframe()))
             convertcmd = ' '.join(['python', progname,
                                    '-o', study_outdir,
                                    '-f', heuristic.filename,
