@@ -89,14 +89,15 @@ def group_dicoms_into_seqinfos(files, file_filter=None, dcmfilter=None,
             if dcmfilter is not None and dcmfilter(mw.dcm_data):
                 series_id = (-1, mw.dcm_data.ProtocolName)
 
-        if not groups:
-            raise RuntimeError("Yarik really thinks this is never ran!")
-            # if I was wrong -- then per_studyUID might need to go above
-            # yoh: I don't think this would ever be executed!
-            mwgroup.append(mw)
-            groups[0].append(series_id)
-            groups[1].append(len(mwgroup) - 1)
-            continue
+        # MG: This will always be false
+        # if not groups:
+        #     raise RuntimeError("Yarik really thinks this is never ran!")
+        #     # if I was wrong -- then per_studyUID might need to go above
+        #     # yoh: I don't think this would ever be executed!
+        #     mwgroup.append(mw)
+        #     groups[0].append(series_id)
+        #     groups[1].append(len(mwgroup) - 1)
+        #     continue
 
         # filter out unwanted non-image-data DICOMs by assigning
         # a series number < 0 (see test below)

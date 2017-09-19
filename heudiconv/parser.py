@@ -51,7 +51,7 @@ def find_files(regex, topdir=op.curdir, exclude=None,
             if exclude_vcs and re.search(_VCS_REGEX, path):
                 continue
             yield path
-            
+
 
 def get_extracted_dicoms(fl):
     """Given a list of files, possibly extract some from tarballs
@@ -84,7 +84,7 @@ def get_extracted_dicoms(fl):
         # tarballs as providing different sessions per each tarball
         if not tarfile.is_tarfile(t):
             sessions[None].append(t)
-            continue  # the rest is tarball specific
+            continue
 
         tf = tarfile.open(t)
         # check content and sanitize permission bits
@@ -168,9 +168,8 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
             files_ += files_ex
 
         # sort all DICOMS using heuristic
-        # TODO:  this one is not groupping by StudyUID but may be we should!
-        seqinfo_dict = group_dicoms_into_seqinfos(
-            files_,
+        # TODO:  this one is not grouping by StudyUID but may be we should!
+        seqinfo_dict = group_dicoms_into_seqinfos(files_,
             file_filter=getattr(heuristic, 'filter_files', None),
             dcmfilter=getattr(heuristic, 'filter_dicom', None),
             grouping=grouping)
