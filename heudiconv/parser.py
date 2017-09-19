@@ -1,6 +1,12 @@
 import logging
+import os
+import os.path as op
+
+from .utils import (TempDirs, docstring_parameter)
 
 lgr = logging.getLogger("")
+
+_VCS_REGEX = '%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (op.sep, op.sep)
 
 StudySessionInfo = namedtuple(
     'StudySessionInfo',
@@ -17,6 +23,36 @@ StudySessionInfo = namedtuple(
     ]
 )
 
+@docstring_parameter(_VCS_REGEX)
+def find_files(regex, topdir=op.curdir, exclude=None,
+               exclude_vcs=True, dirs=False):
+    """Generator to find files matching regex
+    Parameters
+    ----------
+    regex: basestring
+    exclude: basestring, optional
+      Matches to exclude
+    exclude_vcs:
+      If True, excludes commonly known VCS subdirectories.  If string, used
+      as regex to exclude those files (regex: `{}`)
+    topdir: basestring, optional
+      Directory where to search
+    dirs: bool, optional
+      Either to match directories as well as files
+    """
+
+    for dirpath, dirnames, filenames in os.walk(topdir):
+        names = (dirnames + filenames) if dirs else filenames
+        paths = (op.join(dirpath, name) for name in names)
+        for path in filter(re.compile(regex).search, paths):
+            path = path.rstrip(dirsep)
+            if exclude and re.search(exclude, path):
+                continue
+            if exclude_vcs and re.search(_VCS_REGEX, path):
+                continue
+            yield path
+            
+
 def get_extracted_dicoms(fl):
     """Given a list of files, possibly extract some from tarballs
     For 'classical' heudiconv, if multiple tarballs are provided, they correspond
@@ -32,6 +68,9 @@ def get_extracted_dicoms(fl):
     # are unique, or at least in a unqiue subdir per session
     # strategy: extract everything in a temp dir and assemble a list
     # of all files in all tarballs
+
+    tempdirs = TempDirs()
+
     tmpdir = tempdirs(prefix='heudiconvDCM')
 
     sessions = defaultdict(list)
@@ -56,7 +95,7 @@ def get_extracted_dicoms(fl):
         tf_content = [m.name for m in tmembers if m.isfile()]
         # store full paths to each file, so we don't need to drag along
         # tmpdir as some basedir
-        sessions[session] = [opj(tmpdir, f) for f in tf_content]
+        sessions[session] = [op.join(tmpdir, f) for f in tf_content]
         session += 1
         # extract into tmp dir
         tf.extractall(path=tmpdir, members=tmembers)
@@ -66,6 +105,8 @@ def get_extracted_dicoms(fl):
         # to classical 'heudiconv' assumptions, thus just move them all into
         # None
         sessions[None] += sessions.pop(0)
+
+    tempdirs.clean() # will this affect anything?
 
     return sessions.items()
 
@@ -115,7 +156,7 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
         # assert not sids
         files = []
         for f in files_opt:
-            if isdir(f):
+            if op.isdir(f):
                 files += sorted(find_files(
                     '.*', topdir=f, exclude_vcs=True, exclude="/\.datalad/"))
             else:
