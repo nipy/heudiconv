@@ -2,26 +2,11 @@ import logging
 import os
 import os.path as op
 
-from .utils import (TempDirs, docstring_parameter)
+from .utils import (TempDirs, docstring_parameter, StudySessionInfo)
 
-lgr = logging.getLogger("")
+lgr = logging.getLogger(__name__)
 
 _VCS_REGEX = '%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (op.sep, op.sep)
-
-StudySessionInfo = namedtuple(
-    'StudySessionInfo',
-    [
-        'locator',  # possible prefix identifying the study, e.g.
-                    # PI/dataset or just a dataset or empty (default)
-                    # Note that ATM there should be no multiple DICOMs with the same
-                    # StudyInstanceUID which would collide, i.e point to the same
-                    # subject/session.
-                    # So 'locator' is pretty much an assignment from StudyInstanceUID
-                    # into some place within hierarchy
-        'session',  # could be None
-        'subject',  # should be some ID defined either in cmdline or deduced
-    ]
-)
 
 @docstring_parameter(_VCS_REGEX)
 def find_files(regex, topdir=op.curdir, exclude=None,

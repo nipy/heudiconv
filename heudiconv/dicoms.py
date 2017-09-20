@@ -2,6 +2,10 @@
 
 import logging
 
+from collections import OrderedDict
+
+from .utils import SeqInfo
+
 lgr = logging.getLogger(__name__)
 
 def group_dicoms_into_seqinfos(files, file_filter=None, dcmfilter=None,
@@ -112,10 +116,11 @@ def group_dicoms_into_seqinfos(files, file_filter=None, dcmfilter=None,
 
         ingrp = False
         for idx in range(len(mwgroup)):
-            same = mw.is_same_series(mwgroup[idx])
-            if same:
+            # same = mw.is_same_series(mwgroup[idx])
+            if mw.is_same_series(mwgroup[idx]):
                 # the same series should have the same study uuid
-                assert mwgroup[idx].dcm_data.get('StudyInstanceUID', None) == file_studyUID
+                assert (mwgroup[idx].dcm_data.get('StudyInstanceUID', None)
+                        == file_studyUID)
                 ingrp = True
                 if series_id[0] >= 0:
                     series_id = (mwgroup[idx].dcm_data.SeriesNumber,
@@ -133,7 +138,7 @@ def group_dicoms_into_seqinfos(files, file_filter=None, dcmfilter=None,
     group_map = dict(zip(groups[0], groups[1]))
 
     total = 0
-    seqinfo = ordereddict()
+    seqinfo = OrderedDict()
 
     # for the next line to make any sense the series_id needs to
     # be sortable in a way that preserves the series order
@@ -147,7 +152,8 @@ def group_dicoms_into_seqinfos(files, file_filter=None, dcmfilter=None,
             # nothing to see here, just move on
             continue
         dcminfo = mw.dcm_data
-        series_files = [files[i] for i, s in enumerate(groups[0]) if s == series_id]
+        series_files = [files[i] for i, s in enumerate(groups[0])
+                        if s == series_id]
         # turn the series_id into a human-readable string -- string is needed
         # for JSON storage later on
         if per_studyUID:
@@ -197,7 +203,6 @@ def group_dicoms_into_seqinfos(files, file_filter=None, dcmfilter=None,
             TR, TE,
             dcminfo.ProtocolName,
             motion_corrected,
-            # New ones by us
             'derived' in [x.lower() for x in dcminfo.get('ImageType', [])],
             dcminfo.get('PatientID'),
             dcminfo.get('StudyDescription'),
@@ -234,11 +239,11 @@ def group_dicoms_into_seqinfos(files, file_filter=None, dcmfilter=None,
         ))
         if per_studyUID:
             if studyUID not in seqinfo:
-                seqinfo[studyUID] = ordereddict()
+                seqinfo[studyUID] = OrderedDict()
             seqinfo[studyUID][info] = series_files
         elif per_accession_number:
             if accession_number not in seqinfo:
-                seqinfo[accession_number] = ordereddict()
+                seqinfo[accession_number] = OrderedDict()
             seqinfo[accession_number][info] = series_files
         else:
             seqinfo[info] = series_files
@@ -247,8 +252,8 @@ def group_dicoms_into_seqinfos(files, file_filter=None, dcmfilter=None,
         lgr.info("Generated sequence info for %d studies with %d entries total",
                  len(seqinfo), sum(map(len, seqinfo.values())))
     elif per_accession_number:
-        lgr.info("Generated sequence info for %d accession numbers with %d entries total",
-                 len(seqinfo), sum(map(len, seqinfo.values())))
+        lgr.info("Generated sequence info for %d accession numbers with %d "
+                 "entries total", len(seqinfo), sum(map(len, seqinfo.values())))
     else:
         lgr.info("Generated sequence info with %d entries", len(seqinfo))
     return seqinfo
