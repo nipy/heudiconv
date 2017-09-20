@@ -5,10 +5,12 @@ from argparse import ArgumentParser
 # import processing pipeline
 from ..info import __version__, __packagename__
 
+import inspect
 import logging
 lgr = logging.getLogger('cli')
 
 INIT_MSG = "Running {packname} version {version}".format
+
 
 def is_interactive():
    """Return True if all in/outs are tty"""
@@ -126,12 +128,17 @@ def get_parser():
                         """))
     parser = ArgumentParser(description=docstr)
     parser.add_argument('--version', action='version', version=__version__)
-    parser.add_argument('-d', '--dicom_dir_template', dest='dicom_dir_template',
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('-d', '--dicom_dir_template', dest='dicom_dir_template',
                         help='location of dicomdir that can be indexed with '
                         'subject id {subject} and session {session}. Tarballs '
                         '(can be compressed) are supported in addition to '
                         'directory. All matching tarballs for a subject are '
                         'extracted and their content processed in a single pass')
+    group.add_argument('--files', nargs='*',
+                        help='Files (tarballs, dicoms) or directories '
+                        'containing files to process. Cannot be provided if '
+                        'using --dicom_dir_template or --subjects')
     parser.add_argument('-s', '--subjects', dest='subjs', type=str, nargs='*',
                         help='list of subjects - required for dicom template. '
                         'If not provided, DICOMS would first be "sorted" and '
@@ -151,15 +158,12 @@ def get_parser():
                         'useful in combination with --anon-cmd')
     parser.add_argument('--anon-cmd', default=None,
                         help='command to run to convert subject IDs used for '
-                        'DICOMs to anonymmized IDs. Such command must take a '
+                        'DICOMs to anonymized IDs. Such command must take a '
                         'single argument and return a single anonymized ID. '
                         'Also see --conv-outdir')
     parser.add_argument('-f', '--heuristic', dest='heuristic_file',
                         required=True,
                         help='python script containing heuristic')
-    parser.add_argument('-q', '--queue', default=None,
-                        help='select batch system to submit jobs to instead '
-                        'of running the conversion serially')
     parser.add_argument('-p', '--with-prov', action='store_true',
                         help='Store additional provenance information.
                         'Requires python-rdflib.')
@@ -188,13 +192,18 @@ def get_parser():
     parser.add_argument('-g', '--grouping', default='studyUID',
                         choices=('studyUID', 'accession_number'),
                         help='How to group dicoms (default: by studyUID)')
-    parser.add_argument('files', nargs='*',
-                        help='Files (tarballs, dicoms) or directories '
-                        'containing files to process. Cannot be provided if '
-                        'using --dicom_dir_template or --subjects')
     parser.add_argument('--minmeta', action='store_true',
                         help='Exclude dcmstack meta information in sidecar '
                         'jsons')
+
+    submission = parser.add_argument_group('Conversion submission options')
+    submission.add_argument('-q', '--queue', default=None,
+                            help='select batch system to submit jobs to instead'
+                                 ' of running the conversion serially'
+    submission.add_argument('--sbargs', dest='sbatch_args', default=None,
+                            help='Additional sbatch arguments if running with '
+                                 'queue arg')
+)
     return parser
 
 
@@ -252,36 +261,19 @@ def process_args(args):
                 # flatten them all and provide into batching, which again
                 # would group them... heh
                 dicoms = sum(seqinfo.values(), [])
-                # so
                 raise NotImplementedError(
-                    "we already groupped them so need to add a switch to avoid "
-                    "any groupping, so no outdir prefix doubled etc"
-                )
-            # TODO This needs to be updated to better scale with additional args
-            progname = op.abspath(inspect.getfile(inspect.currentframe()))
-            convertcmd = ' '.join(['python', progname,
-                                   '-o', study_outdir,
-                                   '-f', heuristic.filename,
-                                   '-s', sid,
-                                   '--anon-cmd', args.anon_cmd,
-                                   '-c', args.converter])
-            if session:
-                convertcmd += " --ses '%s'" % session
-            if args.with_prov:
-                convertcmd += " --with-prov"
-            if args.bids:
-                convertcmd += " --bids"
-            convertcmd += ["'%s'" % f for f in dicoms]
+                    "we already grouped them so need to add a switch to avoid "
+                    "any grouping, so no outdir prefix doubled etc")
 
-            script_file = 'dicom-%s.sh' % sid
-            with open(script_file, 'wt') as fp:
-                fp.writelines(['#!/bin/bash\n', convertcmd])
-            outcmd = 'sbatch -J dicom-%s -p %s -N1 -c2 --mem=20G %s' \
-                     % (sid, args.queue, script_file)
-            os.system(outcmd)
+            progname = op.abspath(inspect.getfile(inspect.currentframe()))
+
+            queue_conversion(progname, args.queue, study_outdir,
+                             heuristic.filename, dicoms, sid, args.anon_cmd,
+                             args.converter, args.session, args.with_prov, \
+                             args.bids)
             continue
 
-        anon_sid = get_annonimized_sid(sid, args.anon_cmd)
+        anon_sid = get_anonymized_sid(sid, args.anon_cmd)
 
         study_outdir = opj(outdir, locator or '')
 
@@ -340,8 +332,6 @@ def process_args(args):
     #
     #         # TODO: record_collection of the sid/session although that information
     #         # is pretty much present in .heudiconv/SUBJECT/info so we could just poke there
-
-    tempdirs.cleanup()
 
 
 if __name__ == "__main__":
