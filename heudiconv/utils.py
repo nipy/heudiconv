@@ -84,3 +84,11 @@ StudySessionInfo = namedtuple(
         'subject',  # should be some ID defined either in cmdline or deduced
     ]
 )
+
+def get_annonimized_sid(sid, anon_sid_cmd):
+    anon_sid = sid
+    if anon_sid_cmd is not None:
+        from subprocess import check_output
+        anon_sid = check_output([anon_sid_cmd, sid]).strip()
+        lgr.info("Annonimized sid %s into %s", sid, anon_sid)
+    return anon_sid
