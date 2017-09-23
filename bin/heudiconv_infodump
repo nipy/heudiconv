@@ -1,0 +1,27 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import imp
+from glob import glob
+
+# Use the specified file-path template to glob DICOM files
+fpt = sys.argv[1]
+
+# Import heudiconv
+heudi_bin = os.path.dirname(os.path.realpath(__file__))
+heudi_bin = os.path.join(heudi_bin, 'heudiconv')
+heudiconv = imp.load_source('heudiconv', heudi_bin)
+
+# Use heudiconv to get SeqInfo for each scan in the globbed DICOM files.
+si_store = heudiconv.group_dicoms_into_seqinfos(glob(fpt))
+
+# For each scan, write SeqInfo to a text file.
+n_scans = len(si_store.items()[0][1].items())
+
+for scan_id in xrange(n_scans):
+    si = si_store.items()[0][1].items()[scan_id][0]
+    with open('{0}.txt'.format(si.unspecified1), 'w') as f:
+        for i, j in si._asdict().items():
+            f.write("{0}: {1}\n".format(i, j))
+    print("Wrote SeqInfo for {0}".format(si.unspecified1))
