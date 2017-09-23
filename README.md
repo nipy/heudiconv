@@ -33,7 +33,9 @@ as long as the following dependencies are in your path you can use the script
 - nibabel
 - dcm2niix
 
-## Example conversion using Docker
+## Tutorial with example conversion using Docker
+Please read this tutorial to understand how heudiconv works in practice.
+
 [Slides here](http://nipy.org/workshops/2017-03-boston/lectures/bids-heudiconv/#1)
 
 ## How it works (in some more detail)
