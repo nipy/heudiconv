@@ -93,7 +93,7 @@ def group_dicoms_into_seqinfos(files, file_filter=None, dcmfilter=None,
             if dcmfilter is not None and dcmfilter(mw.dcm_data):
                 series_id = (-1, mw.dcm_data.ProtocolName)
 
-        # MG: This will always be false
+        # MG: This will always be false??
         # if not groups:
         #     raise RuntimeError("Yarik really thinks this is never ran!")
         #     # if I was wrong -- then per_studyUID might need to go above
@@ -181,8 +181,8 @@ def group_dicoms_into_seqinfos(files, file_filter=None, dcmfilter=None,
             refphys = '-'
 
         image_type = tuple(dcminfo.ImageType)
-        motion_corrected = 'MoCo' in dcminfo.SeriesDescription \
-                           or 'MOCO' in image_type
+        motion_corrected = ('MoCo' in dcminfo.SeriesDescription
+                           or 'MOCO' in image_type)
 
         if dcminfo.get([0x18,0x24], None):
             # GE and Philips scanners

@@ -1,12 +1,15 @@
 import os
 import os.path as op
 
+import logging
+
+lgr = logging.getLogger(__name__)
+
 # start with SLURM but extend past that #TODO
-
 def queue_conversion(progname, queue, outdir, heuristic, dicoms, sid,
-                     anon_cmd=None, converter=None, session=None,
-                     with_prov=False, bids=False):
+                     anon_cmd, converter, session,with_prov, bids):
 
+        # Rework this...
         convertcmd = ' '.join(['python', progname,
                                '-o', study_outdir,
                                '-f', heuristic,

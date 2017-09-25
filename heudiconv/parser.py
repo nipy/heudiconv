@@ -2,6 +2,10 @@ import logging
 import os
 import os.path as op
 
+from collections import defaultdict
+
+import tarfile
+
 from .utils import (TempDirs, docstring_parameter, StudySessionInfo)
 
 lgr = logging.getLogger(__name__)
