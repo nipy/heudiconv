@@ -1,6 +1,7 @@
 import os
 import os.path as op
 from tempfile import mkdtemp
+from glob import glob
 
 from collections import namedtuple
 
@@ -85,10 +86,41 @@ StudySessionInfo = namedtuple(
     ]
 )
 
-def get_annonimized_sid(sid, anon_sid_cmd):
+def get_anonymized_sid(sid, anon_sid_cmd):
     anon_sid = sid
     if anon_sid_cmd is not None:
         from subprocess import check_output
         anon_sid = check_output([anon_sid_cmd, sid]).strip()
         lgr.info("Annonimized sid %s into %s", sid, anon_sid)
     return anon_sid
+
+def create_file_if_missing(filename, content):
+    """Create file if missing, so we do not
+    override any possibly introduced changes"""
+    if exists(filename):
+        return False
+    with open(filename, 'w') as f:
+        f.write(content)
+    return True
+
+def mark_sensitive(ds, path_glob=None):
+    """
+
+    Parameters
+    ----------
+    ds : Dataset to operate on
+    path_glob : str, optional
+      glob of the paths within dataset to work on
+    Returns
+    -------
+    None
+    """
+    sens_kwargs = dict(
+        init=[('distribution-restrictions', 'sensitive')]
+    )
+    if path_glob:
+        paths = glob(op.join(ds.path, path_glob))
+        if not paths:
+            return
+        sens_kwargs['path'] = paths
+    ds.metadata(**sens_kwargs)

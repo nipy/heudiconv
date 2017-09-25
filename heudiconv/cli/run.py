@@ -5,6 +5,8 @@ from argparse import ArgumentParser
 # import processing pipeline
 from ..info import __version__, __packagename__
 
+from ..external.datalad import prepare_datalad
+
 import inspect
 import logging
 lgr = logging.getLogger('cli')
@@ -274,30 +276,16 @@ def process_args(args):
             continue
 
         anon_sid = get_anonymized_sid(sid, args.anon_cmd)
-
-        study_outdir = opj(outdir, locator or '')
-
+        study_outdir = op.join(outdir, locator or '')
         anon_outdir = args.conv_outdir or outdir
-        anon_study_outdir = opj(anon_outdir, locator or '')
+        anon_study_outdir = op.join(anon_outdir, locator or '')
 
         # TODO: --datalad  cmdline option, which would take care about initiating
         # the outdir -> study_outdir datasets if not yet there
         if args.datalad:
-            datalad_msg_suf = ' %s' % anon_sid
-            if session:
-                datalad_msg_suf += ", session %s" % session
-            if seqinfo:
-                datalad_msg_suf += ", %d sequences" % len(seqinfo)
-            datalad_msg_suf += ", %d dicoms" % (
-                len(sum(seqinfo.values(), [])) if seqinfo else len(dicoms)
-            )
-            from datalad.api import Dataset
-            ds = Dataset(anon_study_outdir)
-            if not exists(anon_outdir) or not ds.is_installed():
-                add_to_datalad(
-                    anon_outdir, anon_study_outdir,
-                    msg="Preparing for %s" % datalad_msg_suf,
-                    bids=args.bids)
+            prepare_datalad(anon_study_outdir, anon_outdir, anon_sid,
+                            args.session, seqinfo, dicoms, args.bids)
+
         lgr.info("PROCESSING STARTS: {0}".format(
             str(dict(subject=sid, outdir=study_outdir, session=session))))
         convert_dicoms(
