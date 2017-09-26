@@ -1,12 +1,15 @@
 import logging
 import os
 import os.path as op
+from glob import glob
+import re
 
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 import tarfile
 
-from .utils import (TempDirs, docstring_parameter, StudySessionInfo)
+from .utils import (TempDirs, docstring_parameter, StudySessionInfo, load_json,
+                    save_json, create_file_if_missing, json_dumps_pretty)
 
 lgr = logging.getLogger(__name__)
 
@@ -113,7 +116,7 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
     """
     study_sessions = {}
     if dicom_dir_template:
-        dicom_dir_template = os.path.abspath(dicom_dir_template)
+        dicom_dir_template = op.abspath(dicom_dir_template)
 
         # MG - should be caught by earlier checks
         # assert not files_opt  # see above TODO
@@ -191,5 +194,4 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
                     % repr(study_session_info))
                 continue # skip for now
             study_sessions[study_session_info] = seqinfo
-
     return study_sessions
