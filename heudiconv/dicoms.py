@@ -8,8 +8,7 @@ from .utils import SeqInfo
 
 lgr = logging.getLogger(__name__)
 
-def group_dicoms_into_seqinfos(files, file_filter=None, dcmfilter=None,
-                               grouping='studyUID'):
+def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
     """Process list of dicoms and return seqinfo and file group
     `seqinfo` contains per-sequence extract of fields from DICOMs which
     will be later provided into heuristics to decide on filenames

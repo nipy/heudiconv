@@ -1,11 +1,14 @@
 import os
 import os.path as op
 from argparse import ArgumentParser
+import sys
 
-# import processing pipeline
+
 from ..info import __version__, __packagename__
-
+from ..parser import get_study_sessions
 from ..external.datalad import prepare_datalad
+from ..utils import (load_heuristic, anonymize_sid, treat_infofile,
+
 
 import inspect
 import logging
@@ -39,15 +42,6 @@ def setup_exceptionhook():
             _sys_excepthook(type, value, tb)
 
     sys.excepthook = _pdb_excepthook
-
-def load_heuristic(heuristic_file):
-    """Load heuristic from the file, return the module
-    """
-    path, fname = op.split(heuristic_file)
-    sys.path.append(path)
-    mod = __import__(fname.split('.')[0])
-    mod.filename = heuristic_file
-    return mod
 
 def process_extra_commands(outdir, args):
     """
@@ -275,7 +269,7 @@ def process_args(args):
                              args.bids)
             continue
 
-        anon_sid = get_anonymized_sid(sid, args.anon_cmd)
+        anon_sid = anonymize_sid(sid, args.anon_cmd)
         study_outdir = op.join(outdir, locator or '')
         anon_outdir = args.conv_outdir or outdir
         anon_study_outdir = op.join(anon_outdir, locator or '')
@@ -287,20 +281,18 @@ def process_args(args):
                             args.session, seqinfo, dicoms, args.bids)
 
         lgr.info("PROCESSING STARTS: {0}".format(
-            str(dict(subject=sid, outdir=study_outdir, session=session))))
-        convert_dicoms(
-                   sid,
-                   dicoms,
-                   study_outdir,
-                   heuristic=heuristic,
+            str(dict(subject=sid, outdir=study_outdir, session=args.session))))
+
+        prep_conversion(sid, dicoms, study_outdir, heuristic,
                    converter=args.converter,
                    anon_sid=anon_sid,
                    anon_outdir=anon_study_outdir,
                    with_prov=args.with_prov,
-                   ses=session,
-                   is_bids=args.bids,
+                   ses=args.session,
+                   bids=args.bids,
                    seqinfo=seqinfo,
                    min_meta=args.minmeta)
+
         lgr.info("PROCESSING DONE: {0}".format(
             str(dict(subject=sid, outdir=study_outdir, session=session))))
 

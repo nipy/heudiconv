@@ -2,6 +2,8 @@ import os
 import os.path as op
 from tempfile import mkdtemp
 from glob import glob
+import json
+import re
 
 from collections import namedtuple
 
@@ -89,7 +91,7 @@ def docstring_parameter(*sub):
     return dec
 
 
-def get_anonymized_sid(sid, anon_sid_cmd):
+def anonymize_sid(sid, anon_sid_cmd):
     anon_sid = sid
     if anon_sid_cmd is not None:
         from subprocess import check_output
@@ -142,6 +144,21 @@ def write_config(outfile, info):
         fp.writelines(PrettyPrinter().pformat(info))
 
 
+def _canonical_dumps(json_obj, **kwargs):
+    """ Dump `json_obj` to string, allowing for Python newline bug
+
+    Runs ``json.dumps(json_obj, \*\*kwargs), then removes trailing whitespaces
+    added when doing indent in some Python versions. See
+    https://bugs.python.org/issue16333. Bug seems to be fixed in 3.4, for now
+    fixing manually not only for aestetics but also to guarantee the same
+    result across versions of Python.
+    """
+    out = json.dumps(json_obj, **kwargs)
+    if 'indent' in kwargs:
+        out = out.replace(' \n', '\n')
+    return out
+
+
 def load_json(filename):
     """Load data from a json file
 
@@ -159,7 +176,7 @@ def load_json(filename):
     return data
 
 
-def save_json(filename, data):
+def save_json(filename, data, indent=4):
     """Save data to a json file
 
     Parameters
@@ -171,7 +188,30 @@ def save_json(filename, data):
 
     """
     with open(filename, 'w') as fp:
-        fp.write(_canonical_dumps(data, sort_keys=True, indent=4))
+        fp.write(_canonical_dumps(data, sort_keys=True, indent=indent))
+
+
+def json_dumps_pretty(j, indent=2, sort_keys=True):
+    """Given a json structure, pretty print it by colliding numeric arrays
+    into a line.
+
+    If resultant structure differs from original -- throws exception
+    """
+    js = _canonical_dumps(j, indent=indent, sort_keys=sort_keys)
+    # trim away \n and spaces between entries of numbers
+    js_ = re.sub(
+        '[\n ]+("?[-+.0-9e]+"?,?) *\n(?= *"?[-+.0-9e]+"?)', r' \1',
+        js, flags=re.MULTILINE)
+    # uniform no spaces before ]
+    js_ = re.sub(" *\]", "]", js_)
+    # uniform spacing before numbers
+    js_ = re.sub('  *("?[-+.0-9e]+"?)[ \n]*', r' \1', js_)
+    # no spaces after [
+    js_ = re.sub('\[ ', '[', js_)
+    j_ = json.loads(js_)
+    # Removed assert as it does not do any floating point comparison
+    #assert(j == j_)
+    return js_
 
 
 def treat_infofile(filename):
@@ -187,6 +227,27 @@ def treat_infofile(filename):
     with open(filename, 'wt') as fp:
         fp.write(j_pretty)
     os.chmod(filename, 0o0444)
+
+
+def slim_down_info(j):
+    """Given an aggregated info structure, removes excessive details
+
+    Such as CSA fields, and SourceImageSequence which on Siemens files could be
+    huge and not providing any additional immediately usable information.
+    If needed, could be recovered from stored DICOMs
+    """
+    j = deepcopy(j)  # we will do in-place modification on a copy
+    dicts = []
+    # poor man programming for now
+    if 'const' in j.get('global', {}):
+        dicts.append(j['global']['const'])
+    if 'samples' in j.get('time', {}):
+        dicts.append(j['time']['samples'])
+    for d in dicts:
+        for k in list(d.keys()):
+            if k.startswith('Csa') or k.lower() in {'sourceimagesequence'}:
+                del d[k]
+    return j
 
 
 def load_heuristic(heuristic_file):
