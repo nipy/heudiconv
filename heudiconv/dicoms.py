@@ -1,8 +1,11 @@
 # dicom operations
-
+import os
+import os.path as op
 import logging
-
 from collections import OrderedDict
+
+import dicom as dcm
+import dcmstack as ds
 
 from .utils import SeqInfo
 
@@ -256,3 +259,87 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
     else:
         lgr.info("Generated sequence info with %d entries", len(seqinfo))
     return seqinfo
+
+
+def get_dicom_series_time(dicom_list):
+    """Get time in seconds since epoch from dicom series date and time
+    Primarily to be used for reproducible time stamping
+    """
+    import time
+    import calendar
+
+    dcm = dcm.read_file(dicom_list[0], stop_before_pixels=True, force=True)
+    dcm_date = dcm.SeriesDate  # YYYYMMDD
+    dcm_time = dcm.SeriesTime  # HHMMSS.MICROSEC
+    dicom_time_str = dcm_date + dcm_time.split('.', 1)[0]  # YYYYMMDDHHMMSS
+    # convert to epoch
+    return calendar.timegm(time.strptime(dicom_time_str, '%Y%m%d%H%M%S'))
+
+
+def compress_dicoms(dicom_list, out_prefix, tempdirs=None):
+    """Archives DICOMs into a tarball
+
+    Also tries to do it reproducibly, so takes the date for files
+    and target tarball based on the series time (within the first file)
+
+    Parameters
+    ----------
+    dicom_list : list of str
+      list of dicom files
+    out_prefix : str
+      output path prefix, including the portion of the output file name
+      before .dicom.tgz suffix
+    tempdirs : object
+      TempDirs object to handle multiple tmpdirs
+
+    Returns
+    -------
+    filename : str
+      Result tarball
+    """
+    if tempdirs:
+        tmpdir = tempdirs(prefix='dicomtar')
+    else:
+        tmpdir = mkdtemp(prefix='dicomtar')
+    outtar = out_prefix + '.dicom.tgz'
+    if op.exists(outtar): # and not global_options['overwrite']:
+        raise RuntimeError("File %s already exists, will not override"
+                           % outtar)
+    # tarfile encodes current time.time inside making those non-reproducible
+    # so we should choose which date to use.
+    # Solution from DataLad although ugly enough:
+
+    dicom_list = sorted(dicom_list)
+    dcm_time = get_dicom_series_time(dicom_list)
+
+    def _assign_dicom_time(ti):
+        # Reset the date to match the one of the last commit, not from the
+        # filesystem since git doesn't track those at all
+        ti.mtime = dcm_time
+        return ti
+
+    # poor man mocking since can't rely on having mock
+    try:
+        import time
+        _old_time = time.time
+        time.time = lambda: dcm_time
+        if op.lexists(outtar):
+            os.unlink(outtar)
+        with tarfile.open(outtar, 'w:gz', dereference=True) as tar:
+            for filename in dicom_list:
+                outfile = op.join(tmpdir, op.basename(filename))
+                if not op.islink(outfile):
+                    os.symlink(op.realpath(filename), outfile)
+                # place into archive stripping any lead directories and
+                # adding the one corresponding to prefix
+                tar.add(outfile,
+                        arcname=op.join(op.basename(out_prefix),
+                                    op.basename(outfile)),
+                        recursive=False,
+                        filter=_assign_dicom_time)
+    finally:
+        time.time = _old_time
+
+    if not tempdirs:
+        shutil.rmtree(tmpdir)
+    return outtar
