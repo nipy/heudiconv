@@ -1,10 +1,12 @@
+"""Utility objects and functions"""
+
 import os
 import os.path as op
 from tempfile import mkdtemp
 from glob import glob
 import json
 import re
-
+import shutil
 from collections import namedtuple
 
 SeqInfo = namedtuple(
@@ -258,3 +260,18 @@ def load_heuristic(heuristic_file):
     mod = __import__(fname.split('.')[0])
     mod.filename = heuristic_file
     return mod
+
+
+def safe_copyfile(src, dest):
+    """Copy file but blow if destination name already exists
+    """
+    if op.isdir(dest):
+        dest = op.join(dest, op.basename(src))
+    if op.lexists(dest):
+        if not global_options['overwrite']:
+            raise ValueError(
+            "was asked to copy %s but destination already exists: %s" % (src,
+                                                                         dest))
+        else:
+            os.unlink(dest)
+    shutil.copyfile(src, dest)
