@@ -297,14 +297,14 @@ def compress_dicoms(dicom_list, out_prefix, tempdirs=None):
     filename : str
       Result tarball
     """
-    if tempdirs:
-        tmpdir = tempdirs(prefix='dicomtar')
-    else:
-        tmpdir = mkdtemp(prefix='dicomtar')
+    # if tempdirs:
+    tmpdir = tempdirs(prefix='dicomtar')
+    # else:
+    #     tmpdir = mkdtemp(prefix='dicomtar')
     outtar = out_prefix + '.dicom.tgz'
     if op.exists(outtar): # and not global_options['overwrite']:
-        raise RuntimeError("File %s already exists, will not override"
-                           % outtar)
+        raise RuntimeError("File %s already exists, will not override, ensure "
+                           "unique scan names" % outtar)
     # tarfile encodes current time.time inside making those non-reproducible
     # so we should choose which date to use.
     # Solution from DataLad although ugly enough:
@@ -334,12 +334,14 @@ def compress_dicoms(dicom_list, out_prefix, tempdirs=None):
                 # adding the one corresponding to prefix
                 tar.add(outfile,
                         arcname=op.join(op.basename(out_prefix),
-                                    op.basename(outfile)),
+                                        op.basename(outfile)),
                         recursive=False,
                         filter=_assign_dicom_time)
     finally:
         time.time = _old_time
 
-    if not tempdirs:
-        shutil.rmtree(tmpdir)
+    # if tempdirs:
+    tempdirs.rmtree(tmpdir)
+    # else:
+    #     shutil.rmtree(tmpdir)
     return outtar

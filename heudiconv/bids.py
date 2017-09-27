@@ -22,7 +22,7 @@ def populate_bids_templates(path, defaults={}):
 
     lgr.info("Populating template files under %s", path)
     descriptor = op.join(path, 'dataset_description.json')
-    if not exists(descriptor):
+    if not op.exists(descriptor):
         save_json(descriptor,
               OrderedDict([
                   ('Name', "TODO: name of the dataset"),

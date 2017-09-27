@@ -7,7 +7,8 @@ import sys
 from ..info import __version__, __packagename__
 from ..parser import get_study_sessions
 from ..external.datalad import prepare_datalad
-from ..utils import (load_heuristic, anonymize_sid, treat_infofile,
+from ..utils import (load_heuristic, anonymize_sid, treat_infofile,)
+from ..convert import prep_conversion
 
 
 import inspect
