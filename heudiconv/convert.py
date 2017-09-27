@@ -3,7 +3,9 @@ import os.path as op
 import logging
 import shutil
 
-from .utils import read_config, load_json, save_json, write_config
+from .utils import read_config, load_json, save_json, write_config, TempDirs
+from .bids import convert_sid_bids
+from .dicoms import compress_dicoms
 
 lgr = logging.getLogger(__name__)
 
@@ -13,8 +15,7 @@ def conversion_info(subject, outdir, info, filegroup, ses):
     for key, items in info.items():
         if not items:
             continue
-        template = key[0]
-        outtype = key[1]
+        template, outtype = key[0], key[1]
         # So no annotation_classes of any kind!  so if not used -- what was the
         # intension???? XXX
         outpath = outdir
@@ -33,7 +34,7 @@ def conversion_info(subject, outdir, info, filegroup, ses):
                     subject=subject,
                     seqitem=item,
                     subindex=subindex + 1,
-                    session='ses-' + str(ses), # if not used -- not used -- not a problem
+                    session='ses-' + str(ses),
                     bids_subject_session_prefix=
                         'sub-%s' % subject + (('_ses-%s' % ses) if ses else ''),
                     bids_subject_session_dir=
@@ -60,30 +61,19 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
     else:
         raise ValueError("neither dicoms nor seqinfo dict was provided")
 
-    # in this reimplementation we can have only a single session assigned
-    # at this point
-    # dcmsessions =
-
     if bids and not sid.isalnum(): # alphanumeric only
-        old_sid = sid
-        cleaner = lambda y: ''.join([x for x in y if x.isalnum()])
-        sid = cleaner(sid) #strip out
-        lgr.warning('{0} contained nonalphanumeric character(s), subject '
-                 'ID was cleaned to be {1}'.format(old_sid, sid))
+        sid, old_sid = convert_sid_bids(sid)
 
     if not anon_sid:
         anon_sid = sid
     if not anon_outdir:
         anon_outdir = outdir
 
-    # Figure out where to stick supplemental info dicoms
+    # Generate heudiconv info folder
     idir = op.join(outdir, '.heudiconv', sid)
     if bids and ses:
         idir = op.join(idir, 'ses-%s' % str(ses))
-    # yoh: in my case if idir exists, it means that that study/subject/session
-    # is already processed
     if anon_outdir == outdir:
-        # if all goes into a single dir, have a dedicated 'info' subdir
         idir = op.join(idir, 'info')
     if not op.exists(idir):
         os.makedirs(idir)
@@ -108,6 +98,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
         # (since no sample data to test on etc)
     else:
         # TODO -- might have been done outside already!
+        # MG -- will have to try with both dicom template, files
         if dicoms:
             seqinfo = group_dicoms_into_seqinfos(
                 dicoms,
@@ -182,7 +173,8 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
     None
     """
     prov_files = []
-    tmpdir = mkdtemp(prefix='heudiconvdcm')
+    tempdirs = TempDirs()
+    tmpdir = tempdirs(prefix='heudiconvdcm')
     for item_idx, item in enumerate(items):
         prefix, outtypes, item_dicoms = item[:3]
         if not isinstance(outtypes, (list, tuple)):
@@ -191,7 +183,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
         prefix_dirname = op.dirname(prefix + '.ext')
         prov_file = None
         outname_bids = prefix + '.json'
-        outname_bids_files = []  # actual bids files since dcm2niix might generate multiple ATM
+        outname_bids_files = []
         lgr.info('Converting %s (%d DICOMs) -> %s . '
                  'Converter: %s . Output types: %s',
                  prefix, len(item_dicoms), prefix_dirname, converter, outtypes)
@@ -209,12 +201,13 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                     # mimic the same hierarchy location as the prefix
                     # although it could all have been done probably
                     # within heuristic really
-                    sourcedir_ = op.join(sourcedir,op.dirname(op.relpath(
-                                                              prefix, outdir)))
+                    sourcedir_ = op.join(sourcedir,
+                                         op.dirname(op.relpath(prefix, outdir)))
                     if not op.exists(sourcedir_):
                         os.makedirs(sourcedir_)
-                    compress_dicoms(item_dicoms, op.join(sourcedir_,
-                                                         op.basename(prefix)))
+                    compress_dicoms(item_dicoms,
+                                    op.join(sourcedir_, op.basename(prefix),
+                                    tempdirs)) # MG - ensure this works...
                 else:
                     dicomdir = prefix + '_dicom'
                     if op.exists(dicomdir):
