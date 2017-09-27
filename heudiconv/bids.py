@@ -5,6 +5,13 @@ import os.path as op
 import logging
 import re
 from collections import OrderedDict
+import datetime
+import csv
+from random import sample
+
+import dicom as dcm
+import dcmstack as ds
+
 from .utils import (load_json, save_json, create_file_if_missing,
                     json_dumps_pretty
 
@@ -152,7 +159,6 @@ def add_participant_record(studydir, subject, age, sex):
             known_subjects = {l.split('\t')[0] for l in f.readlines()}
         if participant_id in known_subjects:
             return
-
     # Add a new participant
     with open(participants_tsv, 'a') as f:
         f.write(
@@ -160,3 +166,150 @@ def add_participant_record(studydir, subject, age, sex):
                               age.lstrip('0').rstrip('Y') if age else 'N/A',
                               sex,
                               'control'])) + '\n')
+
+
+def find_subj_ses(f_name):
+    """Given a path to the bids formatted filename parse out subject/session"""
+    # we will allow the match at either directories or within filename
+    # assuming that bids layout is "correct"
+    regex = re.compile('sub-(?P<subj>[a-zA-Z0-9]*)([/_]ses-(?P<ses>[a-zA-Z0-9]*))?')
+    regex_res = regex.search(f_name)
+    res = regex_res.groupdict() if regex_res else {}
+    return res.get('subj', None), res.get('ses', None)
+
+
+def save_scans_key(item, bids_files):
+    """
+    Parameters
+    ----------
+    items:
+    bids_files: str or list
+
+    Returns
+    -------
+
+    """
+    rows = {}
+    assert bids_files, "we do expect some files since it was called"
+    # we will need to deduce subject and session from the bids_filename
+    # and if there is a conflict, we would just blow since this function
+    # should be invoked only on a result of a single item conversion as far
+    # as I see it, so should have the same subject/session
+    subj, ses = None, None
+    for bids_file in bids_files:
+        # get filenames
+        f_name = '/'.join(bids_file.split('/')[-2:])
+        f_name = f_name.replace('json', 'nii.gz')
+        rows[f_name] = get_formatted_scans_key_row(item)
+        subj_, ses_ = find_subj_ses(f_name)
+        if not subj_:
+            lgr.warning(
+                "Failed to detect fullfilled BIDS layout.  "
+                "No scans.tsv file(s) will be produced for %s",
+                ", ".join(bids_files)
+            )
+            return
+        if subj and subj_ != subj:
+            raise ValueError(
+                "We found before subject %s but now deduced %s from %s"
+                % (subj, subj_, f_name))
+        subj = subj_
+        if ses and ses_ != ses:
+            raise ValueError(
+                "We found before session %s but now deduced %s from %s"
+                % (ses, ses_, f_name)
+            )
+        ses = ses_
+    # where should we store it?
+    output_dir = op.dirname(op.dirname(bids_file))
+    # save
+    ses = '_ses-%s' % ses if ses else ''
+    add_rows_to_scans_keys_file(
+        op.join(output_dir, 'sub-{0}{1}_scans.tsv'.format(subj, ses)), rows)
+
+
+def add_rows_to_scans_keys_file(fn, newrows):
+    """
+    Add new rows to file fn for scans key filename
+
+    Parameters
+    ----------
+    fn: filename
+    newrows: extra rows to add
+        dict fn: [acquisition time, referring physician, random string]
+    """
+    if op.lexists(fn):
+        with open(fn, 'r') as csvfile:
+            reader = csv.reader(csvfile, delimiter='\t')
+            existing_rows = [row for row in reader]
+        # skip header
+        fnames2info = {row[0]: row[1:] for row in existing_rows[1:]}
+
+        newrows_key = newrows.keys()
+        newrows_toadd = list(set(newrows_key) - set(fnames2info.keys()))
+        for key_toadd in newrows_toadd:
+            fnames2info[key_toadd] = newrows[key_toadd]
+        # remove
+        os.unlink(fn)
+    else:
+        fnames2info = newrows
+
+    header = ['filename', 'acq_time', 'operator', 'randstr']
+    # save
+    with open(fn, 'a') as csvfile:
+        writer = csv.writer(csvfile, delimiter='\t')
+        writer.writerow(header)
+        for key in sorted(fnames2info.keys()):
+            writer.writerow([key] + fnames2info[key])
+
+
+def get_formatted_scans_key_row(item):
+    """
+    Parameters
+    ----------
+    item
+
+    Returns
+    -------
+    row: list
+        [ISO acquisition time, performing physician name, random string]
+
+    """
+    dcm_fn = item[-1][0]
+    mw = ds.wrapper_from_data(dcm.read_file(dcm_fn,
+                                            stop_before_pixels=True,
+                                            force=True))
+    # we need to store filenames and acquisition times
+    # parse date and time and get it into isoformat
+    date = mw.dcm_data.ContentDate
+    time = mw.dcm_data.ContentTime.split('.')[0]
+    td = time + date
+    acq_time = datetime.strptime(td, '%H%M%S%Y%m%d').isoformat()
+    # add random string
+    randstr = ''.join(map(chr, sample(k=8, population=range(33, 127))))
+    row = [acq_time, mw.dcm_data.PerformingPhysicianName, randstr]
+    # empty entries should be 'n/a'
+    # https://github.com/dartmouth-pbs/heudiconv/issues/32
+    row = ['n/a' if not str(e) else e for e in row]
+    return row
+
+
+def convert_sid_bids(subject_id):
+    """Strips any non-BIDS compliant characters within subject_id
+
+    Parameters
+    ----------
+    subject_id : string
+
+    Returns
+    -------
+    sid : string
+        New subject ID
+    subject_id : string
+        Original subject ID
+    """
+    cleaner = lambda y: ''.join([x for x in y if x.isalnum()])
+    sid = cleaner(subject_id)
+    lgr.warning('{0} contained nonalphanumeric character(s), subject '
+                'ID was cleaned to be {1}'.format(subject_id, sid))
+    return sid, subject_id
