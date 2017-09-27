@@ -750,7 +750,7 @@ def get_dicom_series_time(dicom_list):
     import calendar
     import dicom as dcm
 
-    dcm = dcm.read_file(dicom_list[0], stop_before_pixels=True)
+    dcm = dcm.read_file(dicom_list[0], stop_before_pixels=True, force=True)
     dcm_date = dcm.SeriesDate  # YYYYMMDD
     dcm_time = dcm.SeriesTime  # HHMMSS.MICROSEC
     dicom_time_str = dcm_date + dcm_time.split('.', 1)[0]  # YYYYMMDDHHMMSS
@@ -975,7 +975,7 @@ def get_formatted_scans_key_row(item):
 
     """
     dcm_fn = item[-1][0]
-    mw = ds.wrapper_from_data(dcm.read_file(dcm_fn, stop_before_pixels=True))
+    mw = ds.wrapper_from_data(dcm.read_file(dcm_fn, stop_before_pixels=True, force=True))
     # we need to store filenames and acquisition times
     # parse date and time and get it into isoformat
     date = mw.dcm_data.ContentDate
@@ -1031,8 +1031,9 @@ def _find_subj_ses(f_name):
     # we will allow the match at either directories or within filename
     # assuming that bids layout is "correct"
     regex = re.compile('sub-(?P<subj>[a-zA-Z0-9]*)([/_]ses-(?P<ses>[a-zA-Z0-9]*))?')
-    res = regex.search(f_name).groupdict()
-    return res.get('subj'), res.get('ses', None)
+    regex_res = regex.search(f_name)
+    res = regex_res.groupdict() if regex_res else {}
+    return res.get('subj', None), res.get('ses', None)
 
 
 def save_scans_key(item, bids_files):
@@ -1059,6 +1060,13 @@ def save_scans_key(item, bids_files):
         f_name = f_name.replace('json', 'nii.gz')
         rows[f_name] = get_formatted_scans_key_row(item)
         subj_, ses_ = _find_subj_ses(f_name)
+        if not subj_:
+            lgr.warning(
+                "Failed to detect fullfilled BIDS layout.  "
+                "No scans.tsv file(s) will be produced for %s",
+                ", ".join(bids_files)
+            )
+            return
         if subj and subj_ != subj:
             raise ValueError(
                 "We found before subject %s but now deduced %s from %s"
