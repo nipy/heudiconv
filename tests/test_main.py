@@ -175,6 +175,9 @@ def test_add_rows_to_scans_keys_file(tmpdir):
                 assert(row_ == ['filename', 'acq_time', 'operator', 'randstr'])
             else:
                 assert(rows[row_[0]] == row_[1:])
+        # dates, filename should be sorted (date "first", filename "second")
+        dates = [(r[1], r[0]) for r in rows_loaded[1:]]
+        assert dates == sorted(dates)
 
     _check_rows(fn, rows)
     # add a new one
