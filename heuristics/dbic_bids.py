@@ -103,7 +103,8 @@ protocols2fix = {
     '1bd62e10672fe0b435a9aa8d75b45425':
         [
             # need to add incrementing session -- study should have 2
-            ('scout_run\+$', 'scout_run+_ses+'),
+            # and no need for run+ for the scout!
+            ('scout(_run\+)?$', 'scout_ses+'),
         ],
     'da218a66de902adb3ad9407d514e3639':
         [
