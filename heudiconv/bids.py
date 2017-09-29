@@ -255,12 +255,14 @@ def add_rows_to_scans_keys_file(fn, newrows):
         fnames2info = newrows
 
     header = ['filename', 'acq_time', 'operator', 'randstr']
+    # prepare all the data rows
+    data_rows = [[k] + v for k, v in fnames2info.items()]
+    # sort by the date/filename
+    data_rows_sorted = sorted(data_rows, key=lambda x: (x[1], x[0]))
     # save
     with open(fn, 'a') as csvfile:
         writer = csv.writer(csvfile, delimiter='\t')
-        writer.writerow(header)
-        for key in sorted(fnames2info.keys()):
-            writer.writerow([key] + fnames2info[key])
+        writer.writerows([header] + data_rows_sorted)
 
 
 def get_formatted_scans_key_row(item):

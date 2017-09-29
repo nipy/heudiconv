@@ -107,6 +107,9 @@ def create_file_if_missing(filename, content):
     override any possibly introduced changes"""
     if exists(filename):
         return False
+    dirname = op.dirname(filename)
+    if not op.exists(dirname):
+        os.makedirs(dirname)
     with open(filename, 'w') as f:
         f.write(content)
     return True
@@ -132,7 +135,7 @@ def mark_sensitive(ds, path_glob=None):
         if not paths:
             return
         sens_kwargs['path'] = paths
-    ds.metadata(**sens_kwargs)
+    ds.metadata(recursive=True, **sens_kwargs)
 
 def read_config(infile):
     with open(infile, 'rt') as fp:

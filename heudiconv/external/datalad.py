@@ -30,10 +30,11 @@ def add_to_datalad(topdir, studydir, msg, bids):
     from datalad.api import Dataset
     from datalad.support.annexrepo import AnnexRepo
     from datalad.support.external_versions import external_versions
-    assert external_versions['datalad'] >= '0.5.1', "Need datalad >= 0.5.1"
+    assert external_versions['datalad'] >= MIN_VERSIONS['datalad'], (
+      "Need datalad >= {}".format(MIN_VERSIONS['datalad'])) # add to reqs
 
-    studyrelpath = os.path.relpath(studydir, topdir)
-    assert not studyrelpath.startswith(os.path.pardir)  # so we are under
+    studyrelpath = op.relpath(studydir, topdir)
+    assert not studyrelpath.startswith(op.pardir)  # so we are under
     # now we need to test and initiate a DataLad dataset all along the path
     curdir_ = topdir
     superds = None
@@ -76,20 +77,31 @@ def add_to_datalad(topdir, studydir, msg, bids):
     ds = Dataset(studydir)
     # Add doesn't have all the options of save such as msg and supers
     ds.add('.gitattributes', to_git=True, save=False)
-    dsh = None
+    dsh = dsh_path = None
     if op.lexists(op.join(ds.path, '.heudiconv')):
-        dsh = Dataset(op.join(ds.path, '.heudiconv'))
+        dsh_path = op.join(ds.path, '.heudiconv')
+        dsh = Dataset(dsh_path)
         if not dsh.is_installed():
-            # we need to create it first
-            dsh = ds.create(path='.heudiconv',
-                            force=True,
-                            shared_access='all')
+            # Previously we did not have it as a submodule, and since no
+            # automagic migration is implemented, we just need to check first
+            # if any path under .heudiconv is already under git control
+            if any(x[0].startswith('.heudiconv/') for x in
+                   ds.repo.repo.index.entries.keys()):
+                lgr.warning("%s has .heudiconv not as a submodule from previous"
+                            " versions of heudiconv. No automagic migration is "
+                            "yet provided", ds)
+            else:
+                dsh = ds.create(path='.heudiconv',
+                                force=True,
+                                shared_access='all')
         # Since .heudiconv could contain sensitive information
         # we place all files under annex and then add
-        if create_file_if_missing(op.join(dsh.path, '.gitattributes'),
+        if create_file_if_missing(op.join(dsh_path, '.gitattributes'),
                                   """* annex.largefiles=anything"""):
-            dsh.add('.gitattributes',
-              message="Added gitattributes to place all content under annex")
+            ds.add('.heudiconv/.gitattributes',
+                   to_git=True,
+                   message="Added gitattributes to place all .heudiconv content"
+                           " under annex")
     ds.add('.', recursive=True, save=False,
            # not in effect! ?
            #annex_add_opts=['--include-dotfiles']
@@ -103,9 +115,8 @@ def add_to_datalad(topdir, studydir, msg, bids):
     mark_sensitive(ds, '*/*/*_scans.tsv')  # within sess/subj
     mark_sensitive(ds, '*/anat')  # within subj
     mark_sensitive(ds, '*/*/anat')  # within ses/subj
-    if dsh:
-        mark_sensitive(dsh)  # entire .heudiconv!
-        dsh.save(message=msg)
+    if dsh_path:
+        mark_sensitive(ds, '.heudiconv')  # entire .heudiconv!
     ds.save(message=msg, recursive=True, super_datasets=True)
 
     assert not ds.repo.dirty
