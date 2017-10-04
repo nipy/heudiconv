@@ -171,11 +171,11 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
             size.append(1)
         try:
             TR = float(dcminfo.RepetitionTime) / 1000.
-        except AttributeError:
+        except (AttributeError, ValueError):
             TR = -1
         try:
             TE = float(dcminfo.EchoTime)
-        except AttributeError:
+        except (AttributeError, ValueError):
             TE = -1
         try:
             refphys = str(dcminfo.ReferringPhysicianName)
