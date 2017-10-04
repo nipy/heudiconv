@@ -8,6 +8,7 @@ import json
 import re
 import shutil
 from collections import namedtuple
+import copy
 
 SeqInfo = namedtuple(
     'SeqInfo',
@@ -241,7 +242,7 @@ def slim_down_info(j):
     huge and not providing any additional immediately usable information.
     If needed, could be recovered from stored DICOMs
     """
-    j = deepcopy(j)  # we will do in-place modification on a copy
+    j = copy.deepcopy(j)  # we will do in-place modification on a copy
     dicts = []
     # poor man programming for now
     if 'const' in j.get('global', {}):
@@ -271,10 +272,10 @@ def safe_copyfile(src, dest):
     if op.isdir(dest):
         dest = op.join(dest, op.basename(src))
     if op.lexists(dest):
-        if not global_options['overwrite']:
-            raise ValueError(
-            "was asked to copy %s but destination already exists: %s" % (src,
-                                                                         dest))
-        else:
-            os.unlink(dest)
+        # if not global_options['overwrite']:
+            # raise ValueError(
+            # "was asked to copy %s but destination already exists: %s" % (src,
+            #                                                              dest))
+        # else:
+        os.unlink(dest)
     shutil.copyfile(src, dest)
