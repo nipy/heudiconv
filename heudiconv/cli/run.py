@@ -264,9 +264,16 @@ def process_args(args):
 
             progname = op.abspath(inspect.getfile(inspect.currentframe()))
 
-            queue_conversion(progname, args.queue, study_outdir,
-                             heuristic.filename, dicoms, sid, args.anon_cmd,
-                             args.converter, args.session, args.with_prov, \
+            queue_conversion(progname,
+                             args.queue,
+                             study_outdir,
+                             heuristic.filename,
+                             dicoms,
+                             sid,
+                             args.anon_cmd,
+                             args.converter,
+                             args.session,
+                             args.with_prov,
                              args.bids)
             continue
 
@@ -284,15 +291,18 @@ def process_args(args):
         lgr.info("PROCESSING STARTS: {0}".format(
             str(dict(subject=sid, outdir=study_outdir, session=args.session))))
 
-        prep_conversion(sid, dicoms, study_outdir, heuristic,
-                   converter=args.converter,
-                   anon_sid=anon_sid,
-                   anon_outdir=anon_study_outdir,
-                   with_prov=args.with_prov,
-                   ses=args.session,
-                   bids=args.bids,
-                   seqinfo=seqinfo,
-                   min_meta=args.minmeta)
+        prep_conversion(sid,
+                        dicoms,
+                        study_outdir,
+                        heuristic,
+                        converter=args.converter,
+                        anon_sid=anon_sid,
+                        anon_outdir=anon_study_outdir,
+                        with_prov=args.with_prov,
+                        ses=args.session,
+                        bids=args.bids,
+                        seqinfo=seqinfo,
+                        min_meta=args.minmeta)
 
         lgr.info("PROCESSING DONE: {0}".format(
             str(dict(subject=sid, outdir=study_outdir, session=session))))
