@@ -197,9 +197,9 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
 
         info = SeqInfo(
             total,
-            os.path.split(series_files[0])[1],
+            op.split(series_files[0])[1],
             series_id,
-            os.path.basename(os.path.dirname(series_files[0])),
+            op.basename(op.dirname(series_files[0])),
             '-', '-',
             size[0], size[1], size[2], size[3],
             TR, TE,
@@ -276,7 +276,7 @@ def get_dicom_series_time(dicom_list):
     return calendar.timegm(time.strptime(dicom_time_str, '%Y%m%d%H%M%S'))
 
 
-def compress_dicoms(dicom_list, out_prefix, tempdirs=None):
+def compress_dicoms(dicom_list, out_prefix, tempdirs):
     """Archives DICOMs into a tarball
 
     Also tries to do it reproducibly, so takes the date for files
@@ -339,9 +339,84 @@ def compress_dicoms(dicom_list, out_prefix, tempdirs=None):
                         filter=_assign_dicom_time)
     finally:
         time.time = _old_time
+        tempdirs.rmtree(tmpdir)
 
-    # if tempdirs:
-    tempdirs.rmtree(tmpdir)
-    # else:
-    #     shutil.rmtree(tmpdir)
     return outtar
+
+
+def embed_metadata_from_dicoms(bids, item_dicoms, outname, outname_bids,
+                               prov_file, scaninfo, tempdirs, with_prov,
+                               min_meta):
+    """
+    Enhance sidecar information file with more information from DICOMs
+
+    Parameters
+    ----------
+    bids
+    item_dicoms
+    outname
+    outname_bids
+    prov_file
+    scaninfo
+    tempdirs
+    with_prov
+    min_meta
+
+    Returns
+    -------
+
+    """
+    from nipype import Node, Function
+    tmpdir = tempdirs(prefix='embedmeta')
+
+    embedfunc = Node(Function(input_names=['dcmfiles', 'niftifile', 'infofile',
+                                           'bids_info', 'force', 'min_meta'],
+                              output_names=['outfile', 'meta'],
+                              function=embed_nifti),
+                     name='embedder')
+    embedfunc.inputs.dcmfiles = item_dicoms
+    embedfunc.inputs.niftifile = op.abspath(outname)
+    embedfunc.inputs.infofile = op.abspath(scaninfo)
+    embedfunc.inputs.min_meta = min_meta
+    if bids:
+        embedfunc.inputs.bids_info = load_json(op.abspath(outname_bids))
+    else:
+        embedfunc.inputs.bids_info = None
+    embedfunc.inputs.force = True
+    embedfunc.base_dir = tmpdir
+    cwd = os.getcwd()
+    try:
+        # MG - still a bug?
+        """
+        Ran into
+INFO: Executing node embedder in dir: /tmp/heudiconvdcm2W3UQ7/embedder
+ERROR: Embedding failed: [Errno 13] Permission denied: '/inbox/BIDS/tmp/test2-jessie/Wheatley/Beau/1007_personality/sub-sid000138/fmap/sub-sid000138_3mm_run-01_phasediff.json'
+while
+HEUDICONV_LOGLEVEL=WARNING time bin/heudiconv -f heuristics/dbic_bids.py -c dcm2niix -o /inbox/BIDS/tmp/test2-jessie --bids --datalad /inbox/DICOM/2017/01/28/A000203
+
+so it seems that there is a filename collision so it tries to save into the same file name
+and there was a screw up for that A
+
+/mnt/btrfs/dbic/inbox/DICOM/2017/01/28/A000203
+        StudySessionInfo(locator='Wheatley/Beau/1007_personality', session=None, subject='sid000138') 16 sequences
+        StudySessionInfo(locator='Wheatley/Beau/1007_personality', session=None, subject='a000203') 2 sequences
+
+
+in that one though
+        """
+        # if global_options['overwrite'] and op.lexists(scaninfo):
+        if op.lexists(scaninfo):
+            # TODO: handle annexed file case
+            if not op.islink(scaninfo):
+                os.chmod(scaninfo, 0o0660)
+        res = embedfunc.run()
+        os.chmod(scaninfo, 0o0444)
+        if with_prov:
+            g = res.provenance.rdf()
+            g.parse(prov_file,
+                    format='turtle')
+            g.serialize(prov_file, format='turtle')
+            os.chmod(prov_file, 0o0440)
+    except Exception as exc:
+        lgr.error("Embedding failed: %s", str(exc))
+        os.chdir(cwd)
