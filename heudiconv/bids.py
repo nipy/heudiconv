@@ -289,7 +289,11 @@ def get_formatted_scans_key_row(item):
     acq_time = datetime.strptime(td, '%H%M%S%Y%m%d').isoformat()
     # add random string
     randstr = ''.join(map(chr, sample(k=8, population=range(33, 127))))
-    row = [acq_time, mw.dcm_data.PerformingPhysicianName, randstr]
+    try:
+        perfphys = mw.dcm_data.PerformingPhysicianName
+    except AttributeError:
+        perfphys = ''
+    row = [acq_time, perfphys, randstr]
     # empty entries should be 'n/a'
     # https://github.com/dartmouth-pbs/heudiconv/issues/32
     row = ['n/a' if not str(e) else e for e in row]
