@@ -1722,7 +1722,7 @@ def add_to_datalad(topdir, studydir, msg=None, bids=False):
             ds_ = create(curdir_, dataset=superds,
                          force=True,
                          no_annex=True,  # need to add .gitattributes first anyways
-                         shared_access='all',
+                         # shared_access='all',
                          annex_version=6)
             assert ds == ds_
         assert ds.is_installed()
