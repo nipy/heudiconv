@@ -6,6 +6,8 @@ from ..utils import (create_file_if_missing, mark_sensitive)
 
 lgr = lgr.getLogger(__name__)
 
+MIN_VERSION = 0.7
+
 def prepare_datalad(studydir, outdir, sid, session, seqinfo, dicoms, bids):
     """ Prepare data for datalad """
     datalad_msg_suf = ' %s' % sid
@@ -30,8 +32,8 @@ def add_to_datalad(topdir, studydir, msg, bids):
     from datalad.api import Dataset
     from datalad.support.annexrepo import AnnexRepo
     from datalad.support.external_versions import external_versions
-    assert external_versions['datalad'] >= MIN_VERSIONS['datalad'], (
-      "Need datalad >= {}".format(MIN_VERSIONS['datalad'])) # add to reqs
+    assert external_versions['datalad'] >= MIN_VERSION, (
+      "Need datalad >= {}".format(MIN_VERSION)) # add to reqs
 
     studyrelpath = op.relpath(studydir, topdir)
     assert not studyrelpath.startswith(op.pardir)  # so we are under
