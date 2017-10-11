@@ -441,7 +441,7 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info, force, min_meta):
         new_nii = stack.to_nifti(voxel_order=''.join(axcodes), embed_meta=True)
         meta = ds.NiftiWrapper(new_nii).meta_ext.to_json()
 
-    meta_info = None if min_meta else json.loads(meta
+    meta_info = None if min_meta else json.loads(meta)
 
     if bids_info:
 
