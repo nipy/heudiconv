@@ -169,6 +169,8 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
         total += size[-1]
         if len(size) < 4:
             size.append(1)
+
+        # MG - refactor into util function
         try:
             TR = float(dcminfo.RepetitionTime) / 1000.
         except (AttributeError, ValueError):
@@ -180,11 +182,18 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
         try:
             refphys = str(dcminfo.ReferringPhysicianName)
         except AttributeError:
-            refphys = '-'
+            refphys = ''
+        try:
+            image_type = tuple(dcminfo.ImageType)
+        except AttributeError:
+            image_type = ''
+        try:
+            series_desc = dcminfo.SeriesDescription
+        except AttributeError:
+            series_desc = ''
 
-        image_type = tuple(dcminfo.ImageType)
-        motion_corrected = ('MoCo' in dcminfo.SeriesDescription
-                           or 'MOCO' in image_type)
+        motion_corrected = ('moco' in dcminfo.SeriesDescription.lower()
+                           or 'moco' in image_type.lower())
 
         if dcminfo.get([0x18,0x24], None):
             # GE and Philips scanners
