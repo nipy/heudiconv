@@ -162,7 +162,7 @@ def get_parser():
                         required=True,
                         help='python script containing heuristic')
     parser.add_argument('-p', '--with-prov', action='store_true',
-                        help='Store additional provenance information.
+                        help='Store additional provenance information. '
                         'Requires python-rdflib.')
     parser.add_argument('-ss', '--ses', dest='session', default=None,
                         help='session for longitudinal study_sessions, default '
@@ -196,11 +196,10 @@ def get_parser():
     submission = parser.add_argument_group('Conversion submission options')
     submission.add_argument('-q', '--queue', default=None,
                             help='select batch system to submit jobs to instead'
-                                 ' of running the conversion serially'
+                                 ' of running the conversion serially')
     submission.add_argument('--sbargs', dest='sbatch_args', default=None,
                             help='Additional sbatch arguments if running with '
                                  'queue arg')
-)
     return parser
 
 
