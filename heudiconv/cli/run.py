@@ -23,6 +23,7 @@ def is_interactive():
    # TODO: check on windows if hasattr check would work correctly and add value:
    return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
 
+
 def setup_exceptionhook():
     """
     Overloads default sys.excepthook with our exceptionhook handler.
@@ -43,6 +44,7 @@ def setup_exceptionhook():
             _sys_excepthook(type, value, tb)
 
     sys.excepthook = _pdb_excepthook
+
 
 def process_extra_commands(outdir, args):
     """

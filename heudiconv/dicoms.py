@@ -7,7 +7,7 @@ from collections import OrderedDict
 import dicom as dcm
 import dcmstack as ds
 
-from .utils import SeqInfo
+from .utils import SeqInfo, load_json
 
 lgr = logging.getLogger(__name__)
 
@@ -193,7 +193,7 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
             series_desc = ''
 
         motion_corrected = ('moco' in dcminfo.SeriesDescription.lower()
-                           or 'moco' in image_type.lower())
+                           or 'MOCO' in image_type)
 
         if dcminfo.get([0x18,0x24], None):
             # GE and Philips scanners
@@ -351,6 +351,82 @@ def compress_dicoms(dicom_list, out_prefix, tempdirs):
         tempdirs.rmtree(tmpdir)
 
     return outtar
+
+
+def embed_nifti(dcmfiles, niftifile, infofile, bids_info, force, min_meta):
+    """
+
+    If `niftifile` doesn't exist, it gets created out of the `dcmfiles` stack,
+    and json representation of its meta_ext is returned (bug since should return
+    both niftifile and infofile?)
+
+    if `niftifile` exists, its affine's orientation information is used while
+    establishing new `NiftiImage` out of dicom stack and together with `bids_info`
+    (if provided) is dumped into json `infofile`
+
+    Parameters
+    ----------
+    dcmfiles
+    niftifile
+    infofile
+    bids_info
+    force
+    min_meta
+
+    Returns
+    -------
+    niftifile, infofile
+
+    """
+    # imports for nipype
+    import nibabel as nb
+    import os
+    import os.path as op
+    import json
+    import re
+
+    if not min_meta:
+        import dcmstack as ds
+        stack = ds.parse_and_stack(dcmfiles, force=force).values()
+        if len(stack) > 1:
+            raise ValueError('Found multiple series')
+        stack = stack[0]
+
+        #Create the nifti image using the data array
+        if not op.exists(niftifile):
+            nifti_image = stack.to_nifti(embed_meta=True)
+            nifti_image.to_filename(niftifile)
+            return ds.NiftiWrapper(nifti_image).meta_ext.to_json()
+
+        orig_nii = nb.load(niftifile)
+        aff = orig_nii.affine
+        ornt = nb.orientations.io_orientation(aff)
+        axcodes = nb.orientations.ornt2axcodes(ornt)
+        new_nii = stack.to_nifti(voxel_order=''.join(axcodes), embed_meta=True)
+        meta = ds.NiftiWrapper(new_nii).meta_ext.to_json()
+
+    meta_info = None if min_meta else json.loads(meta)
+
+    if bids_info:
+
+        if min_meta:
+            meta_info = bids_info
+        else:
+            # make nice with python 3 - same behavior?
+            meta_info = meta_info.copy()
+            meta_info.update(bids_info)
+            # meta_info = dict(meta_info.items() + bids_info.items())
+        try:
+            meta_info['TaskName'] = (re.search('(?<=_task-)\w+',
+                                               op.basename(infofile))
+                                     .group(0).split('_')[0])
+        except AttributeError:
+            pass
+    # write to outfile
+    with open(infofile, 'wt') as fp:
+        json.dump(meta_info, fp, indent=3, sort_keys=True)
+
+    return niftifile, infofile
 
 
 def embed_metadata_from_dicoms(bids, item_dicoms, outname, outname_bids,

@@ -8,6 +8,7 @@ from collections import defaultdict, OrderedDict
 
 import tarfile
 
+from .dicoms import group_dicoms_into_seqinfos
 from .utils import (TempDirs, docstring_parameter, StudySessionInfo, load_json,
                     save_json, create_file_if_missing, json_dumps_pretty)
 
@@ -98,7 +99,7 @@ def get_extracted_dicoms(fl):
         # None
         sessions[None] += sessions.pop(0)
 
-    tempdirs.clean() # will this affect anything?
+    tempdirs.cleanup() # will this affect anything?
 
     return sessions.items()
 

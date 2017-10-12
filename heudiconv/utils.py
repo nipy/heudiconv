@@ -6,9 +6,11 @@ from tempfile import mkdtemp
 from glob import glob
 import json
 import re
+import sys
 import shutil
 from collections import namedtuple
 import copy
+import logging
 
 SeqInfo = namedtuple(
     'SeqInfo',
@@ -106,7 +108,7 @@ def anonymize_sid(sid, anon_sid_cmd):
 def create_file_if_missing(filename, content):
     """Create file if missing, so we do not
     override any possibly introduced changes"""
-    if exists(filename):
+    if op.exists(filename):
         return False
     dirname = op.dirname(filename)
     if not op.exists(dirname):

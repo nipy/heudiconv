@@ -5,13 +5,15 @@ import os.path as op
 import logging
 import re
 from collections import OrderedDict
-import datetime
+from datetime import datetime
 import csv
 from random import sample
+from glob import glob
 
 import dicom as dcm
 import dcmstack as ds
 
+from .parser import find_files
 from .utils import (load_json, save_json, create_file_if_missing,
                     json_dumps_pretty)
 

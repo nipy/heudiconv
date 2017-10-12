@@ -5,8 +5,9 @@ import shutil
 
 from .utils import (read_config, load_json, save_json, write_config,
                     TempDirs, safe_copyfile, treat_infofile)
-from .bids import convert_sid_bids
-from .dicoms import compress_dicoms
+from .bids import (convert_sid_bids, populate_bids_templates, save_scans_key,
+                   tuneup_bids_json_files, add_participant_record)
+from .dicoms import group_dicoms_into_seqinfos, embed_metadata_from_dicoms
 
 lgr = logging.getLogger(__name__)
 
@@ -151,7 +152,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
 
 
 def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
-            bids, outdir, min_meta, symlink=True):
+            bids, outdir, min_meta, symlink=True, prov_file=None):
     """Perform actual conversion (calls to converter etc) given info from
     heuristic's `infotodict`
 
@@ -183,6 +184,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
 
         prefix_dirname = op.dirname(prefix + '.ext')
         outname_bids = prefix + '.json'
+        bids_outfiles = []
         lgr.info('Converting %s (%d DICOMs) -> %s . '
                  'Converter: %s . Output types: %s',
                  prefix, len(item_dicoms), prefix_dirname, converter, outtypes)
@@ -203,31 +205,37 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                 assert converter == 'dcm2niix', ('Invalid converter '
                                                  '{}'.format(converter))
 
-                tmpdir = tempdirs('dcm2niix')
-                # run conversion through nipype
-                res = nipype_convert(item_dicoms, prefix, outtype,
-                                     scaninfo_suffix, with_prov,
-                                     bids, tmpdir)
+                outname, scaninfo = (prefix + '.' + outtype,
+                                     prefix + scaninfo_suffix)
 
-                bids_outfiles = save_converted_files(res, item_dicoms,
-                                                     bids, outtype)
+                # TODO: option to force reconversion?
+                if not op.exists(outname):
+                    tmpdir = tempdirs('dcm2niix')
 
-                # save acquisition time information if it's BIDS
-                # at this point we still have acquisition date
-                if bids:
-                    save_scans_key(item, bids_outfiles)
-                # Fix up and unify BIDS files
-                tuneup_bids_json_files(bids_outfiles)
+                    # run conversion through nipype
+                    res = nipype_convert(item_dicoms, prefix, with_prov, bids,
+                                         tmpdir)
 
-                prov_file = prefix + '_prov.ttl' if with_prov else None
-                if prov_file:
-                    safe_copyfile(op.join(convertnode.base_dir,
-                                          convertnode.name,
-                                         'provenance.ttl'),
-                                  prov_file)
-                    prov_files.append(prov_file)
+                    bids_outfiles = save_converted_files(res, item_dicoms, bids,
+                                                         outtype, prefix,
+                                                         outname_bids)
 
-                tempdirs.rmtree(tmpdir)
+                    # save acquisition time information if it's BIDS
+                    # at this point we still have acquisition date
+                    if bids:
+                        save_scans_key(item, bids_outfiles)
+                    # Fix up and unify BIDS files
+                    tuneup_bids_json_files(bids_outfiles)
+
+                    prov_file = prefix + '_prov.ttl' if with_prov else None
+                    if prov_file:
+                        safe_copyfile(op.join(convertnode.base_dir,
+                                              convertnode.name,
+                                             'provenance.ttl'),
+                                      prov_file)
+                        prov_files.append(prov_file)
+
+                    tempdirs.rmtree(tmpdir)
 
         if len(bids_outfiles) > 1:
             lgr.warning("For now not embedding BIDS and info generated "
@@ -292,31 +300,26 @@ def convert_dicom(item_dicoms, bids, sourcedir, prefix,
                     os.link(filename, outfile)
 
 
-def nipype_convert(item_dicoms, prefix, outtype, scaninfo_suffix, with_prov,
-                   bids, tmpdir):
+def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir):
     """ """
-    outname, scaninfo = prefix + '.' + outtype, prefix + scaninfo_suffix
-    # MG - add option to force these to rerun
-    if not op.exists(outname):
-        if with_prov:
-            from nipype import config
-            config.enable_provenance()
-        from nipype import Node
-        from nipype.interfaces.dcm2nii import Dcm2niix
+    if with_prov:
+        from nipype import config
+        config.enable_provenance()
+    from nipype import Node
+    from nipype.interfaces.dcm2nii import Dcm2niix
 
-        item_dicoms = list(map(op.abspath, item_dicoms)) # absolute paths
+    item_dicoms = list(map(op.abspath, item_dicoms)) # absolute paths
 
-        convertnode = Node(Dcm2niix(), name='convert')
-        convertnode.base_dir = tmpdir
-        convertnode.inputs.source_names = item_dicoms
-        convertnode.inputs.out_filename = op.basename(prefix_dirname)
-        convertnode.inputs.terminal_output = 'allatonce'
-        convertnode.inputs.bids_format = bids
-        return convertnode.run()
+    convertnode = Node(Dcm2niix(), name='convert')
+    convertnode.base_dir = tmpdir
+    convertnode.inputs.source_names = item_dicoms
+    convertnode.inputs.out_filename = op.basename(op.dirname(prefix))
+    convertnode.inputs.terminal_output = 'allatonce'
+    convertnode.inputs.bids_format = bids
+    return convertnode.run()
 
 
-def save_converted_files(res, item_dicoms, bids, outtype,
-                         prefix, suffix):
+def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids):
     """Copy converted files from tempdir to output directory.
     Will rename files if necessary.
 
@@ -377,88 +380,14 @@ def save_converted_files(res, item_dicoms, bids, outtype,
                 outname_bids_file = "%s%s.json" % (prefix, suffix)
                 safe_copyfile(bids_file, outname_bids_file)
                 bids_outfiles.append(outname_bids_file)
+    # res_files is not a list
     else:
+        outname = "{}.{}".format(prefix, outtype)
         safe_copyfile(res_files, outname)
         if isdefined(res.outputs.bids):
             try:
                 safe_copyfile(res.outputs.bids, outname_bids)
                 bids_outfiles.append(outname_bids)
             except TypeError as exc:  ##catch lists
-                #lgr.warning("There was someone catching lists!: %s", exc)
                 raise TypeError("Multiple BIDS sidecars detected.")
-    return bids_files
-
-
-def embed_nifti(dcmfiles, niftifile, infofile, bids_info, force, min_meta):
-    """
-
-    If `niftifile` doesn't exist, it gets created out of the `dcmfiles` stack,
-    and json representation of its meta_ext is returned (bug since should return
-    both niftifile and infofile?)
-
-    if `niftifile` exists, its affine's orientation information is used while
-    establishing new `NiftiImage` out of dicom stack and together with `bids_info`
-    (if provided) is dumped into json `infofile`
-
-    Parameters
-    ----------
-    dcmfiles
-    niftifile
-    infofile
-    bids_info
-    force
-    min_meta
-
-    Returns
-    -------
-    niftifile, infofile
-
-    """
-    # imports for nipype
-    import nibabel as nb
-    import os
-    import os.path as op
-    import json
-    import re
-
-    if not min_meta:
-        import dcmstack as ds
-        stack = ds.parse_and_stack(dcmfiles, force=force).values()
-        if len(stack) > 1:
-            raise ValueError('Found multiple series')
-        stack = stack[0]
-
-        #Create the nifti image using the data array
-        if not op.exists(niftifile):
-            nifti_image = stack.to_nifti(embed_meta=True)
-            nifti_image.to_filename(niftifile)
-            return ds.NiftiWrapper(nifti_image).meta_ext.to_json()
-
-        orig_nii = nb.load(niftifile)
-        aff = orig_nii.affine
-        ornt = nb.orientations.io_orientation(aff)
-        axcodes = nb.orientations.ornt2axcodes(ornt)
-        new_nii = stack.to_nifti(voxel_order=''.join(axcodes), embed_meta=True)
-        meta = ds.NiftiWrapper(new_nii).meta_ext.to_json()
-
-    meta_info = None if min_meta else json.loads(meta)
-
-    if bids_info:
-
-        if min_meta:
-            meta_info = bids_info
-        else:
-            # make nice with python 3 - same behavior?
-            meta_info = meta_info.copy()
-            meta_info.update(bids_info)
-            # meta_info = dict(meta_info.items() + bids_info.items())
-        try:
-            meta_info['TaskName'] = (re.search('(?<=_task-)\w+',
-                                               op.basename(infofile))
-                                     .group(0).split('_')[0])
-        except AttributeError:
-            pass
-    # write to outfile
-    with open(infofile, 'wt') as fp:
-        json.dump(meta_info, fp, indent=3, sort_keys=True)
-    return niftifile, infofile
+        return bids_outfiles
