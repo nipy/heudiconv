@@ -97,12 +97,12 @@ def docstring_parameter(*sub):
 
 
 def anonymize_sid(sid, anon_sid_cmd):
-    anon_sid = sid
     if anon_sid_cmd is not None:
         from subprocess import check_output
         anon_sid = check_output([anon_sid_cmd, sid]).strip()
-        lgr.info("Annonimized sid %s into %s", sid, anon_sid)
-    return anon_sid
+        lgr.info("Anonymized sid %s into %s", sid, anon_sid)
+        return anon_sid
+    return
 
 
 def create_file_if_missing(filename, content):

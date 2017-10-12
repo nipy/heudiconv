@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 import sys
 
 
-from ..info import __version__, __packagename__
+from .. import __version__, __packagename__
 from ..parser import get_study_sessions
 from ..external.datalad import prepare_datalad
 from ..utils import (load_heuristic, anonymize_sid, treat_infofile,)
@@ -13,7 +13,7 @@ from ..convert import prep_conversion
 
 import inspect
 import logging
-lgr = logging.getLogger('cli')
+lgr = logging.getLogger(__name__)
 
 INIT_MSG = "Running {packname} version {version}".format
 
@@ -91,7 +91,7 @@ def process_extra_commands(outdir, args):
 def main():
     args = get_parser().parse_args()
     if args.debug:
-        logger.setLevel(logging.DEBUG)
+        lgr.setLevel(logging.DEBUG)
 
     # error check some inputs
     if args.files and args.dicom_dir_template:
