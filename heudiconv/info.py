@@ -11,7 +11,6 @@ REQUIRES = [
     'nibabel',
     'pydicom',
     'nipype',
-    'dcmstack',
 ]
 
 TESTS_REQUIRES = [
