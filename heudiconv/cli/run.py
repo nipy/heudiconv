@@ -298,7 +298,8 @@ def process_args(args):
                         ses=args.session,
                         bids=args.bids,
                         seqinfo=seqinfo,
-                        min_meta=args.minmeta)
+                        min_meta=args.minmeta,
+                        overwrite=args.overwrite,)
 
         lgr.info("PROCESSING DONE: {0}".format(
             str(dict(subject=sid, outdir=study_outdir, session=session))))

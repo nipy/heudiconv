@@ -55,7 +55,8 @@ def conversion_info(subject, outdir, info, filegroup, ses):
 
 
 def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
-                   anon_outdir, with_prov, ses, bids, seqinfo, min_meta):
+                   anon_outdir, with_prov, ses, bids, seqinfo, min_meta,
+                   overwrite):
     if dicoms:
         lgr.info("Processing %d dicoms", len(dicoms))
     elif seqinfo:
@@ -88,7 +89,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
 
     # MG - maybe add an option to force rerun?
     # related issue : https://github.com/nipy/heudiconv/issues/84
-    if op.exists(edit_file):  # XXX may be condition on seqinfo is None
+    if op.exists(edit_file) and overwrite == True:
         lgr.info("Reloading existing filegroup.json "
                  "because %s exists", edit_file)
         info = read_config(edit_file)
@@ -139,7 +140,8 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                 with_prov=with_prov,
                 bids=bids,
                 outdir=tdir,
-                min_meta=min_meta)
+                min_meta=min_meta,
+                overwrite=overwrite,)
     if bids:
         if seqinfo:
             keys = list(seqinfo)
@@ -152,7 +154,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
 
 
 def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
-            bids, outdir, min_meta, symlink=True, prov_file=None):
+            bids, outdir, min_meta, overwrite, symlink=True, prov_file=None):
     """Perform actual conversion (calls to converter etc) given info from
     heuristic's `infotodict`
 
@@ -208,8 +210,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                 outname, scaninfo = (prefix + '.' + outtype,
                                      prefix + scaninfo_suffix)
 
-                # TODO: option to force reconversion?
-                if not op.exists(outname):
+                if not op.exists(outname) or overwrite:
                     tmpdir = tempdirs('dcm2niix')
 
                     # run conversion through nipype
