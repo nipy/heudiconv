@@ -201,7 +201,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                               outdir, tempdirs, symlink)
             elif outtype in ['nii', 'nii.gz']:
                 assert converter == 'dcm2niix', ('Invalid converter '
-                                                 '{}'.format(converter)
+                                                 '{}'.format(converter))
 
                 tmpdir = tempdirs('dcm2niix')
                 # run conversion through nipype
@@ -384,8 +384,8 @@ def save_converted_files(res, item_dicoms, bids, outtype,
                 safe_copyfile(res.outputs.bids, outname_bids)
                 bids_outfiles.append(outname_bids)
             except TypeError as exc:  ##catch lists
-                lgr.warning("There was someone catching lists!: %s", exc)
-                continue
+                #lgr.warning("There was someone catching lists!: %s", exc)
+                raise TypeError("Multiple BIDS sidecars detected.")
     return bids_files
 
 

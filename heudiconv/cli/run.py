@@ -116,13 +116,8 @@ def main():
 
 
 def get_parser():
-    docstr = '\n'.join((__doc__,
-                        """
-                                   Example:
-
-                                   heudiconv -d rawdata/{subject} -o . -f
-                                   heuristic.py -s s1 s2 s3
-                        """))
+    docstr = ("""Example:
+             heudiconv -d rawdata/{subject} -o . -f heuristic.py -s s1 s2 s3""")
     parser = ArgumentParser(description=docstr)
     parser.add_argument('--version', action='version', version=__version__)
     group = parser.add_mutually_exclusive_group()

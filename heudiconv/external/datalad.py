@@ -4,7 +4,7 @@ import logging
 
 from ..utils import (create_file_if_missing, mark_sensitive)
 
-lgr = lgr.getLogger(__name__)
+lgr = logging.getLogger(__name__)
 
 MIN_VERSION = 0.7
 
@@ -131,3 +131,4 @@ def add_to_datalad(topdir, studydir, msg, bids):
     - could potentially somehow automate that all:
       http://git-annex.branchable.com/tips/automatically_adding_metadata/
     - possibly even make separate sub-datasets for originaldata, derivatives ?
+    """

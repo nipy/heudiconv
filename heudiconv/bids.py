@@ -13,7 +13,7 @@ import dicom as dcm
 import dcmstack as ds
 
 from .utils import (load_json, save_json, create_file_if_missing,
-                    json_dumps_pretty
+                    json_dumps_pretty)
 
 lgr = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ def populate_bids_templates(path, defaults={}):
             ("TODO: Provide description about source data, e.g. \n"
             "Directory below contains DICOMS compressed into tarballs per "
             "each sequence, replicating directory hierarchy of the BIDS dataset"
-            " itself.")
+            " itself."))
     create_file_if_missing(op.join(path, 'CHANGES'),
         "0.0.1  Initial data acquired\n"
         "TODOs:\n\t- verify and possibly extend information in participants.tsv"
