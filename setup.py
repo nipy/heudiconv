@@ -39,9 +39,9 @@ def main():
         version=ldict['__version__'],
         description=ldict['__description__'],
         long_description=ldict['__longdesc__'],
-        scripts=[
-            op.join('heudiconv', 'cli', 'run.py')
-        ],
+        entry_points={'console_scripts': [
+            'heudiconv=heudiconv.cli.run:main',
+        ]},
         install_requires=ldict['REQUIRES'],
         extras_require=ldict['EXTRA_REQUIRES'],
         package_data={
