@@ -89,7 +89,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
 
     # MG - maybe add an option to force rerun?
     # related issue : https://github.com/nipy/heudiconv/issues/84
-    if op.exists(edit_file) and overwrite == True:
+    if op.exists(edit_file) and overwrite:
         lgr.info("Reloading existing filegroup.json "
                  "because %s exists", edit_file)
         info = read_config(edit_file)
@@ -202,7 +202,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
 
             if outtype == 'dicom':
                 convert_dicom(item_dicoms, bids, prefix,
-                              outdir, tempdirs, symlink)
+                              outdir, tempdirs, symlink, overwrite)
             elif outtype in ['nii', 'nii.gz']:
                 assert converter == 'dcm2niix', ('Invalid converter '
                                                  '{}'.format(converter))
@@ -256,7 +256,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
 
 
 def convert_dicom(item_dicoms, bids, sourcedir, prefix,
-                  outdir, tempdirs, symlink):
+                  outdir, tempdirs, symlink, overwrite):
     """Save DICOMs as output (default is by symbolic link)
 
     Parameters
@@ -283,7 +283,8 @@ def convert_dicom(item_dicoms, bids, sourcedir, prefix,
 
         compress_dicoms(item_dicoms,
                         op.join(sourcedir_, op.basename(prefix)),
-                        tempdirs)
+                        tempdirs,
+                        overwrite)
     else:
         dicomdir = prefix + '_dicom'
         if op.exists(dicomdir):

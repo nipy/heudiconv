@@ -311,9 +311,9 @@ def compress_dicoms(dicom_list, out_prefix, tempdirs):
     # else:
     #     tmpdir = mkdtemp(prefix='dicomtar')
     outtar = out_prefix + '.dicom.tgz'
-    if op.exists(outtar): # and not global_options['overwrite']:
-        raise RuntimeError("File %s already exists, will not override, ensure "
-                           "unique scan names" % outtar)
+    if op.exists(outtar) and not overwrite:
+        lgr.info("File {} already exists, will not overwrite".format(outtar))
+        return
     # tarfile encodes current time.time inside making those non-reproducible
     # so we should choose which date to use.
     # Solution from DataLad although ugly enough:
@@ -471,25 +471,6 @@ def embed_metadata_from_dicoms(bids, item_dicoms, outname, outname_bids,
     embedfunc.base_dir = tmpdir
     cwd = os.getcwd()
     try:
-        # MG - still a bug?
-        """
-        Ran into
-INFO: Executing node embedder in dir: /tmp/heudiconvdcm2W3UQ7/embedder
-ERROR: Embedding failed: [Errno 13] Permission denied: '/inbox/BIDS/tmp/test2-jessie/Wheatley/Beau/1007_personality/sub-sid000138/fmap/sub-sid000138_3mm_run-01_phasediff.json'
-while
-HEUDICONV_LOGLEVEL=WARNING time bin/heudiconv -f heuristics/dbic_bids.py -c dcm2niix -o /inbox/BIDS/tmp/test2-jessie --bids --datalad /inbox/DICOM/2017/01/28/A000203
-
-so it seems that there is a filename collision so it tries to save into the same file name
-and there was a screw up for that A
-
-/mnt/btrfs/dbic/inbox/DICOM/2017/01/28/A000203
-        StudySessionInfo(locator='Wheatley/Beau/1007_personality', session=None, subject='sid000138') 16 sequences
-        StudySessionInfo(locator='Wheatley/Beau/1007_personality', session=None, subject='a000203') 2 sequences
-
-
-in that one though
-        """
-        # if global_options['overwrite'] and op.lexists(scaninfo):
         if op.lexists(scaninfo):
             # TODO: handle annexed file case
             if not op.islink(scaninfo):
