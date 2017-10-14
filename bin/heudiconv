@@ -997,7 +997,7 @@ def convert(items, symlink=True, converter=None,
                 if exists(scaninfo):
                     lgr.info("Post-treating %s file", scaninfo)
                     treat_infofile(scaninfo)
-                os.chmod(outname, 0o0440)
+                set_readonly(outname)
 
         if custom_callable is not None:
             custom_callable(*item)
@@ -1168,9 +1168,9 @@ def tuneup_bids_json_files(json_files):
                     lgr.error("Failed to open magnitude file: %s", exc)
 
             # might have been made R/O already
-            os.chmod(json_phasediffname, 0o0664)
+            set_readonly(json_phasediffname, False)
             json.dump(json_, open(json_phasediffname, 'w'), indent=2)
-            os.chmod(json_phasediffname, 0o0444)
+            set_readonly(json_phasediffname)
 
         # phasediff one should contain two PhaseDiff's
         #  -- one for original amplitude and the other already replicating what is there
@@ -1244,15 +1244,15 @@ in that one though
         if global_options['overwrite'] and os.path.lexists(scaninfo):
             # TODO: handle annexed file case
             if not os.path.islink(scaninfo):
-                os.chmod(scaninfo, 0o0660)
+                set_readonly(scaninfo, False)
         res = embedfunc.run()
-        os.chmod(scaninfo, 0o0444)
+        set_readonly(scaninfo)
         if with_prov:
             g = res.provenance.rdf()
             g.parse(prov_file,
                     format='turtle')
             g.serialize(prov_file, format='turtle')
-            os.chmod(prov_file, 0o0440)
+            set_readonly(prov_file)
     except Exception as exc:
         lgr.error("Embedding failed: %s", str(exc))
         os.chdir(cwd)
@@ -1269,10 +1269,10 @@ def treat_infofile(filename):
     j_slim = slim_down_info(j)
     j_pretty = json_dumps_pretty(j_slim, indent=2, sort_keys=True)
 
-    os.chmod(filename, 0o0664)
+    set_readonly(filename, False)
     with open(filename, 'wt') as fp:
         fp.write(j_pretty)
-    os.chmod(filename, 0o0444)
+    set_readonly(filename)
 
 
 def convert_dicoms(sid,
