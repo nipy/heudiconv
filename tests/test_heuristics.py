@@ -13,7 +13,7 @@ import pytest
 
 try:
     from datalad.api import Dataset
-except ImportError:
+except ImportError:  # pragma: no cover
     Dataset = None
 
 
