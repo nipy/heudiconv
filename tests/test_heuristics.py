@@ -11,7 +11,10 @@ import re
 
 import pytest
 
-from datalad.api import Dataset
+try:
+    from datalad.api import Dataset
+except ImportError:
+    Dataset = None
 
 
 def test_smoke_converall(tmpdir):
@@ -28,6 +31,7 @@ def test_smoke_converall(tmpdir):
         "-d tests/data/{subject}/* -s 01-fmap_acq-3mm" # "old" way specifying subject
         # should produce the same results
     ])
+@pytest.mark.skipif(Dataset is None, reason="no datalad")
 def test_dbic_bids_largely_smoke(tmpdir, heuristic, invocation):
     is_bids = True if heuristic == 'dbic_bids' else False
     arg = "-f heuristics/%s.py -c dcm2niix -o %s" % (heuristic, tmpdir)
