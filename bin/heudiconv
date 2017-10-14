@@ -53,6 +53,14 @@ from random import sample
 MIN_VERSIONS = {
     'datalad': '0.7'
 }
+
+# Some variables for reuse
+import stat
+
+ALL_CAN_WRITE = (stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH)
+ALL_CAN_READ = (stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
+assert ALL_CAN_READ >> 1 == ALL_CAN_WRITE  # Assumption in the code
+
 PY3 = sys.version_info[0] >= 3
 
 import logging
@@ -303,6 +311,35 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False)
                 continue
             yield path
 find_files.__doc__ %= (_VCS_REGEX,)
+
+
+def set_readonly(path, read_only=True):
+    """Make file read only or writeable while preserving "access levels"
+
+    So if file was not readable by "others" it should remain not readable
+    by others
+
+    Parameters
+    ----------
+    path : str
+    read_only : bool, optional
+      If True (default) - would make it read-only. If False, would make it
+      writeable for levels where it is readable
+    """
+    # get current permissions
+    perms = stat.S_IMODE(os.lstat(path).st_mode)
+    # set new permissions
+    if read_only:
+        new_perms = perms & (~ALL_CAN_WRITE)
+    else:
+        # need to set only for those which had read bit set
+        # read bit is <<1 away from write bit
+        whocanread = perms & ALL_CAN_READ
+        thosecanwrite = whocanread >> 1
+        new_perms = perms | thosecanwrite
+    # apply and return those target permissions
+    os.chmod(path, new_perms)
+    return new_perms
 
 
 def group_dicoms_into_seqinfos(
