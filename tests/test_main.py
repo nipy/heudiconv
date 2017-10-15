@@ -1,6 +1,7 @@
 import csv
 import os
 import pytest
+import stat
 import sys
 
 from mock import patch
@@ -195,3 +196,22 @@ def test__find_subj_ses():
     assert heudiconv._find_subj_ses('sub-s1/ses-s1/fmap/sub-s1_ses-s1_acq-3mm_phasediff.json') == ('s1', 's1')
     assert heudiconv._find_subj_ses('sub-s1/ses-s1/fmap/sub-s1_ses-s1_acq-3mm_phasediff.json') == ('s1', 's1')
     assert heudiconv._find_subj_ses('fmap/sub-01-fmap_acq-3mm_acq-3mm_phasediff.nii.gz') == ('01', None)
+
+
+def test_make_readonly(tmpdir):
+    # we could test it all without torturing a poor file, but for going all
+    # the way, let's do it on a file
+    path = tmpdir.join('f')
+    pathname = str(path)
+    with open(pathname, 'w'):
+        pass
+    for orig, ro, rw in [
+        (0o600, 0o400, 0o600),  # fully returned
+        (0o624, 0o404, 0o606),  # it will not get write bit where it is not readable
+        (0o1777, 0o1555, 0o1777),  # and other bits should be preserved
+    ]:
+        os.chmod(pathname, orig)
+        assert heudiconv.set_readonly(pathname) == ro
+        assert stat.S_IMODE(os.lstat(pathname).st_mode) == ro
+        # and it should go back if we set it back to non-read_only
+        assert heudiconv.set_readonly(pathname, read_only=False) == rw
