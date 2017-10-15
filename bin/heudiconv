@@ -20,7 +20,7 @@ It has multiple modes of operation
   DICOMs are sorted based on study UID, and layed out using specified heuristic
 """
 
-__version__ = '0.3'
+__version__ = '0.4'
 
 import argparse
 from glob import glob
