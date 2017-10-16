@@ -16,6 +16,7 @@ REQUIRES = [
 TESTS_REQUIRES = [
     'six',
     'pytest',
+    'mock',
 ]
 
 EXTRA_REQUIRES = {

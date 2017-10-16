@@ -38,7 +38,7 @@ def find_files(regex, topdir=op.curdir, exclude=None,
         names = (dirnames + filenames) if dirs else filenames
         paths = (op.join(dirpath, name) for name in names)
         for path in filter(re.compile(regex).search, paths):
-            path = path.rstrip(dirsep)
+            path = path.rstrip(op.sep)
             if exclude and re.search(exclude, path):
                 continue
             if exclude_vcs and re.search(_VCS_REGEX, path):

@@ -7,7 +7,8 @@ from .utils import (read_config, load_json, save_json, write_config,
                     TempDirs, safe_copyfile, treat_infofile, set_readonly)
 from .bids import (convert_sid_bids, populate_bids_templates, save_scans_key,
                    tuneup_bids_json_files, add_participant_record)
-from .dicoms import group_dicoms_into_seqinfos, embed_metadata_from_dicoms
+from .dicoms import (group_dicoms_into_seqinfos, embed_metadata_from_dicoms,
+                     compress_dicoms)
 
 lgr = logging.getLogger(__name__)
 
@@ -255,7 +256,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
         custom_callable(*item)
 
 
-def convert_dicom(item_dicoms, bids, sourcedir, prefix,
+def convert_dicom(item_dicoms, bids, prefix,
                   outdir, tempdirs, symlink, overwrite):
     """Save DICOMs as output (default is by symbolic link)
 

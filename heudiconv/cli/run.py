@@ -3,13 +3,11 @@ import os.path as op
 from argparse import ArgumentParser
 import sys
 
-
 from .. import __version__, __packagename__
 from ..parser import get_study_sessions
 from ..external.datalad import prepare_datalad
-from ..utils import (load_heuristic, anonymize_sid, treat_infofile,)
+from ..utils import (load_heuristic, anonymize_sid, treat_infofile, SeqInfo)
 from ..convert import prep_conversion
-
 
 import inspect
 import logging
@@ -88,31 +86,17 @@ def process_extra_commands(outdir, args):
     return
 
 
-def main():
-    args = get_parser().parse_args()
+def main(argv=None):
+    parser = get_parser()
+    args = parser.parse_args(argv)
     if args.debug:
         lgr.setLevel(logging.DEBUG)
 
-    # error check some inputs
-    if args.files and args.dicom_dir_template:
-        raise ValueError("Specify files or dicom_dir_template, not both")
-
-    if args.files and args.sids:
-        raise ValueError("")
+    if args.files and args.subjs:
+        raise ValueError("Unable to processes `--subjects` with files")
 
     if args.debug:
         setup_exceptionhook()
-
-    # MG QUESTION - why not just use args.overwrite
-
-    # orig_global_options = global_options.copy()
-    # try:
-    #     global_options['overwrite'] = args.overwrite
-    #     return _main(args)
-    # finally:
-    #     # reset back
-    #     for k, v in orig_global_options.items():
-    #         global_options[k] = v
 
     process_args(args)
 
@@ -318,8 +302,8 @@ def process_args(args):
     #     for study_outdir in processed_studydirs:
     #         populate_bids_templates(study_outdir)
     #
-    #         # TODO: record_collection of the sid/session although that information
-    #         # is pretty much present in .heudiconv/SUBJECT/info so we could just poke there
+    # TODO: record_collection of the sid/session although that information
+    # is pretty much present in .heudiconv/SUBJECT/info so we could just poke there
 
 
 if __name__ == "__main__":
