@@ -517,8 +517,12 @@ def group_dicoms_into_seqinfos(
             refphys = str(dcminfo.ReferringPhysicianName)
         except AttributeError:
             refphys = '-'
-
-        image_type = tuple(dcminfo.ImageType)
+        
+        try:
+            image_type = tuple(dcminfo.ImageType)
+        except AttributeError:
+            image_type='na'
+            
         motion_corrected = 'MoCo' in dcminfo.SeriesDescription \
                            or 'MOCO' in image_type
 
