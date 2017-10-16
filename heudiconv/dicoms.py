@@ -3,6 +3,7 @@ import os
 import os.path as op
 import logging
 from collections import OrderedDict
+import tarfile
 
 import dicom as dcm
 import dcmstack as ds
@@ -95,16 +96,6 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
             if dcmfilter is not None and dcmfilter(mw.dcm_data):
                 series_id = (-1, mw.dcm_data.ProtocolName)
 
-        # MG: This will always be false??
-        # if not groups:
-        #     raise RuntimeError("Yarik really thinks this is never ran!")
-        #     # if I was wrong -- then per_studyUID might need to go above
-        #     # yoh: I don't think this would ever be executed!
-        #     mwgroup.append(mw)
-        #     groups[0].append(series_id)
-        #     groups[1].append(len(mwgroup) - 1)
-        #     continue
-
         # filter out unwanted non-image-data DICOMs by assigning
         # a series number < 0 (see test below)
         if not series_id[0] < 0 and mw.dcm_data[0x0008, 0x0016].repval in (
@@ -114,7 +105,6 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
 
         if per_studyUID:
             series_id = series_id + (file_studyUID,)
-
 
         ingrp = False
         for idx in range(len(mwgroup)):
@@ -277,15 +267,15 @@ def get_dicom_series_time(dicom_list):
     import time
     import calendar
 
-    dcm = dcm.read_file(dicom_list[0], stop_before_pixels=True, force=True)
-    dcm_date = dcm.SeriesDate  # YYYYMMDD
-    dcm_time = dcm.SeriesTime  # HHMMSS.MICROSEC
+    dicom = dcm.read_file(dicom_list[0], stop_before_pixels=True, force=True)
+    dcm_date = dicom.SeriesDate  # YYYYMMDD
+    dcm_time = dicom.SeriesTime  # HHMMSS.MICROSEC
     dicom_time_str = dcm_date + dcm_time.split('.', 1)[0]  # YYYYMMDDHHMMSS
     # convert to epoch
     return calendar.timegm(time.strptime(dicom_time_str, '%Y%m%d%H%M%S'))
 
 
-def compress_dicoms(dicom_list, out_prefix, tempdirs):
+def compress_dicoms(dicom_list, out_prefix, tempdirs, overwrite):
     """Archives DICOMs into a tarball
 
     Also tries to do it reproducibly, so takes the date for files
@@ -300,17 +290,18 @@ def compress_dicoms(dicom_list, out_prefix, tempdirs):
       before .dicom.tgz suffix
     tempdirs : object
       TempDirs object to handle multiple tmpdirs
+    overwrite : bool
+      Overwrite existing tarfiles
 
     Returns
     -------
     filename : str
       Result tarball
     """
-    # if tempdirs:
+
     tmpdir = tempdirs(prefix='dicomtar')
-    # else:
-    #     tmpdir = mkdtemp(prefix='dicomtar')
     outtar = out_prefix + '.dicom.tgz'
+
     if op.exists(outtar) and not overwrite:
         lgr.info("File {} already exists, will not overwrite".format(outtar))
         return
