@@ -15,7 +15,7 @@ import dcmstack as ds
 
 from .parser import find_files
 from .utils import (load_json, save_json, create_file_if_missing,
-                    json_dumps_pretty)
+                    json_dumps_pretty, set_readonly)
 
 lgr = logging.getLogger(__name__)
 
@@ -143,10 +143,10 @@ def tuneup_bids_json_files(json_files):
                 except IOError as exc:
                     lgr.error("Failed to open magnitude file: %s", exc)
             # might have been made R/O already
-            os.chmod(json_phasediffname, 0o0664)
+            set_readonly(json_phasediffname, False)
             #json.dump(json_, open(json_phasediffname, 'w'), indent=2)
             save_json(json_phasediffname, json_, indent=2)
-            os.chmod(json_phasediffname, 0o0444)
+            set_readonly(json_phasediffname)
 
 
 def add_participant_record(studydir, subject, age, sex):

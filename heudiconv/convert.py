@@ -4,7 +4,7 @@ import logging
 import shutil
 
 from .utils import (read_config, load_json, save_json, write_config,
-                    TempDirs, safe_copyfile, treat_infofile)
+                    TempDirs, safe_copyfile, treat_infofile, set_readonly)
 from .bids import (convert_sid_bids, populate_bids_templates, save_scans_key,
                    tuneup_bids_json_files, add_participant_record)
 from .dicoms import group_dicoms_into_seqinfos, embed_metadata_from_dicoms
@@ -249,7 +249,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
         if op.exists(scaninfo):
             lgr.info("Post-treating %s file", scaninfo)
             treat_infofile(scaninfo)
-        os.chmod(outname, 0o0440)
+        set_readonly(outname)
 
     if custom_callable is not None:
         custom_callable(*item)

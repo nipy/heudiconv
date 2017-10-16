@@ -11,6 +11,7 @@ import shutil
 from collections import namedtuple
 import copy
 import logging
+import stat
 
 SeqInfo = namedtuple(
     'SeqInfo',
@@ -231,10 +232,10 @@ def treat_infofile(filename):
     j_slim = slim_down_info(j)
     j_pretty = json_dumps_pretty(j_slim, indent=2, sort_keys=True)
 
-    os.chmod(filename, 0o0664)
+    set_readonly(filename, False)
     with open(filename, 'wt') as fp:
         fp.write(j_pretty)
-    os.chmod(filename, 0o0444)
+    set_readonly(filename)
 
 
 def slim_down_info(j):
@@ -274,10 +275,39 @@ def safe_copyfile(src, dest):
     if op.isdir(dest):
         dest = op.join(dest, op.basename(src))
     if op.lexists(dest):
-        # if not global_options['overwrite']:
-            # raise ValueError(
-            # "was asked to copy %s but destination already exists: %s" % (src,
-            #                                                              dest))
-        # else:
         os.unlink(dest)
     shutil.copyfile(src, dest)
+
+
+def set_readonly(path, read_only=True):
+    """Make file read only or writeable while preserving "access levels"
+
+    So if file was not readable by others, it should remain not readable by
+    others.
+
+    Parameters
+    ----------
+    path : str
+    read_only : bool, optional
+        If True (default) - would make it read-only. If False, would make it
+        writeable for levels where it is readable
+
+    """
+    ALL_CAN_WRITE = (stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH)
+    ALL_CAN_READ = (stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
+    assert ALL_CAN_READ >> 1 == ALL_CAN_WRITE  # Assumption in the code
+
+    # get current permissions
+    perms = stat.S_IMODE(os.lstat(path).st_mode)
+    # set new permissions
+    if read_only:
+        new_perms = perms & (~ALL_CAN_WRITE)
+    else:
+        # need to set only for those which had read bit set
+        # read bit is <<1 away from write bit
+        whocanread = perms & ALL_CAN_READ
+        thosecanwrite = whocanread >> 1
+        new_perms = perms | thosecanwrite
+        # apply and return those target permissions
+        os.chmod(path, new_perms)
+        return new_perms

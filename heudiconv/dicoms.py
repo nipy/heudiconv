@@ -7,7 +7,7 @@ from collections import OrderedDict
 import dicom as dcm
 import dcmstack as ds
 
-from .utils import SeqInfo, load_json
+from .utils import SeqInfo, load_json, set_readonly
 
 lgr = logging.getLogger(__name__)
 
@@ -474,15 +474,15 @@ def embed_metadata_from_dicoms(bids, item_dicoms, outname, outname_bids,
         if op.lexists(scaninfo):
             # TODO: handle annexed file case
             if not op.islink(scaninfo):
-                os.chmod(scaninfo, 0o0660)
+                set_readonly(scaninfo, False)
         res = embedfunc.run()
-        os.chmod(scaninfo, 0o0444)
+        set_readonly(scaninfo)
         if with_prov:
             g = res.provenance.rdf()
             g.parse(prov_file,
                     format='turtle')
             g.serialize(prov_file, format='turtle')
-            os.chmod(prov_file, 0o0440)
+            set_readonly(prov_file)
     except Exception as exc:
         lgr.error("Embedding failed: %s", str(exc))
         os.chdir(cwd)
