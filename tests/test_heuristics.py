@@ -44,9 +44,9 @@ def test_dbic_bids_largely_smoke(tmpdir, heuristic, invocation):
     if heuristic != 'dbic_bids' and invocation == 'tests/data':
         # none other heuristic has mighty infotoids atm
         with pytest.raises(NotImplementedError):
-            heudiconv.main(args)
+            runner(args)
         return
-    heudiconv.main(args)
+    runner(args)
     ds = Dataset(str(tmpdir))
     assert ds.is_installed()
     assert not ds.repo.dirty

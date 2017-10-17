@@ -5,7 +5,6 @@ import sys
 
 from .. import __version__, __packagename__
 from ..parser import get_study_sessions
-from ..external.datalad import prepare_datalad
 from ..utils import (load_heuristic, anonymize_sid, treat_infofile, SeqInfo)
 from ..convert import prep_conversion
 
@@ -265,6 +264,7 @@ def process_args(args):
         # TODO: --datalad  cmdline option, which would take care about initiating
         # the outdir -> study_outdir datasets if not yet there
         if args.datalad:
+            from ..external.dlad import prepare_datalad
             prepare_datalad(anon_study_outdir, anon_outdir, anon_sid,
                             args.session, seqinfo, dicoms, args.bids)
 
@@ -289,6 +289,7 @@ def process_args(args):
             str(dict(subject=sid, outdir=study_outdir, session=session))))
 
         if args.datalad:
+            from ..external.datalad import add_to_datalad
             msg = "Converted subject %s" % datalad_msg_suf
             # TODO:  whenever propagate to supers work -- do just
             # ds.save(msg=msg)
