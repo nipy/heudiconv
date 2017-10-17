@@ -17,11 +17,12 @@ TESTS_REQUIRES = [
     'six',
     'pytest',
     'mock',
+    'tinydb',
+    'inotify',
 ]
 
 EXTRA_REQUIRES = {
     'tests': TESTS_REQUIRES,
-    'monitor': ['inotify', 'tinydb'],
     'datalad': ['datalad']
 }
 
