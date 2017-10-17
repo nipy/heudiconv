@@ -6,7 +6,7 @@ from ..utils import (create_file_if_missing, mark_sensitive)
 
 lgr = logging.getLogger(__name__)
 
-MIN_VERSION = 0.7
+MIN_VERSION = '0.7'
 
 def prepare_datalad(studydir, outdir, sid, session, seqinfo, dicoms, bids):
     """ Prepare data for datalad """
