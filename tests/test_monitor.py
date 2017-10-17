@@ -6,7 +6,7 @@ from mock import patch
 from tinydb import TinyDB, Query
 from subprocess import CalledProcessError
 
-from heudiconv.monitor import monitor, process, run_heudiconv, MASK_NEWDIR
+from heudiconv.cli.monitor import monitor, process, run_heudiconv, MASK_NEWDIR
 
 
 class MockInotifyTree(object):

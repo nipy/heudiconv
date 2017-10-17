@@ -81,7 +81,7 @@ def monitor(topdir='/tmp/new_dir', check_ptrn='/20../../..',
             db=None, wait=WAIT_TIME, logdir='log'):
     # make logdir if not existant
     try:
-        os.makedirs(parsed.logdir)
+        os.makedirs(logdir)
     except OSError:
         pass
     #paths2process = deque()
