@@ -8,7 +8,7 @@ from heudiconv.bids import (populate_bids_templates,
                             get_formatted_scans_key_row,
                             add_rows_to_scans_keys_file,
                             find_subj_ses)
-from heudiconv.external.datalad import MIN_VERSION, add_to_datalad
+from heudiconv.external.dlad import MIN_VERSION, add_to_datalad
 
 import csv
 import os
