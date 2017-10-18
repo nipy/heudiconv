@@ -256,7 +256,10 @@ def process_args(args):
                              args.bids)
             continue
 
-        anon_sid = anonymize_sid(sid, args.anon_cmd)
+        anon_sid = anonymize_sid(sid, args.anon_cmd) if args.anon_cmd else None
+        if args.anon_cmd:
+            lgr.info('Anonymized {} to {}'.format(sid, anon_sid))
+
         study_outdir = op.join(outdir, locator or '')
         anon_outdir = args.conv_outdir or outdir
         anon_study_outdir = op.join(anon_outdir, locator or '')
