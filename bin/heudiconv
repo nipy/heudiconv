@@ -314,6 +314,14 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False)
 find_files.__doc__ %= (_VCS_REGEX,)
 
 
+def is_readonly(path):
+    """Return True if it is a fully read-only file (dereferences the symlink)
+    """
+    # get current permissions
+    perms = stat.S_IMODE(os.lstat(os.path.realpath(path)).st_mode)
+    return not bool(perms & ALL_CAN_WRITE)  # should be true if anyone is allowed to write
+
+
 def set_readonly(path, read_only=True):
     """Make file read only or writeable while preserving "access levels"
 
@@ -1179,10 +1187,14 @@ def tuneup_bids_json_files(json_files):
                 except IOError as exc:
                     lgr.error("Failed to open magnitude file: %s", exc)
 
-            # might have been made R/O already
-            set_readonly(json_phasediffname, False)
+            # might have been made R/O already, but if not -- it will be set
+            # only later in the pipeline, so we must not make it read-only yet
+            was_readonly = is_readonly(json_phasediffname)
+            if was_readonly:
+                set_readonly(json_phasediffname, False)
             json.dump(json_, open(json_phasediffname, 'w'), indent=2)
-            set_readonly(json_phasediffname)
+            if was_readonly:
+                set_readonly(json_phasediffname)
 
         # phasediff one should contain two PhaseDiff's
         #  -- one for original amplitude and the other already replicating what is there
@@ -1236,23 +1248,6 @@ def embed_metadata_from_dicoms(converter, is_bids, item_dicoms, outname,
     embedfunc.base_dir = tmpdir
     cwd = os.getcwd()
     try:
-        """
-        Ran into
-INFO: Executing node embedder in dir: /tmp/heudiconvdcm2W3UQ7/embedder
-ERROR: Embedding failed: [Errno 13] Permission denied: '/inbox/BIDS/tmp/test2-jessie/Wheatley/Beau/1007_personality/sub-sid000138/fmap/sub-sid000138_3mm_run-01_phasediff.json'
-while
-HEUDICONV_LOGLEVEL=WARNING time bin/heudiconv -f heuristics/dbic_bids.py -c dcm2niix -o /inbox/BIDS/tmp/test2-jessie --bids --datalad /inbox/DICOM/2017/01/28/A000203
-
-so it seems that there is a filename collision so it tries to save into the same file name
-and there was a screw up for that A
-
-/mnt/btrfs/dbic/inbox/DICOM/2017/01/28/A000203
-        StudySessionInfo(locator='Wheatley/Beau/1007_personality', session=None, subject='sid000138') 16 sequences
-        StudySessionInfo(locator='Wheatley/Beau/1007_personality', session=None, subject='a000203') 2 sequences
-
-
-in that one though
-        """
         if global_options['overwrite'] and os.path.lexists(scaninfo):
             # TODO: handle annexed file case
             if not os.path.islink(scaninfo):
