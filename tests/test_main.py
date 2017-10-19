@@ -205,13 +205,18 @@ def test_make_readonly(tmpdir):
     pathname = str(path)
     with open(pathname, 'w'):
         pass
+    symname = pathname + 'link'
+    os.symlink(pathname, symname)
     for orig, ro, rw in [
         (0o600, 0o400, 0o600),  # fully returned
         (0o624, 0o404, 0o606),  # it will not get write bit where it is not readable
         (0o1777, 0o1555, 0o1777),  # and other bits should be preserved
     ]:
         os.chmod(pathname, orig)
+        assert not heudiconv.is_readonly(pathname)
         assert heudiconv.set_readonly(pathname) == ro
+        assert heudiconv.is_readonly(pathname)
         assert stat.S_IMODE(os.lstat(pathname).st_mode) == ro
         # and it should go back if we set it back to non-read_only
         assert heudiconv.set_readonly(pathname, read_only=False) == rw
+        assert not heudiconv.is_readonly(pathname)

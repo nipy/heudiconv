@@ -33,8 +33,16 @@ as long as the following dependencies are in your path you can use the script
 - nibabel
 - dcm2niix
 
-## Example conversion using Docker
+## Tutorial with example conversion to BIDS format using Docker
+Please read this tutorial to understand how heudiconv works in practice.
+
 [Slides here](http://nipy.org/workshops/2017-03-boston/lectures/bids-heudiconv/#1)
+
+To generate lean BIDS output, consider using both the `-b` and the `--minmeta` flags 
+to your heudiconv command. The `-b` flag generates a json file with BIDS keys, while
+the `--minmeta` flag restricts the json file to only BIDS keys. Without `--minmeta`,
+the json file and the associated Nifti file contains DICOM metadata extracted using
+dicomstack.
 
 ## How it works (in some more detail)
 

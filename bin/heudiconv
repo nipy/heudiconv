@@ -20,7 +20,7 @@ It has multiple modes of operation
   DICOMs are sorted based on study UID, and layed out using specified heuristic
 """
 
-__version__ = '0.3'
+__version__ = '0.4'
 
 import argparse
 from glob import glob
@@ -245,7 +245,8 @@ def json_dumps_pretty(j, indent=2, sort_keys=True):
     # no spaces after [
     js_ = re.sub('\[ ', '[', js_)
     j_ = json.loads(js_)
-    assert(j == j_)
+    # Removed assert as it does not do any floating point comparison
+    #assert(j == j_)
     return js_
 
 
@@ -311,6 +312,14 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False)
                 continue
             yield path
 find_files.__doc__ %= (_VCS_REGEX,)
+
+
+def is_readonly(path):
+    """Return True if it is a fully read-only file (dereferences the symlink)
+    """
+    # get current permissions
+    perms = stat.S_IMODE(os.lstat(os.path.realpath(path)).st_mode)
+    return not bool(perms & ALL_CAN_WRITE)  # should be true if anyone is allowed to write
 
 
 def set_readonly(path, read_only=True):
@@ -453,11 +462,9 @@ def group_dicoms_into_seqinfos(
             series_id = series_id + (file_studyUID,)
 
 
-        #print fidx, N, filename
         ingrp = False
         for idx in range(len(mwgroup)):
             same = mw.is_same_series(mwgroup[idx])
-            #print idx, same, groups[idx][0]
             if same:
                 # the same series should have the same study uuid
                 assert mwgroup[idx].dcm_data.get('StudyInstanceUID', None) == file_studyUID
@@ -792,7 +799,7 @@ def get_dicom_series_time(dicom_list):
     import calendar
     import dicom as dcm
 
-    dcm = dcm.read_file(dicom_list[0], stop_before_pixels=True)
+    dcm = dcm.read_file(dicom_list[0], stop_before_pixels=True, force=True)
     dcm_date = dcm.SeriesDate  # YYYYMMDD
     dcm_time = dcm.SeriesTime  # HHMMSS.MICROSEC
     dicom_time_str = dcm_date + dcm_time.split('.', 1)[0]  # YYYYMMDDHHMMSS
@@ -1017,7 +1024,7 @@ def get_formatted_scans_key_row(item):
 
     """
     dcm_fn = item[-1][0]
-    mw = ds.wrapper_from_data(dcm.read_file(dcm_fn, stop_before_pixels=True))
+    mw = ds.wrapper_from_data(dcm.read_file(dcm_fn, stop_before_pixels=True, force=True))
     # we need to store filenames and acquisition times
     # parse date and time and get it into isoformat
     date = mw.dcm_data.ContentDate
@@ -1026,7 +1033,12 @@ def get_formatted_scans_key_row(item):
     acq_time = datetime.strptime(td, '%H%M%S%Y%m%d').isoformat()
     # add random string
     randstr = ''.join(map(chr, sample(k=8, population=range(33, 127))))
-    row = [acq_time, mw.dcm_data.PerformingPhysicianName, randstr]
+    # Catch AttributeError if PerformingPhysicianName info is missing
+    try:
+        perfphys = mw.dcm_data.PerformingPhysicianName
+    except AttributeError:
+        perfphys = 'n/a'
+    row = [acq_time, perfphys, randstr]
     # empty entries should be 'n/a'
     # https://github.com/dartmouth-pbs/heudiconv/issues/32
     row = ['n/a' if not str(e) else e for e in row]
@@ -1075,8 +1087,9 @@ def _find_subj_ses(f_name):
     # we will allow the match at either directories or within filename
     # assuming that bids layout is "correct"
     regex = re.compile('sub-(?P<subj>[a-zA-Z0-9]*)([/_]ses-(?P<ses>[a-zA-Z0-9]*))?')
-    res = regex.search(f_name).groupdict()
-    return res.get('subj'), res.get('ses', None)
+    regex_res = regex.search(f_name)
+    res = regex_res.groupdict() if regex_res else {}
+    return res.get('subj', None), res.get('ses', None)
 
 
 def save_scans_key(item, bids_files):
@@ -1103,6 +1116,13 @@ def save_scans_key(item, bids_files):
         f_name = f_name.replace('json', 'nii.gz')
         rows[f_name] = get_formatted_scans_key_row(item)
         subj_, ses_ = _find_subj_ses(f_name)
+        if not subj_:
+            lgr.warning(
+                "Failed to detect fullfilled BIDS layout.  "
+                "No scans.tsv file(s) will be produced for %s",
+                ", ".join(bids_files)
+            )
+            return
         if subj and subj_ != subj:
             raise ValueError(
                 "We found before subject %s but now deduced %s from %s"
@@ -1167,10 +1187,14 @@ def tuneup_bids_json_files(json_files):
                 except IOError as exc:
                     lgr.error("Failed to open magnitude file: %s", exc)
 
-            # might have been made R/O already
-            set_readonly(json_phasediffname, False)
+            # might have been made R/O already, but if not -- it will be set
+            # only later in the pipeline, so we must not make it read-only yet
+            was_readonly = is_readonly(json_phasediffname)
+            if was_readonly:
+                set_readonly(json_phasediffname, False)
             json.dump(json_, open(json_phasediffname, 'w'), indent=2)
-            set_readonly(json_phasediffname)
+            if was_readonly:
+                set_readonly(json_phasediffname)
 
         # phasediff one should contain two PhaseDiff's
         #  -- one for original amplitude and the other already replicating what is there
@@ -1225,23 +1249,6 @@ def embed_metadata_from_dicoms(converter, is_bids, item_dicoms, outname,
     cwd = os.getcwd()
     lgr.debug("Embedding into %s based on dicoms[0]=%s for nifti %s", scaninfo, item_dicoms[0], outname)
     try:
-        """
-        Ran into
-INFO: Executing node embedder in dir: /tmp/heudiconvdcm2W3UQ7/embedder
-ERROR: Embedding failed: [Errno 13] Permission denied: '/inbox/BIDS/tmp/test2-jessie/Wheatley/Beau/1007_personality/sub-sid000138/fmap/sub-sid000138_3mm_run-01_phasediff.json'
-while
-HEUDICONV_LOGLEVEL=WARNING time bin/heudiconv -f heuristics/dbic_bids.py -c dcm2niix -o /inbox/BIDS/tmp/test2-jessie --bids --datalad /inbox/DICOM/2017/01/28/A000203
-
-so it seems that there is a filename collision so it tries to save into the same file name
-and there was a screw up for that A
-
-/mnt/btrfs/dbic/inbox/DICOM/2017/01/28/A000203
-        StudySessionInfo(locator='Wheatley/Beau/1007_personality', session=None, subject='sid000138') 16 sequences
-        StudySessionInfo(locator='Wheatley/Beau/1007_personality', session=None, subject='a000203') 2 sequences
-
-
-in that one though
-        """
         if global_options['overwrite'] and os.path.lexists(scaninfo):
             # TODO: handle annexed file case
             if not os.path.islink(scaninfo):
@@ -1392,7 +1399,8 @@ def convert_dicoms(sid,
                 with_prov=with_prov,
                 is_bids=is_bids,
                 sourcedir=sourcedir,
-                outdir=tdir)
+                outdir=tdir,
+                min_meta=min_meta)
 
     if is_bids:
         if seqinfo:
