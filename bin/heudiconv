@@ -1223,6 +1223,7 @@ def embed_metadata_from_dicoms(converter, is_bids, item_dicoms, outname,
     embedfunc.inputs.force = True
     embedfunc.base_dir = tmpdir
     cwd = os.getcwd()
+    lgr.debug("Embedding into %s based on dicoms[0]=%s for nifti %s", scaninfo, item_dicoms[0], outname)
     try:
         """
         Ran into
