@@ -53,7 +53,7 @@ def test_dbic_bids_largely_smoke(tmpdir, heuristic, invocation):
     head = ds.repo.get_hexsha()
 
     # and if we rerun -- should fail
-    if heuristic != 'dbic_bids' and invocation != 'tests/data':
+    if heuristic != 'dbic_bids' and invocation != '--files tests/data':
         # those guys -- they just plow through it ATM without failing, i.e.
         # the logic is to reprocess
         runner(args)
