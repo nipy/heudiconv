@@ -250,7 +250,11 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
         if op.exists(scaninfo):
             lgr.info("Post-treating %s file", scaninfo)
             treat_infofile(scaninfo)
-        set_readonly(outname)
+
+        # this may not always be the case: ex. fieldmap1, fieldmap2
+        # will address after refactor
+        if op.exists(outname):
+            set_readonly(outname)
 
     if custom_callable is not None:
         custom_callable(*item)
