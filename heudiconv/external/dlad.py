@@ -23,7 +23,7 @@ def prepare_datalad(studydir, outdir, sid, session, seqinfo, dicoms, bids):
         add_to_datalad(outdir, studydir,
                        msg="Preparing for %s" % datalad_msg_suf,
                        bids=bids)
-
+    return datalad_msg_suf
 
 def add_to_datalad(topdir, studydir, msg, bids):
     """Do all necessary preparations (if were not done before) and save

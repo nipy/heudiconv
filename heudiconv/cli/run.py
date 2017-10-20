@@ -268,8 +268,8 @@ def process_args(args):
         # the outdir -> study_outdir datasets if not yet there
         if args.datalad:
             from ..external.dlad import prepare_datalad
-            prepare_datalad(anon_study_outdir, anon_outdir, anon_sid,
-                            args.session, seqinfo, dicoms, args.bids)
+            dl_msg = prepare_datalad(anon_study_outdir, anon_outdir, anon_sid,
+                                     args.session, seqinfo, dicoms, args.bids)
 
         lgr.info("PROCESSING STARTS: {0}".format(
             str(dict(subject=sid, outdir=study_outdir, session=args.session))))
@@ -293,7 +293,7 @@ def process_args(args):
 
         if args.datalad:
             from ..external.dlad import add_to_datalad
-            msg = "Converted subject %s" % datalad_msg_suf
+            msg = "Converted subject %s" % dl_msg
             # TODO:  whenever propagate to supers work -- do just
             # ds.save(msg=msg)
             #  also in batch mode might fail since we have no locking ATM
