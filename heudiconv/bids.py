@@ -15,7 +15,7 @@ import dcmstack as ds
 
 from .parser import find_files
 from .utils import (load_json, save_json, create_file_if_missing,
-                    json_dumps_pretty, set_readonly)
+                    json_dumps_pretty, set_readonly, is_readonly)
 
 lgr = logging.getLogger(__name__)
 
@@ -142,11 +142,14 @@ def tuneup_bids_json_files(json_files):
                                           '_magnitude%d.json' % i)['EchoTime'])
                 except IOError as exc:
                     lgr.error("Failed to open magnitude file: %s", exc)
-            # might have been made R/O already
-            set_readonly(json_phasediffname, False)
-            #json.dump(json_, open(json_phasediffname, 'w'), indent=2)
+            # might have been made R/O already, but if not -- it will be set
+            # only later in the pipeline, so we must not make it read-only yet
+            was_readonly = is_readonly(json_phasediffname)
+            if was_readonly:
+                set_readonly(json_phasediffname, False)
             save_json(json_phasediffname, json_, indent=2)
-            set_readonly(json_phasediffname)
+            if was_readonly:
+                set_readonly(json_phasediffname)
 
 
 def add_participant_record(studydir, subject, age, sex):

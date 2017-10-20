@@ -276,6 +276,11 @@ def safe_copyfile(src, dest):
     shutil.copyfile(src, dest)
 
 
+# Globals to check filewriting permissions
+ALL_CAN_WRITE = (stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH)
+ALL_CAN_READ = (stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
+assert ALL_CAN_READ >> 1 == ALL_CAN_WRITE  # Assumption in the code
+
 def set_readonly(path, read_only=True):
     """Make file read only or writeable while preserving "access levels"
 
@@ -290,9 +295,6 @@ def set_readonly(path, read_only=True):
         writeable for levels where it is readable
 
     """
-    ALL_CAN_WRITE = (stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH)
-    ALL_CAN_READ = (stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
-    assert ALL_CAN_READ >> 1 == ALL_CAN_WRITE  # Assumption in the code
 
     # get current permissions
     perms = stat.S_IMODE(os.lstat(path).st_mode)
@@ -305,6 +307,15 @@ def set_readonly(path, read_only=True):
         whocanread = perms & ALL_CAN_READ
         thosecanwrite = whocanread >> 1
         new_perms = perms | thosecanwrite
-        # apply and return those target permissions
-        os.chmod(path, new_perms)
-        return new_perms
+    # apply and return those target permissions
+    os.chmod(path, new_perms)
+    return new_perms
+
+
+def is_readonly(path):
+    """Return True if it is a fully read-only file (dereferences the symlink)
+    """
+    # get current permissions
+    perms = stat.S_IMODE(os.lstat(os.path.realpath(path)).st_mode)
+    # should be true if anyone is allowed to write
+    return not bool(perms & ALL_CAN_WRITE)

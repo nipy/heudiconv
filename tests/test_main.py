@@ -2,7 +2,10 @@
 
 from heudiconv.cli.run import main as runner
 from heudiconv import __version__
-from heudiconv.utils import create_file_if_missing, json_dumps_pretty
+from heudiconv.utils import (create_file_if_missing,
+                             json_dumps_pretty,
+                             set_readonly,
+                             is_readonly)
 from heudiconv.bids import (populate_bids_templates,
                             add_participant_record,
                             get_formatted_scans_key_row,
@@ -18,9 +21,7 @@ import sys
 from mock import patch
 from os.path import join as opj
 from six.moves import StringIO
-
-
-import heudiconv
+import stat
 
 
 @patch('sys.stdout', new_callable=StringIO)
@@ -215,3 +216,27 @@ def test__find_subj_ses():
                                                                        's1')
     assert find_subj_ses(
         'fmap/sub-01-fmap_acq-3mm_acq-3mm_phasediff.nii.gz') == ('01', None)
+
+
+def test_make_readonly(tmpdir):
+    # we could test it all without torturing a poor file, but for going all
+    # the way, let's do it on a file
+    path = tmpdir.join('f')
+    pathname = str(path)
+    with open(pathname, 'w'):
+        pass
+    symname = pathname + 'link'
+    os.symlink(pathname, symname)
+    for orig, ro, rw in [
+        (0o600, 0o400, 0o600),  # fully returned
+        (0o624, 0o404, 0o606),  # it will not get write bit where it is not readable
+        (0o1777, 0o1555, 0o1777),  # and other bits should be preserved
+    ]:
+        os.chmod(pathname, orig)
+        assert not is_readonly(pathname)
+        assert set_readonly(pathname) == ro
+        assert is_readonly(pathname)
+        assert stat.S_IMODE(os.lstat(pathname).st_mode) == ro
+        # and it should go back if we set it back to non-read_only
+        assert set_readonly(pathname, read_only=False) == rw
+        assert not is_readonly(pathname)
