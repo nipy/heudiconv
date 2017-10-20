@@ -292,7 +292,7 @@ def process_args(args):
             str(dict(subject=sid, outdir=study_outdir, session=session))))
 
         if args.datalad:
-            from ..external.datalad import add_to_datalad
+            from ..external.dlad import add_to_datalad
             msg = "Converted subject %s" % datalad_msg_suf
             # TODO:  whenever propagate to supers work -- do just
             # ds.save(msg=msg)
