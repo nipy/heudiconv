@@ -299,7 +299,7 @@ def process_args(args):
             #  also in batch mode might fail since we have no locking ATM
             #  and theoretically no need actually to save entire study
             #  we just need that
-            add_to_datalad(outdir, study_outdir, msg=msg, bids=args.bids)
+            add_to_datalad(outdir, study_outdir, msg, args.bids)
 
     # if args.bids:
     #     # Let's populate BIDS templates for folks to take care about
