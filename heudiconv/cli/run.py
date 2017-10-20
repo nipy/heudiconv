@@ -38,7 +38,6 @@ def setup_exceptionhook():
         else:
             lgr.warn(
               "We cannot setup exception hook since not in interactive mode")
-            _sys_excepthook(type, value, tb)
 
     sys.excepthook = _pdb_excepthook
 

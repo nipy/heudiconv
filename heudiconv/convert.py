@@ -393,4 +393,4 @@ def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids):
                 bids_outfiles.append(outname_bids)
             except TypeError as exc:  ##catch lists
                 raise TypeError("Multiple BIDS sidecars detected.")
-        return bids_outfiles
+    return bids_outfiles
