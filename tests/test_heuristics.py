@@ -57,9 +57,11 @@ def test_dbic_bids_largely_smoke(tmpdir, heuristic, invocation):
         # those guys -- they just plow through it ATM without failing, i.e.
         # the logic is to reprocess
         runner(args)
-    else:
-        with pytest.raises(RuntimeError):
-            runner(args)
+
+    # don't raise error by rerun...
+    # else:
+        # with pytest.raises(RuntimeError):
+        #     runner(args)
     # but there should be nothing new
     assert not ds.repo.dirty
     assert head == ds.repo.get_hexsha()
