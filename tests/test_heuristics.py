@@ -41,7 +41,7 @@ def test_dbic_bids_largely_smoke(tmpdir, heuristic, invocation):
     args = (
         arg + invocation
     ).split(' ')
-    if heuristic != 'dbic_bids' and invocation == 'tests/data':
+    if heuristic != 'dbic_bids' and invocation == '--files tests/data':
         # none other heuristic has mighty infotoids atm
         with pytest.raises(NotImplementedError):
             runner(args)
