@@ -27,6 +27,7 @@ before_install:
   - source venv/bin/activate
   - python --version # just to check
   - pip install -r dev-requirements.txt
+  - pip install requests # below installs pyld but that assumes we have requests already
   - pip install datalad
   - pip install codecov pytest
 
