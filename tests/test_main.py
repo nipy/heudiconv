@@ -16,6 +16,7 @@ from heudiconv.external.dlad import MIN_VERSION, add_to_datalad
 import csv
 import os
 import pytest
+import stat
 import sys
 
 from mock import patch
@@ -225,8 +226,7 @@ def test_make_readonly(tmpdir):
     pathname = str(path)
     with open(pathname, 'w'):
         pass
-    symname = pathname + 'link'
-    os.symlink(pathname, symname)
+
     for orig, ro, rw in [
         (0o600, 0o400, 0o600),  # fully returned
         (0o624, 0o404, 0o606),  # it will not get write bit where it is not readable

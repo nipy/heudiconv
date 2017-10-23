@@ -13,8 +13,9 @@ import pytest
 
 try:
     from datalad.api import Dataset
-except ImportError:
+except ImportError:  # pragma: no cover
     Dataset = None
+
 
 # this will fail if not in project's root directory
 def test_smoke_converall(tmpdir):
