@@ -7,9 +7,10 @@ import re
 from collections import defaultdict, OrderedDict
 
 import tarfile
+from tempfile import mkdtemp
 
 from .dicoms import group_dicoms_into_seqinfos
-from .utils import (TempDirs, docstring_parameter, StudySessionInfo, load_json,
+from .utils import (docstring_parameter, StudySessionInfo, load_json,
                     save_json, create_file_if_missing, json_dumps_pretty)
 
 lgr = logging.getLogger(__name__)
@@ -62,9 +63,8 @@ def get_extracted_dicoms(fl):
     # strategy: extract everything in a temp dir and assemble a list
     # of all files in all tarballs
 
-    tempdirs = TempDirs()
-
-    tmpdir = tempdirs(prefix='heudiconvDCM')
+    # cannot use TempDirs since will trigger cleanup with __del__
+    tmpdir = mkdtemp(prefix='heudiconvDCM')
 
     sessions = defaultdict(list)
     session = 0
@@ -98,8 +98,6 @@ def get_extracted_dicoms(fl):
         # to classical 'heudiconv' assumptions, thus just move them all into
         # None
         sessions[None] += sessions.pop(0)
-
-    tempdirs.cleanup() # will this affect anything?
 
     return sessions.items()
 

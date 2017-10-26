@@ -256,6 +256,14 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
         if op.exists(outname):
             set_readonly(outname)
 
+    if items:
+        common = op.commonprefix(item_dicoms)
+        tmp = '/'.join(common.split(op.sep)[:3])
+        if (op.dirname(tmp) == '/tmp'
+            and op.basename(tmp).startswith('heudiconvDCM')):
+            # clean up directory holding dicoms
+            shutil.rmtree(tmp)
+
     if custom_callable is not None:
         custom_callable(*item)
 
