@@ -1,5 +1,4 @@
 """Testing conversion with conversion saved on datalad"""
-import os.path as op
 import json
 from glob import glob
 

@@ -28,7 +28,7 @@ def gen_heudiconv_args(datadir, outdir, subject, heuristic_file, xargs=None):
 
 def fetch_data(tmpdir, subject):
 	"""Fetches some test dicoms using datalad"""
-	targetdir = os.path.join(tmpdir, 'QA')
+	targetdir = op.join(tmpdir, 'QA')
 	api.install(path=targetdir,
 				source='///dbic/QA')
 	api.get('{}/sourcedata/{}'.format(targetdir, subject))
