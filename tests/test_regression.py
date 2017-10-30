@@ -12,6 +12,7 @@ except ImportError:
 
 import heudiconv
 from heudiconv.cli.run import main as runner
+# testing utilities
 from .utils import fetch_data, gen_heudiconv_args
 
 
