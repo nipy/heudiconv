@@ -1,10 +1,10 @@
 import hashlib
 import os.path as op
 
-
 def md5sum(filename):
     with open(filename, 'rb') as f:
         return hashlib.md5(f.read()).hexdigest()
+
 
 def gen_heudiconv_args(datadir, outdir, subject, heuristic_file, xargs=None):
 	heuristic = op.realpath(op.join(
@@ -12,7 +12,6 @@ def gen_heudiconv_args(datadir, outdir, subject, heuristic_file, xargs=None):
 					        	'..',
 			        			'heuristics',
 			        			heuristic_file))
-
 	args = ["-d", op.join(datadir, 'sourcedata/{subject}/*/*/*.tgz'),
 			"-c", "dcm2niix",
 			"-o", outdir,
@@ -28,7 +27,9 @@ def gen_heudiconv_args(datadir, outdir, subject, heuristic_file, xargs=None):
 
 def fetch_data(tmpdir, subject):
 	"""Fetches some test dicoms using datalad"""
-	targetdir = op.join(tmpdir, 'QA')
+    from datalad import api
+
+    targetdir = op.join(tmpdir, 'QA')
 	api.install(path=targetdir,
 				source='///dbic/QA')
 	api.get('{}/sourcedata/{}'.format(targetdir, subject))
