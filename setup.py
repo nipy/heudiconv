@@ -41,6 +41,7 @@ def main():
         long_description=ldict['__longdesc__'],
         entry_points={'console_scripts': [
             'heudiconv=heudiconv.cli.run:main',
+            'heudiconv_monitor=heudiconv.cli.monitor:main',
         ]},
         install_requires=ldict['REQUIRES'],
         extras_require=ldict['EXTRA_REQUIRES'],
