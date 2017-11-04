@@ -16,8 +16,8 @@ def gen_heudiconv_args(datadir, outdir, subject, heuristic_file, xargs=None):
             "-c", "dcm2niix",
             "-o", outdir,
             "-s", subject,
-			"-f", heuristic,
-			"--bids",]
+            "-f", heuristic,
+            "--bids",]
     if xargs:
         args += xargs
 

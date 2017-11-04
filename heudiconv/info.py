@@ -26,4 +26,4 @@ EXTRA_REQUIRES = {
     'datalad': ['datalad']
 }
 
-EXTRA_REQUIRES['all'] = [val for _, val in list(EXTRA_REQUIRES.items())]
+EXTRA_REQUIRES['all'] = list(EXTRA_REQUIRES.values())
