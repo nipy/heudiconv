@@ -255,7 +255,7 @@ def process_args(args):
                              args.bids)
             continue
 
-        anon_sid = anonymize_sid(sid, args.anon_cmd) if args.anon_cmd else None
+        anon_sid = anonymize_sid(sid, args.anon_cmd) if args.anon_cmd else sid
         if args.anon_cmd:
             lgr.info('Anonymized {} to {}'.format(sid, anon_sid))
 
