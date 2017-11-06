@@ -328,8 +328,8 @@ def clear_temp_dicoms(item_dicoms):
         tmp = Path(op.commonprefix(item_dicoms).parents[1])
     except IndexError:
         return
-    if (op.dirname(tmp) == tempfile.gettempdir()
-        and op.basename(tmp).startswith('heudiconvDCM')
-        and op.exists(tmp)):
+    if (str(tmp.parent) == tempfile.gettempdir()
+        and str(tmp.stem).startswith('heudiconvDCM')
+        and op.exists(str(tmp))):
         # clean up directory holding dicoms
         shutil.rmtree(tmp)

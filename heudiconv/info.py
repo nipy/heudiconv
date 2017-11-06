@@ -11,6 +11,7 @@ REQUIRES = [
     'nibabel',
     'pydicom',
     'nipype',
+    'pathlib',
 ]
 
 TESTS_REQUIRES = [
