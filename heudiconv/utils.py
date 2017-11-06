@@ -325,7 +325,7 @@ def is_readonly(path):
 def clear_temp_dicoms(item_dicoms):
     """Ensures DICOM temporary directories are safely cleared"""
     try:
-        tmp = Path(op.commonprefix(item_dicoms).parents[1])
+        tmp = Path(op.commonprefix(item_dicoms)).parents[1]
     except IndexError:
         return
     if (str(tmp.parent) == tempfile.gettempdir()
