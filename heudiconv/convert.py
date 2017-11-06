@@ -3,8 +3,9 @@ import os.path as op
 import logging
 import shutil
 
-from .utils import (read_config, load_json, save_json, write_config,
-                    TempDirs, safe_copyfile, treat_infofile, set_readonly)
+from .utils import (read_config, load_json, save_json, write_config, TempDirs,
+                    safe_copyfile, treat_infofile, set_readonly,
+                    clear_temp_dicoms)
 from .bids import (convert_sid_bids, populate_bids_templates, save_scans_key,
                    tuneup_bids_json_files, add_participant_record)
 from .dicoms import (group_dicoms_into_seqinfos, embed_metadata_from_dicoms,
@@ -143,6 +144,10 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                 outdir=tdir,
                 min_meta=min_meta,
                 overwrite=overwrite,)
+
+    for item_dicoms in filegroup.values():
+        clear_temp_dicoms(item_dicoms)
+
     if bids:
         if seqinfo:
             keys = list(seqinfo)
@@ -255,14 +260,6 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
         # will address after refactor
         if op.exists(outname):
             set_readonly(outname)
-
-    if items:
-        common = op.commonprefix(item_dicoms)
-        tmp = '/'.join(common.split(op.sep)[:3])
-        if (op.dirname(tmp) == '/tmp'
-            and op.basename(tmp).startswith('heudiconvDCM')):
-            # clean up directory holding dicoms
-            shutil.rmtree(tmp)
 
     if custom_callable is not None:
         custom_callable(*item)
