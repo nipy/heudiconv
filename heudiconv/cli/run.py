@@ -267,8 +267,8 @@ def process_args(args):
         # the outdir -> study_outdir datasets if not yet there
         if args.datalad:
             from ..external.dlad import prepare_datalad
-            anon_sid = sid if not anon_sid else anon_sid
-            dl_msg = prepare_datalad(anon_study_outdir, anon_outdir, anon_sid,
+            dlad_sid = sid if not anon_sid else anon_sid
+            dl_msg = prepare_datalad(anon_study_outdir, anon_outdir, dlad_sid,
                                      args.session, seqinfo, dicoms, args.bids)
 
         lgr.info("PROCESSING STARTS: {0}".format(
