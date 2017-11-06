@@ -332,4 +332,4 @@ def clear_temp_dicoms(item_dicoms):
         and str(tmp.stem).startswith('heudiconvDCM')
         and op.exists(str(tmp))):
         # clean up directory holding dicoms
-        shutil.rmtree(tmp)
+        shutil.rmtree(str(tmp))
