@@ -1,4 +1,6 @@
 # HeuDiConv - Heuristic DICOM Converter
+[![Build Status](https://travis-ci.org/nipy/heudiconv.svg?branch=master)](https://travis-ci.org/nipy/heudiconv)
+[![codecov](https://codecov.io/gh/nipy/heudiconv/branch/master/graph/badge.svg)](https://codecov.io/gh/nipy/heudiconv)
 
 This is a flexible DICOM converter for organizing brain imaging data into
 structured directory layouts.
@@ -17,13 +19,9 @@ structured directory layouts.
 
 You can clone this directory and do a `make install`
 
-or you can download the `heudiconv` script from the bin directory
+or `pip install https://github.com/nipy/heudiconv/archive/master.zip`
 
-```
-curl -O https://raw.githubusercontent.com/nipy/heudiconv/master/bin/heudiconv
-chmod +x heudiconv
-```
-as long as the following dependencies are in your path you can use the script
+as long as the following dependencies are in your path you can use the package
 
 ## Dependencies
 
