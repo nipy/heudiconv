@@ -1,17 +1,18 @@
 """Utility objects and functions"""
 
 import os
-import os.path as op
-from tempfile import mkdtemp
-from glob import glob
+import tempfile
 import json
 import re
 import sys
 import shutil
-from collections import namedtuple
 import copy
 import logging
 import stat
+import os.path as op
+from pathlib import Path
+from collections import namedtuple
+from glob import glob
 
 SeqInfo = namedtuple(
     'SeqInfo',
@@ -64,7 +65,7 @@ class TempDirs(object):
         self.lgr = logging.getLogger('tempdirs')
 
     def __call__(self, prefix=None):
-        tmpdir = mkdtemp(prefix=prefix)
+        tmpdir = tempfile.mkdtemp(prefix=prefix)
         self.dirs.append(tmpdir)
         return tmpdir
 
@@ -319,3 +320,16 @@ def is_readonly(path):
     perms = stat.S_IMODE(os.lstat(os.path.realpath(path)).st_mode)
     # should be true if anyone is allowed to write
     return not bool(perms & ALL_CAN_WRITE)
+
+
+def clear_temp_dicoms(item_dicoms):
+    """Ensures DICOM temporary directories are safely cleared"""
+    try:
+        tmp = Path(op.commonprefix(item_dicoms)).parents[1]
+    except IndexError:
+        return
+    if (str(tmp.parent) == tempfile.gettempdir()
+        and str(tmp.stem).startswith('heudiconvDCM')
+        and op.exists(str(tmp))):
+        # clean up directory holding dicoms
+        shutil.rmtree(str(tmp))

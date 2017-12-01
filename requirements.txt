@@ -1,4 +1,4 @@
-.[full]
+.[all]
 # This is a dcmstack branch with changes for Python 3
 # sent PR to main repo, TODO: check if merged
 # https://github.com/ghisvail/dcmstack/pull/1
