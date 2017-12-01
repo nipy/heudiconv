@@ -5,7 +5,7 @@
 # pull request on our GitHub repository:
 #     https://github.com/kaczmarj/neurodocker
 #
-# Timestamp: 2017-12-01 15:38:42
+# Timestamp: 2017-12-01 19:04:23
 
 FROM debian:stretch
 
@@ -83,7 +83,7 @@ RUN conda create -y -q --name neuro python=2 \
     && sync \
     && sed -i '$isource activate neuro' $ND_ENTRYPOINT
 
-CMD ["heudiconv"]
+ENTRYPOINT ["/neurodocker/startup.sh", "heudiconv"]
 
 #--------------------------------------
 # Save container specifications to JSON
@@ -127,12 +127,10 @@ RUN echo '{ \
     \n      } \
     \n    ], \
     \n    [ \
-    \n      "cmd", \
-    \n      [ \
-    \n        "heudiconv" \
-    \n      ] \
+    \n      "entrypoint", \
+    \n      "/neurodocker/startup.sh heudiconv" \
     \n    ] \
     \n  ], \
-    \n  "generation_timestamp": "2017-12-01 15:38:42", \
+    \n  "generation_timestamp": "2017-12-01 19:04:23", \
     \n  "neurodocker_version": "0.3.2-1-gcfd3c6f" \
     \n}' > /neurodocker/neurodocker_specs.json
