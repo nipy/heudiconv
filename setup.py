@@ -39,6 +39,7 @@ def main():
         version=ldict['__version__'],
         description=ldict['__description__'],
         long_description=ldict['__longdesc__'],
+        packages=find_packages(),
         entry_points={'console_scripts': [
             'heudiconv=heudiconv.cli.run:main',
             'heudiconv_monitor=heudiconv.cli.monitor:main',
