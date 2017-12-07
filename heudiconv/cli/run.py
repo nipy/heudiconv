@@ -201,8 +201,7 @@ def process_args(args):
     #
     # Load heuristic -- better do it asap to make sure it loads correctly
     #
-    heuristic = (load_heuristic(op.realpath(args.heuristic_file))
-                if args.heuristic_file else gen_heuristic)
+    heuristic = load_heuristic(op.realpath(args.heuristic_file))
 
     study_sessions = get_study_sessions(args.dicom_dir_template, args.files,
                                         heuristic, outdir, args.session,
