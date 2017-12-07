@@ -3,13 +3,30 @@ import os.path as op
 import logging
 import shutil
 
-from .utils import (read_config, load_json, save_json, write_config, TempDirs,
-                    safe_copyfile, treat_infofile, set_readonly,
-                    clear_temp_dicoms)
-from .bids import (convert_sid_bids, populate_bids_templates, save_scans_key,
-                   tuneup_bids_json_files, add_participant_record)
-from .dicoms import (group_dicoms_into_seqinfos, embed_metadata_from_dicoms,
-                     compress_dicoms)
+from .utils import (
+    read_config,
+    load_json,
+    save_json,
+    write_config,
+    TempDirs,
+    safe_copyfile,
+    treat_infofile,
+    set_readonly,
+    clear_temp_dicoms,
+    seqinfo_fields,
+)
+from .bids import (
+    convert_sid_bids,
+    populate_bids_templates,
+    save_scans_key,
+    tuneup_bids_json_files,
+    add_participant_record,
+)
+from .dicoms import (
+    group_dicoms_into_seqinfos,
+    embed_metadata_from_dicoms,
+    compress_dicoms
+)
 
 lgr = logging.getLogger(__name__)
 
@@ -115,6 +132,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
         filegroup = {si.series_id: x for si, x in seqinfo.items()}
         dicominfo_file = op.join(idir, 'dicominfo%s.tsv' % ses_suffix)
         with open(dicominfo_file, 'wt') as fp:
+            fp.write('\t'.join([val for val in seqinfo_fields]) + '\n')
             for seq in seqinfo_list:
                 fp.write('\t'.join([str(val) for val in seq]) + '\n')
         lgr.debug("Calling out to %s.infodict", heuristic)

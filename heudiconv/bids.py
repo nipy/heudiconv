@@ -14,8 +14,14 @@ import dicom as dcm
 import dcmstack as ds
 
 from .parser import find_files
-from .utils import (load_json, save_json, create_file_if_missing,
-                    json_dumps_pretty, set_readonly, is_readonly)
+from .utils import (
+    load_json,
+    save_json,
+    create_file_if_missing,
+    json_dumps_pretty,
+    set_readonly,
+    is_readonly,
+)
 
 lgr = logging.getLogger(__name__)
 

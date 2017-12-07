@@ -5,7 +5,7 @@ import sys
 
 from .. import __version__, __packagename__
 from ..parser import get_study_sessions
-from ..utils import (load_heuristic, anonymize_sid, treat_infofile, SeqInfo)
+from ..utils import load_heuristic, anonymize_sid, treat_infofile, SeqInfo
 from ..convert import prep_conversion
 
 import inspect
@@ -201,7 +201,8 @@ def process_args(args):
     #
     # Load heuristic -- better do it asap to make sure it loads correctly
     #
-    heuristic = load_heuristic(op.realpath(args.heuristic_file))
+    heuristic = (load_heuristic(op.realpath(args.heuristic_file))
+                if args.heuristic_file else gen_heuristic)
 
     study_sessions = get_study_sessions(args.dicom_dir_template, args.files,
                                         heuristic, outdir, args.session,
