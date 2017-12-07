@@ -1,0 +1,64 @@
+# Copyright (c) 2015-2016, Gregory M. Kurtzer. All rights reserved.
+#
+# Changes for NeuroDebian/DBIC setup are Copyright (c) 2017 Yaroslav Halchenko.
+#
+# The purpose of the environment is to provide a complete suite for running
+# heudiconv on the INBOX server to provide conversion into BIDS layout.
+# ATM it does not ship heudiconv itself which would be accessed directly
+# from the main drive for now.
+#
+# "Singularity" Copyright (c) 2016, The Regents of the University of California,
+# through Lawrence Berkeley National Laboratory (subject to receipt of any
+# required approvals from the U.S. Dept. of Energy).  All rights reserved.
+
+#
+# Notes:
+#  - Due to  https://github.com/singularityware/singularity/issues/471
+#    bootstrapping leads to non-usable/non-removable-without-reboot
+#    image due to some rogue run away processes.
+#    This line could help to kill them but should be used with caution
+#    since could kill other unrelated processes
+#
+#      grep -l loop /proc/*/mountinfo | sed -e 's,/proc/\(.*\)/.*,\1,g' | while read pid; do sudo kill $pid; done
+
+BootStrap: debootstrap
+#OSVersion: stable
+# needs nipype 0.12.1 but that one didn't build for stable since needs python-prov...
+# so trying stretch
+OSVersion: stretch
+MirrorURL: http://ftp.us.debian.org/debian/
+
+# so if image is executed we just enter the environment
+%runscript
+    echo "Welcome to the DBIC BIDS environment"
+    /bin/bash
+
+
+%post
+    echo "Configuring the environment"
+    apt-get update
+    apt-get -y install eatmydata 
+    eatmydata apt-get -y install vim wget strace time ncdu gnupg curl procps
+    wget -q -O/tmp/nd-configurerepo https://raw.githubusercontent.com/neurodebian/neurodebian/4d26c8f30433145009aa3f74516da12f560a5a13/tools/nd-configurerepo
+    bash /tmp/nd-configurerepo
+    chmod a+r -R /etc/apt
+    eatmydata apt-get -y install datalad python-nipype virtualenv dcm2niix python-dcmstack python-configparser python-funcsigs python-pytest dcmtk
+
+    # for bids-validator
+    curl -sL https://deb.nodesource.com/setup_6.x | bash - && \
+       eatmydata apt-get install -y nodejs
+    npm install -g bids-validator@0.20.0
+    chmod a+rX -R /usr/lib/node_modules/
+
+    chmod a+rX -R /etc/apt/sources.list.d
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    apt-get clean
+
+    # and wipe out apt lists since not to be used RW for further tuning
+    # find /var/lib/apt/lists/ -type f -delete
+    # /usr/bin/find /var/lib/apt/lists/ -type f -name \*Packages\* -o -name \*Contents\*
+    # complicates later interrogation - thus disabled
+
+    # Create some bind mount directories present on rolando
+    mkdir -p /afs /inbox
+    chmod a+rX /afs /inbox

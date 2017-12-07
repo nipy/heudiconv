@@ -33,12 +33,20 @@ def findsome(subdir, extensions):
 requires = {
     'core': [
         'nibabel',
-        # TODO: migrate more from requirements.txt
+        'pydicom',
+        'nipype',
     ],
     'tests': [
         'six',
-        'nose',
+        'pytest',
     ],
+    'monitor': [
+        'inotify',
+        'tinydb'
+    ],
+    'datalad': [
+        'datalad'
+    ]
 }
 requires['full'] = sum(list(requires.values()), [])
 

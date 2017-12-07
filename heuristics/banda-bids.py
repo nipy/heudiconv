@@ -8,11 +8,11 @@ def create_key(template, outtype=('nii.gz','dicom'), annotation_classes=None):
 
 def infotodict(seqinfo):
     """Heuristic evaluator for determining which runs belong where
-    
-    allowed template fields - follow python string module: 
-    
-    item: index within category 
-    subject: participant id 
+
+    allowed template fields - follow python string module:
+
+    item: index within category
+    subject: participant id
     seqitem: run number during scanning
     subindex: sub index within group
     """
@@ -30,46 +30,45 @@ def infotodict(seqinfo):
     dwi_sbref = create_key('dwi/sub-{subject}_run-{item:02d}_sbref')
     fmap = create_key('fmap/sub-{subject}_dir-{dir}_run-{item:02d}_epi')
 
-    info = {t1:[], t2:[], 
-            rest:[], face:[], gamble:[], conflict:[], dwi:[], 
-            rest_sbref:[], face_sbref:[], gamble_sbref:[], conflict_sbref:[], dwi_sbref:[], 
+    info = {t1:[], t2:[],
+            rest:[], face:[], gamble:[], conflict:[], dwi:[],
+            rest_sbref:[], face_sbref:[], gamble_sbref:[], conflict_sbref:[], dwi_sbref:[],
             fmap:[]}
 
     for idx, s in enumerate(seqinfo):
-        x, y, sl, nt = (s[6], s[7], s[8], s[9])
         # T1 and T2 scans
-        if (sl == 208) and (nt == 1) and ('T1w' in s[12]):
-            info[t1] = [s[2]]
-        if (sl == 208) and ('T2w' in s[12]):
-            info[t2] = [s[2]]
+        if (s.dim3 == 208) and (s.dim4 == 1) and ('T1w' in s.protocol_name):
+            info[t1] = [s.series_id]
+        if (s.dim3 == 208) and ('T2w' in s.protocol_name):
+            info[t2] = [s.series_id]
         # diffusion scans
-        if ('dMRI_dir9' in s[12]):
+        if ('dMRI_dir9' in s.protocol_name):
             key = None
-            if (nt >= 99):
+            if (s.dim4 >= 99):
                 key = dwi
-            elif (nt == 1) and ('SBRef' in s[18]):
+            elif (s.dim4 == 1) and ('SBRef' in s.series_description):
                 key = dwi_sbref
             if key:
-                info[key].append({'item': s[2]})
+                info[key].append({'item': s.series_id})
         # functional scans
-        if ('fMRI' in s[12]):
-            tasktype = s[12].split('fMRI')[1].split('_')[1]
+        if ('fMRI' in s.protocol_name):
+            tasktype = s.protocol_name.split('fMRI')[1].split('_')[1]
             key = None
-            if (nt in [420, 215, 338, 280]):
+            if (s.dim4 in [420, 215, 338, 280]):
                 if 'rest' in tasktype: key = rest
                 if 'face' in tasktype: key = face
                 if 'conflict' in tasktype: key = conflict
                 if 'gambling' in tasktype: key = gamble
-            if (nt == 1) and ('SBRef' in s[18]):
+            if (s.dim4 == 1) and ('SBRef' in s.series_description):
                 if 'rest' in tasktype: key = rest_sbref
                 if 'face' in tasktype: key = face_sbref
                 if 'conflict' in tasktype: key = conflict_sbref
                 if 'gambling' in tasktype: key = gamble_sbref
             if key:
-                info[key].append({'item': s[2]})
-        if (nt == 3) and ('SpinEchoFieldMap' in s[12]):
-            dirtype = s[12].split('_')[-1]
-            info[fmap].append({'item': s[2], 'dir': dirtype})
+                info[key].append({'item': s.series_id})
+        if (s.dim4 == 3) and ('SpinEchoFieldMap' in s.protocol_name):
+            dirtype = s.protocol_name.split('_')[-1]
+            info[fmap].append({'item': s.series_id, 'dir': dirtype})
 
     # You can even put checks in place for your protocol
     msg = []
