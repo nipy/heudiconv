@@ -1,3 +1,16 @@
+heudiconv (0.4-1) unstable; urgency=medium
+
+  * Recent upstream release
+    - lots of changes
+  * debian/control
+    - Vcs fields
+    - myself to uploaders
+    - uses pytest for tests
+  * debian/copyright
+    - adjusted years, source url
+
+ --
+
 heudiconv (0.1+git94-g85a2afb-1) UNRELEASED; urgency=low
 
   * New upstream snapshot.

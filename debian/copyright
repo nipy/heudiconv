@@ -1,14 +1,16 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: heudiconv
-Source: https://github.com/hanke/mridefacer
+Source: https://github.com/nipy/heudiconv
 
 Files: *
 Copyright: 2014-2015 Satrajit Ghosh <satrajit.ghosh@gmail.com>,
-           2015 Michael Hanke <michael.hanke@gmail.com>
+           2015      Michael Hanke <michael.hanke@gmail.com>
+           2016-     Heudiconv Team
 License: MIT
 
 Files: debian/*
 Copyright: 2015-2017 Michael Hanke <michael.hanke@gmail.com>
+           2017      Yaroslav Halchenko <debian@onerussian.com>
 License: MIT
 
 License: MIT

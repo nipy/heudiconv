@@ -1,6 +1,6 @@
 Source: heudiconv
 Maintainer: NeuroDebian Team <team@neuro.debian.net>
-Uploaders: Michael Hanke <mih@debian.org>
+Uploaders: Michael Hanke <mih@debian.org>, Yaroslav Halchenko <debian@onerussian.com>
 Section: science
 Priority: optional
 Build-Depends: debhelper (>= 9),
@@ -9,10 +9,12 @@ Build-Depends: debhelper (>= 9),
                python-mock,
                python-setuptools,
                python-six,
-               python-nose,
+               python-pytest,
                help2man,
-Standards-Version: 3.9.8
+Standards-Version: 4.1.1
 Homepage: https://github.com/nipy/heudiconv
+Vcs-Browser: https://github.com/nipy/heudiconv
+Vcs-Git: https://github.com/nipy/heudiconv -b debian
 
 Package: heudiconv
 Architecture: all
@@ -25,6 +27,7 @@ Depends: ${misc:Depends},
          python-nipype,
 Recommends: mricron,
             dcm2niix,
+            python-pytest,
 Description: DICOM converter with support for structure heuristics
  This is a flexible dicom converter for organizing brain imaging data into
  structured directory layouts. It allows for flexible directory layouts and
