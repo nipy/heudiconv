@@ -4,3 +4,22 @@
  [pytest]
  addopts = --doctest-modules
 +testpaths = heuristics tests
+--- a/tests/test_heuristics.py
++++ b/tests/test_heuristics.py
+@@ -16,6 +16,9 @@ try:
+ except ImportError:  # pragma: no cover
+     Dataset = None
+ 
++if not os.path.exists(os.path.join(os.path.dirname(__file__), os.path.pardir, 'heuristics')):
++    from unittest import SkipTest
++    raise SkipTest("We are testing out of source, no heuristics directory available")
+ 
+ def test_smoke_converall(tmpdir):
+     heudiconv.main(
+@@ -103,4 +106,4 @@ def test_ls(stdout):
+     heudiconv.main(args)
+     out = stdout.getvalue()
+     assert 'StudySessionInfo(locator=' in out
+-    assert 'Halchenko/Yarik/950_bids_test4' in out
+\ No newline at end of file
++    assert 'Halchenko/Yarik/950_bids_test4' in out
