@@ -17,6 +17,13 @@ export PYBUILD_NAME = heudiconv
 %:
 	dh $@ --buildsystem=pybuild
 
+override_dh_auto_test::
+	mkdir -p build; \
+        export HOME=$(CURDIR)/build;  \
+        git config --global user.name "TESTING"; \
+        git config --global user.email "TESTING@example.com"
+	HOME=$(CURDIR)/build dh_auto_test $@
+
 override_dh_auto_install:
 	help2man -n 'DICOM converter for organizing brain imaging data into structured directory layouts' \
 		-N --no-discard-stderr bin/heudiconv > build/heudiconv.1
