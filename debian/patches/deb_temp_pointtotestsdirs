@@ -1,3 +1,11 @@
+From: Yaroslav Halchenko <debian@onerussian.com>
+Subject: some (temporary) tune ups to tests setup to run them during pkg build
+
+They should not be needed since the next major release since
+heudiconv was refactored into a proper module with tests within it
+
+Last-Update: 2017-12-07
+
 --- a/pytest.ini
 +++ b/pytest.ini
 @@ -1,2 +1,3 @@
