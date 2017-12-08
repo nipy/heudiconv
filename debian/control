@@ -12,6 +12,7 @@ Build-Depends: debhelper (>= 9),
                python-six,
                python-pytest,
                help2man,
+               python-datalad,
 Standards-Version: 4.1.1
 Homepage: https://github.com/nipy/heudiconv
 Vcs-Browser: https://github.com/nipy/heudiconv
@@ -29,6 +30,7 @@ Depends: ${misc:Depends},
 Recommends: mricron,
             dcm2niix,
             python-pytest,
+            python-datalad,
 Description: DICOM converter with support for structure heuristics
  This is a flexible dicom converter for organizing brain imaging data into
  structured directory layouts. It allows for flexible directory layouts and
