@@ -1,0 +1,2 @@
+Test-Command: pytest -s -v .
+Depends: @, @builddeps@

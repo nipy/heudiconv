@@ -3,6 +3,7 @@ Maintainer: NeuroDebian Team <team@neuro.debian.net>
 Uploaders: Michael Hanke <mih@debian.org>, Yaroslav Halchenko <debian@onerussian.com>
 Section: science
 Priority: optional
+Testsuite: autopkgtest
 Build-Depends: debhelper (>= 9),
                dh-python,
                python-all,

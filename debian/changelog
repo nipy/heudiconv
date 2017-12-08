@@ -8,8 +8,10 @@ heudiconv (0.4-1) unstable; urgency=medium
     - uses pytest for tests
   * debian/copyright
     - adjusted years, source url
+  * debian/tests
+    - added for rudimentary autopkgtest
 
- --
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 07 Dec 2017 20:14:38 -0500
 
 heudiconv (0.1+git94-g85a2afb-1) UNRELEASED; urgency=low
 
