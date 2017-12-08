@@ -6,7 +6,7 @@ heudiconv (0.4-1) unstable; urgency=medium
     - Vcs fields
     - myself to uploaders
     - uses pytest for tests
-    - added python-datalad to B-Depends and Recommends
+    - added python-datalad to Recommends
     - added python-dicom and python-dcmstack to B-Depends for tests
   * debian/copyright
     - adjusted years, source url
