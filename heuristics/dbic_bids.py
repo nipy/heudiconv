@@ -114,6 +114,10 @@ protocols2fix = {
             ('hardi_64',  'dwi_acq-DTI-hardi64'),
             ('acq-hardi', 'acq-DTI-hardi'),
         ],
+    'ed20c1ad4a0861b2b65768e159258eec':
+        [
+            ('fmap_acq-discorr-dti-', 'fmap_acq-dwi_dir-'),
+        ],
 }
 keys2replace = ['protocol_name', 'series_description']
 
@@ -379,7 +383,8 @@ def infotodict(seqinfo):
         if seqtype == 'fmap' and not seqtype_label:
             seqtype_label = {
                 'M': 'magnitude',  # might want explicit {file_index}  ?
-                'P': 'phasediff'
+                'P': 'phasediff',
+                'DIFFUSION': 'epi', # according to KODI those DWI are the EPIs we need
             }[image_data_type]
 
         # label for dwi as well
