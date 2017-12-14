@@ -2,7 +2,7 @@ import os
 import os.path as op
 import logging
 
-from ..utils import (create_file_if_missing, mark_sensitive)
+from ..utils import create_file_if_missing, mark_sensitive
 
 lgr = logging.getLogger(__name__)
 

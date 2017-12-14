@@ -10,8 +10,14 @@ import tarfile
 from tempfile import mkdtemp
 
 from .dicoms import group_dicoms_into_seqinfos
-from .utils import (docstring_parameter, StudySessionInfo, load_json,
-                    save_json, create_file_if_missing, json_dumps_pretty)
+from .utils import (
+    docstring_parameter,
+    StudySessionInfo,
+    load_json,
+    save_json,
+    create_file_if_missing,
+    json_dumps_pretty,
+)
 
 lgr = logging.getLogger(__name__)
 

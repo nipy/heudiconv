@@ -5,7 +5,7 @@ import sys
 
 from .. import __version__, __packagename__
 from ..parser import get_study_sessions
-from ..utils import (load_heuristic, anonymize_sid, treat_infofile, SeqInfo)
+from ..utils import load_heuristic, anonymize_sid, treat_infofile, SeqInfo
 from ..convert import prep_conversion
 
 import inspect

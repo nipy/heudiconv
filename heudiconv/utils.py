@@ -14,31 +14,31 @@ from pathlib import Path
 from collections import namedtuple
 from glob import glob
 
-SeqInfo = namedtuple(
-    'SeqInfo',
-    ['total_files_till_now',  # 0
-     'example_dcm_file',      # 1
-     'series_id',             # 2
-     'unspecified1',          # 3
-     'unspecified2',          # 4
-     'unspecified3',          # 5
-     'dim1', 'dim2', 'dim3', 'dim4', # 6, 7, 8, 9
-     'TR', 'TE',              # 10, 11
-     'protocol_name',         # 12
-     'is_motion_corrected',   # 13
-     'is_derived',            # 14
-     'patient_id',            # 15
-     'study_description',     # 16
-     'referring_physician_name', # 17
-     'series_description',    # 18
-     'sequence_name',         # 19
-     'image_type',            # 20
-     'accession_number',      # 21
-     'patient_age',           # 22
-     'patient_sex',           # 23
-     'date'                   # 24
-     ]
-)
+seqinfo_fields = [
+    'total_files_till_now',  # 0
+    'example_dcm_file',      # 1
+    'series_id',             # 2
+    'dcm_dir_name',          # 3
+    'unspecified2',          # 4
+    'unspecified3',          # 5
+    'dim1', 'dim2', 'dim3', 'dim4', # 6, 7, 8, 9
+    'TR', 'TE',              # 10, 11
+    'protocol_name',         # 12
+    'is_motion_corrected',   # 13
+    'is_derived',            # 14
+    'patient_id',            # 15
+    'study_description',     # 16
+    'referring_physician_name', # 17
+    'series_description',    # 18
+    'sequence_name',         # 19
+    'image_type',            # 20
+    'accession_number',      # 21
+    'patient_age',           # 22
+    'patient_sex',           # 23
+    'date'                   # 24
+ ]
+
+SeqInfo = namedtuple('SeqInfo', seqinfo_fields)
 
 StudySessionInfo = namedtuple(
     'StudySessionInfo',
