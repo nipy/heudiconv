@@ -28,6 +28,6 @@ def fetch_data(tmpdir, subject):
     """Fetches some test dicoms using datalad"""
     from datalad import api
     targetdir = op.join(tmpdir, 'QA')
-    api.install(path=targetdir, source='///dbic/QA')
+    api.install(path=targetdir, source='http://datasets-tests.datalad.org/dbic/QA')
     api.get('{}/sourcedata/{}'.format(targetdir, subject))
     return targetdir
