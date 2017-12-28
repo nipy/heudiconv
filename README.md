@@ -12,10 +12,36 @@ structured directory layouts.
 - it's faster than parsesdicomdir or mri_convert if you use dcm2niix option
 - it tracks the provenance of the conversion from DICOM to NIfTI in W3C
   PROV format
-- the cmrr_heuristic example shows a conversion to [BIDS](http://bids.neuroimaging.io)
-  layout structure
+- it provides assistance in converting to [BIDS]
+- it integrates with [DataLad] to place converted and original data
+  under git/git-annex version control, while automatically annotating files
+  with sensitive information (e.g., non-defaced anatomicals, etc)
+
+### Heuristics
+
+HeuDiConv operates using a heuristic, which provides information on
+how your files should be converted. A number of example heuristics are
+provided to address various use-cases
+
+- the [cmrr_heuristic](heuristics/cmrr_heuristic.py) provides an
+  example for a conversion to [BIDS]
+- the [dbic_bids](heuristics/dbic_bids.py) could be used to establish
+  a complete imaging center wide automation to convert all acquired
+  data to [BIDS] following a simple naming
+  [convention](https://goo.gl/o0YASC) for studies and sequences
 
 ## Install
+
+### Released versions
+
+Released versions of HeuDiConv are available from PyPI so you could
+just `pip install heudiconv` but it would require manual installation
+of the [dcm2niix](https://github.com/rordenlab/dcm2niix/).  On
+Debian-based systems we recommend to use
+[NeuroDebian](http://neuro.debian.net) providing
+[heudiconv Debian package](http://neuro.debian.net/pkgs/heudiconv.html).
+
+### From source
 
 You can clone this directory and do a `make install`
 
@@ -159,3 +185,6 @@ info[some_3-tuple] = [{'item': 12, 'acq': 'AP'},
                       {'item': 14, 'acq': 'AP'},
                       {'item': 16, 'acq': 'PA'}]
 ```
+
+[BIDS]: http://bids.neuroimaging.io
+[DataLad]: http://datalad.org
