@@ -1824,8 +1824,9 @@ def add_to_datalad(topdir, studydir, msg=None, bids=False):
             else:
                 # use/create a submodule dataset for .heudiconv
                 dsh = ds.create(path='.heudiconv',
-                                force=True,
-                                shared_access='all')
+                                force=True
+                                #shared_access='all'
+                                )
         # Since .heudiconv could contain sensitive information
         # we place all files under annex and then add
         if create_file_if_missing(
