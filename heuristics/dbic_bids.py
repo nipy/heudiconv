@@ -29,6 +29,7 @@ fix_accession2run = {
     'A000467': ['^15-'],
     'A000490': ['^15-'],
     'A000511': ['^15-'],
+    'A000797': ['^[1-7]-'],
 }
 
 # dictionary containing fixes, keys are md5sum of study_description from
@@ -103,7 +104,8 @@ protocols2fix = {
     '1bd62e10672fe0b435a9aa8d75b45425':
         [
             # need to add incrementing session -- study should have 2
-            ('scout_run\+$', 'scout_run+_ses+'),
+            # and no need for run+ for the scout!
+            ('scout(_run\+)?$', 'scout_ses+'),
         ],
     'da218a66de902adb3ad9407d514e3639':
         [
@@ -111,6 +113,10 @@ protocols2fix = {
             # so fot consistency
             ('hardi_64',  'dwi_acq-DTI-hardi64'),
             ('acq-hardi', 'acq-DTI-hardi'),
+        ],
+    'ed20c1ad4a0861b2b65768e159258eec':
+        [
+            ('fmap_acq-discorr-dti-', 'fmap_acq-dwi_dir-'),
         ],
 }
 keys2replace = ['protocol_name', 'series_description']
@@ -377,7 +383,8 @@ def infotodict(seqinfo):
         if seqtype == 'fmap' and not seqtype_label:
             seqtype_label = {
                 'M': 'magnitude',  # might want explicit {file_index}  ?
-                'P': 'phasediff'
+                'P': 'phasediff',
+                'DIFFUSION': 'epi', # according to KODI those DWI are the EPIs we need
             }[image_data_type]
 
         # label for dwi as well

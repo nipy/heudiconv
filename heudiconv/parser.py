@@ -148,9 +148,9 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
                         sid)] = files_
     else:
         # MG - should be caught on initial run
+        # YOH - what if it is the initial run?
         # prep files
         # assert files_opt
-        # assert not sids
         files = []
         for f in files_opt:
             if op.isdir(f):
@@ -176,6 +176,18 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
                 "For now, if no subj template is provided, requiring "
                 "heuristic to have infotoids")
 
+        if sids:
+            if not (len(sids) == 1 and len(seqinfo_dict) == 1):
+                raise RuntimeError(
+                    "We were provided some subjects (%s) but "
+                    "we can deal only "
+                    "with overriding only 1 subject id. Got %d subjects and "
+                    "found %d sequences" % (sids, len(sids), len(seqinfo_dict))
+                )
+            sid = sids[0]
+        else:
+            sid = None
+
         for studyUID, seqinfo in seqinfo_dict.items():
             # so we have a single study, we need to figure out its
             # locator, session, subject
@@ -191,7 +203,8 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
             study_session_info = StudySessionInfo(
                 ids.get('locator'),
                 ids.get('session', session) or session,
-                ids.get('subject', None))
+                sid or ids.get('subject', None)
+            )
             if study_session_info in study_sessions:
                 #raise ValueError(
                 lgr.warning(

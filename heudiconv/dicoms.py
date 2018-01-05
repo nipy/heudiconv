@@ -464,6 +464,8 @@ def embed_metadata_from_dicoms(bids, item_dicoms, outname, outname_bids,
     embedfunc.inputs.force = True
     embedfunc.base_dir = tmpdir
     cwd = os.getcwd()
+    lgr.debug("Embedding into %s based on dicoms[0]=%s for nifti %s",
+              scaninfo, item_dicoms[0], outname)
     try:
         if op.lexists(scaninfo):
             # TODO: handle annexed file case

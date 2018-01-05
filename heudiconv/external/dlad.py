@@ -51,7 +51,7 @@ def add_to_datalad(topdir, studydir, msg, bids):
             ds_ = create(curdir_, dataset=superds,
                          force=True,
                          no_annex=True,
-                         shared_access='all',
+                         # shared_access='all',
                          annex_version=6)
             assert ds == ds_
         assert ds.is_installed()
@@ -94,8 +94,9 @@ def add_to_datalad(topdir, studydir, msg, bids):
                             "yet provided", ds)
             else:
                 dsh = ds.create(path='.heudiconv',
-                                force=True,
-                                shared_access='all')
+                                force=True
+                                # shared_access='all'
+                                )
         # Since .heudiconv could contain sensitive information
         # we place all files under annex and then add
         if create_file_if_missing(op.join(dsh_path, '.gitattributes'),
