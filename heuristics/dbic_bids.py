@@ -730,8 +730,9 @@ def fixup_subjectid(subjectid):
 
 
 def test_filter_files():
+    # Filtering is currently disabled -- any sequence directory is Ok
     assert(filter_files('/home/mvdoc/dbic/09-run_func_meh/0123432432.dcm'))
-    assert(not filter_files('/home/mvdoc/dbic/run_func_meh/012343143.dcm'))
+    assert(filter_files('/home/mvdoc/dbic/run_func_meh/012343143.dcm'))
 
 
 def test_md5sum():
