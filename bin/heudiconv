@@ -192,6 +192,12 @@ def _canonical_dumps(json_obj, **kwargs):
     return out
 
 
+def assure_no_file_exists(path):
+    """Check if file or symlink (git-annex?) exists, and if so -- remove"""
+    if os.path.lexists(path):
+        os.unlink(path)
+
+
 def save_json(filename, data):
     """Save data to a json file
 
@@ -203,6 +209,7 @@ def save_json(filename, data):
         Dictionary to save in json file.
 
     """
+    assure_no_file_exists(filename)
     with open(filename, 'w') as fp:
         fp.write(_canonical_dumps(data, sort_keys=True, indent=4))
 
@@ -814,7 +821,7 @@ def safe_copyfile(src, dest):
         dest = os.path.join(dest, os.path.basename(src))
     if os.path.lexists(dest):
         if not global_options['overwrite']:
-            raise ValueError("was asked to copy %s but destination already exists: %s"
+            raise RuntimeError("was asked to copy %s but destination already exists: %s"
                              % (src, dest))
         else:
             # to make sure we can write there ... still fail if it is entire directory ;)
@@ -1333,7 +1340,7 @@ def convert_dicoms(sid,
     if not os.path.exists(idir):
         os.makedirs(idir)
 
-    shutil.copy(heuristic.filename, idir)
+    safe_copyfile(heuristic.filename, idir)
     ses_suffix = "_ses-%s" % ses if ses is not None else ""
     info_file = os.path.join(idir, '%s%s.auto.txt' % (sid, ses_suffix))
     edit_file = os.path.join(idir, '%s%s.edit.txt' % (sid, ses_suffix))
