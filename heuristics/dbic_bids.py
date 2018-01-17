@@ -117,6 +117,7 @@ protocols2fix = {
     'ed20c1ad4a0861b2b65768e159258eec':
         [
             ('fmap_acq-discorr-dti-', 'fmap_acq-dwi_dir-'),
+            ('_test', ''),
         ],
 }
 keys2replace = ['protocol_name', 'series_description']
