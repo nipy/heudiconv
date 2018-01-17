@@ -183,6 +183,12 @@ def load_json(filename):
     return data
 
 
+def assure_no_file_exists(path):
+    """Check if file or symlink (git-annex?) exists, and if so -- remove"""
+    if os.path.lexists(path):
+        os.unlink(path)
+
+
 def save_json(filename, data, indent=4):
     """Save data to a json file
 
@@ -194,6 +200,7 @@ def save_json(filename, data, indent=4):
         Dictionary to save in json file.
 
     """
+    assure_no_file_exists(filename)
     with open(filename, 'w') as fp:
         fp.write(_canonical_dumps(data, sort_keys=True, indent=indent))
 

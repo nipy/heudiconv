@@ -14,6 +14,7 @@ from .utils import (
     set_readonly,
     clear_temp_dicoms,
     seqinfo_fields,
+    assure_no_file_exists,
 )
 from .bids import (
     convert_sid_bids,
@@ -100,7 +101,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
     if not op.exists(idir):
         os.makedirs(idir)
 
-    shutil.copy(heuristic.filename, idir)
+    safe_copyfile(heuristic.filename, idir)
     ses_suffix = "_ses-%s" % ses if ses is not None else ""
     info_file = op.join(idir, '%s%s.auto.txt' % (sid, ses_suffix))
     edit_file = op.join(idir, '%s%s.edit.txt' % (sid, ses_suffix))
@@ -131,6 +132,8 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
         seqinfo_list = list(seqinfo.keys())
         filegroup = {si.series_id: x for si, x in seqinfo.items()}
         dicominfo_file = op.join(idir, 'dicominfo%s.tsv' % ses_suffix)
+        # allow to overwrite even if was present under git-annex already
+        assure_no_file_exists(dicominfo_file)
         with open(dicominfo_file, 'wt') as fp:
             fp.write('\t'.join([val for val in seqinfo_fields]) + '\n')
             for seq in seqinfo_list:
