@@ -1,10 +1,5 @@
-import hashlib
 import os.path as op
 import heudiconv
-
-def md5sum(filename):
-    with open(filename, 'rb') as f:
-        return hashlib.md5(f.read()).hexdigest()
 
 
 def gen_heudiconv_args(datadir, outdir, subject, heuristic_file, xargs=None):

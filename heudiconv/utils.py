@@ -1,5 +1,5 @@
 """Utility objects and functions"""
-
+import hashlib
 import os
 import tempfile
 import json
@@ -274,12 +274,17 @@ def load_heuristic(heuristic_file):
     return mod
 
 
-def safe_copyfile(src, dest):
+def safe_copyfile(src, dest, overwrite=False):
     """Copy file but blow if destination name already exists
     """
     if op.isdir(dest):
         dest = op.join(dest, op.basename(src))
     if op.lexists(dest):
+        if not overwrite:
+            raise RuntimeError(
+                "was asked to copy %s but destination already exists: %s"
+                % (src, dest)
+            )
         os.unlink(dest)
     shutil.copyfile(src, dest)
 
@@ -340,3 +345,8 @@ def clear_temp_dicoms(item_dicoms):
         and op.exists(str(tmp))):
         # clean up directory holding dicoms
         shutil.rmtree(str(tmp))
+
+
+def file_md5sum(filename):
+    with open(filename, 'rb') as f:
+        return hashlib.md5(f.read()).hexdigest()

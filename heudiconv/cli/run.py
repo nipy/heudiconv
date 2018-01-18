@@ -119,9 +119,10 @@ def get_parser():
                         help='list of subjects - required for dicom template. '
                         'If not provided, DICOMS would first be "sorted" and '
                         'subject IDs deduced by the heuristic')
-    parser.add_argument('-c', '--converter', default='dcm2niix',
+    parser.add_argument('-c', '--converter',
+                        default='dcm2niix',
                         choices=('dcm2niix', 'none'),
-                        help='tool to use for dicom conversion. Setting to '
+                        help='tool to use for DICOM conversion. Setting to '
                         '"none" disables the actual conversion step -- useful'
                         'for testing heuristics.')
     parser.add_argument('-o', '--outdir', default=os.getcwd(),
@@ -149,7 +150,7 @@ def get_parser():
     parser.add_argument('-b', '--bids', action='store_true',
                         help='flag for output into BIDS structure')
     parser.add_argument('--overwrite', action='store_true', default=False,
-                        help='flag to allow overwrite existing files')
+                        help='flag to allow overwriting existing converted files')
     parser.add_argument('--datalad', action='store_true',
                         help='Store the entire collection as DataLad '
                         'dataset(s). Small files will be committed directly to '
