@@ -119,10 +119,14 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
     #  1. add a test
     #  2. possibly extract into a dedicated function for easier logic flow here
     #     and a dedicated unittest
-    if op.exists(target_heuristic_filename) and \
+    if not reuse_conversion_table and \
+        op.exists(target_heuristic_filename) and \
         file_md5sum(target_heuristic_filename) != file_md5sum(heuristic.filename):
         reuse_conversion_table = False
-    safe_copyfile(heuristic.filename, idir, overwrite=overwrite)
+        lgr.info(
+            "Will not reuse existing conversion table files because heuristic "
+            "has changed"
+        )
 
     # MG - maybe add an option to force rerun?
     # related issue : https://github.com/nipy/heudiconv/issues/84
@@ -140,6 +144,8 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
     else:
         # TODO -- might have been done outside already!
         # MG -- will have to try with both dicom template, files
+        assure_no_file_exists(target_heuristic_filename)
+        safe_copyfile(heuristic.filename, idir)
         if dicoms:
             seqinfo = group_dicoms_into_seqinfos(
                 dicoms,
