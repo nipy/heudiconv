@@ -448,6 +448,9 @@ def embed_metadata_from_dicoms(bids, item_dicoms, outname, outname_bids,
     from nipype import Node, Function
     tmpdir = tempdirs(prefix='embedmeta')
 
+    # We need to assure that paths are absolute if they are relative
+    item_dicoms = list(map(op.abspath, item_dicoms))
+
     embedfunc = Node(Function(input_names=['dcmfiles', 'niftifile', 'infofile',
                                            'bids_info', 'force', 'min_meta'],
                               output_names=['outfile', 'meta'],
