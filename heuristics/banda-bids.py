@@ -16,19 +16,19 @@ def infotodict(seqinfo):
     seqitem: run number during scanning
     subindex: sub index within group
     """
-    t1 = create_key('anat/sub-{subject}_T1w')
-    t2 = create_key('anat/sub-{subject}_T2w')
-    rest = create_key('func/sub-{subject}_task-rest_run-{item:02d}_bold')
-    rest_sbref = create_key('func/sub-{subject}_task-rest_run-{item:02d}_sbref')
-    face = create_key('func/sub-{subject}_task-face_run-{item:02d}_bold')
-    face_sbref = create_key('func/sub-{subject}_task-face_run-{item:02d}_sbref')
-    gamble = create_key('func/sub-{subject}_task-gambling_run-{item:02d}_bold')
-    gamble_sbref = create_key('func/sub-{subject}_task-gambling_run-{item:02d}_sbref')
-    conflict = create_key('func/sub-{subject}_task-conflict_run-{item:02d}_bold')
-    conflict_sbref = create_key('func/sub-{subject}_task-conflict_run-{item:02d}_sbref')
-    dwi = create_key('dwi/sub-{subject}_run-{item:02d}_dwi')
-    dwi_sbref = create_key('dwi/sub-{subject}_run-{item:02d}_sbref')
-    fmap = create_key('fmap/sub-{subject}_dir-{dir}_run-{item:02d}_epi')
+    t1 = create_key('sub-{subject}/anat/sub-{subject}_T1w')
+    t2 = create_key('sub-{subject}/anat/sub-{subject}_T2w')
+    rest = create_key('sub-{subject}/func/sub-{subject}_task-rest_run-{item:02d}_bold')
+    rest_sbref = create_key('sub-{subject}/func/sub-{subject}_task-rest_run-{item:02d}_sbref')
+    face = create_key('sub-{subject}/func/sub-{subject}_task-face_run-{item:02d}_bold')
+    face_sbref = create_key('sub-{subject}/func/sub-{subject}_task-face_run-{item:02d}_sbref')
+    gamble = create_key('sub-{subject}/func/sub-{subject}_task-gambling_run-{item:02d}_bold')
+    gamble_sbref = create_key('sub-{subject}/func/sub-{subject}_task-gambling_run-{item:02d}_sbref')
+    conflict = create_key('sub-{subject}/func/sub-{subject}_task-conflict_run-{item:02d}_bold')
+    conflict_sbref = create_key('sub-{subject}/func/sub-{subject}_task-conflict_run-{item:02d}_sbref')
+    dwi = create_key('sub-{subject}/dwi/sub-{subject}_run-{item:02d}_dwi')
+    dwi_sbref = create_key('sub-{subject}/dwi/sub-{subject}_run-{item:02d}_sbref')
+    fmap = create_key('sub-{subject}/fmap/sub-{subject}_dir-{dir}_run-{item:02d}_epi')
 
     info = {t1:[], t2:[],
             rest:[], face:[], gamble:[], conflict:[], dwi:[],
