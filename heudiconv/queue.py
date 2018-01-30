@@ -11,7 +11,7 @@ def queue_conversion(progname, queue, outdir, heuristic, dicoms, sid,
 
         # Rework this...
         convertcmd = ' '.join(['python', progname,
-                               '-o', study_outdir,
+                               '-o', outdir,
                                '-f', heuristic,
                                '-s', sid,
                                '--anon-cmd', anon_cmd,

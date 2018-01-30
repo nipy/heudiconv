@@ -7,6 +7,8 @@ from .. import __version__, __packagename__
 from ..parser import get_study_sessions
 from ..utils import load_heuristic, anonymize_sid, treat_infofile, SeqInfo
 from ..convert import prep_conversion
+from ..bids import populate_bids_templates, tuneup_bids_json_files
+from ..queue import queue_conversion
 
 import inspect
 import logging
@@ -36,7 +38,7 @@ def setup_exceptionhook():
             # print()
             pdb.post_mortem(tb)
         else:
-            lgr.warn(
+            lgr.warning(
               "We cannot setup exception hook since not in interactive mode")
 
     sys.excepthook = _pdb_excepthook
@@ -106,15 +108,15 @@ def get_parser():
     parser.add_argument('--version', action='version', version=__version__)
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-d', '--dicom_dir_template', dest='dicom_dir_template',
-                        help='location of dicomdir that can be indexed with '
-                        'subject id {subject} and session {session}. Tarballs '
-                        '(can be compressed) are supported in addition to '
-                        'directory. All matching tarballs for a subject are '
-                        'extracted and their content processed in a single pass')
+                       help='location of dicomdir that can be indexed with '
+                       'subject id {subject} and session {session}. Tarballs '
+                       '(can be compressed) are supported in addition to '
+                       'directory. All matching tarballs for a subject are '
+                       'extracted and their content processed in a single pass')
     group.add_argument('--files', nargs='*',
-                        help='Files (tarballs, dicoms) or directories '
-                        'containing files to process. Cannot be provided if '
-                        'using --dicom_dir_template or --subjects')
+                       help='Files (tarballs, dicoms) or directories '
+                       'containing files to process. Cannot be provided if '
+                       'using --dicom_dir_template or --subjects')
     parser.add_argument('-s', '--subjects', dest='subjs', type=str, nargs='*',
                         help='list of subjects - required for dicom template. '
                         'If not provided, DICOMS would first be "sorted" and '
