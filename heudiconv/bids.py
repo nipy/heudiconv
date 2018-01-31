@@ -92,7 +92,7 @@ def populate_bids_templates(path, defaults={}):
         events_file = fpath[:-len(suf)] + '_events.tsv'
         lgr.debug("Generating %s", events_file)
         with open(events_file, 'w') as f:
-            f.write("onset\tduration\ttrial_type\tresponse_time\tTODO -- fill in rows and add more tab-separated columns if desired")
+            f.write("onset\tduration\ttrial_type\tresponse_time\tstim_file\tTODO -- fill in rows and add more tab-separated columns if desired")
     # extract tasks files stubs
     for task_acq, fields in tasks.items():
         task_file = op.join(path, task_acq + '_bold.json')
