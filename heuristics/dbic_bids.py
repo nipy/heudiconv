@@ -436,8 +436,9 @@ def infotodict(seqinfo):
             # if there is no _run -- no run label addded
             run_label = None
 
-        if s.is_motion_corrected:
-            assert s.is_derived, "Motion corrected images must be 'derived'"
+        # yoh: had a wrong assumption
+        # if s.is_motion_corrected:
+        #     assert s.is_derived, "Motion corrected images must be 'derived'"
 
         if s.is_motion_corrected and 'rec-' in regd.get('bids', ''):
             raise NotImplementedError("want to add _acq-moco but there is _acq- already")
