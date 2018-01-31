@@ -217,6 +217,9 @@ def process_args(args):
 
     for (locator, session, sid), files_or_seqinfo in study_sessions.items():
 
+        # Allow for session to be overloaded from command line
+        if args.session is not None:
+            session = args.session
         if not len(files_or_seqinfo):
             raise ValueError("nothing to process?")
         # that is how life is ATM :-/ since we don't do sorting if subj
@@ -252,7 +255,7 @@ def process_args(args):
                              sid,
                              args.anon_cmd,
                              args.converter,
-                             args.session,
+                             session,
                              args.with_prov,
                              args.bids)
             continue
@@ -271,10 +274,10 @@ def process_args(args):
             from ..external.dlad import prepare_datalad
             dlad_sid = sid if not anon_sid else anon_sid
             dl_msg = prepare_datalad(anon_study_outdir, anon_outdir, dlad_sid,
-                                     args.session, seqinfo, dicoms, args.bids)
+                                     session, seqinfo, dicoms, args.bids)
 
         lgr.info("PROCESSING STARTS: {0}".format(
-            str(dict(subject=sid, outdir=study_outdir, session=args.session))))
+            str(dict(subject=sid, outdir=study_outdir, session=session))))
 
         prep_conversion(sid,
                         dicoms,
@@ -284,7 +287,7 @@ def process_args(args):
                         anon_sid=anon_sid,
                         anon_outdir=anon_study_outdir,
                         with_prov=args.with_prov,
-                        ses=args.session,
+                        ses=session,
                         bids=args.bids,
                         seqinfo=seqinfo,
                         min_meta=args.minmeta,
