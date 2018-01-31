@@ -2165,6 +2165,8 @@ def get_parser():
              "not both")
     parser.add_argument('--minmeta', dest='minmeta', action='store_true',
                         help="Exclude dcmstack's meta information in sidecar jsons")
+    parser.add_argument('--random-seed', type=int, default=None,
+                        help='Random seed to initialize RNG')
     return parser
 
 
@@ -2173,6 +2175,12 @@ def main(argv=None):
     """
     parser = get_parser()
     args = parser.parse_args(argv)
+    # To be done asap so anything random is deterministic
+    if args.random_seed is not None:
+        import random
+        random.seed(args.random_seed)
+        import numpy
+        numpy.random.seed(args.random_seed)
 
     # TODO: assign   distribution-restrictions=sensitive
 
