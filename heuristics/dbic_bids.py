@@ -309,8 +309,9 @@ def infotodict(seqinfo):
     image_data_type = None
     for s in seqinfo:
         # XXX: skip derived sequences, we don't store them to avoid polluting
-        # the directory
-        if s.is_derived:
+        # the directory, unless it is the motion corrected ones
+        # (will get _rec-moco suffix)
+        if s.is_derived and not s.is_motion_corrected:
             skipped.append(s.series_id)
             lgr.debug("Ignoring derived data %s", s.series_id)
             continue
@@ -434,6 +435,9 @@ def infotodict(seqinfo):
         else:
             # if there is no _run -- no run label addded
             run_label = None
+
+        if s.is_motion_corrected:
+            assert s.is_derived, "Motion corrected images must be 'derived'"
 
         if s.is_motion_corrected and 'rec-' in regd.get('bids', ''):
             raise NotImplementedError("want to add _acq-moco but there is _acq- already")

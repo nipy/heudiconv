@@ -527,8 +527,7 @@ def group_dicoms_into_seqinfos(
             refphys = '-'
 
         image_type = tuple(dcminfo.ImageType)
-        motion_corrected = 'MoCo' in dcminfo.SeriesDescription \
-                           or 'MOCO' in image_type
+        motion_corrected = 'MOCO' in image_type
 
         if dcminfo.get([0x18,0x24], None):
             # GE and Philips scanners
