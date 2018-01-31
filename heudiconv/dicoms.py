@@ -185,8 +185,7 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
         except AttributeError:
             series_desc = ''
 
-        motion_corrected = ('moco' in dcminfo.SeriesDescription.lower()
-                           or 'MOCO' in image_type)
+        motion_corrected = 'MOCO' in image_type
 
         if dcminfo.get([0x18,0x24], None):
             # GE and Philips scanners
