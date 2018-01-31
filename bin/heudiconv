@@ -41,6 +41,7 @@ from collections import namedtuple
 from collections import defaultdict
 from collections import OrderedDict as ordereddict
 from datetime import datetime
+import os.path as op
 from os.path import isdir
 from os.path import basename
 from os.path import dirname
@@ -1637,35 +1638,22 @@ def populate_bids_templates(path, defaults={}):
         ]))
 
     sourcedata_README = opj(path, 'sourcedata', 'README')
-    if exists(dirname(sourcedata_README)):
-        create_file_if_missing(
-            sourcedata_README,
-            """\
-TODO: Provide description about source data, e.g.
-
-Directory below contains DICOMS compressed into tarballs per each sequence,
-replicating directory hierarchy of the BIDS dataset itself.
-""")
-
-    create_file_if_missing(
-        opj(path, 'CHANGES'),
-        """\
-0.0.1  Initial data acquired
-
-TODOs:
-  - verify and possibly extend information in participants.tsv
-    (see for example http://datasets.datalad.org/?dir=/openfmri/ds000208)
-  - fill out dataset_description.json, README, sourcedata/README (if present)
-  - provide _events.tsv file for each _bold.nii.gz with onsets of events
-    (see  "8.5 Task events"  of BIDS specification)
-""")
-
-    create_file_if_missing(
-        opj(path, 'README'),
-        """\
-TODO: Provide description for the dataset -- basic details about the study,
-possibly pointing to pre-registration (if public or embargoed)
-""")
+    if op.exists(op.dirname(sourcedata_README)):
+        create_file_if_missing(sourcedata_README,
+            ("TODO: Provide description about source data, e.g. \n"
+            "Directory below contains DICOMS compressed into tarballs per "
+            "each sequence, replicating directory hierarchy of the BIDS dataset"
+            " itself."))
+    create_file_if_missing(op.join(path, 'CHANGES'),
+        "0.0.1  Initial data acquired\n"
+        "TODOs:\n\t- verify and possibly extend information in participants.tsv"
+        " (see for example http://datasets.datalad.org/?dir=/openfmri/ds000208)"
+        "\n\t- fill out dataset_description.json, README, sourcedata/README"
+        " (if present)\n\t- provide _events.tsv file for each _bold.nii.gz with"
+        " onsets of events (see  '8.5 Task events'  of BIDS specification)")
+    create_file_if_missing(op.join(path, 'README'),
+        "TODO: Provide description for the dataset -- basic details about the "
+        "study, possibly pointing to pre-registration (if public or embargoed)")
 
     # TODO: collect all task- .json files for func files to
     tasks = {}
