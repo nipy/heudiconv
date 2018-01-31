@@ -88,9 +88,14 @@ def process_extra_commands(outdir, args):
 def main(argv=None):
     parser = get_parser()
     args = parser.parse_args(argv)
+    # To be done asap so anything random is deterministic
+    if args.random_seed is not None:
+        import random
+        random.seed(args.random_seed)
+        import numpy
+        numpy.random.seed(args.random_seed)
     if args.debug:
         lgr.setLevel(logging.DEBUG)
-
     if args.files and args.subjs:
         raise ValueError("Unable to processes `--subjects` with files")
 
@@ -173,7 +178,8 @@ def get_parser():
     parser.add_argument('--minmeta', action='store_true',
                         help='Exclude dcmstack meta information in sidecar '
                         'jsons')
-
+    parser.add_argument('--random-seed', type=int, default=None,
+                        help='Random seed to initialize RNG')
     submission = parser.add_argument_group('Conversion submission options')
     submission.add_argument('-q', '--queue', default=None,
                             help='select batch system to submit jobs to instead'
