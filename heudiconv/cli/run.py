@@ -8,6 +8,7 @@ from ..parser import get_study_sessions
 from ..utils import load_heuristic, anonymize_sid, treat_infofile, SeqInfo
 from ..convert import prep_conversion
 
+from ..bids import (populate_bids_templates, tuneup_bids_json_files)
 import inspect
 import logging
 lgr = logging.getLogger(__name__)
