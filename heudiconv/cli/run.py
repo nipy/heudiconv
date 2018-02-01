@@ -96,8 +96,12 @@ def main(argv=None):
         numpy.random.seed(args.random_seed)
     if args.debug:
         lgr.setLevel(logging.DEBUG)
-    if args.files and args.subjs:
-        raise ValueError("Unable to processes `--subjects` with files")
+    # Should be possible but only with a single subject -- will be used to
+    # override subject deduced from the DICOMs
+    if args.files and args.subjs and len(args.subjs) > 1:
+        raise ValueError(
+            "Unable to processes multiple `--subjects` with files"
+        )
 
     if args.debug:
         setup_exceptionhook()
