@@ -246,8 +246,8 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
             os.makedirs(prefix_dirname)
 
         for outtype in outtypes:
-            lgr.debug("Processing %d dicoms for output type %s",
-                     len(item_dicoms), outtype)
+            lgr.debug("Processing %d dicoms for output type %s. Overwrite=%s",
+                     len(item_dicoms), outtype, overwrite)
             lgr.debug("Includes the following dicoms: %s", item_dicoms)
 
             seqtype = op.basename(op.dirname(prefix)) if bids else None
@@ -291,6 +291,11 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                         prov_files.append(prov_file)
 
                     tempdirs.rmtree(tmpdir)
+                else:
+                    raise RuntimeError(
+                        "was asked to convert into %s but destination already exists"
+                        % (outname)
+                    )
 
         if len(bids_outfiles) > 1:
             lgr.warning("For now not embedding BIDS and info generated "

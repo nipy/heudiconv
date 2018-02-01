@@ -11,6 +11,9 @@ import re
 
 import pytest
 
+import logging
+lgr = logging.getLogger(__name__)
+
 try:
     from datalad.api import Dataset
 except ImportError:  # pragma: no cover
@@ -54,6 +57,10 @@ def test_dbic_bids_largely_smoke(tmpdir, heuristic, invocation):
     head = ds.repo.get_hexsha()
 
     # and if we rerun -- should fail
+    lgr.info(
+        "RERUNNING, expecting to FAIL since the same everything "
+        "and -c specified so we did conversion already"
+    )
     with pytest.raises(RuntimeError):
         runner(args)
 
