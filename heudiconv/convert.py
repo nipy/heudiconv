@@ -296,6 +296,8 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
             lgr.warning("For now not embedding BIDS and info generated "
                         ".nii.gz itself since sequence produced "
                         "multiple files")
+        elif not bids_outfiles:
+            lgr.debug("No BIDS files were produced, nothing to embed to then")
         else:
             embed_metadata_from_dicoms(bids, item_dicoms, outname, outname_bids,
                                        prov_file, scaninfo, tempdirs, with_prov,
