@@ -324,10 +324,11 @@ def convert_dicom(item_dicoms, bids, prefix,
             outfile = op.join(dicomdir, op.basename(filename))
             if not op.islink(outfile):
                 # TODO: add option to enable hardlink?
-                if symlink:
-                    os.symlink(filename, outfile)
-                else:
-                    os.link(filename, outfile)
+#                if symlink:
+#                    os.symlink(filename, outfile)
+#                else:
+#                    os.link(filename, outfile)
+                shutil.copyfile(filename, outfile)
 
 
 def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir):
