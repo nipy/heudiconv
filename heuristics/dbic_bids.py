@@ -470,18 +470,19 @@ def infotodict(seqinfo):
         # if seq:
         #     suffix += 'seq-%s' % ('+'.join(seq))
 
-        # some are ok to skip and not to whine
-
+        # For scouts -- we want only dicoms
+        # https://github.com/nipy/heudiconv/issues/145
         if "_Scout" in s.series_description or \
                 (seqtype == 'anat' and seqtype_label and seqtype_label.startswith('scout')):
-            skipped.append(s.series_id)
-            lgr.debug("Ignoring %s", s.series_id)
+            outtype = ('dicom',)
         else:
-            template = create_key(seqtype, suffix, prefix=prefix)
-            # we wanted ordered dict for consistent demarcation of dups
-            if template not in info:
-                info[template] = []
-            info[template].append(s.series_id)
+            outtype = ('nii.gz', 'dicom')
+
+        template = create_key(seqtype, suffix, prefix=prefix, outtype=outtype)
+        # we wanted ordered dict for consistent demarcation of dups
+        if template not in info:
+            info[template] = []
+        info[template].append(s.series_id)
 
     if skipped:
         lgr.info("Skipped %d sequences: %s" % (len(skipped), skipped))
