@@ -55,7 +55,7 @@ def process_extra_commands(outdir, args):
     args : Namespace
         arguments
     """
-    if args.command == 'treat-json':
+    if args.command == 'treat-jsons':
         for f in args.files:
             treat_infofile(f)
     elif args.command == 'ls':
@@ -173,7 +173,8 @@ def get_parser():
                         help='Do not catch exceptions and show exception '
                         'traceback')
     parser.add_argument('--command',
-                        choices=('treat-json', 'ls', 'populate-templates'),
+                        choices=('ls', 'populate-templates',
+                                 'treat-jsons', 'sanitize-jsons'),
                         help='custom actions to be performed on provided '
                         'files instead of regular operation.')
     parser.add_argument('-g', '--grouping', default='studyUID',

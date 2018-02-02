@@ -58,7 +58,17 @@ def test_populate_bids_templates(tmpdir):
     for f in "README", "dataset_description.json", "CHANGES":
         # Just test that we have created them and they all have stuff TODO
         assert "TODO" in tmpdir.join(f).read()
-    assert "something" in tmpdir.join('dataset_description.json').read()
+    description_file = tmpdir.join('dataset_description.json')
+    assert "something" in description_file.read()
+
+    # it should also be available as a command
+    os.unlink(str(description_file))
+    runner([
+        '--command', 'populate-templates', '-f', 'heuristics/convertall.py',
+        '--files', str(tmpdir)
+    ])
+    assert "something" not in description_file.read()
+    assert "TODO" in description_file.read()
 
 
 def test_add_participant_record(tmpdir):
