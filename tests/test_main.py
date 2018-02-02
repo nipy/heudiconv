@@ -13,6 +13,7 @@ from heudiconv.bids import (populate_bids_templates,
                             find_subj_ses)
 from heudiconv.external.dlad import MIN_VERSION, add_to_datalad
 
+from .utils import TESTS_DATA_PATH
 import csv
 import os
 import pytest
@@ -164,9 +165,11 @@ def test_json_dumps_pretty():
 
 def test_get_formatted_scans_key_row():
     item = [
-        ('tests/data/01-fmap_acq-3mm/1.3.12.2.1107.5.2.43.66112.2016101409263663466202201.dcm',
+         ('%s/01-fmap_acq-3mm/1.3.12.2.1107.5.2.43.66112.2016101409263663466202201.dcm'
+          % TESTS_DATA_PATH,
          ('nii.gz', 'dicom'),
-         ['tests/data/01-fmap_acq-3mm/1.3.12.2.1107.5.2.43.66112.2016101409263663466202201.dcm'])
+         ['%s/01-fmap_acq-3mm/1.3.12.2.1107.5.2.43.66112.2016101409263663466202201.dcm'
+          % TESTS_DATA_PATH])
     ]
     outname_bids_file = '/a/path/Halchenko/Yarik/950_bids_test4/sub-phantom1sid1/fmap/sub-phantom1sid1_acq-3mm_phasediff.json'
 
