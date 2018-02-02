@@ -10,7 +10,6 @@ from ..convert import prep_conversion
 from ..bids import populate_bids_templates, tuneup_bids_json_files
 from ..queue import queue_conversion
 
-from ..bids import (populate_bids_templates, tuneup_bids_json_files)
 import inspect
 import logging
 lgr = logging.getLogger(__name__)
