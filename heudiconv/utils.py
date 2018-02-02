@@ -14,6 +14,10 @@ from pathlib import Path
 from collections import namedtuple
 from glob import glob
 
+import logging
+lgr = logging.getLogger(__name__)
+
+
 seqinfo_fields = [
     'total_files_till_now',  # 0
     'example_dcm_file',      # 1
@@ -264,14 +268,63 @@ def slim_down_info(j):
     return j
 
 
-def load_heuristic(heuristic_file):
+def get_known_heuristic_names():
+    """Return a list of heuristic names present under heudiconv/heuristics"""
+    import heudiconv.heuristics
+    candidates = {
+        op.splitext(op.basename(x))[0]
+        for hp in heudiconv.heuristics.__path__
+        for x in glob(op.join(hp, '*.py')) + glob(op.join(hp, '*.py[co]'))
+    }
+    return sorted(
+        filter(
+            lambda c: not (c.startswith('test_') or c.startswith('_')),
+            candidates
+        )
+    )
+
+
+def load_heuristic(heuristic):
     """Load heuristic from the file, return the module
     """
-    path, fname = op.split(heuristic_file)
-    sys.path.append(path)
-    mod = __import__(fname.split('.')[0])
-    mod.filename = heuristic_file
+    if os.path.sep in heuristic or os.path.lexists(heuristic):
+        heuristic_file = op.realpath(heuristic)
+        path, fname = op.split(heuristic_file)
+        try:
+            old_syspath = sys.path[:]
+            sys.path.append(path)
+            mod = __import__(fname.split('.')[0])
+            mod.filename = heuristic_file
+        finally:
+            sys.path = old_syspath
+    else:
+        from importlib import import_module
+        try:
+            mod = import_module('heudiconv.heuristics.%s' % heuristic)
+            mod.filename = mod.__file__.rstrip('co')  # remove c or o from pyc/pyo
+        except Exception as exc:
+            raise RuntimeError(
+                "Failed to import heuristic %s: %s"
+                % (heuristic, exc)
+            )
     return mod
+
+
+def get_heuristic_description(name, full=False):
+    try:
+        mod = load_heuristic(name)
+        desc = (getattr(mod, '__doc__', '') or '').strip()
+        return desc.split(os.linesep)[0] if not full else desc
+    except Exception as exc:
+        return "Failed to load: %s" % exc
+
+
+def get_known_heuristics_with_descriptions():
+    from collections import OrderedDict
+    heuristics = OrderedDict()
+    for name in get_known_heuristic_names():
+        heuristics[name] = get_heuristic_description(name, full=False)
+    return heuristics
 
 
 def safe_copyfile(src, dest, overwrite=False):

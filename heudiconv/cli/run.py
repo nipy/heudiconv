@@ -59,7 +59,7 @@ def process_extra_commands(outdir, args):
         for f in args.files:
             treat_infofile(f)
     elif args.command == 'ls':
-        heuristic = load_heuristic(op.realpath(args.heuristic_file))
+        heuristic = load_heuristic(args.heuristic)
         heuristic_ls = getattr(heuristic, 'ls', None)
         for f in args.files:
             study_sessions = get_study_sessions(
@@ -75,11 +75,21 @@ def process_extra_commands(outdir, args):
                     % (str(study_session), len(sequences), suf)
                 )
     elif args.command == 'populate-templates':
-        heuristic = load_heuristic(op.realpath(args.heuristic_file))
+        heuristic = load_heuristic(args.heuristic)
         for f in args.files:
             populate_bids_templates(f, getattr(heuristic, 'DEFAULT_FIELDS', {}))
     elif args.command == 'sanitize-jsons':
         tuneup_bids_json_files(args.files)
+    elif args.command == 'heuristics':
+        from ..utils import get_known_heuristics_with_descriptions
+        for name_desc in get_known_heuristics_with_descriptions().items():
+            print("- %s: %s" % name_desc)
+    elif args.command == 'heuristic-info':
+        from ..utils import get_heuristic_description, get_known_heuristic_names
+        if not args.heuristic:
+            raise ValueError("Specify heuristic using -f. Known are: %s"
+                             % ', '.join(get_known_heuristic_names()))
+        print(get_heuristic_description(args.heuristic, full=True))
     else:
         raise ValueError("Unknown command %s", args.command)
     return
@@ -148,9 +158,11 @@ def get_parser():
                         'DICOMs to anonymized IDs. Such command must take a '
                         'single argument and return a single anonymized ID. '
                         'Also see --conv-outdir')
-    parser.add_argument('-f', '--heuristic', dest='heuristic_file',
-                        required=True,
-                        help='python script containing heuristic')
+    parser.add_argument('-f', '--heuristic', dest='heuristic',
+                        # some commands might not need heuristic
+                        # required=True,
+                        help='Name of a known heuristic or path to the Python'
+                             'script containing heuristic')
     parser.add_argument('-p', '--with-prov', action='store_true',
                         help='Store additional provenance information. '
                         'Requires python-rdflib.')
@@ -174,7 +186,8 @@ def get_parser():
                         'traceback')
     parser.add_argument('--command',
                         choices=('ls', 'populate-templates',
-                                 'treat-jsons', 'sanitize-jsons'),
+                                 'treat-jsons', 'sanitize-jsons',
+                                 'heuristics', 'heuristic-info'),
                         help='custom actions to be performed on provided '
                         'files instead of regular operation.')
     parser.add_argument('-g', '--grouping', default='studyUID',
@@ -202,19 +215,20 @@ def process_args(args):
     # pre-process provided list of files and possibly sort into groups/sessions
     # Group files per each study/sid/session
 
-    lgr.info(INIT_MSG(packname=__packagename__,
-                      version=__version__))
-
     outdir = op.abspath(args.outdir)
 
     if args.command:
         process_extra_commands(outdir, args)
         return
 
+    lgr.info(INIT_MSG(packname=__packagename__,
+                      version=__version__))
+
+
     #
     # Load heuristic -- better do it asap to make sure it loads correctly
     #
-    heuristic = load_heuristic(op.realpath(args.heuristic_file))
+    heuristic = load_heuristic(args.heuristic)
 
     study_sessions = get_study_sessions(args.dicom_dir_template, args.files,
                                         heuristic, outdir, args.session,
