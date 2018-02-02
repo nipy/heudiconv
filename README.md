@@ -25,7 +25,7 @@ provided to address various use-cases
 
 - the [cmrr_heuristic](heuristics/cmrr_heuristic.py) provides an
   example for a conversion to [BIDS]
-- the [dbic_bids](heuristics/dbic_bids.py) could be used to establish
+- the [reproin](heuristics/reproin.py) could be used to establish
   a complete imaging center wide automation to convert all acquired
   data to [BIDS] following a simple naming
   [convention](https://goo.gl/o0YASC) for studies and sequences

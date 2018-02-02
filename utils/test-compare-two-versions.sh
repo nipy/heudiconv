@@ -30,7 +30,7 @@ function run() {
 
    # just do full conversion
    echo "Running $whichheudiconv with log in $out.log"
-   $RUN heudiconv --random-seed 1 -f $heudiconvdir/heuristics/dbic_bids.py -c dcm2niix -o $out --datalad --bids "$@" >| $out.log 2>&1
+   $RUN heudiconv --random-seed 1 -f $heudiconvdir/heuristics/reproin.py -c dcm2niix -o $out --datalad --bids "$@" >| $out.log 2>&1
 }
 
 run heudiconv rolando "$@"

@@ -31,7 +31,7 @@ def test_smoke_converall(tmpdir):
     )
 
 
-@pytest.mark.parametrize('heuristic', ['dbic_bids', 'convertall'])
+@pytest.mark.parametrize('heuristic', ['reproin', 'convertall'])
 @pytest.mark.parametrize(
     'invocation', [
         "--files %s" % TESTS_DATA_PATH,    # our new way with automated groupping
@@ -39,8 +39,8 @@ def test_smoke_converall(tmpdir):
         # should produce the same results
     ])
 @pytest.mark.skipif(Dataset is None, reason="no datalad")
-def test_dbic_bids_largely_smoke(tmpdir, heuristic, invocation):
-    is_bids = True if heuristic == 'dbic_bids' else False
+def test_reproin_largely_smoke(tmpdir, heuristic, invocation):
+    is_bids = True if heuristic == 'reproin' else False
     arg = "--random-seed 1 -f %s -c dcm2niix -o %s" \
           % (heuristic, tmpdir)
     if is_bids:
@@ -57,7 +57,7 @@ def test_dbic_bids_largely_smoke(tmpdir, heuristic, invocation):
         with pytest.raises(ValueError):
             runner(args + ['--subjects', 'sub1', 'sub2'])
 
-        if heuristic != 'dbic_bids':
+        if heuristic != 'reproin':
             # none other heuristic has mighty infotoids atm
             with pytest.raises(NotImplementedError):
                 runner(args)
@@ -93,8 +93,8 @@ def test_dbic_bids_largely_smoke(tmpdir, heuristic, invocation):
     'invocation', [
         "--files %s" % TESTS_DATA_PATH,    # our new way with automated groupping
     ])
-def test_scans_keys_dbic_bids(tmpdir, invocation):
-    args = "-f dbic_bids -c dcm2niix -o %s -b " % (tmpdir)
+def test_scans_keys_reproin(tmpdir, invocation):
+    args = "-f reproin -c dcm2niix -o %s -b " % (tmpdir)
     args += invocation
     runner(args.split())
     # for now check it exists
@@ -116,7 +116,7 @@ def test_scans_keys_dbic_bids(tmpdir, invocation):
 @patch('sys.stdout', new_callable=StringIO)
 def test_ls(stdout):
     args = (
-            "-f dbic_bids --command ls --files %s"
+            "-f reproin --command ls --files %s"
             % (TESTS_DATA_PATH)
     ).split(' ')
     runner(args)
