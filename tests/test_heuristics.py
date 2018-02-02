@@ -11,6 +11,9 @@ import re
 
 import pytest
 
+import logging
+lgr = logging.getLogger(__name__)
+
 try:
     from datalad.api import Dataset
 except ImportError:  # pragma: no cover
@@ -25,7 +28,7 @@ def test_smoke_converall(tmpdir):
     )
 
 
-@pytest.mark.parametrize('heuristic', [ 'dbic_bids', 'convertall' ])
+@pytest.mark.parametrize('heuristic', ['dbic_bids', 'convertall'])
 @pytest.mark.parametrize(
     'invocation', [
         "--files tests/data",    # our new way with automated groupping
@@ -35,18 +38,26 @@ def test_smoke_converall(tmpdir):
 @pytest.mark.skipif(Dataset is None, reason="no datalad")
 def test_dbic_bids_largely_smoke(tmpdir, heuristic, invocation):
     is_bids = True if heuristic == 'dbic_bids' else False
-    arg = "-f heuristics/%s.py -c dcm2niix -o %s" % (heuristic, tmpdir)
+    arg = "--random-seed 1 -f heuristics/%s.py -c dcm2niix -o %s" % (heuristic, tmpdir)
     if is_bids:
         arg += " -b"
     arg += " --datalad "
     args = (
         arg + invocation
     ).split(' ')
-    if heuristic != 'dbic_bids' and invocation == '--files tests/data':
-        # none other heuristic has mighty infotoids atm
-        with pytest.raises(NotImplementedError):
-            runner(args)
-        return
+
+    # Test some safeguards
+    if invocation == '--files tests/data':
+        # Multiple subjects must not be specified -- only a single one could
+        # be overridden from the command line
+        with pytest.raises(ValueError):
+            runner(args + ['--subjects', 'sub1', 'sub2'])
+
+        if heuristic != 'dbic_bids':
+            # none other heuristic has mighty infotoids atm
+            with pytest.raises(NotImplementedError):
+                runner(args)
+            return
     runner(args)
     ds = Dataset(str(tmpdir))
     assert ds.is_installed()
@@ -54,15 +65,13 @@ def test_dbic_bids_largely_smoke(tmpdir, heuristic, invocation):
     head = ds.repo.get_hexsha()
 
     # and if we rerun -- should fail
-    if heuristic != 'dbic_bids' and invocation != '--files tests/data':
-        # those guys -- they just plow through it ATM without failing, i.e.
-        # the logic is to reprocess
+    lgr.info(
+        "RERUNNING, expecting to FAIL since the same everything "
+        "and -c specified so we did conversion already"
+    )
+    with pytest.raises(RuntimeError):
         runner(args)
 
-    # don't raise error by rerun...
-    # else:
-        # with pytest.raises(RuntimeError):
-        #     runner(args)
     # but there should be nothing new
     assert not ds.repo.dirty
     assert head == ds.repo.get_hexsha()

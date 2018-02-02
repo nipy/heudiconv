@@ -14,6 +14,8 @@ from .utils import (
     set_readonly,
     clear_temp_dicoms,
     seqinfo_fields,
+    assure_no_file_exists,
+    file_md5sum
 )
 from .bids import (
     convert_sid_bids,
@@ -100,15 +102,35 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
     if not op.exists(idir):
         os.makedirs(idir)
 
-    shutil.copy(heuristic.filename, idir)
     ses_suffix = "_ses-%s" % ses if ses is not None else ""
     info_file = op.join(idir, '%s%s.auto.txt' % (sid, ses_suffix))
     edit_file = op.join(idir, '%s%s.edit.txt' % (sid, ses_suffix))
     filegroup_file = op.join(idir, 'filegroup%s.json' % ses_suffix)
 
+    # if conversion table(s) do not exist -- we need to prepare them
+    # (the *prepare* stage in https://github.com/nipy/heudiconv/issues/134)
+    reuse_conversion_table = op.exists(edit_file)
+    # We also might need to redo it if changes in the heuristic file
+    # detected
+    # ref: https://github.com/nipy/heudiconv/issues/84#issuecomment-330048609
+    # for more automagical wishes
+    target_heuristic_filename = op.join(idir, op.basename(heuristic.filename))
+    # TODO:
+    #  1. add a test
+    #  2. possibly extract into a dedicated function for easier logic flow here
+    #     and a dedicated unittest
+    if not reuse_conversion_table and \
+        op.exists(target_heuristic_filename) and \
+        file_md5sum(target_heuristic_filename) != file_md5sum(heuristic.filename):
+        reuse_conversion_table = False
+        lgr.info(
+            "Will not reuse existing conversion table files because heuristic "
+            "has changed"
+        )
+
     # MG - maybe add an option to force rerun?
     # related issue : https://github.com/nipy/heudiconv/issues/84
-    if op.exists(edit_file) and overwrite:
+    if reuse_conversion_table:
         lgr.info("Reloading existing filegroup.json "
                  "because %s exists", edit_file)
         info = read_config(edit_file)
@@ -122,6 +144,8 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
     else:
         # TODO -- might have been done outside already!
         # MG -- will have to try with both dicom template, files
+        assure_no_file_exists(target_heuristic_filename)
+        safe_copyfile(heuristic.filename, idir)
         if dicoms:
             seqinfo = group_dicoms_into_seqinfos(
                 dicoms,
@@ -131,6 +155,8 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
         seqinfo_list = list(seqinfo.keys())
         filegroup = {si.series_id: x for si, x in seqinfo.items()}
         dicominfo_file = op.join(idir, 'dicominfo%s.tsv' % ses_suffix)
+        # allow to overwrite even if was present under git-annex already
+        assure_no_file_exists(dicominfo_file)
         with open(dicominfo_file, 'wt') as fp:
             fp.write('\t'.join([val for val in seqinfo_fields]) + '\n')
             for seq in seqinfo_list:
@@ -139,7 +165,9 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
         info = heuristic.infotodict(seqinfo_list)
         lgr.debug("Writing to {}, {}, {}".format(info_file, edit_file,
                                                  filegroup_file))
+        assure_no_file_exists(info_file)
         write_config(info_file, info)
+        assure_no_file_exists(edit_file)
         write_config(edit_file, info)
         save_json(filegroup_file, filegroup)
 
@@ -150,7 +178,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
     else:
         tdir = op.join(anon_outdir, anon_sid)
 
-    if converter != 'none':
+    if converter.lower() != 'none':
         lgr.info("Doing conversion using %s", converter)
         cinfo = conversion_info(anon_sid, tdir, info, filegroup, ses)
         convert(cinfo,
@@ -218,8 +246,8 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
             os.makedirs(prefix_dirname)
 
         for outtype in outtypes:
-            lgr.debug("Processing %d dicoms for output type %s",
-                     len(item_dicoms), outtype)
+            lgr.debug("Processing %d dicoms for output type %s. Overwrite=%s",
+                     len(item_dicoms), outtype, overwrite)
             lgr.debug("Includes the following dicoms: %s", item_dicoms)
 
             seqtype = op.basename(op.dirname(prefix)) if bids else None
@@ -243,7 +271,8 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
 
                     bids_outfiles = save_converted_files(res, item_dicoms, bids,
                                                          outtype, prefix,
-                                                         outname_bids)
+                                                         outname_bids,
+                                                         overwrite=overwrite)
 
                     # save acquisition time information if it's BIDS
                     # at this point we still have acquisition date
@@ -257,15 +286,23 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                         safe_copyfile(op.join(convertnode.base_dir,
                                               convertnode.name,
                                              'provenance.ttl'),
-                                      prov_file)
+                                      prov_file,
+                                      overwrite=overwrite)
                         prov_files.append(prov_file)
 
                     tempdirs.rmtree(tmpdir)
+                else:
+                    raise RuntimeError(
+                        "was asked to convert into %s but destination already exists"
+                        % (outname)
+                    )
 
         if len(bids_outfiles) > 1:
             lgr.warning("For now not embedding BIDS and info generated "
                         ".nii.gz itself since sequence produced "
                         "multiple files")
+        elif not bids_outfiles:
+            lgr.debug("No BIDS files were produced, nothing to embed to then")
         else:
             embed_metadata_from_dicoms(bids, item_dicoms, outname, outname_bids,
                                        prov_file, scaninfo, tempdirs, with_prov,
@@ -350,7 +387,7 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir):
     return convertnode.run()
 
 
-def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids):
+def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids, overwrite):
     """Copy converted files from tempdir to output directory.
     Will rename files if necessary.
 
@@ -381,8 +418,8 @@ def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids):
 
     if isdefined(res.outputs.bvecs) and isdefined(res.outputs.bvals):
         outname_bvecs, outname_bvals = prefix + '.bvec', prefix + '.bval'
-        safe_copyfile(res.outputs.bvecs, outname_bvecs)
-        safe_copyfile(res.outputs.bvals, outname_bvals)
+        safe_copyfile(res.outputs.bvecs, outname_bvecs, overwrite)
+        safe_copyfile(res.outputs.bvals, outname_bvals, overwrite)
 
     if isinstance(res_files, list):
         # we should provide specific handling for fmap,
@@ -406,18 +443,18 @@ def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids):
 
         for fl, suffix, bids_file in zip(res_files, suffixes, bids_files):
             outname = "%s%s.%s" % (prefix, suffix, outtype)
-            safe_copyfile(fl, outname)
+            safe_copyfile(fl, outname, overwrite)
             if bids_file:
                 outname_bids_file = "%s%s.json" % (prefix, suffix)
-                safe_copyfile(bids_file, outname_bids_file)
+                safe_copyfile(bids_file, outname_bids_file, overwrite)
                 bids_outfiles.append(outname_bids_file)
     # res_files is not a list
     else:
         outname = "{}.{}".format(prefix, outtype)
-        safe_copyfile(res_files, outname)
+        safe_copyfile(res_files, outname, overwrite)
         if isdefined(res.outputs.bids):
             try:
-                safe_copyfile(res.outputs.bids, outname_bids)
+                safe_copyfile(res.outputs.bids, outname_bids, overwrite)
                 bids_outfiles.append(outname_bids)
             except TypeError as exc:  ##catch lists
                 raise TypeError("Multiple BIDS sidecars detected.")

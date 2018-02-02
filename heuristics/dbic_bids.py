@@ -29,6 +29,7 @@ fix_accession2run = {
     'A000467': ['^15-'],
     'A000490': ['^15-'],
     'A000511': ['^15-'],
+    'A000797': ['^[1-7]-'],
 }
 
 # dictionary containing fixes, keys are md5sum of study_description from
@@ -103,7 +104,8 @@ protocols2fix = {
     '1bd62e10672fe0b435a9aa8d75b45425':
         [
             # need to add incrementing session -- study should have 2
-            ('scout_run\+$', 'scout_run+_ses+'),
+            # and no need for run+ for the scout!
+            ('scout(_run\+)?$', 'scout_ses+'),
         ],
     'da218a66de902adb3ad9407d514e3639':
         [
@@ -111,6 +113,11 @@ protocols2fix = {
             # so fot consistency
             ('hardi_64',  'dwi_acq-DTI-hardi64'),
             ('acq-hardi', 'acq-DTI-hardi'),
+        ],
+    'ed20c1ad4a0861b2b65768e159258eec':
+        [
+            ('fmap_acq-discorr-dti-', 'fmap_acq-dwi_dir-'),
+            ('_test', ''),
         ],
 }
 keys2replace = ['protocol_name', 'series_description']
@@ -302,8 +309,9 @@ def infotodict(seqinfo):
     image_data_type = None
     for s in seqinfo:
         # XXX: skip derived sequences, we don't store them to avoid polluting
-        # the directory
-        if s.is_derived:
+        # the directory, unless it is the motion corrected ones
+        # (will get _rec-moco suffix)
+        if s.is_derived and not s.is_motion_corrected:
             skipped.append(s.series_id)
             lgr.debug("Ignoring derived data %s", s.series_id)
             continue
@@ -377,7 +385,8 @@ def infotodict(seqinfo):
         if seqtype == 'fmap' and not seqtype_label:
             seqtype_label = {
                 'M': 'magnitude',  # might want explicit {file_index}  ?
-                'P': 'phasediff'
+                'P': 'phasediff',
+                'DIFFUSION': 'epi', # according to KODI those DWI are the EPIs we need
             }[image_data_type]
 
         # label for dwi as well
@@ -427,6 +436,10 @@ def infotodict(seqinfo):
             # if there is no _run -- no run label addded
             run_label = None
 
+        # yoh: had a wrong assumption
+        # if s.is_motion_corrected:
+        #     assert s.is_derived, "Motion corrected images must be 'derived'"
+
         if s.is_motion_corrected and 'rec-' in regd.get('bids', ''):
             raise NotImplementedError("want to add _acq-moco but there is _acq- already")
 
@@ -457,18 +470,19 @@ def infotodict(seqinfo):
         # if seq:
         #     suffix += 'seq-%s' % ('+'.join(seq))
 
-        # some are ok to skip and not to whine
-
+        # For scouts -- we want only dicoms
+        # https://github.com/nipy/heudiconv/issues/145
         if "_Scout" in s.series_description or \
                 (seqtype == 'anat' and seqtype_label and seqtype_label.startswith('scout')):
-            skipped.append(s.series_id)
-            lgr.debug("Ignoring %s", s.series_id)
+            outtype = ('dicom',)
         else:
-            template = create_key(seqtype, suffix, prefix=prefix)
-            # we wanted ordered dict for consistent demarcation of dups
-            if template not in info:
-                info[template] = []
-            info[template].append(s.series_id)
+            outtype = ('nii.gz', 'dicom')
+
+        template = create_key(seqtype, suffix, prefix=prefix, outtype=outtype)
+        # we wanted ordered dict for consistent demarcation of dups
+        if template not in info:
+            info[template] = []
+        info[template].append(s.series_id)
 
     if skipped:
         lgr.info("Skipped %d sequences: %s" % (len(skipped), skipped))
@@ -717,8 +731,9 @@ def fixup_subjectid(subjectid):
 
 
 def test_filter_files():
+    # Filtering is currently disabled -- any sequence directory is Ok
     assert(filter_files('/home/mvdoc/dbic/09-run_func_meh/0123432432.dcm'))
-    assert(not filter_files('/home/mvdoc/dbic/run_func_meh/012343143.dcm'))
+    assert(filter_files('/home/mvdoc/dbic/run_func_meh/012343143.dcm'))
 
 
 def test_md5sum():

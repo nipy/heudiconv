@@ -8,6 +8,7 @@ from ..parser import get_study_sessions
 from ..utils import load_heuristic, anonymize_sid, treat_infofile, SeqInfo
 from ..convert import prep_conversion
 
+from ..bids import (populate_bids_templates, tuneup_bids_json_files)
 import inspect
 import logging
 lgr = logging.getLogger(__name__)
@@ -87,11 +88,20 @@ def process_extra_commands(outdir, args):
 def main(argv=None):
     parser = get_parser()
     args = parser.parse_args(argv)
+    # To be done asap so anything random is deterministic
+    if args.random_seed is not None:
+        import random
+        random.seed(args.random_seed)
+        import numpy
+        numpy.random.seed(args.random_seed)
     if args.debug:
         lgr.setLevel(logging.DEBUG)
-
-    if args.files and args.subjs:
-        raise ValueError("Unable to processes `--subjects` with files")
+    # Should be possible but only with a single subject -- will be used to
+    # override subject deduced from the DICOMs
+    if args.files and args.subjs and len(args.subjs) > 1:
+        raise ValueError(
+            "Unable to processes multiple `--subjects` with files"
+        )
 
     if args.debug:
         setup_exceptionhook()
@@ -119,9 +129,10 @@ def get_parser():
                         help='list of subjects - required for dicom template. '
                         'If not provided, DICOMS would first be "sorted" and '
                         'subject IDs deduced by the heuristic')
-    parser.add_argument('-c', '--converter', default='dcm2niix',
+    parser.add_argument('-c', '--converter',
+                        default='dcm2niix',
                         choices=('dcm2niix', 'none'),
-                        help='tool to use for dicom conversion. Setting to '
+                        help='tool to use for DICOM conversion. Setting to '
                         '"none" disables the actual conversion step -- useful'
                         'for testing heuristics.')
     parser.add_argument('-o', '--outdir', default=os.getcwd(),
@@ -149,7 +160,7 @@ def get_parser():
     parser.add_argument('-b', '--bids', action='store_true',
                         help='flag for output into BIDS structure')
     parser.add_argument('--overwrite', action='store_true', default=False,
-                        help='flag to allow overwrite existing files')
+                        help='flag to allow overwriting existing converted files')
     parser.add_argument('--datalad', action='store_true',
                         help='Store the entire collection as DataLad '
                         'dataset(s). Small files will be committed directly to '
@@ -171,7 +182,8 @@ def get_parser():
     parser.add_argument('--minmeta', action='store_true',
                         help='Exclude dcmstack meta information in sidecar '
                         'jsons')
-
+    parser.add_argument('--random-seed', type=int, default=None,
+                        help='Random seed to initialize RNG')
     submission = parser.add_argument_group('Conversion submission options')
     submission.add_argument('-q', '--queue', default=None,
                             help='select batch system to submit jobs to instead'
@@ -215,6 +227,9 @@ def process_args(args):
 
     for (locator, session, sid), files_or_seqinfo in study_sessions.items():
 
+        # Allow for session to be overloaded from command line
+        if args.session is not None:
+            session = args.session
         if not len(files_or_seqinfo):
             raise ValueError("nothing to process?")
         # that is how life is ATM :-/ since we don't do sorting if subj
@@ -250,7 +265,7 @@ def process_args(args):
                              sid,
                              args.anon_cmd,
                              args.converter,
-                             args.session,
+                             session,
                              args.with_prov,
                              args.bids)
             continue
@@ -269,10 +284,10 @@ def process_args(args):
             from ..external.dlad import prepare_datalad
             dlad_sid = sid if not anon_sid else anon_sid
             dl_msg = prepare_datalad(anon_study_outdir, anon_outdir, dlad_sid,
-                                     args.session, seqinfo, dicoms, args.bids)
+                                     session, seqinfo, dicoms, args.bids)
 
         lgr.info("PROCESSING STARTS: {0}".format(
-            str(dict(subject=sid, outdir=study_outdir, session=args.session))))
+            str(dict(subject=sid, outdir=study_outdir, session=session))))
 
         prep_conversion(sid,
                         dicoms,
@@ -282,7 +297,7 @@ def process_args(args):
                         anon_sid=anon_sid,
                         anon_outdir=anon_study_outdir,
                         with_prov=args.with_prov,
-                        ses=args.session,
+                        ses=session,
                         bids=args.bids,
                         seqinfo=seqinfo,
                         min_meta=args.minmeta,

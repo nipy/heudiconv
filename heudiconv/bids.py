@@ -61,10 +61,10 @@ def populate_bids_templates(path, defaults={}):
     create_file_if_missing(op.join(path, 'CHANGES'),
         "0.0.1  Initial data acquired\n"
         "TODOs:\n\t- verify and possibly extend information in participants.tsv"
-        "(see for example http://datasets.datalad.org/?dir=/openfmri/ds000208)"
-        "\n\t- fill out dataset_description.json, README, sourcedata/README "
-        "(if present)\n\t- provide _events.tsv file for each _bold.nii.gz with "
-        "onsets of events (see  '8.5 Task events'  of BIDS specification)")
+        " (see for example http://datasets.datalad.org/?dir=/openfmri/ds000208)"
+        "\n\t- fill out dataset_description.json, README, sourcedata/README"
+        " (if present)\n\t- provide _events.tsv file for each _bold.nii.gz with"
+        " onsets of events (see  '8.5 Task events'  of BIDS specification)")
     create_file_if_missing(op.join(path, 'README'),
         "TODO: Provide description for the dataset -- basic details about the "
         "study, possibly pointing to pre-registration (if public or embargoed)")
@@ -92,7 +92,7 @@ def populate_bids_templates(path, defaults={}):
         events_file = fpath[:-len(suf)] + '_events.tsv'
         lgr.debug("Generating %s", events_file)
         with open(events_file, 'w') as f:
-            f.write("onset\tduration\ttrial_type\tresponse_time\tTODO -- fill in rows and add more tab-separated columns if desired")
+            f.write("onset\tduration\ttrial_type\tresponse_time\tstim_file\tTODO -- fill in rows and add more tab-separated columns if desired")
     # extract tasks files stubs
     for task_acq, fields in tasks.items():
         task_file = op.join(path, task_acq + '_bold.json')

@@ -185,8 +185,7 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
         except AttributeError:
             series_desc = ''
 
-        motion_corrected = ('moco' in dcminfo.SeriesDescription.lower()
-                           or 'MOCO' in image_type)
+        motion_corrected = 'MOCO' in image_type
 
         if dcminfo.get([0x18,0x24], None):
             # GE and Philips scanners
@@ -448,6 +447,9 @@ def embed_metadata_from_dicoms(bids, item_dicoms, outname, outname_bids,
     from nipype import Node, Function
     tmpdir = tempdirs(prefix='embedmeta')
 
+    # We need to assure that paths are absolute if they are relative
+    item_dicoms = list(map(op.abspath, item_dicoms))
+
     embedfunc = Node(Function(input_names=['dcmfiles', 'niftifile', 'infofile',
                                            'bids_info', 'force', 'min_meta'],
                               output_names=['outfile', 'meta'],
@@ -464,6 +466,8 @@ def embed_metadata_from_dicoms(bids, item_dicoms, outname, outname_bids,
     embedfunc.inputs.force = True
     embedfunc.base_dir = tmpdir
     cwd = os.getcwd()
+    lgr.debug("Embedding into %s based on dicoms[0]=%s for nifti %s",
+              scaninfo, item_dicoms[0], outname)
     try:
         if op.lexists(scaninfo):
             # TODO: handle annexed file case

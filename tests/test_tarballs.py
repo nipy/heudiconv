@@ -10,9 +10,7 @@ from six.moves import StringIO
 from glob import glob
 
 from heudiconv.dicoms import compress_dicoms
-from heudiconv.utils import TempDirs
-
-from .utils import md5sum
+from heudiconv.utils import TempDirs, file_md5sum
 
 tests_datadir = opj(dirname(__file__), 'data')
 
@@ -24,7 +22,7 @@ def test_reproducibility(tmpdir):
             TempDirs(),
             True]
     tarball = compress_dicoms(*args)
-    md5 = md5sum(tarball)
+    md5 = file_md5sum(tarball)
     assert tarball
     # must not override, ensure overwrite is set to False
     args[-1] = False
@@ -36,6 +34,6 @@ def test_reproducibility(tmpdir):
 
     time.sleep(1.1)  # need to guarantee change of time
     tarball_ = compress_dicoms(*args)
-    md5_ = md5sum(tarball_)
+    md5_ = file_md5sum(tarball_)
     assert tarball == tarball_
     assert md5 == md5_
