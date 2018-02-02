@@ -386,6 +386,8 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir):
     if nipype.__version__.split('.')[0] == '0':
         # deprecated since 1.0, might be needed(?) before
         convertnode.inputs.terminal_output = 'allatonce'
+    else:
+        convertnode.terminal_output = 'allatonce'
     convertnode.inputs.bids_format = bids
     return convertnode.run()
 
