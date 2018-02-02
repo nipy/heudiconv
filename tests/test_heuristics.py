@@ -91,7 +91,7 @@ def test_dbic_bids_largely_smoke(tmpdir, heuristic, invocation):
 
 @pytest.mark.parametrize(
     'invocation', [
-        "--files %s/data" % TESTS_DATA_PATH,    # our new way with automated groupping
+        "--files %s" % TESTS_DATA_PATH,    # our new way with automated groupping
     ])
 def test_scans_keys_dbic_bids(tmpdir, invocation):
     args = "-f %s/dbic_bids.py -c dcm2niix -o %s -b " % (HEURISTICS_PATH, tmpdir)
