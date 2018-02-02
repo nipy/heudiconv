@@ -27,4 +27,5 @@ EXTRA_REQUIRES = {
     'datalad': ['datalad']
 }
 
-EXTRA_REQUIRES['all'] = list(EXTRA_REQUIRES.values())
+# Flatten the lists
+EXTRA_REQUIRES['all'] = sum(EXTRA_REQUIRES.values(), [])
