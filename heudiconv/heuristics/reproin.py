@@ -2,7 +2,9 @@
 (AKA dbic-bids) Flexible heuristic to establish BIDS DataLad datasets hierarchy
 
 Initially developed and deployed at Dartmouth Brain Imaging Center
-(http://dbic.dartmouth.edu) using Siemens Prisma 3T
+(http://dbic.dartmouth.edu) using Siemens Prisma 3T under the umbrellas of the
+Center of Reproducible Neuroimaging Computation (ReproNim, http://repronim.org)
+and Center for Open Neuroscience (CON, http://centerforopenneuroscience.org).
 
 ## Dataset ownership/location
 
@@ -77,8 +79,8 @@ _run-<RUNID> (optional)
     a (typically functional) run. The same idea as with SESID.
 
 _dir-[AP,PA,LR,RL,VD,DV] (optional)
-	to be used for fmap images, whenever a pair of the SE images is collected
-	to be used to estimate the fieldmap
+    to be used for fmap images, whenever a pair of the SE images is collected
+    to be used to estimate the fieldmap
 
 <more BIDS> (optional)
     any other fields (e.g. _acq-) from BIDS acquisition
