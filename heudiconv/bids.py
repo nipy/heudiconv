@@ -123,8 +123,7 @@ def tuneup_bids_json_files(json_files):
             # Let's hope no word 'Date' comes within a study name or smth like
             # that
             raise ValueError("There must be no dates in .json sidecar")
-        #json.dump(json_, open(jsonfile, 'w'), indent=2)
-        save_json(jsonfile, json_, indent=2) # ensure this does same as above
+        save_json(jsonfile, json_, indent=2)
 
     # Load the beast
     seqtype = op.basename(op.dirname(jsonfile))
@@ -163,7 +162,7 @@ def add_participant_record(studydir, subject, age, sex):
     participant_id = 'sub-%s' % subject
 
     if not create_file_if_missing(participants_tsv,
-            '\t'.join(['participant_id', 'age', 'sex', 'group']) + '\n'):
+           '\t'.join(['participant_id', 'age', 'sex', 'group']) + '\n'):
         # check if may be subject record already exists
         with open(participants_tsv) as f:
             f.readline()

@@ -2,6 +2,7 @@ import os
 import os.path as op
 import logging
 import shutil
+import sys
 
 from .utils import (
     read_config,
@@ -68,6 +69,7 @@ def conversion_info(subject, outdir, info, filegroup, ses):
                 try:
                     files = filegroup[item]
                 except KeyError:
+                    PY3 = sys.version_info[0] >= 3
                     files = filegroup[(str if PY3 else unicode)(item)]
                 outprefix = template.format(**parameters)
                 convert_info.append((op.join(outpath, outprefix),
@@ -266,8 +268,8 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                     tmpdir = tempdirs('dcm2niix')
 
                     # run conversion through nipype
-                    res = nipype_convert(item_dicoms, prefix, with_prov, bids,
-                                         tmpdir)
+                    res, prov_file = nipype_convert(item_dicoms, prefix, with_prov,
+                                                    bids, tmpdir)
 
                     bids_outfiles = save_converted_files(res, item_dicoms, bids,
                                                          outtype, prefix,
@@ -281,13 +283,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                     # Fix up and unify BIDS files
                     tuneup_bids_json_files(bids_outfiles)
 
-                    prov_file = prefix + '_prov.ttl' if with_prov else None
                     if prov_file:
-                        safe_copyfile(op.join(convertnode.base_dir,
-                                              convertnode.name,
-                                             'provenance.ttl'),
-                                      prov_file,
-                                      overwrite=overwrite)
                         prov_files.append(prov_file)
 
                     tempdirs.rmtree(tmpdir)
@@ -330,8 +326,17 @@ def convert_dicom(item_dicoms, bids, prefix,
         DICOMs to save
     bids : bool
         Save to BIDS format
-    sourcedir : string
-        Path to BIDS output
+    prefix : string
+        Conversion outname
+    outdir : string
+        Output directory
+    tempdirs : TempDirs instance
+        Object to handle temporary directories created
+        TODO: remove
+    symlink : bool
+        Create softlink to DICOMs - if False, create hardlink instead.
+    overwrite : bool
+        If True, allows overwriting of previous conversion
 
     Returns
     -------
@@ -389,7 +394,17 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir):
     else:
         convertnode.terminal_output = 'allatonce'
     convertnode.inputs.bids_format = bids
-    return convertnode.run()
+    eg = convertnode.run()
+
+    # prov information
+    prov_file = prefix + '_prov.ttl' if with_prov else None
+    if prov_file:
+        safe_copyfile(op.join(convertnode.base_dir,
+                              convertnode.name,
+                              'provenance.ttl'),
+                      prov_file)
+
+    return eg, prov_file
 
 
 def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids, overwrite):
