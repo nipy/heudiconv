@@ -1,8 +1,13 @@
 import os
+import os.path as op
 from heudiconv.utils import (
     get_known_heuristics_with_descriptions,
-    get_heuristic_description
+    get_heuristic_description,
+    load_heuristic
 )
+
+import pytest
+from .utils import HEURISTICS_PATH
 
 
 def test_get_known_heuristics_with_descriptions():
@@ -22,3 +27,17 @@ def test_get_heuristic_description():
     assert '_run-' in desc
     # and mention ReproNim ;)
     assert 'ReproNim' in desc
+
+
+def test_load_heuristic():
+    by_name = load_heuristic('reproin')
+    from_file = load_heuristic(op.join(HEURISTICS_PATH, 'reproin.py'))
+
+    assert by_name
+    assert by_name.filename == from_file.filename
+
+    with pytest.raises(ImportError):
+        load_heuristic('unknownsomething')
+
+    with pytest.raises(ImportError):
+        load_heuristic(op.join(HEURISTICS_PATH, 'unknownsomething.py'))

@@ -303,7 +303,7 @@ def load_heuristic(heuristic):
             mod = import_module('heudiconv.heuristics.%s' % heuristic)
             mod.filename = mod.__file__.rstrip('co')  # remove c or o from pyc/pyo
         except Exception as exc:
-            raise RuntimeError(
+            raise ImportError(
                 "Failed to import heuristic %s: %s"
                 % (heuristic, exc)
             )
