@@ -43,11 +43,10 @@ Debian-based systems we recommend to use
 
 ### From source
 
-You can clone this directory and do a `make install`
+You can clone this directory and use `pip install .` (with `--user`, `-e`
+and other flags appropriate for your case), or
 
-or `pip install https://github.com/nipy/heudiconv/archive/master.zip`
-
-as long as the following dependencies are in your path you can use the package
+`pip install https://github.com/nipy/heudiconv/archive/master.zip`
 
 ## Dependencies
 
@@ -56,6 +55,10 @@ as long as the following dependencies are in your path you can use the package
 - nipype
 - nibabel
 - dcm2niix
+
+and should be checked/installed during `pip install` call, all but `dcm2niix`
+which should be installed directly from upstream or using the distribution
+manager appropriate for your OS.
 
 ## Tutorial with example conversion to BIDS format using Docker
 Please read this tutorial to understand how heudiconv works in practice.
