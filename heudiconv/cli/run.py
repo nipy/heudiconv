@@ -185,9 +185,11 @@ def get_parser():
                         help='Do not catch exceptions and show exception '
                         'traceback')
     parser.add_argument('--command',
-                        choices=('ls', 'populate-templates',
-                                 'treat-jsons', 'sanitize-jsons',
-                                 'heuristics', 'heuristic-info'),
+                        choices=(
+                            'heuristics', 'heuristic-info',
+                            'ls', 'populate-templates',
+                            'sanitize-jsons', 'treat-jsons',
+                        ),
                         help='custom actions to be performed on provided '
                         'files instead of regular operation.')
     parser.add_argument('-g', '--grouping', default='studyUID',
