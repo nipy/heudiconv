@@ -370,6 +370,7 @@ def convert_dicom(item_dicoms, bids, prefix,
 
 def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir):
     """ """
+    import nipype
     if with_prov:
         from nipype import config
         config.enable_provenance()
@@ -382,7 +383,11 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir):
     convertnode.base_dir = tmpdir
     convertnode.inputs.source_names = item_dicoms
     convertnode.inputs.out_filename = op.basename(op.dirname(prefix))
-    convertnode.inputs.terminal_output = 'allatonce'
+    if nipype.__version__.split('.')[0] == '0':
+        # deprecated since 1.0, might be needed(?) before
+        convertnode.inputs.terminal_output = 'allatonce'
+    else:
+        convertnode.terminal_output = 'allatonce'
     convertnode.inputs.bids_format = bids
     return convertnode.run()
 
