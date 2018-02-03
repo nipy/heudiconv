@@ -22,7 +22,7 @@ except ImportError:  # pragma: no cover
 
 
 # this will fail if not in project's root directory
-def test_smoke_converall(tmpdir):
+def test_smoke_convertall(tmpdir):
     runner(
         ("-f convertall -c dcm2niix -o %s -b --datalad "
          "-s fmap_acq-3mm -d %s/{subject}/*"
