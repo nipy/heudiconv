@@ -1,7 +1,7 @@
 import os.path as op
 import heudiconv.heuristics
 
-HEURISTICS_PATH = op.join(heudiconv.heuristics.__path__)
+HEURISTICS_PATH = op.join(heudiconv.heuristics.__path__[0])
 TESTS_DATA_PATH = op.join(op.dirname(__file__), 'data')
 
 
