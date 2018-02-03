@@ -10,6 +10,7 @@ import csv
 import re
 
 import pytest
+from .utils import HEURISTICS_PATH, TESTS_DATA_PATH
 
 import logging
 lgr = logging.getLogger(__name__)
@@ -23,22 +24,25 @@ except ImportError:  # pragma: no cover
 # this will fail if not in project's root directory
 def test_smoke_converall(tmpdir):
     runner(
-        ("-f heuristics/convertall.py -c dcm2niix -o %s -b --datalad "
-         "-s fmap_acq-3mm -d tests/data/{subject}/*" % tmpdir).split(' ')
+        ("-f %s/convertall.py -c dcm2niix -o %s -b --datalad "
+         "-s fmap_acq-3mm -d %s/{subject}/*"
+         % (HEURISTICS_PATH, tmpdir, TESTS_DATA_PATH)
+        ).split(' ')
     )
 
 
 @pytest.mark.parametrize('heuristic', ['dbic_bids', 'convertall'])
 @pytest.mark.parametrize(
     'invocation', [
-        "--files tests/data",    # our new way with automated groupping
-        "-d tests/data/{subject}/* -s 01-fmap_acq-3mm" # "old" way specifying subject
+        "--files %s" % TESTS_DATA_PATH,    # our new way with automated groupping
+        "-d %s/{subject}/* -s 01-fmap_acq-3mm" % TESTS_DATA_PATH # "old" way specifying subject
         # should produce the same results
     ])
 @pytest.mark.skipif(Dataset is None, reason="no datalad")
 def test_dbic_bids_largely_smoke(tmpdir, heuristic, invocation):
     is_bids = True if heuristic == 'dbic_bids' else False
-    arg = "--random-seed 1 -f heuristics/%s.py -c dcm2niix -o %s" % (heuristic, tmpdir)
+    arg = "--random-seed 1 -f %s/%s.py -c dcm2niix -o %s" \
+          % (HEURISTICS_PATH, heuristic, tmpdir)
     if is_bids:
         arg += " -b"
     arg += " --datalad "
@@ -47,7 +51,7 @@ def test_dbic_bids_largely_smoke(tmpdir, heuristic, invocation):
     ).split(' ')
 
     # Test some safeguards
-    if invocation == '--files tests/data':
+    if invocation == "--files %s" % TESTS_DATA_PATH:
         # Multiple subjects must not be specified -- only a single one could
         # be overridden from the command line
         with pytest.raises(ValueError):
@@ -87,10 +91,10 @@ def test_dbic_bids_largely_smoke(tmpdir, heuristic, invocation):
 
 @pytest.mark.parametrize(
     'invocation', [
-        "--files tests/data",    # our new way with automated groupping
+        "--files %s" % TESTS_DATA_PATH,    # our new way with automated groupping
     ])
 def test_scans_keys_dbic_bids(tmpdir, invocation):
-    args = "-f heuristics/dbic_bids.py -c dcm2niix -o %s -b " % tmpdir
+    args = "-f %s/dbic_bids.py -c dcm2niix -o %s -b " % (HEURISTICS_PATH, tmpdir)
     args += invocation
     runner(args.split())
     # for now check it exists
@@ -111,7 +115,10 @@ def test_scans_keys_dbic_bids(tmpdir, invocation):
 
 @patch('sys.stdout', new_callable=StringIO)
 def test_ls(stdout):
-    args = "-f heuristics/dbic_bids.py --command ls --files tests/data".split(' ')
+    args = (
+            "-f %s/dbic_bids.py --command ls --files %s"
+            % (HEURISTICS_PATH, TESTS_DATA_PATH)
+    ).split(' ')
     runner(args)
     out = stdout.getvalue()
     assert 'StudySessionInfo(locator=' in out

@@ -1,12 +1,12 @@
 import os.path as op
 import heudiconv
 
+HEURISTICS_PATH = op.join(op.dirname(op.dirname(__file__)), 'heuristics')
+TESTS_DATA_PATH = op.join(op.dirname(__file__), 'data')
+
 
 def gen_heudiconv_args(datadir, outdir, subject, heuristic_file, xargs=None):
-    heuristic = op.realpath(op.join(op.dirname(heudiconv.__file__),
-                                    '..',
-                                    'heuristics',
-                                    heuristic_file))
+    heuristic = op.realpath(op.join(HEURISTICS_PATH, heuristic_file))
     args = ["-d", op.join(datadir, 'sourcedata/{subject}/*/*/*.tgz'),
             "-c", "dcm2niix",
             "-o", outdir,
