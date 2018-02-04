@@ -35,7 +35,8 @@ provided to address various use-cases
 ### Released versions
 
 Released versions of HeuDiConv are available from PyPI so you could
-just `pip install heudiconv` but it would require manual installation
+just `pip install heudiconv[all]` for the most complete installation, 
+and it would require manual installation ony
 of the [dcm2niix](https://github.com/rordenlab/dcm2niix/).  On
 Debian-based systems we recommend to use
 [NeuroDebian](http://neuro.debian.net) providing
@@ -43,8 +44,8 @@ Debian-based systems we recommend to use
 
 ### From source
 
-You can clone this directory and use `pip install .` (with `--user`, `-e`
-and other flags appropriate for your case), or
+You can clone this directory and use `pip install .[all]` (with `--user`,
+`-e` and other flags appropriate for your case), or
 
 `pip install https://github.com/nipy/heudiconv/archive/master.zip`
 

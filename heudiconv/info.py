@@ -24,6 +24,7 @@ TESTS_REQUIRES = [
 
 EXTRA_REQUIRES = {
     'tests': TESTS_REQUIRES,
+    'extras': ['dcmstack'],
     'datalad': ['datalad']
 }
 
