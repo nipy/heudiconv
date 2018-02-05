@@ -1,8 +1,9 @@
 #
-# Tests for dbic_bids.py
+# Tests for reproin.py
 #
 from collections import OrderedDict
-from dbic_bids import get_dups_marked
+from .reproin import get_dups_marked
+
 
 def test_get_dups_marked():
     no_dups = {('some',): [1]}

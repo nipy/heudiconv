@@ -46,9 +46,6 @@ def main():
         ]},
         install_requires=ldict['REQUIRES'],
         extras_require=ldict['EXTRA_REQUIRES'],
-        package_data={
-            'heudiconv_heuristics':
-                findsome('heuristics', ('py'))},
         )
 
 

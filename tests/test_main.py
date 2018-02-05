@@ -65,7 +65,7 @@ def test_populate_bids_templates(tmpdir):
     # it should also be available as a command
     os.unlink(str(description_file))
     runner([
-        '--command', 'populate-templates', '-f', 'heuristics/convertall.py',
+        '--command', 'populate-templates', '-f', 'convertall',
         '--files', str(tmpdir)
     ])
     assert "something" not in description_file.read()

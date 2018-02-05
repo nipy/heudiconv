@@ -10,7 +10,7 @@ import csv
 import re
 
 import pytest
-from .utils import HEURISTICS_PATH, TESTS_DATA_PATH
+from .utils import TESTS_DATA_PATH
 
 import logging
 lgr = logging.getLogger(__name__)
@@ -22,16 +22,16 @@ except ImportError:  # pragma: no cover
 
 
 # this will fail if not in project's root directory
-def test_smoke_converall(tmpdir):
+def test_smoke_convertall(tmpdir):
     runner(
-        ("-f %s/convertall.py -c dcm2niix -o %s -b --datalad "
+        ("-f convertall -c dcm2niix -o %s -b --datalad "
          "-s fmap_acq-3mm -d %s/{subject}/*"
-         % (HEURISTICS_PATH, tmpdir, TESTS_DATA_PATH)
+         % (tmpdir, TESTS_DATA_PATH)
         ).split(' ')
     )
 
 
-@pytest.mark.parametrize('heuristic', ['dbic_bids', 'convertall'])
+@pytest.mark.parametrize('heuristic', ['reproin', 'convertall'])
 @pytest.mark.parametrize(
     'invocation', [
         "--files %s" % TESTS_DATA_PATH,    # our new way with automated groupping
@@ -39,10 +39,10 @@ def test_smoke_converall(tmpdir):
         # should produce the same results
     ])
 @pytest.mark.skipif(Dataset is None, reason="no datalad")
-def test_dbic_bids_largely_smoke(tmpdir, heuristic, invocation):
-    is_bids = True if heuristic == 'dbic_bids' else False
-    arg = "--random-seed 1 -f %s/%s.py -c dcm2niix -o %s" \
-          % (HEURISTICS_PATH, heuristic, tmpdir)
+def test_reproin_largely_smoke(tmpdir, heuristic, invocation):
+    is_bids = True if heuristic == 'reproin' else False
+    arg = "--random-seed 1 -f %s -c dcm2niix -o %s" \
+          % (heuristic, tmpdir)
     if is_bids:
         arg += " -b"
     arg += " --datalad "
@@ -57,7 +57,7 @@ def test_dbic_bids_largely_smoke(tmpdir, heuristic, invocation):
         with pytest.raises(ValueError):
             runner(args + ['--subjects', 'sub1', 'sub2'])
 
-        if heuristic != 'dbic_bids':
+        if heuristic != 'reproin':
             # none other heuristic has mighty infotoids atm
             with pytest.raises(NotImplementedError):
                 runner(args)
@@ -93,8 +93,8 @@ def test_dbic_bids_largely_smoke(tmpdir, heuristic, invocation):
     'invocation', [
         "--files %s" % TESTS_DATA_PATH,    # our new way with automated groupping
     ])
-def test_scans_keys_dbic_bids(tmpdir, invocation):
-    args = "-f %s/dbic_bids.py -c dcm2niix -o %s -b " % (HEURISTICS_PATH, tmpdir)
+def test_scans_keys_reproin(tmpdir, invocation):
+    args = "-f reproin -c dcm2niix -o %s -b " % (tmpdir)
     args += invocation
     runner(args.split())
     # for now check it exists
@@ -116,8 +116,8 @@ def test_scans_keys_dbic_bids(tmpdir, invocation):
 @patch('sys.stdout', new_callable=StringIO)
 def test_ls(stdout):
     args = (
-            "-f %s/dbic_bids.py --command ls --files %s"
-            % (HEURISTICS_PATH, TESTS_DATA_PATH)
+            "-f reproin --command ls --files %s"
+            % (TESTS_DATA_PATH)
     ).split(' ')
     runner(args)
     out = stdout.getvalue()
