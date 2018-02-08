@@ -6,7 +6,23 @@ from mock import patch
 from tinydb import TinyDB, Query
 from subprocess import CalledProcessError
 
-from heudiconv.cli.monitor import monitor, process, run_heudiconv, MASK_NEWDIR
+try:
+    from heudiconv.cli.monitor import (monitor, process, run_heudiconv,
+                                       MASK_NEWDIR)
+
+    Header = namedtuple('header', ['wd', 'mask', 'cookie', 'len'])
+    header = Header(5, MASK_NEWDIR, 5, 5)
+    watch_path = b'WATCHME'
+    filename = b'FILE'
+    type_names = b'TYPE'
+
+    path2 = watch_path + b'/' + filename + b'/subpath'
+
+    my_events = [(header, type_names, watch_path, filename),
+                 (header, type_names, path2, b'')]
+except AttributeError:
+    my_events = []
+    pytestmark = pytest.mark.skip(reason='TODO')
 
 
 class MockInotifyTree(object):
@@ -26,16 +42,6 @@ class MockTime(object):
         return self.time
 
 
-Header = namedtuple('header', ['wd', 'mask', 'cookie', 'len'])
-header = Header(5, MASK_NEWDIR, 5, 5)
-watch_path = b'WATCHME'
-filename = b'FILE'
-type_names = b'TYPE'
-
-path2 = watch_path + b'/' + filename + b'/subpath'
-
-my_events = [(header, type_names, watch_path, filename),
-             (header, type_names, path2, b'')]
 
 @pytest.mark.skip(reason="TODO")
 @patch('inotify.adapters.InotifyTree', MockInotifyTree(my_events))
