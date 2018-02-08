@@ -244,7 +244,10 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
         lgr.info('Converting %s (%d DICOMs) -> %s . '
                  'Converter: %s . Output types: %s',
                  prefix, len(item_dicoms), prefix_dirname, converter, outtypes)
-        if not op.exists(prefix_dirname):
+        # We want to create this dir only if we are converting it to nifti,
+        # or if we're using BIDS
+        dicom_only = len(outtypes) == 1 and outtypes[0] == 'dicom'
+        if not(dicom_only and bids) and not op.exists(prefix_dirname):
             os.makedirs(prefix_dirname)
 
         for outtype in outtypes:
@@ -254,6 +257,9 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
 
             seqtype = op.basename(op.dirname(prefix)) if bids else None
 
+            # set empty outname and scaninfo in case we only want dicoms
+            outname = ''
+            scaninfo = ''
             if outtype == 'dicom':
                 convert_dicom(item_dicoms, bids, prefix,
                               outdir, tempdirs, symlink, overwrite)
@@ -299,17 +305,17 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                         "multiple files")
         elif not bids_outfiles:
             lgr.debug("No BIDS files were produced, nothing to embed to then")
-        else:
+        elif outname:
             embed_metadata_from_dicoms(bids, item_dicoms, outname, outname_bids,
                                        prov_file, scaninfo, tempdirs, with_prov,
                                        min_meta)
-        if op.exists(scaninfo):
+        if scaninfo and op.exists(scaninfo):
             lgr.info("Post-treating %s file", scaninfo)
             treat_infofile(scaninfo)
 
         # this may not always be the case: ex. fieldmap1, fieldmap2
         # will address after refactor
-        if op.exists(outname):
+        if outname and op.exists(outname):
             set_readonly(outname)
 
     if custom_callable is not None:
