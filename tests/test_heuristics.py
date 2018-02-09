@@ -127,12 +127,12 @@ def test_ls(stdout):
 
 
 def test_scout_conversion(tmpdir):
-    args = (
-        "-b -f reproin --files %s -o %s"
-        % (TESTS_DATA_PATH, tmpdir)
-    ).split(' ')
-    runner(args)
     tmppath = tmpdir.strpath
+    args = (
+        "-b -f reproin --files %s"
+        % (TESTS_DATA_PATH)
+    ).split(' ') + ['-o', tmppath]
+    runner(args)
 
     assert not op.exists(pjoin(
         tmppath,

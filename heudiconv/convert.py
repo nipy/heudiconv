@@ -236,7 +236,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
 
         prefix, outtypes, item_dicoms = item[:3]
         if not isinstance(outtypes, (list, tuple)):
-            outtypes = [outtypes]
+            outtypes = (outtypes,)
 
         prefix_dirname = op.dirname(prefix + '.ext')
         outname_bids = prefix + '.json'
@@ -246,7 +246,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                  prefix, len(item_dicoms), prefix_dirname, converter, outtypes)
         # We want to create this dir only if we are converting it to nifti,
         # or if we're using BIDS
-        dicom_only = len(outtypes) == 1 and outtypes[0] == 'dicom'
+        dicom_only = outtypes == ('dicom',)
         if not(dicom_only and bids) and not op.exists(prefix_dirname):
             os.makedirs(prefix_dirname)
 
