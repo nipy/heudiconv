@@ -1,6 +1,7 @@
 from heudiconv.cli.run import main as runner
 
 import os
+import os.path as op
 from mock import patch
 from six.moves import StringIO
 
@@ -98,7 +99,7 @@ def test_scans_keys_reproin(tmpdir, invocation):
     args += invocation
     runner(args.split())
     # for now check it exists
-    scans_keys = glob(pjoin(tmpdir.strpath, '*/*/*/*/*.tsv'))
+    scans_keys = glob(pjoin(tmpdir.strpath, '*/*/*/*/*/*.tsv'))
     assert(len(scans_keys) == 1)
     with open(scans_keys[0]) as f:
         reader = csv.reader(f, delimiter='\t')
@@ -123,3 +124,23 @@ def test_ls(stdout):
     out = stdout.getvalue()
     assert 'StudySessionInfo(locator=' in out
     assert 'Halchenko/Yarik/950_bids_test4' in out
+
+
+def test_scout_conversion(tmpdir):
+    tmppath = tmpdir.strpath
+    args = (
+        "-b -f reproin --files %s"
+        % (TESTS_DATA_PATH)
+    ).split(' ') + ['-o', tmppath]
+    runner(args)
+
+    assert not op.exists(pjoin(
+        tmppath,
+        'Halchenko/Yarik/950_bids_test4/sub-phantom1sid1/ses-localizer/anat'))
+
+    assert op.exists(pjoin(
+        tmppath,
+        'Halchenko/Yarik/950_bids_test4/sourcedata/sub-phantom1sid1/'
+        'ses-localizer/anat/sub-phantom1sid1_ses-localizer_scout.dicom.tgz'
+    )
+    )
