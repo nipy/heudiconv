@@ -30,11 +30,11 @@ function run() {
 
    # just do full conversion
    echo "Running $whichheudiconv with log in $out.log"
-   $RUN heudiconv --random-seed 1 -f $heudiconvdir/heuristics/reproin.py -c dcm2niix -o $out --datalad --bids "$@" >| $out.log 2>&1
+   $RUN heudiconv --random-seed 1 -c dcm2niix -o $out --datalad --bids "$@" >| $out.log 2>&1
 }
 
-run heudiconv rolando "$@"
-run heudiconv-master master --files "$@"
+run heudiconv        rolando -f heudiconv/heuristics/dbic_bids.py "$@"
+run heudiconv-master master  -f reproin                   --files "$@"
 
 cd $outdir
 #git remote add rolando "$outdir/rolando"
