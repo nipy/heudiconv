@@ -66,7 +66,7 @@ def process_extra_commands(outdir, args):
             study_sessions = get_study_sessions(
                 args.dicom_dir_template, [f], heuristic, outdir,
                 args.session, args.subjs, grouping=args.grouping)
-            # print(f)
+            print(f)
             for study_session, sequences in study_sessions.items():
                 suf = ''
                 if heuristic_ls:
