@@ -318,8 +318,8 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
         if outname and op.exists(outname):
             set_readonly(outname)
 
-    if custom_callable is not None:
-        custom_callable(*item)
+        if custom_callable is not None:
+            custom_callable(*item)
 
 
 def convert_dicom(item_dicoms, bids, prefix,
