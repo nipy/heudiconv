@@ -150,6 +150,12 @@ def get_parser():
                         help='output directory for conversion setup (for '
                         'further customization and future reference. This '
                         'directory will refer to non-anonymized subject IDs')
+    parser.add_argument('-l', '--locator', default=None,
+                        help='study path under outdir.  If provided, '
+                        'it overloads the value provided by the heuristic. '
+                        'If --datalad is enabled, every directory within '
+                        'locator becomes a super-dataset thus establishing a '
+                        'hierarchy. Setting to "unknown" will skip that dataset')
     parser.add_argument('-a', '--conv-outdir', default=None,
                         help='output directory for converted files. By default '
                         'this is identical to --outdir. This option is most '
@@ -248,6 +254,8 @@ def process_args(args):
         # Allow for session to be overloaded from command line
         if args.session is not None:
             session = args.session
+        if args.locator is not None:
+            locator = args.locator
         if not len(files_or_seqinfo):
             raise ValueError("nothing to process?")
         # that is how life is ATM :-/ since we don't do sorting if subj
