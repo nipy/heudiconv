@@ -226,9 +226,16 @@ def json_dumps_pretty(j, indent=2, sort_keys=True):
     js_ = re.sub('  *("?[-+.0-9e]+"?)[ \n]*', r' \1', js_)
     # no spaces after [
     js_ = re.sub('\[ ', '[', js_)
-    j_ = json.loads(js_)
-    # Removed assert as it does not do any floating point comparison
-    #assert(j == j_)
+    # the load from the original dump and reload from tuned up
+    # version should result in identical values since no value
+    # must be changed, just formatting.
+    j_just_reloaded = json.loads(js)
+    j_tuned = json.loads(js_)
+
+    assert j_just_reloaded == j_tuned, \
+       "Values differed when they should have not. "\
+       "Report to the heudiconv developers"
+
     return js_
 
 
