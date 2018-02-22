@@ -10,8 +10,10 @@ lgr = logging.getLogger(__name__)
 
 MIN_VERSION = '0.7'
 
+
 def prepare_datalad(studydir, outdir, sid, session, seqinfo, dicoms, bids):
     """ Prepare data for datalad """
+    from datalad.api import Dataset
     datalad_msg_suf = ' %s' % sid
     if session:
         datalad_msg_suf += ", session %s" % session
@@ -19,13 +21,13 @@ def prepare_datalad(studydir, outdir, sid, session, seqinfo, dicoms, bids):
         datalad_msg_suf += ", %d sequences" % len(seqinfo)
     datalad_msg_suf += ", %d dicoms" % (len(sum(seqinfo.values(), []))
                                         if seqinfo else len(dicoms))
-    from datalad.api import Dataset
     ds = Dataset(studydir)
     if not op.exists(outdir) or not ds.is_installed():
         add_to_datalad(outdir, studydir,
                        msg="Preparing for %s" % datalad_msg_suf,
                        bids=bids)
     return datalad_msg_suf
+
 
 def add_to_datalad(topdir, studydir, msg, bids):
     """Do all necessary preparations (if were not done before) and save
@@ -35,7 +37,7 @@ def add_to_datalad(topdir, studydir, msg, bids):
     from datalad.support.annexrepo import AnnexRepo
     from datalad.support.external_versions import external_versions
     assert external_versions['datalad'] >= MIN_VERSION, (
-      "Need datalad >= {}".format(MIN_VERSION)) # add to reqs
+      "Need datalad >= {}".format(MIN_VERSION))  # add to reqs
 
     studyrelpath = op.relpath(studydir, topdir)
     assert not studyrelpath.startswith(op.pardir)  # so we are under
