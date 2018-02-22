@@ -1,8 +1,10 @@
 import os
 import os.path as op
 import logging
+from glob import glob
+from os import path as op
 
-from ..utils import create_file_if_missing, mark_sensitive
+from ..utils import create_file_if_missing
 
 lgr = logging.getLogger(__name__)
 
@@ -133,3 +135,26 @@ def add_to_datalad(topdir, studydir, msg, bids):
       http://git-annex.branchable.com/tips/automatically_adding_metadata/
     - possibly even make separate sub-datasets for originaldata, derivatives ?
     """
+
+
+def mark_sensitive(ds, path_glob=None):
+    """
+
+    Parameters
+    ----------
+    ds : Dataset to operate on
+    path_glob : str, optional
+      glob of the paths within dataset to work on
+    Returns
+    -------
+    None
+    """
+    sens_kwargs = dict(
+        init=[('distribution-restrictions', 'sensitive')]
+    )
+    if path_glob:
+        paths = glob(op.join(ds.path, path_glob))
+        if not paths:
+            return
+        sens_kwargs['path'] = paths
+    ds.metadata(recursive=True, **sens_kwargs)
