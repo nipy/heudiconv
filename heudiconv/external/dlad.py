@@ -157,4 +157,4 @@ def mark_sensitive(ds, path_glob=None):
         if not paths:
             return
         sens_kwargs['path'] = paths
-    ds.metadata(recursive=True, **sens_kwargs)
+    ds.repo.set_metadata(recursive=True, **sens_kwargs)
