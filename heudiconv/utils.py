@@ -7,7 +7,6 @@ import re
 import sys
 import shutil
 import copy
-import logging
 import stat
 import os.path as op
 from pathlib import Path
@@ -120,28 +119,6 @@ def create_file_if_missing(filename, content):
         f.write(content)
     return True
 
-
-def mark_sensitive(ds, path_glob=None):
-    """
-
-    Parameters
-    ----------
-    ds : Dataset to operate on
-    path_glob : str, optional
-      glob of the paths within dataset to work on
-    Returns
-    -------
-    None
-    """
-    sens_kwargs = dict(
-        init=[('distribution-restrictions', 'sensitive')]
-    )
-    if path_glob:
-        paths = glob(op.join(ds.path, path_glob))
-        if not paths:
-            return
-        sens_kwargs['path'] = paths
-    ds.metadata(recursive=True, **sens_kwargs)
 
 def read_config(infile):
     with open(infile, 'rt') as fp:
