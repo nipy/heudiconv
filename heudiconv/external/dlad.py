@@ -139,24 +139,23 @@ def add_to_datalad(topdir, studydir, msg, bids):
     """
 
 
-def mark_sensitive(ds, path_glob=None):
+def mark_sensitive(ds, path_glob):
     """
 
     Parameters
     ----------
     ds : Dataset to operate on
-    path_glob : str, optional
+    path_glob : str
       glob of the paths within dataset to work on
+
     Returns
     -------
     None
     """
-    sens_kwargs = dict(
-        init=[('distribution-restrictions', 'sensitive')]
-    )
-    if path_glob:
-        paths = glob(op.join(ds.path, path_glob))
-        if not paths:
-            return
-        sens_kwargs['path'] = paths
-    ds.repo.set_metadata(recursive=True, **sens_kwargs)
+    paths = glob(op.join(ds.path, path_glob))
+    if not paths:
+        return
+    ds.repo.set_metadata(
+        paths,
+        init=[('distribution-restrictions', 'sensitive')],
+        recursive=True)
