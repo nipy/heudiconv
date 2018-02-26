@@ -10,7 +10,12 @@ import csv
 from random import sample
 from glob import glob
 
-import dicom as dcm
+try:
+    # for pydicom < 1.0
+    import dicom as dcm
+except:
+    # pydicom >= 1.0
+    import pydicom as dcm
 import dcmstack as ds
 
 from .parser import find_files
