@@ -3,7 +3,10 @@ import os
 import os.path as op
 import pytest
 from mock import patch
-from tinydb import TinyDB, Query
+try:
+    from tinydb import TinyDB, Query
+except ImportError:
+    pytest.importorskip("tinydb")
 from subprocess import CalledProcessError
 
 try:
