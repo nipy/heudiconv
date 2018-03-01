@@ -7,8 +7,9 @@ heudiconv (0.5-1) neurodebian; urgency=medium
     - depend on python-pathlib and dcm2niix (from Recommends)
     - remove recommends of mricron, no longer used
     - python-nipype and dcm2niix into build-depends for build-time testing
+    - custom patch for trusty to tollerate exec in setup.py
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 01 Mar 2018 09:27:55 -0500
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 01 Mar 2018 18:39:07 -0500
 
 heudiconv (0.4-1) neurodebian; urgency=medium
 
