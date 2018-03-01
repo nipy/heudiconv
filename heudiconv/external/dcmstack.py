@@ -7,7 +7,8 @@ from .pydicom import dcm  # to assure that we have it one way or another
 try:
     import dcmstack as ds
 except ImportError as e:
-    if "No module named dicom" not in str(e):
+    # looks different between py2 and 3 so we go for very rudimentary matching
+    if not ("No module" in str(e) and "dicom" in str(e)):
         raise
     # a butt plug due to rename of dicom -> pydicom
     import sys
