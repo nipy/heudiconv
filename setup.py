@@ -6,64 +6,49 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from os.path import sep as pathsep
-from os.path import join as opj
-from os.path import splitext
 
-from setuptools import findall
-from setuptools import setup, find_packages
+def main():
+
+    import os.path as op
+
+    from setuptools import findall, setup, find_packages
+
+    thispath = op.dirname(__file__)
+    ldict = locals()
+
+    # Get version and release info, which is all stored in heudiconv/info.py
+    info_file = op.join(thispath, 'heudiconv', 'info.py')
+    with open(info_file) as infofile:
+        exec(infofile.read(), globals(), ldict)
 
 
-def get_version():
-    return [l.split('=', 1)[1].strip(" '\n")
-            for l in open(opj('bin', 'heudiconv'))
-            if l.startswith('__version__')][0]
+    def findsome(subdir, extensions):
+        """Find files under subdir having specified extensions
 
+        Leading directory (datalad) gets stripped
+        """
+        return [
+            f.split(op.sep, 1)[1] for f in findall(subdir)
+            if op.splitext(f)[-1].lstrip('.') in extensions
+        ]
 
-def findsome(subdir, extensions):
-    """Find files under subdir having specified extensions
+    setup(
+        name=ldict['__packagename__'],
+        author=ldict['__author__'],
+        #author_email="team@???",
+        version=ldict['__version__'],
+        description=ldict['__description__'],
+        long_description=ldict['__longdesc__'],
+        license=ldict['__license__'],
+        packages=find_packages(),
+        entry_points={'console_scripts': [
+            'heudiconv=heudiconv.cli.run:main',
+            'heudiconv_monitor=heudiconv.cli.monitor:main',
+        ]},
+        install_requires=ldict['REQUIRES'],
+        extras_require=ldict['EXTRA_REQUIRES'],
+        )
 
-    Leading directory (datalad) gets stripped
-    """
-    return [
-        f.split(pathsep, 1)[1] for f in findall(subdir)
-        if splitext(f)[-1].lstrip('.') in extensions
-    ]
-
-requires = {
-    'core': [
-        'nibabel',
-        'pydicom',
-        'nipype',
-    ],
-    'tests': [
-        'six',
-        'pytest',
-    ],
-    'monitor': [
-        'inotify',
-        'tinydb'
-    ],
-    'datalad': [
-        'datalad'
-    ]
-}
-requires['full'] = sum(list(requires.values()), [])
 
 if __name__ == '__main__':
-    setup(
-        name="heudiconv",
-        author="The Heudiconv Team and Contributors",
-        #author_email="team@???",
-        version=get_version(),
-        description="Heuristic DICOM Converter",
-        scripts=[
-            opj('bin', 'heudiconv')
-        ],
-        install_requires=requires['core'],
-        extras_require=requires,
-        package_data={
-            'heudiconv_heuristics':
-                findsome('heuristics', {'py'})
-        }
-    )
+    main()

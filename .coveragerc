@@ -1,4 +1,4 @@
 [run]
 include = tests/*
-          bin/*
+          heudiconv/*
           setup.py
