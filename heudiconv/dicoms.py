@@ -6,7 +6,6 @@ from collections import OrderedDict
 import tarfile
 
 from heudiconv.external.pydicom import dcm
-import dcmstack as ds
 
 from .utils import SeqInfo, load_json, set_readonly
 
@@ -57,6 +56,7 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
         lgr.info('Filtering out {0} dicoms based on their filename'.format(
             nfl_before-nfl_after))
     for fidx, filename in enumerate(files):
+        from heudiconv.external.dcmstack import ds
         # TODO after getting a regression test check if the same behavior
         #      with stop_before_pixels=True
         mw = ds.wrapper_from_data(dcm.read_file(filename, force=True))
