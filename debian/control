@@ -11,6 +11,7 @@ Build-Depends: debhelper (>= 9),
                python-setuptools,
                python-six,
                python-pytest,
+               python-pathlib,
                help2man,
                python-dcmstack,
                python-dicom,
@@ -22,15 +23,15 @@ Vcs-Git: https://github.com/nipy/heudiconv -b debian
 Package: heudiconv
 Architecture: all
 Depends: ${misc:Depends},
+         dcm2niix,
          python,
          python-dcmstack,
          python-dicom,
          python-nibabel,
+         python-pathlib,
          python-numpy,
          python-nipype,
-Recommends: mricron,
-            dcm2niix,
-            python-pytest,
+Recommends: python-pytest,
             python-datalad,
 Description: DICOM converter with support for structure heuristics
  This is a flexible dicom converter for organizing brain imaging data into

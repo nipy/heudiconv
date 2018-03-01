@@ -3,6 +3,9 @@ heudiconv (0.5-1) neurodebian; urgency=medium
   * Fresh upstream release
     - huge refactoring to provide a heudiconv module
     - explicit assignment of the license (apache-2.0)
+  * debian/
+    - depend on python-pathlib and dcm2niix (from Recommends)
+    - remove recommends of mricron, no longer used
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 01 Mar 2018 09:27:55 -0500
 
