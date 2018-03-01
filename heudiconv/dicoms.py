@@ -5,12 +5,7 @@ import logging
 from collections import OrderedDict
 import tarfile
 
-try:
-    # for pydicom < 1.0
-    import dicom as dcm
-except:
-    # pydicom >= 1.0
-    import pydicom as dcm
+from heudiconv.external.pydicom import dcm
 import dcmstack as ds
 
 from .utils import SeqInfo, load_json, set_readonly
@@ -46,8 +41,6 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
     per_studyUID = grouping == 'studyUID'
     per_accession_number = grouping == 'accession_number'
     lgr.info("Analyzing %d dicoms", len(files))
-    #import dcmstack as ds
-    #import dicom as dcm
 
     groups = [[], []]
     mwgroup = []
