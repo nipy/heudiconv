@@ -18,6 +18,7 @@ export PYBUILD_NAME = heudiconv
 	dh $@ --buildsystem=pybuild
 
 override_dh_auto_install:
+	mkdir -p build
 	help2man -n 'DICOM converter for organizing brain imaging data into structured directory layouts' \
 		-N --no-discard-stderr bin/heudiconv > build/heudiconv.1
 	dh_auto_install
