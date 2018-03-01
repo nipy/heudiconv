@@ -1,4 +1,12 @@
-heudiconv (0.4-1) unstable; urgency=medium
+heudiconv (0.5-1) neurodebian; urgency=medium
+
+  * Fresh upstream release
+    - huge refactoring to provide a heudiconv module
+    - explicit assignment of the license (apache-2.0)
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 01 Mar 2018 09:27:55 -0500
+
+heudiconv (0.4-1) neurodebian; urgency=medium
 
   * Recent upstream release
     - lots of changes
@@ -15,7 +23,7 @@ heudiconv (0.4-1) unstable; urgency=medium
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 07 Dec 2017 20:14:38 -0500
 
-heudiconv (0.1+git94-g85a2afb-1) UNRELEASED; urgency=low
+heudiconv (0.1+git94-g85a2afb-1) neurodebian; urgency=low
 
   * New upstream snapshot.
     - More heuristics.
@@ -25,7 +33,7 @@ heudiconv (0.1+git94-g85a2afb-1) UNRELEASED; urgency=low
 
  -- Michael Hanke <mih@debian.org>  Tue, 18 Apr 2017 08:31:40 +0200
 
-heudiconv (0.1-1) UNRELEASED; urgency=low
+heudiconv (0.1-1) neurodebian; urgency=low
 
   * Initial release.
 
