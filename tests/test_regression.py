@@ -7,6 +7,7 @@ import pytest
 have_datalad = True
 try:
     from datalad import api # to pull and grab data
+    from datalad.support.exceptions import IncompleteResultsError
 except ImportError:
     have_datalad = False
 
@@ -21,7 +22,10 @@ from .utils import fetch_data, gen_heudiconv_args
 @pytest.mark.skipif(not have_datalad, reason="no datalad")
 def test_conversion(tmpdir, subject, heuristic):
     tmpdir.chdir()
-    datadir = fetch_data(tmpdir.strpath, subject)
+    try:
+        datadir = fetch_data(tmpdir.strpath, subject)
+    except IncompleteResultsError as exc:
+        pytest.skip("Failed to fetch test data: %s" % str(exc))
     outdir = tmpdir.mkdir('out').strpath
 
     args = gen_heudiconv_args(datadir, outdir, subject, heuristic)
