@@ -9,7 +9,12 @@ try:
 except ImportError as e:
     from heudiconv import lgr
     # looks different between py2 and 3 so we go for very rudimentary matching
-    if not ("No module" in str(e) and "dicom" in str(e)):
+    e_str = str(e)
+    # there were changes from how
+    if not (
+        ("No module" in e_str and "dicom" in e_str) or
+        ('has been removed in pydicom version' in e_str)
+    ):
         raise
     # a butt plug due to rename of dicom -> pydicom
     import sys
