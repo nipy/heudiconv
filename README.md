@@ -64,7 +64,7 @@ manager appropriate for your OS.
 ## Tutorial with example conversion to BIDS format using Docker
 Please read this tutorial to understand how heudiconv works in practice.
 
-[Slides here](http://nipy.org/workshops/2017-03-boston/lectures/bids-heudiconv/#1)
+[Slides here](http://nipy.org/heudiconv/#1)
 
 To generate lean BIDS output, consider using both the `-b` and the `--minmeta` flags 
 to your heudiconv command. The `-b` flag generates a json file with BIDS keys, while
