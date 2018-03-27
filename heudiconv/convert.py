@@ -79,7 +79,7 @@ def conversion_info(subject, outdir, info, filegroup, ses):
 
 def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                    anon_outdir, with_prov, ses, bids, seqinfo, min_meta,
-                   overwrite):
+                   overwrite,grouping=None):
     if dicoms:
         lgr.info("Processing %d dicoms", len(dicoms))
     elif seqinfo:
@@ -156,7 +156,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                 dicoms,
                 file_filter=getattr(heuristic, 'filter_files', None),
                 dcmfilter=getattr(heuristic, 'filter_dicom', None),
-                grouping=None)
+                grouping=grouping)
         seqinfo_list = list(seqinfo.keys())
         filegroup = {si.series_id: x for si, x in seqinfo.items()}
         dicominfo_file = op.join(idir, 'dicominfo%s.tsv' % ses_suffix)
