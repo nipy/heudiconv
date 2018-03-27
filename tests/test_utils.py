@@ -45,6 +45,8 @@ def test_load_heuristic():
 
 def test_json_dumps_pretty():
     pretty = json_dumps_pretty
+    assert pretty({"SeriesDescription": "Trace:Nov 13 2017 14-36-14 EST"}) \
+        == '{\n  "SeriesDescription": "Trace:Nov 13 2017 14-36-14 EST"\n}'
     assert pretty({}) == "{}"
     assert pretty({"a": -1, "b": "123", "c": [1, 2, 3], "d": ["1.0", "2.0"]}) \
         == '{\n  "a": -1,\n  "b": "123",\n  "c": [1, 2, 3],\n  "d": ["1.0", "2.0"]\n}'
