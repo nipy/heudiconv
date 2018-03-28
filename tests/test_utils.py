@@ -3,8 +3,8 @@ import os.path as op
 from heudiconv.utils import (
     get_known_heuristics_with_descriptions,
     get_heuristic_description,
-    load_heuristic
-)
+    load_heuristic,
+    json_dumps_pretty)
 
 import pytest
 from .utils import HEURISTICS_PATH
@@ -41,3 +41,14 @@ def test_load_heuristic():
 
     with pytest.raises(ImportError):
         load_heuristic(op.join(HEURISTICS_PATH, 'unknownsomething.py'))
+
+
+def test_json_dumps_pretty():
+    pretty = json_dumps_pretty
+    assert pretty({"SeriesDescription": "Trace:Nov 13 2017 14-36-14 EST"}) \
+        == '{\n  "SeriesDescription": "Trace:Nov 13 2017 14-36-14 EST"\n}'
+    assert pretty({}) == "{}"
+    assert pretty({"a": -1, "b": "123", "c": [1, 2, 3], "d": ["1.0", "2.0"]}) \
+        == '{\n  "a": -1,\n  "b": "123",\n  "c": [1, 2, 3],\n  "d": ["1.0", "2.0"]\n}'
+    assert pretty({'a': ["0.3", "-1.9128906358217845e-12", "0.2"]}) \
+        == '{\n  "a": ["0.3", "-1.9128906358217845e-12", "0.2"]\n}'

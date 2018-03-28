@@ -200,7 +200,8 @@ def json_dumps_pretty(j, indent=2, sort_keys=True):
     # uniform no spaces before ]
     js_ = re.sub(" *\]", "]", js_)
     # uniform spacing before numbers
-    js_ = re.sub('  *("?[-+.0-9e]+"?)[ \n]*', r' \1', js_)
+    js_ = re.sub('  *("?[-+.0-9e]+"?)(?P<space> ?)[ \n]*',
+                 r' \1\g<space>', js_)
     # no spaces after [
     js_ = re.sub('\[ ', '[', js_)
     # the load from the original dump and reload from tuned up

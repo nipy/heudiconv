@@ -3,7 +3,6 @@
 from heudiconv.cli.run import main as runner
 from heudiconv import __version__
 from heudiconv.utils import (create_file_if_missing,
-                             json_dumps_pretty,
                              set_readonly,
                              is_readonly)
 from heudiconv.bids import (populate_bids_templates,
@@ -17,7 +16,6 @@ from .utils import TESTS_DATA_PATH
 import csv
 import os
 import pytest
-import stat
 import sys
 
 from mock import patch
@@ -152,15 +150,6 @@ def test_prepare_for_datalad(tmpdir):
     assert '.heudiconv' in ds.subdatasets(result_xfm='relpaths')
     assert not ds.repo.dirty
     assert '.heudiconv/dummy.nii.gz' not in ds.repo.get_files()
-
-
-def test_json_dumps_pretty():
-    pretty = json_dumps_pretty
-    assert pretty({}) == "{}"
-    assert pretty({"a": -1, "b": "123", "c": [1, 2, 3], "d": ["1.0", "2.0"]}) \
-        == '{\n  "a": -1,\n  "b": "123",\n  "c": [1, 2, 3],\n  "d": ["1.0", "2.0"]\n}'
-    assert pretty({'a': ["0.3", "-1.9128906358217845e-12", "0.2"]}) \
-        == '{\n  "a": ["0.3", "-1.9128906358217845e-12", "0.2"]\n}'
 
 
 def test_get_formatted_scans_key_row():
