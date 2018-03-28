@@ -390,12 +390,13 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir):
 
     item_dicoms = list(map(op.abspath, item_dicoms)) # absolute paths
 
+    dicom_dir = op.dirname(item_dicoms[0]) if item_dicoms else None
+
     convertnode = Node(Dcm2niix(), name='convert')
     convertnode.base_dir = tmpdir
-    convertnode.inputs.source_names = item_dicoms
+    convertnode.inputs.source_dir = dicom_dir
     convertnode.inputs.out_filename = op.basename(op.dirname(prefix))
-    # nipype 1.0.0 causes dcm2niix run with -o PWD (not base_dir even)
-    convertnode.inputs.output_dir = tmpdir
+
     if nipype.__version__.split('.')[0] == '0':
         # deprecated since 1.0, might be needed(?) before
         convertnode.inputs.terminal_output = 'allatonce'
