@@ -326,6 +326,10 @@ def convert_sid_bids(subject_id):
     """
     cleaner = lambda y: ''.join([x for x in y if x.isalnum()])
     sid = cleaner(subject_id)
+    if not sid:
+        raise ValueError(
+            "Subject ID became empty after cleanup.  Please provide manually "
+            "a suitable alphanumeric subject ID")
     lgr.warning('{0} contained nonalphanumeric character(s), subject '
                 'ID was cleaned to be {1}'.format(subject_id, sid))
     return sid, subject_id
