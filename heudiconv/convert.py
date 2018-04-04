@@ -87,8 +87,12 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
     else:
         raise ValueError("neither dicoms nor seqinfo dict was provided")
 
-    if bids and not sid.isalnum(): # alphanumeric only
-        sid, old_sid = convert_sid_bids(sid)
+    if bids:
+        if not sid:
+            raise ValueError(
+                "BIDS requires alphanumeric subject ID. Got an empty value")
+        if not sid.isalnum():  # alphanumeric only
+            sid, old_sid = convert_sid_bids(sid)
 
     if not anon_sid:
         anon_sid = sid
