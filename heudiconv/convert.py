@@ -270,18 +270,31 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                                      prefix + scaninfo_suffix)
 
                 if not op.exists(outname) or overwrite:
-
-                    # first copy files select files
+                    # softlink select files
                     item_dicoms_dir = tempdirs('DICOMs')
+                    lgr.info(
+                        "Symlinking series %s/%s into %s",
+                        item_idx+1,
+                        len(items),
+                        item_dicoms_dir)
+
                     for dcm in item_dicoms:
-                        shutil.copy(
-                            dcm, op.join(item_dicoms_dir, op.basename(dcm)))
+                        try:
+                            os.symlink(
+                                dcm, op.join(item_dicoms_dir, op.basename(dcm)))
+                        except:  # unsupported
+                            shutil.copy(
+                                dcm, op.join(item_dicoms_dir, op.basename(dcm)))
 
                     tmpdir = tempdirs('dcm2niix')
                     # run conversion through nipype
                     res, prov_file = nipype_convert(
                         item_dicoms_dir, prefix, with_prov, bids, tmpdir)
 
+                    try:
+                        os.unlink(item_dicoms_dir)
+                    except:  # DICOMs were copied instead
+                        pass
                     tempdirs.rmtree(item_dicoms_dir)
 
                     bids_outfiles = save_converted_files(
