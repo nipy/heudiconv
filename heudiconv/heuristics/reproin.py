@@ -413,12 +413,13 @@ def infotodict(seqinfo):
     skipped, skipped_unknown = [], []
     current_run = 0
     run_label = None   # run-
-    image_data_type = None
+    dcm_image_iod_spec = None
+    skip_derived = False
     for s in seqinfo:
         # XXX: skip derived sequences, we don't store them to avoid polluting
         # the directory, unless it is the motion corrected ones
         # (will get _rec-moco suffix)
-        if s.is_derived and not s.is_motion_corrected:
+        if skip_derived and s.is_derived and not s.is_motion_corrected:
             skipped.append(s.series_id)
             lgr.debug("Ignoring derived data %s", s.series_id)
             continue
@@ -433,18 +434,25 @@ def infotodict(seqinfo):
 
         # figure out type of image from s.image_info -- just for checking ATM
         # since we primarily rely on encoded in the protocol name information
-        prev_image_data_type = image_data_type
-        image_data_type = s.image_type[2]
-        image_type_seqtype = {
-            'P': 'fmap',   # phase
-            'FMRI': 'func',
-            'MPR': 'anat',
-            # 'M': 'func',  "magnitude"  -- can be for scout, anat, bold, fmap
-            'DIFFUSION': 'dwi',
-            'MIP_SAG': 'anat',  # angiography
-            'MIP_COR': 'anat',  # angiography
-            'MIP_TRA': 'anat',  # angiography
-        }.get(image_data_type, None)
+        prev_dcm_image_iod_spec = dcm_image_iod_spec
+        if len(s.image_type) > 2:
+            # https://dicom.innolitics.com/ciods/cr-image/general-image/00080008
+            # 0 - ORIGINAL/DERIVED
+            # 1 - PRIMARY/SECONDARY
+            # 3 - Image IOD specific specialization (optional)
+            dcm_image_iod_spec = s.image_type[2]
+            image_type_seqtype = {
+                'P': 'fmap',   # phase
+                'FMRI': 'func',
+                'MPR': 'anat',
+                # 'M': 'func',  "magnitude"  -- can be for scout, anat, bold, fmap
+                'DIFFUSION': 'dwi',
+                'MIP_SAG': 'anat',  # angiography
+                'MIP_COR': 'anat',  # angiography
+                'MIP_TRA': 'anat',  # angiography
+            }.get(dcm_image_iod_spec, None)
+        else:
+            dcm_image_iod_spec = image_type_seqtype = None
 
         protocol_name_tuned = s.protocol_name
         # Few common replacements
@@ -453,8 +461,8 @@ def infotodict(seqinfo):
 
         regd = parse_dbic_protocol_name(protocol_name_tuned)
 
-        if image_data_type.startswith('MIP'):
-            regd['acq'] = regd.get('acq', '') + sanitize_str(image_data_type)
+        if dcm_image_iod_spec and dcm_image_iod_spec.startswith('MIP'):
+            regd['acq'] = regd.get('acq', '') + sanitize_str(dcm_image_iod_spec)
 
         if not regd:
             skipped_unknown.append(s.series_id)
@@ -490,11 +498,13 @@ def infotodict(seqinfo):
                 seqtype_label = 'bold'
 
         if seqtype == 'fmap' and not seqtype_label:
+            if not dcm_image_iod_spec:
+                raise ValueError("Do not know image data type yet to make decision")
             seqtype_label = {
                 'M': 'magnitude',  # might want explicit {file_index}  ?
                 'P': 'phasediff',
                 'DIFFUSION': 'epi', # according to KODI those DWI are the EPIs we need
-            }[image_data_type]
+            }[dcm_image_iod_spec]
 
         # label for dwi as well
         if seqtype == 'dwi' and not seqtype_label:
@@ -507,8 +517,8 @@ def infotodict(seqinfo):
                 # some sequences, e.g.  fmap, would generate two (or more?)
                 # sequences -- e.g. one for magnitude(s) and other ones for
                 # phases.  In those we must not increment run!
-                if image_data_type == 'P':
-                    if prev_image_data_type != 'M':
+                if dcm_image_iod_spec and dcm_image_iod_spec == 'P':
+                    if prev_dcm_image_iod_spec != 'M':
                         # XXX if we have a known earlier study, we need to always
                         # increase the run counter for phasediff because magnitudes
                         # were not acquired
@@ -517,7 +527,7 @@ def infotodict(seqinfo):
                         else:
                             raise RuntimeError(
                                 "Was expecting phase image to follow magnitude "
-                                "image, but previous one was %r", prev_image_data_type)
+                                "image, but previous one was %r", prev_dcm_image_iod_spec)
                         # else we do nothing special
                 else:  # and otherwise we go to the next run
                     current_run += 1
