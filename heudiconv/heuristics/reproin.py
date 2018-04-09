@@ -455,6 +455,12 @@ def infotodict(seqinfo):
             dcm_image_iod_spec = image_type_seqtype = None
 
         protocol_name_tuned = s.protocol_name
+        if not protocol_name_tuned:
+            protocol_name_tuned = s.series_description
+        if not protocol_name_tuned:
+            lgr.warning(
+                "Could not determine the series name by looking at "
+                "protocol_name and series_description - both were empty")
         # Few common replacements
         if protocol_name_tuned in {'AAHead_Scout'}:
             protocol_name_tuned = 'anat-scout'
