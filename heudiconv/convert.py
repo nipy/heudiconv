@@ -273,10 +273,10 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                     # softlink select files
                     item_dicoms_dir = tempdirs('DICOMs')
                     lgr.info(
-                        "Symlinking series %s/%s into %s",
+                        "Populating %s with series %s/%s",
+                        item_dicoms_dir,
                         item_idx+1,
-                        len(items),
-                        item_dicoms_dir)
+                        len(items))
 
                     for dcm in item_dicoms:
                         try:
