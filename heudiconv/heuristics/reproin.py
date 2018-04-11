@@ -787,6 +787,9 @@ def parse_series_spec(series_spec):
 
     # Parse the name according to our convention/specification
 
+    # leading or trailing spaces do not matter
+    series_spec = series_spec.strip(' ')
+
     # Strip off leading CAPITALS: prefix to accommodate some reported usecases:
     # https://github.com/ReproNim/reproin/issues/14
     # where PU: prefix is added by the scanner
@@ -988,8 +991,9 @@ def test_parse_series_spec():
            {'seqtype': 'func', 'seqtype_label': 'bold'}
 
     # pdpn("bids_func_ses+_task-boo_run+") == \
-    # order and PREFIX: should not matter
+    # order and PREFIX: should not matter, as well as trailing spaces
     assert \
+        pdpn(" PREFIX:bids_func_ses+_task-boo_run+  ") == \
         pdpn("PREFIX:bids_func_ses+_task-boo_run+") == \
         pdpn("bids_func_ses+_run+_task-boo") == \
            {
