@@ -28,9 +28,10 @@ per each session.
 Sequence names on the scanner must follow this specification to avoid manual
 conversion/handling:
 
-  <seqtype[-label]>[_ses-<SESID>][_task-<TASKID>][_acq-<ACQLABEL>][_run-<RUNID>][_dir-<DIR>][<more BIDS>][__<custom>]
+  [PREFIX:]<seqtype[-label]>[_ses-<SESID>][_task-<TASKID>][_acq-<ACQLABEL>][_run-<RUNID>][_dir-<DIR>][<more BIDS>][__<custom>]
 
 where
+ [PREFIX:] - leading capital letters followed by : are stripped/ignored
  <...> - value to be entered
  [...] - optional -- might be nearly mandatory for some modalities (e.g.,
          run for functional) and very optional for others
@@ -783,9 +784,14 @@ def parse_series_spec(series_spec):
     series_spec = series_spec.replace("anat_T1w", "anat-T1w")
     series_spec = series_spec.replace("hardi_64", "dwi_acq-hardi64")
     series_spec = series_spec.replace("AAHead_Scout", "anat-scout")
-    
-    # Parse the name according to our convention
-    # https://docs.google.com/document/d/1R54cgOe481oygYVZxI7NHrifDyFUZAjOBwCTu7M7y48/edit?usp=sharing
+
+    # Parse the name according to our convention/specification
+
+    # Strip off leading CAPITALS: prefix to accommodate some reported usecases:
+    # https://github.com/ReproNim/reproin/issues/14
+    # where PU: prefix is added by the scanner
+    series_spec = re.sub("^[A-Z]*:", "", series_spec)
+
     # Remove possible suffix we don't care about after __
     series_spec = series_spec.split('__', 1)[0]
 
@@ -982,8 +988,10 @@ def test_parse_series_spec():
            {'seqtype': 'func', 'seqtype_label': 'bold'}
 
     # pdpn("bids_func_ses+_task-boo_run+") == \
-    # order should not matter
-    assert pdpn("bids_func_ses+_run+_task-boo") == \
+    # order and PREFIX: should not matter
+    assert \
+        pdpn("PREFIX:bids_func_ses+_task-boo_run+") == \
+        pdpn("bids_func_ses+_run+_task-boo") == \
            {
                'seqtype': 'func',
                # 'seqtype_label': 'bold',
@@ -991,6 +999,7 @@ def test_parse_series_spec():
                'run': '+',
                'task': 'boo',
             }
+
     # TODO: fix for that
     assert pdpn("bids_func-pace_ses-1_task-boo_acq-bu_bids-please_run-2__therest") == \
            pdpn("bids_func-pace_ses-1_run-2_task-boo_acq-bu_bids-please__therest") == \
