@@ -114,6 +114,18 @@ from glob import glob
 import logging
 lgr = logging.getLogger('heudiconv')
 
+# Terminology to hamornise and use to name variables etc
+# experiment
+#  subject
+#   [session]
+#    exam (AKA scanning session) - currently seqinfo, unless brought together from multiple
+#     series  (AKA protocol?)
+#      - series_spec - deduced from fields the spec (literal value)
+#      - series_info - the dictionary with fields parsed from series_spec
+
+# Which fields in seqinfo (in this order) to check for the ReproIn spec
+series_spec_fields = ('protocol_name', 'series_description')
+
 # dictionary from accession-number to runs that need to be marked as bad
 # NOTE: even if filename has number that is 0-padded, internally no padding
 # is done
@@ -227,7 +239,6 @@ protocols2fix = {
             ('_test', ''),
         ],
 }
-keys2replace = ['protocol_name', 'series_description']
 
 # list containing StudyInstanceUID to skip -- hopefully doesn't happen too often
 dicoms2skip = [
@@ -341,13 +352,13 @@ def fix_canceled_runs(seqinfo, accession2run=fix_accession2run):
             if re.match(badruns_pattern, s.series_id):
                 lgr.info('Fixing bad run {0}'.format(s.series_id))
                 fixedkwargs = dict()
-                for key in keys2replace:
+                for key in series_spec_fields:
                     fixedkwargs[key] = 'cancelme_' + getattr(s, key)
                 seqinfo[i] = s._replace(**fixedkwargs)
     return seqinfo
 
 
-def fix_dbic_protocol(seqinfo, keys=keys2replace, subsdict=protocols2fix):
+def fix_dbic_protocol(seqinfo, keys=series_spec_fields, subsdict=protocols2fix):
     """Ad-hoc fixup for existing protocols
     """
     study_hash = get_study_hash(seqinfo)
@@ -454,33 +465,36 @@ def infotodict(seqinfo):
         else:
             dcm_image_iod_spec = image_type_seqtype = None
 
-        protocol_name_tuned = s.protocol_name
-        if not protocol_name_tuned:
-            protocol_name_tuned = s.series_description
-        if not protocol_name_tuned:
+        series_info = {}  # For please lintian and its friends
+        for sfield in series_spec_fields:
+            svalue = getattr(s, sfield)
+            series_info = parse_series_spec(svalue)
+            if series_info:  # looks like a valid spec - we are done
+                series_spec = svalue
+                break
+            else:
+                lgr.debug(
+                    "Failed to parse reproin spec in .%s=%r",
+                    sfield, svalue)
+
+        if not series_info:
+            series_spec = None  # we cannot know better
             lgr.warning(
                 "Could not determine the series name by looking at "
-                "protocol_name and series_description - both were empty")
-        # Few common replacements
-        if protocol_name_tuned in {'AAHead_Scout'}:
-            protocol_name_tuned = 'anat-scout'
-
-        regd = parse_dbic_protocol_name(protocol_name_tuned)
-
-        if dcm_image_iod_spec and dcm_image_iod_spec.startswith('MIP'):
-            regd['acq'] = regd.get('acq', '') + sanitize_str(dcm_image_iod_spec)
-
-        if not regd:
+                "%s fields", ', '.join(series_spec_fields))
             skipped_unknown.append(s.series_id)
             continue
 
-        seqtype = regd.pop('seqtype')
-        seqtype_label = regd.pop('seqtype_label', None)
+        if dcm_image_iod_spec and dcm_image_iod_spec.startswith('MIP'):
+            series_info['acq'] = series_info.get('acq', '') + sanitize_str(dcm_image_iod_spec)
+
+        seqtype = series_info.pop('seqtype')
+        seqtype_label = series_info.pop('seqtype_label', None)
 
         if image_type_seqtype and seqtype != image_type_seqtype:
             lgr.warning(
                 "Deduced seqtype to be %s from DICOM, but got %s out of %s",
-                image_type_seqtype, seqtype, protocol_name_tuned)
+                image_type_seqtype, seqtype, series_spec)
 
         # if s.is_derived:
         #     # Let's for now stash those close to original images
@@ -497,7 +511,7 @@ def infotodict(seqinfo):
 
         # analyze s.protocol_name (series_id is based on it) for full name mapping etc
         if seqtype == 'func' and not seqtype_label:
-            if '_pace_' in protocol_name_tuned:
+            if '_pace_' in series_spec:
                 seqtype_label = 'pace'  # or should it be part of seq-
             else:
                 # assume bold by default
@@ -516,7 +530,7 @@ def infotodict(seqinfo):
         if seqtype == 'dwi' and not seqtype_label:
             seqtype_label = 'dwi'
 
-        run = regd.get('run')
+        run = series_info.get('run')
         if run is not None:
             # so we have an indicator for a run
             if run == '+':
@@ -563,16 +577,16 @@ def infotodict(seqinfo):
         # if s.is_motion_corrected:
         #     assert s.is_derived, "Motion corrected images must be 'derived'"
 
-        if s.is_motion_corrected and 'rec-' in regd.get('bids', ''):
+        if s.is_motion_corrected and 'rec-' in series_info.get('bids', ''):
             raise NotImplementedError("want to add _acq-moco but there is _acq- already")
 
         suffix_parts = [
-            None if not regd.get('task') else "task-%s" % regd['task'],
-            None if not regd.get('acq') else "acq-%s" % regd['acq'],
+            None if not series_info.get('task') else "task-%s" % series_info['task'],
+            None if not series_info.get('acq') else "acq-%s" % series_info['acq'],
             # But we want to add an indicator in case it was motion corrected
             # in the magnet. ref sample  /2017/01/03/qa
             None if not s.is_motion_corrected else 'rec-moco',
-            regd.get('bids'),
+            series_info.get('bids'),
             run_label,
             seqtype_label,
         ]
@@ -680,7 +694,7 @@ def infotoids(seqinfos, outdir):
 
     # So -- use `outdir` and locator etc to see if for a given locator/subject
     # and possible ses+ in the sequence names, so we would provide a sequence
-    # So might need to go through  parse_dbic_protocol_name(s.protocol_name)
+    # So might need to go through  parse_series_spec(s.protocol_name)
     # to figure out presence of sessions.
     ses_markers = []
 
@@ -691,7 +705,7 @@ def infotoids(seqinfos, outdir):
     for s in seqinfos:
         if s.is_derived:
             continue
-        session_ = parse_dbic_protocol_name(s.protocol_name).get('session', None)
+        session_ = parse_series_spec(s.protocol_name).get('session', None)
         if session_ and '{' in session_:
             # there was a marker for something we could provide from our seqinfo
             # e.g. {date}
@@ -761,22 +775,23 @@ def sanitize_str(value):
     return _delete_chars(value, '#!@$%^&.,:;_-')
 
 
-def parse_dbic_protocol_name(protocol_name):
+def parse_series_spec(series_spec):
     """Parse protocol name according to our convention with minimal set of fixups
     """
     # Since Yarik didn't know better place to put it in, but could migrate outside
-    # at some point
-    protocol_name = protocol_name.replace("anat_T1w", "anat-T1w")
-    protocol_name = protocol_name.replace("hardi_64", "dwi_acq-hardi64")
-
+    # at some point. TODO
+    series_spec = series_spec.replace("anat_T1w", "anat-T1w")
+    series_spec = series_spec.replace("hardi_64", "dwi_acq-hardi64")
+    series_spec = series_spec.replace("AAHead_Scout", "anat-scout")
+    
     # Parse the name according to our convention
     # https://docs.google.com/document/d/1R54cgOe481oygYVZxI7NHrifDyFUZAjOBwCTu7M7y48/edit?usp=sharing
     # Remove possible suffix we don't care about after __
-    protocol_name = protocol_name.split('__', 1)[0]
+    series_spec = series_spec.split('__', 1)[0]
 
     bids = None  # we don't know yet for sure
     # We need to figure out if it is a valid bids
-    split = protocol_name.split('_')
+    split = series_spec.split('_')
     prefix = split[0]
 
     # Fixups
@@ -956,8 +971,8 @@ def test_fixupsubjectid():
     assert fixup_subjectid("SID30") == "sid000030"
 
 
-def test_parse_dbic_protocol_name():
-    pdpn = parse_dbic_protocol_name
+def test_parse_series_spec():
+    pdpn = parse_series_spec
 
     assert pdpn("nondbic_func-bold") == {}
     assert pdpn("cancelme_func-bold") == {}
