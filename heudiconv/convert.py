@@ -237,7 +237,6 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
     tempdirs = TempDirs()
 
     for item_idx, item in enumerate(items):
-
         prefix, outtypes, item_dicoms = item[:3]
         if not isinstance(outtypes, (list, tuple)):
             outtypes = (outtypes,)
@@ -275,16 +274,36 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                                      prefix + scaninfo_suffix)
 
                 if not op.exists(outname) or overwrite:
+                    # softlink select files
+                    item_dicoms_dir = tempdirs('DICOMs')
+                    lgr.info(
+                        "Populating %s with series %s/%s",
+                        item_dicoms_dir,
+                        item_idx+1,
+                        len(items))
+
+                    for dcm in item_dicoms:
+                        try:
+                            os.symlink(
+                                dcm, op.join(item_dicoms_dir, op.basename(dcm)))
+                        except:  # unsupported
+                            shutil.copy(
+                                dcm, op.join(item_dicoms_dir, op.basename(dcm)))
+
                     tmpdir = tempdirs('dcm2niix')
-
                     # run conversion through nipype
-                    res, prov_file = nipype_convert(item_dicoms, prefix, with_prov,
-                                                    bids, tmpdir)
+                    res, prov_file = nipype_convert(
+                        item_dicoms_dir, prefix, with_prov, bids, tmpdir)
 
-                    bids_outfiles = save_converted_files(res, item_dicoms, bids,
-                                                         outtype, prefix,
-                                                         outname_bids,
-                                                         overwrite=overwrite)
+                    try:
+                        os.unlink(item_dicoms_dir)
+                    except:  # DICOMs were copied instead
+                        pass
+                    tempdirs.rmtree(item_dicoms_dir)
+
+                    bids_outfiles = save_converted_files(
+                        res, item_dicoms, bids, outtype, prefix,
+                        outname_bids, overwrite=overwrite)
 
                     # save acquisition time information if it's BIDS
                     # at this point we still have acquisition date
@@ -383,7 +402,7 @@ def convert_dicom(item_dicoms, bids, prefix,
                 shutil.copyfile(filename, outfile)
 
 
-def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir):
+def nipype_convert(item_dicoms_dir, prefix, with_prov, bids, tmpdir):
     """ """
     import nipype
     if with_prov:
@@ -392,13 +411,9 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir):
     from nipype import Node
     from nipype.interfaces.dcm2nii import Dcm2niix
 
-    item_dicoms = list(map(op.abspath, item_dicoms)) # absolute paths
-
-    dicom_dir = op.dirname(item_dicoms[0]) if item_dicoms else None
-
     convertnode = Node(Dcm2niix(), name='convert')
     convertnode.base_dir = tmpdir
-    convertnode.inputs.source_dir = dicom_dir
+    convertnode.inputs.source_dir = item_dicoms_dir
     convertnode.inputs.out_filename = op.basename(op.dirname(prefix))
 
     if nipype.__version__.split('.')[0] == '0':
