@@ -25,6 +25,7 @@ before_install:
   - pip install --upgrade virtualenv
   - virtualenv --python=python venv
   - source venv/bin/activate
+  - pip --version # check again since seems that python_requires='>=3.5' in secretstorage is not in effect
   - python --version # just to check
   - pip install -r dev-requirements.txt
   - pip install requests # below installs pyld but that assumes we have requests already

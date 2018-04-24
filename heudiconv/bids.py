@@ -293,10 +293,14 @@ def get_formatted_scans_key_row(item):
                                             force=True))
     # we need to store filenames and acquisition times
     # parse date and time and get it into isoformat
-    date = mw.dcm_data.ContentDate
-    time = mw.dcm_data.ContentTime.split('.')[0]
-    td = time + date
-    acq_time = datetime.strptime(td, '%H%M%S%Y%m%d').isoformat()
+    try:
+        date = mw.dcm_data.ContentDate
+        time = mw.dcm_data.ContentTime.split('.')[0]
+        td = time + date
+        acq_time = datetime.strptime(td, '%H%M%S%Y%m%d').isoformat()
+    except AttributeError as exc:
+        lgr.warning("Failed to get date/time for the content: %s", str(exc))
+        acq_time = None
     # add random string
     randstr = ''.join(map(chr, sample(k=8, population=range(33, 127))))
     try:
@@ -326,6 +330,10 @@ def convert_sid_bids(subject_id):
     """
     cleaner = lambda y: ''.join([x for x in y if x.isalnum()])
     sid = cleaner(subject_id)
+    if not sid:
+        raise ValueError(
+            "Subject ID became empty after cleanup.  Please provide manually "
+            "a suitable alphanumeric subject ID")
     lgr.warning('{0} contained nonalphanumeric character(s), subject '
                 'ID was cleaned to be {1}'.format(subject_id, sid))
     return sid, subject_id
