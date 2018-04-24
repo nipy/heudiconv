@@ -72,6 +72,11 @@ the `--minmeta` flag restricts the json file to only BIDS keys. Without `--minme
 the json file and the associated Nifti file contains DICOM metadata extracted using
 dicomstack.
 
+### Other tutorials
+
+- YouTube:
+    - ["Heudiconv Example"](https://www.youtube.com/watch?v=O1kZAuR7E00) by [James Kent](https://github.com/jdkent)
+
 ## How it works (in some more detail)
 
 Call `heudiconv` like this:
