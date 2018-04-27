@@ -29,7 +29,7 @@ def populate_bids_templates(path, defaults={}):
 
     lgr.info("Populating template files under %s", path)
     descriptor = op.join(path, 'dataset_description.json')
-    if not op.exists(descriptor):
+    if not op.lexists(descriptor):
         save_json(descriptor,
               OrderedDict([
                   ('Name', "TODO: name of the dataset"),
@@ -51,7 +51,7 @@ def populate_bids_templates(path, defaults={}):
                   ('DatasetDOI', 'TODO: eventually a DOI for the dataset')
         ]))
     sourcedata_README = op.join(path, 'sourcedata', 'README')
-    if op.exists(op.dirname(sourcedata_README)):
+    if not op.lexists(op.dirname(sourcedata_README)):
         create_file_if_missing(sourcedata_README,
             ("TODO: Provide description about source data, e.g. \n"
             "Directory below contains DICOMS compressed into tarballs per "
@@ -89,18 +89,22 @@ def populate_bids_templates(path, defaults={}):
         suf = '_bold.json'
         assert fpath.endswith(suf)
         events_file = fpath[:-len(suf)] + '_events.tsv'
-        lgr.debug("Generating %s", events_file)
-        with open(events_file, 'w') as f:
-            f.write("onset\tduration\ttrial_type\tresponse_time\tstim_file\tTODO -- fill in rows and add more tab-separated columns if desired")
+        # do not touch any existing thing, it may be precious
+        if not op.lexists(events_file):
+            lgr.debug("Generating %s", events_file)
+            with open(events_file, 'w') as f:
+                f.write("onset\tduration\ttrial_type\tresponse_time\tstim_file\tTODO -- fill in rows and add more tab-separated columns if desired")
     # extract tasks files stubs
     for task_acq, fields in tasks.items():
         task_file = op.join(path, task_acq + '_bold.json')
-        lgr.debug("Generating %s", task_file)
-        fields["TaskName"] = ("TODO: full task name for %s" %
-                              task_acq.split('_')[0].split('-')[1])
-        fields["CogAtlasID"] = "TODO"
-        with open(task_file, 'w') as f:
-            f.write(json_dumps_pretty(fields, indent=2, sort_keys=True))
+        # do not touch any existing thing, it may be precious
+        if not op.lexists(task_file):
+            lgr.debug("Generating %s", task_file)
+            fields["TaskName"] = ("TODO: full task name for %s" %
+                                  task_acq.split('_')[0].split('-')[1])
+            fields["CogAtlasID"] = "TODO"
+            with open(task_file, 'w') as f:
+                f.write(json_dumps_pretty(fields, indent=2, sort_keys=True))
 
 
 def tuneup_bids_json_files(json_files):
