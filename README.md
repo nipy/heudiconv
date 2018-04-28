@@ -30,7 +30,7 @@ provided to address various use-cases
   data to [BIDS] following a simple naming
   [convention](https://goo.gl/o0YASC) for studies and sequences
   
-[![IMAGE ALT TEXT](http://img.youtube.com/vi/O1kZAuR7E00/0.jpg)](http://www.youtube.com/watch?v=O1kZAuR7E00 "Heudiconv Tutorial by James Kent")
+[![IMAGE ALT TEXT](youtube_screenshot.png)](http://www.youtube.com/watch?v=O1kZAuR7E00 "Heudiconv Tutorial by James Kent")
 
 ## Install
 
