@@ -29,6 +29,8 @@ provided to address various use-cases
   a complete imaging center wide automation to convert all acquired
   data to [BIDS] following a simple naming
   [convention](https://goo.gl/o0YASC) for studies and sequences
+  
+[![IMAGE ALT TEXT](http://img.youtube.com/vi/O1kZAuR7E00/0.jpg)](http://www.youtube.com/watch?v=O1kZAuR7E00 "Heudiconv Tutorial by James Kent")
 
 ## Install
 
