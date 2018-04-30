@@ -110,7 +110,7 @@ def anonymize_sid(sid, anon_sid_cmd):
 def create_file_if_missing(filename, content):
     """Create file if missing, so we do not
     override any possibly introduced changes"""
-    if op.exists(filename):
+    if op.lexists(filename):
         return False
     dirname = op.dirname(filename)
     if not op.exists(dirname):
