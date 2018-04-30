@@ -34,7 +34,7 @@ from .dicoms import (
 lgr = logging.getLogger(__name__)
 
 
-def conversion_info(subject, outdir, info, filegroup, ses):
+def conversion_info(subject, outdir, info, filegroup, ses,echo=None):
     convert_info = []
     for key, items in info.items():
         if not items:
@@ -58,6 +58,7 @@ def conversion_info(subject, outdir, info, filegroup, ses):
                     subject=subject,
                     seqitem=item,
                     subindex=subindex + 1,
+                    echo = echo,
                     session='ses-' + str(ses),
                     bids_subject_session_prefix=
                         'sub-%s' % subject + (('_ses-%s' % ses) if ses else ''),
@@ -176,7 +177,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
         assure_no_file_exists(edit_file)
         write_config(edit_file, info)
         save_json(filegroup_file, filegroup)
-
+    import pdb;pdb.set_trace()
     if bids:
         # the other portion of the path would mimic BIDS layout
         # so we don't need to worry here about sub, ses at all
@@ -186,7 +187,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
 
     if converter.lower() != 'none':
         lgr.info("Doing conversion using %s", converter)
-        cinfo = conversion_info(anon_sid, tdir, info, filegroup, ses)
+        cinfo = conversion_info(anon_sid, tdir, info, filegroup, ses,echo)
         convert(cinfo,
                 converter=converter,
                 scaninfo_suffix=getattr(heuristic, 'scaninfo_suffix', '.json'),

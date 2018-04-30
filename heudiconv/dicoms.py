@@ -194,6 +194,10 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
         else:
             sequence_name = 'Not found'
 
+        if dcminfo.get([0x18,0x86], None):
+            # Siemens scanners
+            echo = dcminfo[0x18,0x86].value
+
         info = SeqInfo(
             total,
             op.split(series_files[0])[1],
@@ -216,6 +220,7 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
             dcminfo.get('PatientAge'),
             dcminfo.get('PatientSex'),
             dcminfo.get('AcquisitionDate'),
+            echo,
         )
         # candidates
         # dcminfo.AccessionNumber
