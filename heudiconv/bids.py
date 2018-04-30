@@ -51,7 +51,7 @@ def populate_bids_templates(path, defaults={}):
                   ('DatasetDOI', 'TODO: eventually a DOI for the dataset')
         ]))
     sourcedata_README = op.join(path, 'sourcedata', 'README')
-    if not op.lexists(op.dirname(sourcedata_README)):
+    if op.exists(op.dirname(sourcedata_README)):
         create_file_if_missing(sourcedata_README,
             ("TODO: Provide description about source data, e.g. \n"
             "Directory below contains DICOMS compressed into tarballs per "
