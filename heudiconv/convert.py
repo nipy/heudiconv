@@ -398,7 +398,7 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir):
 
     convertnode = Node(Dcm2niix(), name='convert')
     convertnode.base_dir = tmpdir
-    convertnode.inputs.source_dir = dicom_dir
+    convertnode.inputs.source_names = item_dicoms
     convertnode.inputs.out_filename = op.basename(op.dirname(prefix))
 
     if nipype.__version__.split('.')[0] == '0':
