@@ -79,7 +79,7 @@ def conversion_info(subject, outdir, info, filegroup, ses):
 
 def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                    anon_outdir, with_prov, ses, bids, seqinfo, min_meta,
-                   overwrite):
+                   overwrite, dcmconfig):
     if dicoms:
         lgr.info("Processing %d dicoms", len(dicoms))
     elif seqinfo:
@@ -195,7 +195,8 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                 bids=bids,
                 outdir=tdir,
                 min_meta=min_meta,
-                overwrite=overwrite,)
+                overwrite=overwrite,
+                dcmconfig=dcmconfig,)
 
     for item_dicoms in filegroup.values():
         clear_temp_dicoms(item_dicoms)
@@ -212,7 +213,8 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
 
 
 def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
-            bids, outdir, min_meta, overwrite, symlink=True, prov_file=None):
+            bids, outdir, min_meta, overwrite, symlink=True, prov_file=None,
+            dcmconfig=None):
     """Perform actual conversion (calls to converter etc) given info from
     heuristic's `infotodict`
 
@@ -279,7 +281,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
 
                     # run conversion through nipype
                     res, prov_file = nipype_convert(item_dicoms, prefix, with_prov,
-                                                    bids, tmpdir)
+                                                    bids, tmpdir, dcmconfig)
 
                     bids_outfiles = save_converted_files(res, item_dicoms, bids,
                                                          outtype, prefix,
@@ -383,8 +385,25 @@ def convert_dicom(item_dicoms, bids, prefix,
                 shutil.copyfile(filename, outfile)
 
 
-def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir):
-    """ """
+def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir, dcmconfig=None):
+    """
+    Converts DICOMs grouped from heuristic using Nipype's Dcm2niix interface.
+
+    Parameters
+    ----------
+    item_dicoms : List
+        DICOM files to convert
+    prefix : String
+        Heuristic output path
+    with_prov : Bool
+        Store provenance information
+    bids : Bool
+        Output BIDS sidecar JSONs
+    tmpdir : Directory
+        Conversion working directory
+    dcmconfig : File (optional)
+        JSON file used for additional Dcm2niix configuration
+    """
     import nipype
     if with_prov:
         from nipype import config
@@ -394,9 +413,11 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir):
 
     item_dicoms = list(map(op.abspath, item_dicoms)) # absolute paths
 
-    dicom_dir = op.dirname(item_dicoms[0]) if item_dicoms else None
+    fromfile = dcmconfig if dcmconfig else None
+    if fromfile:
+        lgr.info("Using custom config file %s", fromfile)
 
-    convertnode = Node(Dcm2niix(), name='convert')
+    convertnode = Node(Dcm2niix(from_file=fromfile), name='convert')
     convertnode.base_dir = tmpdir
     convertnode.inputs.source_names = item_dicoms
     convertnode.inputs.out_filename = op.basename(op.dirname(prefix))
