@@ -231,6 +231,9 @@ def process_args(args):
     lgr.info(INIT_MSG(packname=__packagename__,
                       version=__version__))
 
+    if args.command:
+        process_extra_commands(outdir, args)
+        return
     #
     # Load heuristic -- better do it asap to make sure it loads correctly
     #
