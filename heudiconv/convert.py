@@ -115,7 +115,8 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
 
     # if conversion table(s) do not exist -- we need to prepare them
     # (the *prepare* stage in https://github.com/nipy/heudiconv/issues/134)
-    reuse_conversion_table = op.exists(edit_file)
+    # if overwrite - recalculate this anyways
+    reuse_conversion_table = op.exists(edit_file) and not overwrite
     # We also might need to redo it if changes in the heuristic file
     # detected
     # ref: https://github.com/nipy/heudiconv/issues/84#issuecomment-330048609
@@ -134,8 +135,6 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
             "has changed"
         )
 
-    # MG - maybe add an option to force rerun?
-    # related issue : https://github.com/nipy/heudiconv/issues/84
     if reuse_conversion_table:
         lgr.info("Reloading existing filegroup.json "
                  "because %s exists", edit_file)
