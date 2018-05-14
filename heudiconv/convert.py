@@ -127,7 +127,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
     #  2. possibly extract into a dedicated function for easier logic flow here
     #     and a dedicated unittest
     if (op.exists(target_heuristic_filename) and
-        file_md5sum(target_heuristic_filename) != file_md5sum(heuristic.filename):
+        file_md5sum(target_heuristic_filename) != file_md5sum(heuristic.filename)):
         # remake conversion table
         reuse_conversion_table = False
         lgr.info(
