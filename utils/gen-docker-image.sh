@@ -5,7 +5,7 @@ set -eu
 VER=$(grep -Po '(?<=^__version__ = ).*' ../heudiconv/info.py | sed 's/"//g')
 
 docker run --rm kaczmarj/neurodocker:v0.3.2 generate -b debian:stretch -p apt \
-    --dcm2niix version=v1.0.20171215 \
+    --dcm2niix version=v1.0.20180328 \
     --neurodebian os_codename=stretch download_server=usa-nh pkgs=git-annex-standalone \
     --install git gcc pigz \
     --copy . /src/heudiconv \

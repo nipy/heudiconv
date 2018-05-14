@@ -5,7 +5,7 @@
 # pull request on our GitHub repository:
 #     https://github.com/kaczmarj/neurodocker
 #
-# Timestamp: 2018-05-11 21:21:11
+# Timestamp: 2018-05-14 16:30:58
 
 FROM debian:stretch
 
@@ -33,7 +33,7 @@ RUN apt-get update -qq && apt-get install -yq --no-install-recommends  \
 ENTRYPOINT ["/neurodocker/startup.sh"]
 
 #------------------------
-# Install dcm2niix v1.0.20171215
+# Install dcm2niix v1.0.20180328
 #------------------------
 WORKDIR /tmp
 RUN deps='cmake g++ gcc git make pigz zlib1g-dev' \
@@ -41,7 +41,7 @@ RUN deps='cmake g++ gcc git make pigz zlib1g-dev' \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
     && mkdir dcm2niix \
-    && curl -sSL https://github.com/rordenlab/dcm2niix/tarball/v1.0.20171215 | tar xz -C dcm2niix --strip-components 1 \
+    && curl -sSL https://github.com/rordenlab/dcm2niix/tarball/v1.0.20180328 | tar xz -C dcm2niix --strip-components 1 \
     && mkdir dcm2niix/build && cd dcm2niix/build \
     && cmake .. && make \
     && make install \
@@ -120,7 +120,7 @@ RUN echo '{ \
     \n    [ \
     \n      "dcm2niix", \
     \n      { \
-    \n        "version": "v1.0.20171215" \
+    \n        "version": "v1.0.20180328" \
     \n      } \
     \n    ], \
     \n    [ \
@@ -160,6 +160,6 @@ RUN echo '{ \
     \n      "/neurodocker/startup.sh heudiconv" \
     \n    ] \
     \n  ], \
-    \n  "generation_timestamp": "2018-05-11 21:21:11", \
+    \n  "generation_timestamp": "2018-05-14 16:30:58", \
     \n  "neurodocker_version": "0.3.2" \
     \n}' > /neurodocker/neurodocker_specs.json
