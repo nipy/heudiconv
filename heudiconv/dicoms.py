@@ -194,31 +194,39 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
             sequence_name = dcminfo[0x19, 0x109c].value
         else:
             sequence_name = 'Not found'
+        try:
+            seqinfo_args = (
+                total,
+                op.split(series_files[0])[1],
+                series_id,
+                op.basename(op.dirname(series_files[0])),
+                '-', '-',
+                size[0], size[1], size[2], size[3],
+                TR, TE,
+                dcminfo.ProtocolName,
+                motion_corrected,
+                'derived' in [x.lower() for x in dcminfo.get('ImageType', [])],
+                dcminfo.get('PatientID'),
+                dcminfo.get('StudyDescription'),
+                refphys,
+                dcminfo.get('SeriesDescription'),
+                sequence_name,
+                image_type,
+                accession_number,
+                # For demographics to populate BIDS participants.tsv
+                dcminfo.get('PatientAge'),
+                dcminfo.get('PatientSex'),
+                dcminfo.get('AcquisitionDate'),
+                dcminfo.get('SeriesInstanceUID')
+            )
+            info = SeqInfo(*seqinfo_args)
+        except TypeError as e:
+            print("Trying to construct Seqinfo object:",
+                  "{ob}".format(ob=SeqInfo.__doc__),
+                  "\n However the arguments supplied were:")
+            print([repr(v) for v in seqinfo_args])
+            raise(e)
 
-        info = SeqInfo(
-            total,
-            op.split(series_files[0])[1],
-            series_id,
-            op.basename(op.dirname(series_files[0])),
-            '-', '-',
-            size[0], size[1], size[2], size[3],
-            TR, TE,
-            dcminfo.ProtocolName,
-            motion_corrected,
-            'derived' in [x.lower() for x in dcminfo.get('ImageType', [])],
-            dcminfo.get('PatientID'),
-            dcminfo.get('StudyDescription'),
-            refphys,
-            dcminfo.get('SeriesDescription'),
-            sequence_name,
-            image_type,
-            accession_number,
-            # For demographics to populate BIDS participants.tsv
-            dcminfo.get('PatientAge'),
-            dcminfo.get('PatientSex'),
-            dcminfo.get('AcquisitionDate'),
-            dcminfo.get('SeriesInstanceUID')
-        )
         # candidates
         # dcminfo.AccessionNumber
         #   len(dcminfo.ReferencedImageSequence)
