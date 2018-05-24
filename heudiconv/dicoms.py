@@ -220,11 +220,12 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
                 dcminfo.get('SeriesInstanceUID')
             )
             info = SeqInfo(*seqinfo_args)
+
         except TypeError as e:
             print("Trying to construct Seqinfo object:",
                   "{ob}".format(ob=SeqInfo.__doc__),
                   "\n However the arguments supplied were:")
-            print([repr(v) for v in seqinfo_args])
+            print(seqinfo_args)
             raise(e)
 
         # candidates
