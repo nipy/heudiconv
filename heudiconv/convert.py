@@ -79,7 +79,7 @@ def conversion_info(subject, outdir, info, filegroup, ses):
 
 def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                    anon_outdir, with_prov, ses, bids, seqinfo, min_meta,
-                   overwrite,grouping=None):
+                   overwrite,grouping='studyUID'):
     if dicoms:
         lgr.info("Processing %d dicoms", len(dicoms))
     elif seqinfo:

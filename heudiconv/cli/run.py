@@ -96,14 +96,19 @@ def process_extra_commands(outdir, args):
     return
 
 
-def main(argv=None):
+def main(args=None):
     parser = get_parser()
-    args = parser.parse_args(argv)
-    # exit if nothing to be done
-    if not args.files and not args.dicom_dir_template and not args.command:
-        lgr.warning("Nothing to be done - displaying usage help")
-        parser.print_help()
-        sys.exit(1)
+
+    if args:
+        args = parser.parse_args(args)
+    else:
+        args = parser.parse_args(argv)
+        # exit if nothing to be done
+        if not args.files and not args.dicom_dir_template and not args.command:
+            lgr.warning("Nothing to be done - displaying usage help")
+            parser.print_help()
+            sys.exit(1)
+
     # To be done asap so anything random is deterministic
     if args.random_seed is not None:
         import random
@@ -204,8 +209,8 @@ def get_parser():
                         ),
                         help='custom actions to be performed on provided '
                         'files instead of regular operation.')
-    parser.add_argument('-g', '--grouping', default='studyUID',
-                        choices=('studyUID', 'accession_number'),
+    parser.add_argument('-g', '--grouping', default='None',
+                        choices=('studyUID', 'accession_number','None'),
                         help='How to group dicoms (default: by studyUID)')
     parser.add_argument('--minmeta', action='store_true',
                         help='Exclude dcmstack meta information in sidecar '
