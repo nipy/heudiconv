@@ -16,7 +16,8 @@ from .utils import (
     clear_temp_dicoms,
     seqinfo_fields,
     assure_no_file_exists,
-    file_md5sum
+    file_md5sum,
+    SeqInfo
 )
 from .bids import (
     convert_sid_bids,
@@ -75,6 +76,11 @@ def conversion_info(subject, outdir, info, filegroup, ses):
                 convert_info.append((op.join(outpath, outprefix),
                                     outtype, files))
     return convert_info
+
+
+def flatten(items):
+    import operator
+    return reduce(operator.concat, items)
 
 
 def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
@@ -151,15 +157,42 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
         # MG -- will have to try with both dicom template, files
         assure_no_file_exists(target_heuristic_filename)
         safe_copyfile(heuristic.filename, idir)
+        dicominfo_file = op.join(idir, 'dicominfo%s.tsv' % ses_suffix)
+
+
         if dicoms:
-            seqinfo = group_dicoms_into_seqinfos(
+            seqinfo_dict = group_dicoms_into_seqinfos(
                 dicoms,
                 file_filter=getattr(heuristic, 'filter_files', None),
                 dcmfilter=getattr(heuristic, 'filter_dicom', None),
                 grouping=grouping)
+        else: 
+            seqinfo_dict = seqinfo # passed in from elsewhere
+            if isinstance(seqinfo_dict.keys()[0],SeqInfo):
+                seqinfo_dict = {'no_grouping' : seqinfo_dict}
+
+
+        assert(not isinstance(seqinfo_dict.keys()[0],SeqInfo))
+        ## At this point everything is a dict containing dicts in 
+        ## which the SeqInfo objects are keys
+        ## If we were to always output seqinfo I think we have
+        ## the issue that series_ids can't match
+        ## also appears to be not what reproin seems to be using.
+        ## we could make sure we don't accidentally merge identical
+        ## series_ids though:
+        series_ids = flatten(map( lambda x: [seq.series_id for seq in x.keys()], seqinfo_dict.values()))
+        assert(len(series_ids) == len(set(series_ids)))
+
+        filegroup = {si.series_id: x for seqinfo_tmp in seqinfo_dict.values() for si, x in seqinfo_tmp.items() }
+
+        ## For now, the code works with a dict containing with SeqInfo
+        ## objects as keys so we'll make that
+        ## from the current seqinfo_dict.
+        seqinfo  = {} ## for now we'll delete whatever is contained to this point in seqinfo
+        for seqinfo_tmp in seqinfo_dict.values(): seqinfo.update(seqinfo_tmp)
         seqinfo_list = list(seqinfo.keys())
-        filegroup = {si.series_id: x for si, x in seqinfo.items()}
-        dicominfo_file = op.join(idir, 'dicominfo%s.tsv' % ses_suffix)
+
+
         # allow to overwrite even if was present under git-annex already
         assure_no_file_exists(dicominfo_file)
         with open(dicominfo_file, 'wt') as fp:

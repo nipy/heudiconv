@@ -249,7 +249,10 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
                 seqinfo[accession_number] = OrderedDict()
             seqinfo[accession_number][info] = series_files
         else:
-            seqinfo[info] = series_files
+            if not 'no_grouping' in seqinfo:
+                 seqinfo['no_grouping'] = OrderedDict()
+            seqinfo['no_grouping'][info] = series_files
+            seqinfo['no_grouping'].update({info : series_files})
 
     if per_studyUID:
         lgr.info("Generated sequence info for %d studies with %d entries total",
