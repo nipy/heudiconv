@@ -98,11 +98,11 @@ def process_extra_commands(outdir, args):
 
 def main(args=None):
     parser = get_parser()
-
-    if args:
-        args = parser.parse_args(args)
-    else:
+    argv = sys.argv[1:]
+    if argv != ['tests'] :
         args = parser.parse_args(argv)
+    else:
+        args = parser.parse_args(args)
         # exit if nothing to be done
         if not args.files and not args.dicom_dir_template and not args.command:
             lgr.warning("Nothing to be done - displaying usage help")
