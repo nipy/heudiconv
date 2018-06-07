@@ -3,7 +3,7 @@ import os.path as op
 import logging
 import shutil
 import sys
-
+from collections import OrderedDict
 from .utils import (
     read_config,
     load_json,
@@ -188,7 +188,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
         ## For now, the code works with a dict containing with SeqInfo
         ## objects as keys so we'll make that
         ## from the current seqinfo_dict.
-        seqinfo  = {} ## for now we'll delete whatever is contained to this point in seqinfo
+        seqinfo  = OrderedDict() ## for now we'll delete whatever is contained to this point in seqinfo
         for seqinfo_tmp in seqinfo_dict.values(): seqinfo.update(seqinfo_tmp)
         seqinfo_list = list(seqinfo.keys())
 

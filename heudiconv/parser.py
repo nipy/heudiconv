@@ -3,7 +3,7 @@ import os
 import os.path as op
 from glob import glob
 import re
-
+import bisect
 from collections import defaultdict, OrderedDict
 
 import tarfile
@@ -71,7 +71,6 @@ def get_extracted_dicoms(fl):
 
     # cannot use TempDirs since will trigger cleanup with __del__
     tmpdir = mkdtemp(prefix='heudiconvDCM')
-
     sessions = defaultdict(list)
     session = 0
     if not isinstance(fl, (list, tuple)):
@@ -94,7 +93,9 @@ def get_extracted_dicoms(fl):
         tf_content = [m.name for m in tmembers if m.isfile()]
         # store full paths to each file, so we don't need to drag along
         # tmpdir as some basedir
-        sessions[session] = [op.join(tmpdir, f) for f in tf_content]
+        sessions[session] = []
+        for f in tf_content:
+            bisect.insort(sessions[session],op.join(tmpdir, f))
         session += 1
         # extract into tmp dir
         tf.extractall(path=tmpdir, members=tmembers)
