@@ -128,15 +128,14 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
             mwgroup.append(mw)
             groups[0].append(series_id)
             groups[1].append(len(mwgroup) - 1)
-
-    group_map = dict(zip(groups[0], groups[1]))
+    group_map = OrderedDict(zip(groups[0], groups[1]))
 
     total = 0
     seqinfo = OrderedDict()
 
     # for the next line to make any sense the series_id needs to
     # be sortable in a way that preserves the series order
-    for series_id, mwidx in sorted(group_map.items()):
+    for series_id, mwidx in group_map.items():
         if series_id[0] < 0:
             # skip our fake series with unwanted files
             continue
