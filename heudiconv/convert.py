@@ -85,7 +85,7 @@ def flatten(items):
 
 def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                    anon_outdir, with_prov, ses, bids, seqinfo, min_meta,
-                   overwrite,grouping='studyUID'):
+                   overwrite,grouping):
     if dicoms:
         lgr.info("Processing %d dicoms", len(dicoms))
     elif seqinfo:

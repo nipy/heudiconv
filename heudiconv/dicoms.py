@@ -34,7 +34,7 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
     filegrp : dict
       `filegrp` is a dictionary with files groupped per each sequence
     """
-    allowed_groupings = ['studyUID', 'accession_number', 'all']
+    allowed_groupings = ['studyUID', 'accession_number', 'all', None]
     if grouping not in allowed_groupings:
         raise ValueError('I do not know how to group by {0}'.format(grouping))
     per_studyUID = grouping == 'studyUID'
