@@ -178,10 +178,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
         ## If we were to always output seqinfo I think we have
         ## the issue that series_ids can't match
         ## also appears to be not what reproin seems to be using.
-        ## we could make sure we don't accidentally merge identical
-        ## series_ids though:
         series_ids = flatten(map( lambda x: [seq.series_id for seq in x.keys()], seqinfo_dict.values()))
-        assert(len(series_ids) == len(set(series_ids)))
 
         filegroup = {si.series_id: x for seqinfo_tmp in seqinfo_dict.values() for si, x in seqinfo_tmp.items() }
 
