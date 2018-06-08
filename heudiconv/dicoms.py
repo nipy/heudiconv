@@ -24,7 +24,7 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
       kept, False otherwise.
     dcmfilter : callable, optional
       If called on dcm_data and returns True, it is used to set series_id
-    grouping : {'studyUID', 'accession_number', None}, optional
+    grouping : {'studyUID', 'accession_number', 'all'}, optional
         what to group by: studyUID or accession_number
     Returns
     -------
@@ -34,8 +34,7 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
     filegrp : dict
       `filegrp` is a dictionary with files groupped per each sequence
     """
-    if grouping == 'None': grouping = None
-    allowed_groupings = ['studyUID', 'accession_number', None]
+    allowed_groupings = ['studyUID', 'accession_number', 'all']
     if grouping not in allowed_groupings:
         raise ValueError('I do not know how to group by {0}'.format(grouping))
     per_studyUID = grouping == 'studyUID'
@@ -83,6 +82,8 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
                 # verify that we are working with a single study
                 if studyUID is None:
                     studyUID = file_studyUID
+                elif grouping ==  'all':
+                    pass # multiple uids will be treated as a single session
                 elif not per_accession_number:
                     assert studyUID == file_studyUID, (
                     "Conflicting study identifiers found [{}, {}].".format(
