@@ -39,6 +39,7 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
         raise ValueError('I do not know how to group by {0}'.format(grouping))
     per_studyUID = grouping == 'studyUID'
     per_accession_number = grouping == 'accession_number'
+    lgr.info("GROUPING: %s"% grouping)
     lgr.info("Analyzing %d dicoms", len(files))
 
     groups = [[], []]
