@@ -109,15 +109,16 @@ def get_extracted_dicoms(fl):
 
 
 def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
-                       session, sids, grouping='studyUID'):
+                       session, sids, grouping):
     """Given options from cmdline sort files or dicom seqinfos into
     study_sessions which put together files for a single session of a subject
     in a study
+
     Two major possible workflows:
     - if dicom_dir_template provided -- doesn't pre-load DICOMs and just
       loads files pointed by each subject and possibly sessions as corresponding
       to different tarballs
-    - if files_opt is provided, sorts all DICOMs it can find under those paths
+    - if `files_opt` is provided, sorts all DICOMs it can find under those paths
     """
     study_sessions = {}
     if dicom_dir_template:
@@ -143,9 +144,12 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
                         % (session, session_))
                 # in this setup we do not care about tracking "studies" so
                 # locator would be the same None
-                study_sessions[StudySessionInfo(None,
+                study_sessions[
+                    StudySessionInfo(
+                        None,
                         session_ if session_ is not None else session,
-                        sid)] = files_
+                        sid)
+                    ] = files_
     else:
         # MG - should be caught on initial run
         # YOH - what if it is the initial run?
@@ -165,7 +169,6 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
             files_ += files_ex
 
         # sort all DICOMS using heuristic
-        # TODO:  this one is not grouping by StudyUID but may be we should!
         seqinfo_dict = group_dicoms_into_seqinfos(files_,
             file_filter=getattr(heuristic, 'filter_files', None),
             dcmfilter=getattr(heuristic, 'filter_dicom', None),

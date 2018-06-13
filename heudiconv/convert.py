@@ -79,8 +79,9 @@ def conversion_info(subject, outdir, info, filegroup, ses):
 
 
 def flatten(items):
-    import operator
-    return reduce(operator.concat, items)
+    # import operator
+    # no reduce in PY3
+    return sum(items, [])
 
 
 def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
@@ -189,7 +190,8 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
         ## objects as keys so we'll make that
         ## from the current seqinfo_dict.
         seqinfo  = {} ## for now we'll delete whatever is contained to this point in seqinfo
-        for seqinfo_tmp in seqinfo_dict.values(): seqinfo.update(seqinfo_tmp)
+        for seqinfo_tmp in seqinfo_dict.values():
+            seqinfo.update(seqinfo_tmp)
         seqinfo_list = list(seqinfo.keys())
 
 

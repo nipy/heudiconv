@@ -96,18 +96,15 @@ def process_extra_commands(outdir, args):
     return
 
 
-def main(args=None):
+def main(argv=None):
     parser = get_parser()
 
-    if args:
-        args = parser.parse_args(args)
-    else:
-        args = parser.parse_args(argv)
-        # exit if nothing to be done
-        if not args.files and not args.dicom_dir_template and not args.command:
-            lgr.warning("Nothing to be done - displaying usage help")
-            parser.print_help()
-            sys.exit(1)
+    args = parser.parse_args(argv)
+    # exit if nothing to be done
+    if not args.files and not args.dicom_dir_template and not args.command:
+        lgr.warning("Nothing to be done - displaying usage help")
+        parser.print_help()
+        sys.exit(1)
 
     # To be done asap so anything random is deterministic
     if args.random_seed is not None:
@@ -136,6 +133,7 @@ def get_parser():
     parser = ArgumentParser(description=docstr)
     parser.add_argument('--version', action='version', version=__version__)
     group = parser.add_mutually_exclusive_group()
+    default = ' (default: %(default)s)'
     group.add_argument('-d', '--dicom_dir_template', dest='dicom_dir_template',
                        help='location of dicomdir that can be indexed with '
                        'subject id {subject} and session {session}. Tarballs '
@@ -150,12 +148,11 @@ def get_parser():
                         help='list of subjects - required for dicom template. '
                         'If not provided, DICOMS would first be "sorted" and '
                         'subject IDs deduced by the heuristic')
-    parser.add_argument('-c', '--converter',
-                        default='dcm2niix',
+    parser.add_argument('-c', '--converter', default='dcm2niix',
                         choices=('dcm2niix', 'none'),
                         help='tool to use for DICOM conversion. Setting to '
                         '"none" disables the actual conversion step -- useful'
-                        'for testing heuristics.')
+                        'for testing heuristics.' + default)
     parser.add_argument('-o', '--outdir', default=os.getcwd(),
                         help='output directory for conversion setup (for '
                         'further customization and future reference. This '
@@ -184,8 +181,8 @@ def get_parser():
                         help='Store additional provenance information. '
                         'Requires python-rdflib.')
     parser.add_argument('-ss', '--ses', dest='session', default=None,
-                        help='session for longitudinal study_sessions, default '
-                        'is none')
+                        help='session for longitudinal study_sessions.'
+                             + default)
     parser.add_argument('-b', '--bids', action='store_true',
                         help='flag for output into BIDS structure')
     parser.add_argument('--overwrite', action='store_true', default=False,
@@ -209,9 +206,9 @@ def get_parser():
                         ),
                         help='custom actions to be performed on provided '
                         'files instead of regular operation.')
-    parser.add_argument('-g', '--grouping', default='None',
-                        choices=('studyUID', 'accession_number','None'),
-                        help='How to group dicoms (default: by studyUID)')
+    parser.add_argument('-g', '--grouping', default='studyUID',
+                        choices=('studyUID', 'accession_number', 'none'),
+                        help='How to group DICOMs into study sessions.' + default)
     parser.add_argument('--minmeta', action='store_true',
                         help='Exclude dcmstack meta information in sidecar '
                         'jsons')

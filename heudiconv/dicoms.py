@@ -11,10 +11,13 @@ from .utils import SeqInfo, load_json, set_readonly
 
 lgr = logging.getLogger(__name__)
 
+
 def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
-    """Process list of dicoms and return seqinfo and file group
+    """Process list of DICOMs and return seqinfo and file group
+
     `seqinfo` contains per-sequence extract of fields from DICOMs which
     will be later provided into heuristics to decide on filenames
+
     Parameters
     ----------
     files : list of str
@@ -24,20 +27,21 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
       kept, False otherwise.
     dcmfilter : callable, optional
       If called on dcm_data and returns True, it is used to set series_id
-    grouping : {'studyUID', 'accession_number', None}, optional
+    grouping : {'studyUID', 'accession_number', 'none'}, optional
         what to group by: studyUID or accession_number
+
     Returns
     -------
-    seqinfo : list of list
-      `seqinfo` is a list of info entries per each sequence (some entry
-      there defines a key for `filegrp`)
+    OrderedDict{study(group): OrderedDict{SeqInfo: filegrp}}
     filegrp : dict
-      `filegrp` is a dictionary with files groupped per each sequence
+      `filegrp` is a dictionary with files grouped per each sequence
     """
-    if grouping == 'None': grouping = None
+    if grouping and grouping.lower() == 'none':
+        grouping = None
     allowed_groupings = ['studyUID', 'accession_number', None]
     if grouping not in allowed_groupings:
         raise ValueError('I do not know how to group by {0}'.format(grouping))
+
     per_studyUID = grouping == 'studyUID'
     per_accession_number = grouping == 'accession_number'
     lgr.info("Analyzing %d dicoms", len(files))
@@ -186,9 +190,9 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
 
         motion_corrected = 'MOCO' in image_type
 
-        if dcminfo.get([0x18,0x24], None):
+        if dcminfo.get([0x18, 0x24], None):
             # GE and Philips scanners
-            sequence_name = dcminfo[0x18,0x24].value
+            sequence_name = dcminfo[0x18, 0x24].value
         elif dcminfo.get([0x19, 0x109c], None):
             # Siemens scanners
             sequence_name = dcminfo[0x19, 0x109c].value
@@ -225,13 +229,15 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
         #   len(dcminfo.SourceImageSequence)
         # FOR demographics
         if per_studyUID:
-            key = studyUID.split('.')[-1]
+            key = studyUID
+            key_lgr = studyUID.split('.')[-1]
         elif per_accession_number:
-            key = accession_number
+            key_lgr = key = accession_number
         else:
-            key = ''
+            key_lgr = key = None
+
         lgr.debug("%30s %30s %27s %27s %5s nref=%-2d nsrc=%-2d %s" % (
-            key,
+            key_lgr,
             info.series_id,
             dcminfo.SeriesDescription,
             dcminfo.ProtocolName,
@@ -240,28 +246,21 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
             len(dcminfo.get('SourceImageSequence', '')),
             info.image_type
         ))
-        if per_studyUID:
-            if studyUID not in seqinfo:
-                seqinfo[studyUID] = OrderedDict()
-            seqinfo[studyUID][info] = series_files
-        elif per_accession_number:
-            if accession_number not in seqinfo:
-                seqinfo[accession_number] = OrderedDict()
-            seqinfo[accession_number][info] = series_files
-        else:
-            if not 'no_grouping' in seqinfo:
-                 seqinfo['no_grouping'] = OrderedDict()
-            seqinfo['no_grouping'][info] = series_files
-            seqinfo['no_grouping'].update({info : series_files})
 
-    if per_studyUID:
-        lgr.info("Generated sequence info for %d studies with %d entries total",
-                 len(seqinfo), sum(map(len, seqinfo.values())))
-    elif per_accession_number:
-        lgr.info("Generated sequence info for %d accession numbers with %d "
-                 "entries total", len(seqinfo), sum(map(len, seqinfo.values())))
-    else:
-        lgr.info("Generated sequence info with %d entries", len(seqinfo))
+        if key not in seqinfo:
+            seqinfo[key] = OrderedDict()
+        if info in seqinfo[key]:
+            raise ValueError(
+                "Already got info: %s" % str(info)
+            )
+        seqinfo[key][info] = series_files
+
+    lgr.info(
+        "Groupping by %s, generated sequence info for %d studies, %d entries total",
+         grouping or "nothing",
+        len(seqinfo),
+        sum(map(len, seqinfo.values()))
+    )
     return seqinfo
 
 
