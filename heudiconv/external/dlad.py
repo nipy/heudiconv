@@ -1,4 +1,6 @@
+import inspect
 import os
+
 import os.path as op
 import logging
 from glob import glob
@@ -155,7 +157,12 @@ def mark_sensitive(ds, path_glob):
     paths = glob(op.join(ds.path, path_glob))
     if not paths:
         return
-    ds.repo.set_metadata(
+    lgr.debug("Marking %d files with distribution-restrictions field",
+              len(paths))
+    # set_metadata can be a bloody generator
+    res = ds.repo.set_metadata(
         paths,
-        init=[('distribution-restrictions', 'sensitive')],
+        init=dict([('distribution-restrictions', 'sensitive')]),
         recursive=True)
+    if inspect.isgenerator(res):
+        res = list(res)
