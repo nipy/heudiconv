@@ -1,4 +1,6 @@
+import inspect
 import os
+
 import os.path as op
 import logging
 from glob import glob
@@ -61,9 +63,11 @@ def add_to_datalad(topdir, studydir, msg, bids):
         assert ds.is_installed()
         superds = ds
 
-    create_file_if_missing(
-        op.join(studydir, '.gitattributes'),
-        """\
+    # TODO: we need a helper (in DataLad ideally) to ease adding such
+    # specifications
+    gitattributes_path = op.join(studydir, '.gitattributes')
+    # We will just make sure that all our desired rules are present in it
+    desired_attrs = """\
 * annex.largefiles=(largerthan=100kb)
 *.json annex.largefiles=nothing
 *.txt annex.largefiles=nothing
@@ -71,7 +75,18 @@ def add_to_datalad(topdir, studydir, msg, bids):
 *.nii.gz annex.largefiles=anything
 *.tgz annex.largefiles=anything
 *_scans.tsv annex.largefiles=anything
-""")
+"""
+    if op.exists(gitattributes_path):
+        with open(gitattributes_path, 'rb') as f:
+            known_attrs = [line.decode('utf-8').rstrip() for line in f.readlines()]
+    else:
+        known_attrs = []
+    for attr in desired_attrs.split('\n'):
+        if attr not in known_attrs:
+            known_attrs.append(attr)
+    with open(gitattributes_path, 'wb') as f:
+        f.write('\n'.join(known_attrs).encode('utf-8'))
+
     # so for mortals it just looks like a regular directory!
     if not ds.config.get('annex.thin'):
         ds.config.add('annex.thin', 'true', where='local')
@@ -155,7 +170,12 @@ def mark_sensitive(ds, path_glob):
     paths = glob(op.join(ds.path, path_glob))
     if not paths:
         return
-    ds.repo.set_metadata(
+    lgr.debug("Marking %d files with distribution-restrictions field",
+              len(paths))
+    # set_metadata can be a bloody generator
+    res = ds.repo.set_metadata(
         paths,
-        init=[('distribution-restrictions', 'sensitive')],
+        init=dict([('distribution-restrictions', 'sensitive')]),
         recursive=True)
+    if inspect.isgenerator(res):
+        res = list(res)
