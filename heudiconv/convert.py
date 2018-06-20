@@ -3,7 +3,7 @@ import os.path as op
 import logging
 import shutil
 import sys
-
+from collections import OrderedDict
 from .utils import (
     read_config,
     load_json,
@@ -86,7 +86,7 @@ def flatten(items):
 
 def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                    anon_outdir, with_prov, ses, bids, seqinfo, min_meta,
-                   overwrite,grouping='studyUID'):
+                   overwrite,grouping):
     if dicoms:
         lgr.info("Processing %d dicoms", len(dicoms))
     elif seqinfo:
@@ -179,17 +179,14 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
         ## If we were to always output seqinfo I think we have
         ## the issue that series_ids can't match
         ## also appears to be not what reproin seems to be using.
-        ## we could make sure we don't accidentally merge identical
-        ## series_ids though:
         series_ids = flatten(map( lambda x: [seq.series_id for seq in x.keys()], seqinfo_dict.values()))
-        assert(len(series_ids) == len(set(series_ids)))
 
         filegroup = {si.series_id: x for seqinfo_tmp in seqinfo_dict.values() for si, x in seqinfo_tmp.items() }
 
         ## For now, the code works with a dict containing with SeqInfo
         ## objects as keys so we'll make that
         ## from the current seqinfo_dict.
-        seqinfo  = {} ## for now we'll delete whatever is contained to this point in seqinfo
+        seqinfo  = OrderedDict() ## for now we'll delete whatever is contained to this point in seqinfo
         for seqinfo_tmp in seqinfo_dict.values():
             seqinfo.update(seqinfo_tmp)
         seqinfo_list = list(seqinfo.keys())
@@ -432,7 +429,7 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir):
 
     convertnode = Node(Dcm2niix(), name='convert')
     convertnode.base_dir = tmpdir
-    convertnode.inputs.source_names = item_dicoms
+    convertnode.inputs.source_dir = dicom_dir
     convertnode.inputs.out_filename = op.basename(op.dirname(prefix))
 
     if nipype.__version__.split('.')[0] == '0':

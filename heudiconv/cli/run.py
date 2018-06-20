@@ -207,8 +207,8 @@ def get_parser():
                         help='custom actions to be performed on provided '
                         'files instead of regular operation.')
     parser.add_argument('-g', '--grouping', default='studyUID',
-                        choices=('studyUID', 'accession_number', 'none'),
-                        help='How to group DICOMs into study sessions.' + default)
+                        choices=('studyUID', 'accession_number', 'all'),
+                        help='How to group DICOMs into study sessions(TODO: describe possible choices).' + default)
     parser.add_argument('--minmeta', action='store_true',
                         help='Exclude dcmstack meta information in sidecar '
                         'jsons')
