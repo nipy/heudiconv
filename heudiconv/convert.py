@@ -173,7 +173,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                 seqinfo_dict = {'no_grouping' : seqinfo_dict}
 
 
-        assert(not isinstance(seqinfo_dict.keys()[0],SeqInfo))
+        assert(not isinstance(list(seqinfo_dict.keys())[0],SeqInfo))
         ## At this point everything is a dict containing dicts in 
         ## which the SeqInfo objects are keys
         ## If we were to always output seqinfo I think we have
