@@ -2,4 +2,5 @@
 # This is a dcmstack branch with changes for Python 3
 # sent PR to main repo, TODO: check if merged
 # https://github.com/ghisvail/dcmstack/pull/1
-git+git://github.com/mvdoc/dcmstack@bf/importsys
+# git+git://github.com/mvdoc/dcmstack@bf/importsys
+git+git://github.com/moloney/dcmstack
