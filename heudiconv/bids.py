@@ -137,8 +137,9 @@ def tuneup_bids_json_files(json_files):
         json_basename = '_'.join(jsonfile.split('_')[:-1])
         # if we got by now all needed .json files -- we can fix them up
         # unfortunately order of "items" is not guaranteed atm
-        if len(glob(json_basename + '*.json')) == 3:
-            json_phasediffname = json_basename + '_phasediff.json'
+        json_phasediffname = json_basename + '_phasediff.json'
+        json_mag = json_basename + '_magnitude*.json'
+        if op.exists(json_phasediffname) and len(glob(json_mag)) >= 1:
             json_ = load_json(json_phasediffname)
             # TODO: we might want to reorder them since ATM
             # the one for shorter TE is the 2nd one!
