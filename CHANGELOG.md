@@ -15,7 +15,7 @@ Bugfix release
   - series_uid
 - Reproin heuristic support for xnat
 ### Changed
-- Dockerfile updated to use `dcm2niix v1.0.20180328`
+- Dockerfile updated to use `dcm2niix v1.0.20180622`
 - Conversion table will be regenerated if heurisic has changed
 - Do not touch existing BIDS files
   - events.tsv
@@ -27,6 +27,9 @@ Bugfix release
   - `pydicom` 1.0.2
 - Later versions of `pydicom` are prioritized first
 - JSON pretty print should not remove spaces
+- Phasediff fieldmaps behavior
+  - ensure phasediff exists
+  - support for single magnitude acquisitions
 
 ## [0.5] - 2018-03-01
 The first release after major refactoring:
