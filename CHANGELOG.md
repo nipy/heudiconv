@@ -4,20 +4,32 @@ All notable changes to this project will be documented (for humans) in this file
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [UNRELEASED] - 2018-??-??
-TODO Summary
+## [0.5.1] - 2018-07-05
+Bugfix release
+
 ### Added
-
+- Video tutorial / updated slides
+- Helper to set metadata restrictions correctly
+- Usage is now shown when run without arguments
+- New fields to Seqinfo
+  - series_uid
+- Reproin heuristic support for xnat
 ### Changed
-
-### Deprecated
-
+- Dockerfile updated to use `dcm2niix v1.0.20180622`
+- Conversion table will be regenerated if heurisic has changed
+- Do not touch existing BIDS files
+  - events.tsv
+  - task JSON
 ### Fixed
-
-### Removed
-
-### Security
-
+- Python 2.7.8 and older installation
+- Support for updated packages
+  - `Datalad` 0.10
+  - `pydicom` 1.0.2
+- Later versions of `pydicom` are prioritized first
+- JSON pretty print should not remove spaces
+- Phasediff fieldmaps behavior
+  - ensure phasediff exists
+  - support for single magnitude acquisitions
 
 ## [0.5] - 2018-03-01
 The first release after major refactoring:
