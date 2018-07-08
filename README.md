@@ -23,9 +23,9 @@ HeuDiConv operates using a heuristic, which provides information on
 how your files should be converted. A number of example heuristics are
 provided to address various use-cases
 
-- the [cmrr_heuristic](heuristics/cmrr_heuristic.py) provides an
+- the [cmrr_heuristic](heudiconv/heuristics/cmrr_heuristic.py) provides an
   example for a conversion to [BIDS]
-- the [reproin](heuristics/reproin.py) could be used to establish
+- the [reproin](heudiconv/heuristics/reproin.py) could be used to establish
   a complete imaging center wide automation to convert all acquired
   data to [BIDS] following a simple naming
   [convention](https://goo.gl/o0YASC) for studies and sequences
@@ -36,7 +36,7 @@ provided to address various use-cases
 
 Released versions of HeuDiConv are available from PyPI so you could
 just `pip install heudiconv[all]` for the most complete installation, 
-and it would require manual installation ony
+and it would require manual installation only
 of the [dcm2niix](https://github.com/rordenlab/dcm2niix/).  On
 Debian-based systems we recommend to use
 [NeuroDebian](http://neuro.debian.net) providing
