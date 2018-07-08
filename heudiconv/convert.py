@@ -169,7 +169,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                 grouping=grouping)
         else: 
             seqinfo_dict = seqinfo # passed in from elsewhere
-            if isinstance(seqinfo_dict.keys()[0],SeqInfo):
+            if isinstance(list(seqinfo_dict.keys())[0],SeqInfo):
                 seqinfo_dict = {'no_grouping' : seqinfo_dict}
 
 
