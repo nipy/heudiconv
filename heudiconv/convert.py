@@ -35,6 +35,7 @@ lgr = logging.getLogger(__name__)
 
 
 def conversion_info(subject, outdir, info, filegroup, ses):
+    """Conversion information."""
     convert_info = []
     for key, items in info.items():
         if not items:
@@ -59,10 +60,10 @@ def conversion_info(subject, outdir, info, filegroup, ses):
                     seqitem=item,
                     subindex=subindex + 1,
                     session='ses-' + str(ses),
-                    bids_subject_session_prefix=
-                        'sub-%s' % subject + (('_ses-%s' % ses) if ses else ''),
-                    bids_subject_session_dir=
-                        'sub-%s' % subject + (('/ses-%s' % ses) if ses else ''),
+                    bids_subject_session_prefix='sub-{}_ses-{}'.format(
+                        subject, ses if ses else ''),
+                    bids_subject_session_dir='sub-{}/ses-{}'.format(
+                        subject, ses if ses else ''),
                     # referring_physician_name
                     # study_description
                     ))
@@ -78,8 +79,9 @@ def conversion_info(subject, outdir, info, filegroup, ses):
 
 
 def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
-                   anon_outdir, with_prov, ses, bids, seqinfo, min_meta,
-                   overwrite):
+                    anon_outdir, with_prov, ses, bids, seqinfo, min_meta,
+                    overwrite):
+    """Prepare conversion."""
     if dicoms:
         lgr.info("Processing %d dicoms", len(dicoms))
     elif seqinfo:
@@ -212,8 +214,9 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
 
 def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
             bids, outdir, min_meta, overwrite, symlink=True, prov_file=None):
-    """Perform actual conversion (calls to converter etc) given info from
-    heuristic's `infotodict`
+    """Perform actual conversion (calls to converter etc).
+
+    Given info from heuristic's `infotodict`.
 
     Parameters
     ----------
@@ -231,6 +234,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
     Returns
     -------
     None
+
     """
     prov_files = []
     tempdirs = TempDirs()
@@ -255,7 +259,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
 
         for outtype in outtypes:
             lgr.debug("Processing %d dicoms for output type %s. Overwrite=%s",
-                     len(item_dicoms), outtype, overwrite)
+                      len(item_dicoms), outtype, overwrite)
             lgr.debug("Includes the following dicoms: %s", item_dicoms)
 
             seqtype = op.basename(op.dirname(prefix)) if bids else None
@@ -267,8 +271,12 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                 convert_dicom(item_dicoms, bids, prefix,
                               outdir, tempdirs, symlink, overwrite)
             elif outtype in ['nii', 'nii.gz']:
-                assert converter == 'dcm2niix', ('Invalid converter '
-                                                 '{}'.format(converter))
+
+                # Consider dcm2niix given with absolute path
+                converter_dir = op.dirname(converter)
+                converter_name = op.basename(converter)
+                assert converter_name == 'dcm2niix', (
+                    'Invalid converter {}'.format(converter_name))
 
                 outname, scaninfo = (prefix + '.' + outtype,
                                      prefix + scaninfo_suffix)
@@ -277,11 +285,12 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                     tmpdir = tempdirs('dcm2niix')
 
                     # run conversion through nipype
-                    res, prov_file = nipype_convert(item_dicoms, prefix, with_prov,
-                                                    bids, tmpdir)
+                    res, prov_file = nipype_convert(item_dicoms, prefix,
+                                                    with_prov, bids, tmpdir,
+                                                    cmddir=converter_dir)
 
-                    bids_outfiles = save_converted_files(res, item_dicoms, bids,
-                                                         outtype, prefix,
+                    bids_outfiles = save_converted_files(res, item_dicoms,
+                                                         bids, outtype, prefix,
                                                          outname_bids,
                                                          overwrite=overwrite)
 
@@ -298,9 +307,8 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                     tempdirs.rmtree(tmpdir)
                 else:
                     raise RuntimeError(
-                        "was asked to convert into %s but destination already exists"
-                        % (outname)
-                    )
+                        "was asked to convert into {} but destination already \
+                        exists".format(outname))
 
         if len(bids_outfiles) > 1:
             lgr.warning("For now not embedding BIDS and info generated "
@@ -309,9 +317,9 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
         elif not bids_outfiles:
             lgr.debug("No BIDS files were produced, nothing to embed to then")
         elif outname:
-            embed_metadata_from_dicoms(bids, item_dicoms, outname, outname_bids,
-                                       prov_file, scaninfo, tempdirs, with_prov,
-                                       min_meta)
+            embed_metadata_from_dicoms(bids, item_dicoms, outname,
+                                       outname_bids, prov_file, scaninfo,
+                                       tempdirs, with_prov, min_meta)
         if scaninfo and op.exists(scaninfo):
             lgr.info("Post-treating %s file", scaninfo)
             treat_infofile(scaninfo)
@@ -327,7 +335,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
 
 def convert_dicom(item_dicoms, bids, prefix,
                   outdir, tempdirs, symlink, overwrite):
-    """Save DICOMs as output (default is by symbolic link)
+    """Save DICOMs as output (default is by symbolic link).
 
     Parameters
     ----------
@@ -350,6 +358,7 @@ def convert_dicom(item_dicoms, bids, prefix,
     Returns
     -------
     None
+
     """
     if bids:
         # mimic the same hierarchy location as the prefix
@@ -382,7 +391,7 @@ def convert_dicom(item_dicoms, bids, prefix,
                 shutil.copyfile(filename, outfile)
 
 
-def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir):
+def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir, cmddir):
     """ """
     import nipype
     if with_prov:
@@ -391,7 +400,7 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir):
     from nipype import Node
     from nipype.interfaces.dcm2nii import Dcm2niix
 
-    item_dicoms = list(map(op.abspath, item_dicoms)) # absolute paths
+    item_dicoms = list(map(op.abspath, item_dicoms))  # absolute paths
 
     dicom_dir = op.dirname(item_dicoms[0]) if item_dicoms else None
 
@@ -399,6 +408,9 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir):
     convertnode.base_dir = tmpdir
     convertnode.inputs.source_names = item_dicoms
     convertnode.inputs.out_filename = op.basename(op.dirname(prefix))
+
+    if cmddir != '':
+        convertnode.interface._cmd = op.join(cmddir, 'dcm2niix')
 
     if nipype.__version__.split('.')[0] == '0':
         # deprecated since 1.0, might be needed(?) before
@@ -419,8 +431,10 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir):
     return eg, prov_file
 
 
-def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids, overwrite):
+def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids,
+                         overwrite):
     """Copy converted files from tempdir to output directory.
+
     Will rename files if necessary.
 
     Parameters
@@ -458,7 +472,7 @@ def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids, 
         # dwi etc which might spit out multiple files
 
         suffixes = ([str(i+1) for i in range(len(res_files))]
-                     if bids else None)
+                    if bids else None)
 
         if not suffixes:
             lgr.warning("Following series files likely have "
@@ -488,6 +502,6 @@ def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids, 
             try:
                 safe_copyfile(res.outputs.bids, outname_bids, overwrite)
                 bids_outfiles.append(outname_bids)
-            except TypeError as exc:  ##catch lists
+            except TypeError as exc:  # catch lists
                 raise TypeError("Multiple BIDS sidecars detected.")
     return bids_outfiles
