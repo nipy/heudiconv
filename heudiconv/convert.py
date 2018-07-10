@@ -267,8 +267,12 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                 convert_dicom(item_dicoms, bids, prefix,
                               outdir, tempdirs, symlink, overwrite)
             elif outtype in ['nii', 'nii.gz']:
-                assert converter == 'dcm2niix', ('Invalid converter '
-                                                 '{}'.format(converter))
+
+                # Consider dcm2niix given with absolute path
+                converter_dir = op.dirname(converter)
+                converter_name = op.basename(converter)
+                assert converter_name == 'dcm2niix', (
+                    'Invalid converter {}'.format(converter_name))
 
                 outname, scaninfo = (prefix + '.' + outtype,
                                      prefix + scaninfo_suffix)
@@ -277,8 +281,9 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                     tmpdir = tempdirs('dcm2niix')
 
                     # run conversion through nipype
-                    res, prov_file = nipype_convert(item_dicoms, prefix, with_prov,
-                                                    bids, tmpdir)
+                    res, prov_file = nipype_convert(item_dicoms, prefix,
+                                                    with_prov, bids, tmpdir,
+                                                    cmddir=converter_dir)
 
                     bids_outfiles = save_converted_files(res, item_dicoms, bids,
                                                          outtype, prefix,
@@ -382,7 +387,7 @@ def convert_dicom(item_dicoms, bids, prefix,
                 shutil.copyfile(filename, outfile)
 
 
-def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir):
+def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir, cmddir):
     """ """
     import nipype
     if with_prov:
@@ -399,6 +404,9 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir):
     convertnode.base_dir = tmpdir
     convertnode.inputs.source_names = item_dicoms
     convertnode.inputs.out_filename = op.basename(op.dirname(prefix))
+
+    if cmddir != '':
+        convertnode.interface._cmd = op.join(cmddir, 'dcm2niix')
 
     if nipype.__version__.split('.')[0] == '0':
         # deprecated since 1.0, might be needed(?) before
