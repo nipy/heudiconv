@@ -147,10 +147,10 @@ def get_parser():
                         'subject IDs deduced by the heuristic')
     parser.add_argument('-c', '--converter',
                         default='dcm2niix',
-                        choices=('dcm2niix', 'none'),
                         help='tool to use for DICOM conversion. Setting to '
                         '"none" disables the actual conversion step -- useful'
-                        'for testing heuristics.')
+                        'for testing heuristics. Absolute path to dcm2niix can'
+                        'be given (e.g. /home/johndoe/mricrogl/dcm2niix).')
     parser.add_argument('-o', '--outdir', default=os.getcwd(),
                         help='output directory for conversion setup (for '
                         'further customization and future reference. This '
