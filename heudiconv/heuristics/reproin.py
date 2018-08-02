@@ -226,7 +226,23 @@ protocols2fix = {
             ('fmap_acq-discorr-dti-', 'fmap_acq-dwi_dir-'),
             ('_test', ''),
         ],
+    '022969bfde39c2940c114edf1db3fabc':
+        [  # should be applied only for ses-03!
+            ('_acq-MPRAGE_ses-02', '_acq-MPRAGE_ses-03'),
+        ],
+    # to be used only once for one interrupted accession but we cannot
+    # fix per accession yet
+    #    '23763823d2b9b4b09dafcadc8e8edf21':
+    #        [
+    #            ('anat-T1w_acq-MPRAGE', 'anat-T1w_acq-MPRAGE_run-06'), 
+    #            ('anat_T2w', 'anat_T2w_run-06'),
+    #            ('fmap_acq-3mm', 'fmap_acq-3mm_run-06'),
+    #        ],
 }
+# there was also screw up in the locator specification
+# so we need to fix in both
+protocols2fix['67ae5e641ea9d487b6fdf56fb91aeb93'] = protocols2fix['022969bfde39c2940c114edf1db3fabc']
+
 keys2replace = ['protocol_name', 'series_description']
 
 # list containing StudyInstanceUID to skip -- hopefully doesn't happen too often
