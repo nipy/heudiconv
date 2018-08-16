@@ -108,7 +108,7 @@ def get_extracted_dicoms(fl):
     return sessions.items()
 
 
-def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
+def get_study_sessions(dicom_dir_template, recurse_dicom_dir, files_opt, heuristic, outdir,
                        session, sids, grouping='studyUID'):
     """Given options from cmdline sort files or dicom seqinfos into
     study_sessions which put together files for a single session of a subject
@@ -134,16 +134,24 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
                 "subject id.  Got %r" % dicom_dir_template)
         for sid in sids:
             sdir = dicom_dir_template.format(subject=sid, session=session)
-            files = sorted(glob(sdir))
-            for session_, files_ in get_extracted_dicoms(files):
-                if session_ is not None and session:
-                    lgr.warning(
+            if recurse_dicom_dir:
+                root_dirs = [root for root, dirnames, filenames in os.walk(sdir)]
+                files = []
+                for folder in root_dirs:
+                    for file in os.listdir(folder):
+                        if os.path.isfile(os.path.join(folder,file)):
+                            files.append(os.path.join(folder,file))
+            else:
+                files = sorted(glob(sdir))
+                for session_, files_ in get_extracted_dicoms(files):
+                    if session_ is not None and session:
+                        lgr.warning(
                         "We had session specified (%s) but while analyzing "
                         "files got a new value %r (using it instead)"
                         % (session, session_))
-                # in this setup we do not care about tracking "studies" so
-                # locator would be the same None
-                study_sessions[StudySessionInfo(None,
+                    # in this setup we do not care about tracking "studies" so
+                    # locator would be the same None
+                    study_sessions[StudySessionInfo(None,
                         session_ if session_ is not None else session,
                         sid)] = files_
     else:

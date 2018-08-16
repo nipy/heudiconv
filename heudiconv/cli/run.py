@@ -137,6 +137,8 @@ def get_parser():
                        '(can be compressed) are supported in addition to '
                        'directory. All matching tarballs for a subject are '
                        'extracted and their content processed in a single pass')
+    group.add_argument('-r', '--recurse_dicom_dir', dest='recurse_dicom_dir',
+                       help='automatically recurse dicomdir sub directories to find all dicom files')
     group.add_argument('--files', nargs='*',
                        help='Files (tarballs, dicoms) or directories '
                        'containing files to process. Cannot be provided if '
