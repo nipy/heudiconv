@@ -442,7 +442,7 @@ def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids, 
     from nipype.interfaces.base import isdefined
 
     bids_outfiles = []
-    res_files = sorted(res.outputs.converted_files)
+    res_files = res.outputs.converted_files
 
     if not len(res_files):
         lgr.debug("DICOMs {} were not converted".format(item_dicoms))
@@ -454,6 +454,7 @@ def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids, 
         safe_copyfile(res.outputs.bvals, outname_bvals, overwrite)
 
     if isinstance(res_files, list):
+        res_files = sorted(res_files)
         # we should provide specific handling for fmap,
         # dwi etc which might spit out multiple files
 
