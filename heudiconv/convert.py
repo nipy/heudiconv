@@ -442,7 +442,7 @@ def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids, 
     from nipype.interfaces.base import isdefined
 
     bids_outfiles = []
-    res_files = res.outputs.converted_files
+    res_files = sorted(res.outputs.converted_files)
 
     if not len(res_files):
         lgr.debug("DICOMs {} were not converted".format(item_dicoms))
@@ -469,7 +469,7 @@ def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids, 
 
         # Also copy BIDS files although they might need to
         # be merged/postprocessed later
-        bids_files = (res.outputs.bids
+        bids_files = sorted(res.outputs.bids
                       if len(res.outputs.bids) == len(res_files)
                       else [None] * len(res_files))
 
