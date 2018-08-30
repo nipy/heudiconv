@@ -226,6 +226,10 @@ protocols2fix = {
             ('fmap_acq-discorr-dti-', 'fmap_acq-dwi_dir-'),
             ('_test', ''),
         ],
+    '1996f745c30c1df1d3851844e56d294f':
+        [
+            ('fmap_acq-discorr-dti-', 'fmap_acq-dwi_dir-'),
+        ],
     '022969bfde39c2940c114edf1db3fabc':
         [  # should be applied only for ses-03!
             ('_acq-MPRAGE_ses-02', '_acq-MPRAGE_ses-03'),
