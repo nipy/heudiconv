@@ -4,7 +4,7 @@ import os.path as op
 import logging
 from collections import OrderedDict
 import tarfile
-
+from nibabel.nicom import csareader
 from heudiconv.external.pydicom import dcm
 
 from .utils import SeqInfo, load_json, set_readonly
@@ -72,6 +72,23 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
         except AttributeError:
             lgr.info("File {} is missing any StudyInstanceUID".format(filename))
             file_studyUID = None
+
+        # Workaround for protocol name in private siemens csa header
+        try:
+            ProtocolName = mw.dcm_data.ProtocolName
+        except AttributeError:
+            mw.dcm_data.ProtocolName = ''
+
+        # try parsing Siemens csa header
+        try:
+            if mw.is_csa and mw.dcm_data.ProtocolName == '':
+                csastr = csareader.get_csa_header(mw.dcm_data, 'series')['tags']['MrPhoenixProtocol']['items'][0]
+                #Make sure dcmstack finds beginning of header.
+                csastr = csastr.replace("### ASCCONV BEGIN", "### ASCCONV BEGIN ### ") #Remove when dmcstack is updated
+                parsedhdr = ds.extract.parse_phoenix_prot('MrPhoenixProtocol', csastr)
+                mw.dcm_data.ProtocolName = parsedhdr['tProtocolName'].replace(" ", "")
+        except:
+            lgr.info("File {} is missing  ProtocolName".format(filename))
 
         try:
             series_id = (int(mw.dcm_data.SeriesNumber),
@@ -208,7 +225,7 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
             dcminfo.get('PatientID'),
             dcminfo.get('StudyDescription'),
             refphys,
-            dcminfo.get('SeriesDescription'),
+            series_desc, #We try to set this further up.
             sequence_name,
             image_type,
             accession_number,
@@ -232,7 +249,7 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
         lgr.debug("%30s %30s %27s %27s %5s nref=%-2d nsrc=%-2d %s" % (
             key,
             info.series_id,
-            dcminfo.SeriesDescription,
+            series_desc,
             dcminfo.ProtocolName,
             info.is_derived,
             len(dcminfo.get('ReferencedImageSequence', '')),
