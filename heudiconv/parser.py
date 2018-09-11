@@ -107,6 +107,17 @@ def get_extracted_dicoms(fl):
 
     return sessions.items()
 
+def get_dicom_sub_dirs(sdir):
+    """
+    Automatically recurse into any and all sub directories of the dicom directory and return all files found.
+    """
+    root_dirs = [root for root, dirnames, filenames in os.walk(sdir)]
+    files = []
+    for folder in root_dirs:
+        for file in os.listdir(folder):
+            if os.path.isfile(os.path.join(folder,file)):
+                files.append(os.path.join(folder,file))
+    return files
 
 def get_study_sessions(dicom_dir_template, recurse_dicom_dir, files_opt, heuristic, outdir,
                        session, sids, grouping='studyUID'):
@@ -135,12 +146,7 @@ def get_study_sessions(dicom_dir_template, recurse_dicom_dir, files_opt, heurist
         for sid in sids:
             sdir = dicom_dir_template.format(subject=sid, session=session)
             if recurse_dicom_dir:
-                root_dirs = [root for root, dirnames, filenames in os.walk(sdir)]
-                files = []
-                for folder in root_dirs:
-                    for file in os.listdir(folder):
-                        if os.path.isfile(os.path.join(folder,file)):
-                            files.append(os.path.join(folder,file))
+                files = get_dicom_sub_dirs(sdir)
             else:
                 files = sorted(glob(sdir))
                 for session_, files_ in get_extracted_dicoms(files):

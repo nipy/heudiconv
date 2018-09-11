@@ -63,9 +63,8 @@ def process_extra_commands(outdir, args):
         heuristic = load_heuristic(args.heuristic)
         heuristic_ls = getattr(heuristic, 'ls', None)
         for f in args.files:
-            study_sessions = get_study_sessions(
-                args.dicom_dir_template, [f], heuristic, outdir,
-                args.session, args.subjs, grouping=args.grouping)
+            study_sessions = get_study_sessions(dicom_dir_template=args.dicom_dir_template, recurse_dicom_dir=args.recurse_dicom_dir, 
+            files_opt=[f], heuristic=heuristic, outdir=outdir, session=args.session, sids=args.subjs, grouping=args.grouping)
             print(f)
             for study_session, sequences in study_sessions.items():
                 suf = ''
@@ -137,7 +136,7 @@ def get_parser():
                        '(can be compressed) are supported in addition to '
                        'directory. All matching tarballs for a subject are '
                        'extracted and their content processed in a single pass')
-    group.add_argument('-r', '--recurse_dicom_dir', dest='recurse_dicom_dir',
+    group.add_argument('-r', '--recurse_dicom_dir', dest='recurse_dicom_dir',  action='store_true', default=False,
                        help='automatically recurse dicomdir sub directories to find all dicom files')
     group.add_argument('--files', nargs='*',
                        help='Files (tarballs, dicoms) or directories '
@@ -248,10 +247,8 @@ def process_args(args):
         raise RuntimeError("No heuristic specified - add to arguments and rerun")
 
     heuristic = load_heuristic(args.heuristic)
-
-    study_sessions = get_study_sessions(args.dicom_dir_template, args.files,
-                                        heuristic, outdir, args.session,
-                                        args.subjs, grouping=args.grouping)
+    study_sessions = get_study_sessions(dicom_dir_template=args.dicom_dir_template, recurse_dicom_dir=args.recurse_dicom_dir, 
+        files_opt=args.files, heuristic=heuristic, outdir=outdir, session=args.session, sids=args.subjs, grouping=args.grouping)
 
     # extract tarballs, and replace their entries with expanded lists of files
     # TODO: we might need to sort so sessions are ordered???
