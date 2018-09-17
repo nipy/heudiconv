@@ -88,6 +88,22 @@ def populate_bids_templates(path, defaults={}):
         # create a stub onsets file for each one of those
         suf = '_bold.json'
         assert fpath.endswith(suf)
+        # specify the name of the '_events.tsv' file:
+        if ( '_echo-' in fpath ):
+            # multi-echo sequence: bids (1.1.0) specifies just one '_events.tsv'
+            #   file, common for all echoes.  The name will not include _echo-.
+            # So, find out the echo number:
+            fpath_split = fpath.split('_echo-')         # split fpath using '_echo-'
+            fpath_split_2 = fpath_split[1].split('_')   # split the second part of fpath_split using '_'
+            echoNo = fpath_split_2[0]                   # get echo number
+            if ( echoNo == '1' ):
+                # we modify fpath to exclude '_echo-' + echoNo:
+                fpath = fpath_split[0] + '_' + fpath_split_2[1]
+            else:
+                # for echoNo greater than 1, don't create the events file, so go to
+                #   the next for loop iteration:
+                continue
+
         events_file = fpath[:-len(suf)] + '_events.tsv'
         # do not touch any existing thing, it may be precious
         if not op.lexists(events_file):
