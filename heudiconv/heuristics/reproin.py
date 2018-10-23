@@ -653,7 +653,23 @@ def infotodict(seqinfo):
     return info
 
 
-def get_dups_marked(info):
+def get_dups_marked(info, per_series=True):
+    """
+
+    Parameters
+    ----------
+    info
+    per_series: bool
+      If set to False, it would create growing index through all series. That
+      could lead to non-desired effects if some "multi file" scans (such as
+      fmap with magnitude{1,2} and phasediff) would not be able to associate
+      multiple files for the same acquisition.   By default (True) dup indices
+      would be per each series (change introduced in 0.5.2)
+
+    Returns
+    -------
+
+    """
     # analyze for "cancelled" runs, if run number was explicitly specified and
     # thus we ended up with multiple entries which would mean that older ones
     #  were "cancelled"
@@ -664,13 +680,20 @@ def get_dups_marked(info):
             lgr.warning("Detected %d duplicated run(s) for template %s: %s",
                         len(series_ids) - 1, template[0], series_ids[:-1])
             # copy the duplicate ones into separate ones
+            if per_series:
+                dup_id = 0  # reset since declared per series
             for dup_series_id in series_ids[:-1]:
                 dup_id += 1
                 dup_template = (
                     '%s__dup-%02d' % (template[0], dup_id),
                     ) + template[1:]
                 # There must have not been such a beast before!
-                assert dup_template not in info
+                if dup_template in info:
+                    raise AssertionError(
+                        "{} is already known to info={}. "
+                        "May be a bug for per_series=True handling?"
+                        "".format(dup_template, info)
+                    )
                 info[dup_template] = [dup_series_id]
             info[template] = series_ids[-1:]
         assert len(info[template]) == 1
