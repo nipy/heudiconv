@@ -38,7 +38,8 @@ seqinfo_fields = [
     'accession_number',      # 21
     'patient_age',           # 22
     'patient_sex',           # 23
-    'date'                   # 24
+    'date',                  # 24
+    'series_uid'             # 25
  ]
 
 SeqInfo = namedtuple('SeqInfo', seqinfo_fields)
@@ -110,7 +111,7 @@ def anonymize_sid(sid, anon_sid_cmd):
 def create_file_if_missing(filename, content):
     """Create file if missing, so we do not
     override any possibly introduced changes"""
-    if op.exists(filename):
+    if op.lexists(filename):
         return False
     dirname = op.dirname(filename)
     if not op.exists(dirname):
@@ -200,7 +201,8 @@ def json_dumps_pretty(j, indent=2, sort_keys=True):
     # uniform no spaces before ]
     js_ = re.sub(" *\]", "]", js_)
     # uniform spacing before numbers
-    js_ = re.sub('  *("?[-+.0-9e]+"?)[ \n]*', r' \1', js_)
+    js_ = re.sub('  *("?[-+.0-9e]+"?)(?P<space> ?)[ \n]*',
+                 r' \1\g<space>', js_)
     # no spaces after [
     js_ = re.sub('\[ ', '[', js_)
     # the load from the original dump and reload from tuned up
@@ -387,3 +389,63 @@ def clear_temp_dicoms(item_dicoms):
 def file_md5sum(filename):
     with open(filename, 'rb') as f:
         return hashlib.md5(f.read()).hexdigest()
+
+
+# Borrowed from DataLad (MIT license), with "archives" functionality commented
+# out
+class File(object):
+    """Helper for a file entry in the create_tree/@with_tree
+
+    It allows to define additional settings for entries
+    """
+    def __init__(self, name, executable=False):
+        """
+
+        Parameters
+        ----------
+        name : str
+          Name of the file
+        executable: bool, optional
+          Make it executable
+        """
+        self.name = name
+        self.executable = executable
+
+    def __str__(self):
+        return self.name
+
+
+def create_tree(path, tree, archives_leading_dir=True):
+    """Given a list of tuples (name, load) or a dict create such a tree
+
+    if load is a tuple or a dict itself -- that would create either a subtree
+    or an archive with that content and place it into the tree if name ends
+    with .tar.gz
+    """
+    lgr.log(5, "Creating a tree under %s", path)
+    if not op.exists(path):
+        os.makedirs(path)
+
+    if isinstance(tree, dict):
+        tree = tree.items()
+
+    for file_, load in tree:
+        if isinstance(file_, File):
+            executable = file_.executable
+            name = file_.name
+        else:
+            executable = False
+            name = file_
+        full_name = op.join(path, name)
+        if isinstance(load, (tuple, list, dict)):
+            # if name.endswith('.tar.gz') or name.endswith('.tar') or name.endswith('.zip'):
+            #     create_tree_archive(path, name, load, archives_leading_dir=archives_leading_dir)
+            # else:
+            create_tree(full_name, load, archives_leading_dir=archives_leading_dir)
+        else:
+            with open(full_name, 'w') as f:
+                if sys.version_info[0] == 2 and not isinstance(load, str):
+                    load = load.encode('utf-8')
+                f.write(load)
+        if executable:
+            os.chmod(full_name, os.stat(full_name).st_mode | stat.S_IEXEC)

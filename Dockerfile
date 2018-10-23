@@ -5,7 +5,7 @@
 # pull request on our GitHub repository:
 #     https://github.com/kaczmarj/neurodocker
 #
-# Timestamp: 2018-02-02 16:32:55
+# Timestamp: 2018-06-29 18:14:08
 
 FROM debian:stretch
 
@@ -32,15 +32,8 @@ RUN apt-get update -qq && apt-get install -yq --no-install-recommends  \
     && chmod -R 777 /neurodocker && chmod a+s /neurodocker
 ENTRYPOINT ["/neurodocker/startup.sh"]
 
-RUN apt-get update -qq \
-    && apt-get install -y -q --no-install-recommends git \
-                                                     gcc \
-                                                     pigz \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
 #------------------------
-# Install dcm2niix v1.0.20171215
+# Install dcm2niix v1.0.20180622
 #------------------------
 WORKDIR /tmp
 RUN deps='cmake g++ gcc git make pigz zlib1g-dev' \
@@ -48,11 +41,39 @@ RUN deps='cmake g++ gcc git make pigz zlib1g-dev' \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
     && mkdir dcm2niix \
-    && curl -sSL https://github.com/rordenlab/dcm2niix/tarball/v1.0.20171215 | tar xz -C dcm2niix --strip-components 1 \
+    && curl -sSL https://github.com/rordenlab/dcm2niix/tarball/v1.0.20180622 | tar xz -C dcm2niix --strip-components 1 \
     && mkdir dcm2niix/build && cd dcm2niix/build \
     && cmake .. && make \
     && make install \
-    && rm -rf /tmp/*
+    && rm -rf /tmp/* \
+    && apt-get purge -y --auto-remove $deps
+
+#--------------------------------------------------
+# Add NeuroDebian repository
+# Please note that some packages downloaded through
+# NeuroDebian may have restrictive licenses.
+#--------------------------------------------------
+RUN apt-get update -qq && apt-get install -yq --no-install-recommends dirmngr gnupg \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
+    && curl -sSL http://neuro.debian.net/lists/stretch.us-nh.full \
+    > /etc/apt/sources.list.d/neurodebian.sources.list \
+    && curl -sSL https://dl.dropbox.com/s/zxs209o955q6vkg/neurodebian.gpg \
+    | apt-key add - \
+    && (apt-key adv --refresh-keys --keyserver hkp://pool.sks-keyservers.net:80 0xA5D32F012649A5A9 || true) \
+    && apt-get update
+
+# Install NeuroDebian packages
+RUN apt-get update -qq && apt-get install -yq --no-install-recommends git-annex-standalone \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+RUN apt-get update -qq \
+    && apt-get install -y -q --no-install-recommends git \
+                                                     gcc \
+                                                     pigz \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 COPY [".", "/src/heudiconv"]
 
@@ -83,26 +104,6 @@ RUN conda create -y -q --name neuro python=2 \
     && sync \
     && sed -i '$isource activate neuro' $ND_ENTRYPOINT
 
-#--------------------------------------------------
-# Add NeuroDebian repository
-# Please note that some packages downloaded through
-# NeuroDebian may have restrictive licenses.
-#--------------------------------------------------
-RUN apt-get update -qq && apt-get install -yq --no-install-recommends dirmngr gnupg \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
-    && curl -sSL http://neuro.debian.net/lists/stretch.us-nh.full \
-    > /etc/apt/sources.list.d/neurodebian.sources.list \
-    && curl -sSL https://dl.dropbox.com/s/zxs209o955q6vkg/neurodebian.gpg \
-    | apt-key add - \
-    && (apt-key adv --refresh-keys --keyserver hkp://pool.sks-keyservers.net:80 0xA5D32F012649A5A9 || true) \
-    && apt-get update
-
-# Install NeuroDebian packages
-RUN apt-get update -qq && apt-get install -yq --no-install-recommends git-annex-standalone \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
 ENTRYPOINT ["/neurodocker/startup.sh", "heudiconv"]
 
 #--------------------------------------
@@ -117,18 +118,26 @@ RUN echo '{ \
     \n      "debian:stretch" \
     \n    ], \
     \n    [ \
+    \n      "dcm2niix", \
+    \n      { \
+    \n        "version": "v1.0.20180622" \
+    \n      } \
+    \n    ], \
+    \n    [ \
+    \n      "neurodebian", \
+    \n      { \
+    \n        "os_codename": "stretch", \
+    \n        "download_server": "usa-nh", \
+    \n        "pkgs": "git-annex-standalone" \
+    \n      } \
+    \n    ], \
+    \n    [ \
     \n      "install", \
     \n      [ \
     \n        "git", \
     \n        "gcc", \
     \n        "pigz" \
     \n      ] \
-    \n    ], \
-    \n    [ \
-    \n      "dcm2niix", \
-    \n      { \
-    \n        "version": "v1.0.20171215" \
-    \n      } \
     \n    ], \
     \n    [ \
     \n      "copy", \
@@ -142,16 +151,8 @@ RUN echo '{ \
     \n      { \
     \n        "env_name": "neuro", \
     \n        "conda_install": "python=2 traits=4.6.0", \
-    \n        "pip_install": "https://github.com/moloney/dcmstack/tarball/master /src/heudiconv[all]", \
-    \n        "activate": true \
-    \n      } \
-    \n    ], \
-    \n    [ \
-    \n      "neurodebian", \
-    \n      { \
-    \n        "os_codename": "stretch", \
-    \n        "download_server": "usa-nh", \
-    \n        "pkgs": "git-annex-standalone" \
+    \n        "activate": true, \
+    \n        "pip_install": "https://github.com/moloney/dcmstack/tarball/master /src/heudiconv[all]" \
     \n      } \
     \n    ], \
     \n    [ \
@@ -159,6 +160,6 @@ RUN echo '{ \
     \n      "/neurodocker/startup.sh heudiconv" \
     \n    ] \
     \n  ], \
-    \n  "generation_timestamp": "2018-02-02 16:32:55", \
+    \n  "generation_timestamp": "2018-06-29 18:14:08", \
     \n  "neurodocker_version": "0.3.2" \
     \n}' > /neurodocker/neurodocker_specs.json
