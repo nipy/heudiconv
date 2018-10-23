@@ -292,13 +292,9 @@ def get_formatted_scans_key_row(dcm_fn):
         [ISO acquisition time, performing physician name, random string]
 
     """
-    from heudiconv.external.dcmstack import ds
-    mw = ds.wrapper_from_data(dcm.read_file(dcm_fn,
-                                            stop_before_pixels=True,
-                                            force=True))
+    dcm_data = dcm.read_file(dcm_fn, stop_before_pixels=True, force=True)
     # we need to store filenames and acquisition times
     # parse date and time and get it into isoformat
-    dcm_data = mw.dcm_data
     try:
         date = dcm_data.ContentDate
         time = dcm_data.ContentTime.split('.')[0]
