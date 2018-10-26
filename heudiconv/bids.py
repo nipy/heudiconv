@@ -307,7 +307,7 @@ def get_formatted_scans_key_row(dcm_fn):
     # But let's make it reproducible by using all UIDs
     # (might change across versions?)
     randcontent = u''.join(
-        [getattr(dcm_data, f) for f in sorted(dir(dcm_data))
+        [getattr(dcm_data, f) or '' for f in sorted(dir(dcm_data))
          if f.endswith('UID')]
     )
     randstr = hashlib.md5(randcontent.encode()).hexdigest()[:8]
