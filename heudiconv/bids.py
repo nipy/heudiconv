@@ -1,5 +1,6 @@
 """Handle BIDS specific operations"""
 
+import hashlib
 import os
 import os.path as op
 import logging
@@ -196,7 +197,7 @@ def save_scans_key(item, bids_files):
     """
     Parameters
     ----------
-    items:
+    item:
     bids_files: str or list
 
     Returns
@@ -214,7 +215,7 @@ def save_scans_key(item, bids_files):
         # get filenames
         f_name = '/'.join(bids_file.split('/')[-2:])
         f_name = f_name.replace('json', 'nii.gz')
-        rows[f_name] = get_formatted_scans_key_row(item)
+        rows[f_name] = get_formatted_scans_key_row(item[-1][0])
         subj_, ses_ = find_subj_ses(f_name)
         if not subj_:
             lgr.warning(
@@ -279,7 +280,7 @@ def add_rows_to_scans_keys_file(fn, newrows):
         writer.writerows([header] + data_rows_sorted)
 
 
-def get_formatted_scans_key_row(item):
+def get_formatted_scans_key_row(dcm_fn):
     """
     Parameters
     ----------
@@ -291,25 +292,27 @@ def get_formatted_scans_key_row(item):
         [ISO acquisition time, performing physician name, random string]
 
     """
-    dcm_fn = item[-1][0]
-    from heudiconv.external.dcmstack import ds
-    mw = ds.wrapper_from_data(dcm.read_file(dcm_fn,
-                                            stop_before_pixels=True,
-                                            force=True))
+    dcm_data = dcm.read_file(dcm_fn, stop_before_pixels=True, force=True)
     # we need to store filenames and acquisition times
     # parse date and time and get it into isoformat
     try:
-        date = mw.dcm_data.ContentDate
-        time = mw.dcm_data.ContentTime.split('.')[0]
+        date = dcm_data.ContentDate
+        time = dcm_data.ContentTime.split('.')[0]
         td = time + date
         acq_time = datetime.strptime(td, '%H%M%S%Y%m%d').isoformat()
     except AttributeError as exc:
         lgr.warning("Failed to get date/time for the content: %s", str(exc))
         acq_time = None
     # add random string
-    randstr = ''.join(map(chr, sample(k=8, population=range(33, 127))))
+    # But let's make it reproducible by using all UIDs
+    # (might change across versions?)
+    randcontent = u''.join(
+        [getattr(dcm_data, f) or '' for f in sorted(dir(dcm_data))
+         if f.endswith('UID')]
+    )
+    randstr = hashlib.md5(randcontent.encode()).hexdigest()[:8]
     try:
-        perfphys = mw.dcm_data.PerformingPhysicianName
+        perfphys = dcm_data.PerformingPhysicianName
     except AttributeError:
         perfphys = ''
     row = [acq_time, perfphys, randstr]
