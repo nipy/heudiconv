@@ -153,23 +153,31 @@ def test_prepare_for_datalad(tmpdir):
 
 
 def test_get_formatted_scans_key_row():
-    item = [
-         ('%s/01-fmap_acq-3mm/1.3.12.2.1107.5.2.43.66112.2016101409263663466202201.dcm'
-          % TESTS_DATA_PATH,
-         ('nii.gz', 'dicom'),
-         ['%s/01-fmap_acq-3mm/1.3.12.2.1107.5.2.43.66112.2016101409263663466202201.dcm'
-          % TESTS_DATA_PATH])
-    ]
-    outname_bids_file = '/a/path/Halchenko/Yarik/950_bids_test4/sub-phantom1sid1/fmap/sub-phantom1sid1_acq-3mm_phasediff.json'
+    dcm_fn = \
+        '%s/01-fmap_acq-3mm/1.3.12.2.1107.5.2.43.66112.2016101409263663466202201.dcm' \
+         % TESTS_DATA_PATH
 
-    row = get_formatted_scans_key_row(item)
-    assert len(row) == 3
-    assert row[0] == '2016-10-14T09:26:36'
-    assert row[1] == 'n/a'
-    randstr1 = row[2]
-    row = get_formatted_scans_key_row(item)
-    randstr2 = row[2]
-    assert(randstr1 != randstr2)
+    row1 = get_formatted_scans_key_row(dcm_fn)
+    assert len(row1) == 3
+    assert row1[0] == '2016-10-14T09:26:36'
+    assert row1[1] == 'n/a'
+    prandstr1 = row1[2]
+
+    # if we rerun - should be identical!
+    row2 = get_formatted_scans_key_row(dcm_fn)
+    prandstr2 = row2[2]
+    assert(prandstr1 == prandstr2)
+    assert(row1 == row2)
+    # So it is consistent across pythons etc, we use explicit value here
+    assert(prandstr1 == "437fe57c")
+
+    # but the prandstr should change when we consider another DICOM file
+    row3 = get_formatted_scans_key_row(
+        "%s/01-anat-scout/0001.dcm" % TESTS_DATA_PATH)
+    assert(row3 != row1)
+    prandstr3 = row3[2]
+    assert(prandstr1 != prandstr3)
+    assert(prandstr3 == "fae3befb")
 
 
 # TODO: finish this

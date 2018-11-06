@@ -4,6 +4,23 @@ All notable changes to this project will be documented (for humans) in this file
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - Date
+
+TODO Summary
+
+### Added
+### Changed
+
+- Reproin heuristic: `__dup` indices would now be assigned incrementally
+  individually per each sequence, so there is a chance to properly treat
+  associate for multi-file (e.g. `fmap`) sequences
+
+### Deprecated
+### Fixed
+### Removed
+### Security
+
+
 ## [0.5.1] - 2018-07-05
 Bugfix release
 

@@ -13,6 +13,7 @@ REQUIRES = [
     'pydicom',
     'nipype',
     'pathlib',
+    'dcmstack>=0.7',
 ]
 
 TESTS_REQUIRES = [

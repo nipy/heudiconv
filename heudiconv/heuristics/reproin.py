@@ -239,7 +239,26 @@ protocols2fix = {
             ('fmap_acq-discorr-dti-', 'fmap_acq-dwi_dir-'),
             ('_test', ''),
         ],
+    '1996f745c30c1df1d3851844e56d294f':
+        [
+            ('fmap_acq-discorr-dti-', 'fmap_acq-dwi_dir-'),
+        ],
+    #'022969bfde39c2940c114edf1db3fabc':
+    #    [  # should be applied only for ses-03!
+    #        ('_acq-MPRAGE_ses-02', '_acq-MPRAGE_ses-03'),
+    #    ],
+    # to be used only once for one interrupted accession but we cannot
+    # fix per accession yet
+    #    '23763823d2b9b4b09dafcadc8e8edf21':
+    #        [
+    #            ('anat-T1w_acq-MPRAGE', 'anat-T1w_acq-MPRAGE_run-06'), 
+    #            ('anat_T2w', 'anat_T2w_run-06'),
+    #            ('fmap_acq-3mm', 'fmap_acq-3mm_run-06'),
+    #        ],
 }
+# there was also screw up in the locator specification
+# so we need to fix in both
+#protocols2fix['67ae5e641ea9d487b6fdf56fb91aeb93'] = protocols2fix['022969bfde39c2940c114edf1db3fabc']
 
 # list containing StudyInstanceUID to skip -- hopefully doesn't happen too often
 dicoms2skip = [
@@ -634,7 +653,23 @@ def infotodict(seqinfo):
     return info
 
 
-def get_dups_marked(info):
+def get_dups_marked(info, per_series=True):
+    """
+
+    Parameters
+    ----------
+    info
+    per_series: bool
+      If set to False, it would create growing index through all series. That
+      could lead to non-desired effects if some "multi file" scans (such as
+      fmap with magnitude{1,2} and phasediff) would not be able to associate
+      multiple files for the same acquisition.   By default (True) dup indices
+      would be per each series (change introduced in 0.5.2)
+
+    Returns
+    -------
+
+    """
     # analyze for "cancelled" runs, if run number was explicitly specified and
     # thus we ended up with multiple entries which would mean that older ones
     #  were "cancelled"
@@ -645,13 +680,20 @@ def get_dups_marked(info):
             lgr.warning("Detected %d duplicated run(s) for template %s: %s",
                         len(series_ids) - 1, template[0], series_ids[:-1])
             # copy the duplicate ones into separate ones
+            if per_series:
+                dup_id = 0  # reset since declared per series
             for dup_series_id in series_ids[:-1]:
                 dup_id += 1
                 dup_template = (
                     '%s__dup-%02d' % (template[0], dup_id),
                     ) + template[1:]
                 # There must have not been such a beast before!
-                assert dup_template not in info
+                if dup_template in info:
+                    raise AssertionError(
+                        "{} is already known to info={}. "
+                        "May be a bug for per_series=True handling?"
+                        "".format(dup_template, info)
+                    )
                 info[dup_template] = [dup_series_id]
             info[template] = series_ids[-1:]
         assert len(info[template]) == 1
@@ -681,7 +723,8 @@ def infotoids(seqinfos, outdir):
     subject = fixup_subjectid(get_unique(seqinfos, 'patient_id'))
     # TODO:  fix up subject id if missing some 0s
     if study_description:
-        split = study_description.split('^', 1)
+        # Generally it is a ^ but if entered manually, ppl place space in it
+        split = re.split('[ ^]', study_description, 1)
         # split first one even more, since couldbe PI_Student or PI-Student
         split = re.split('-|_', split[0], 1) + split[1:]
 
@@ -732,7 +775,11 @@ def infotoids(seqinfos, outdir):
                 raise NotImplementedError(
                     "Should not mix hardcoded session markers with incremental ones (+=)"
                 )
-            assert len(ses_markers) == 1
+            if not len(ses_markers) == 1:
+                raise NotImplementedError(
+                    "Should have got a single session marker.  Got following: %s"
+                    % ', '.join(map(repr, ses_markers))
+                )
             session = ses_markers[0]
         else:
             # TODO - I think we are doomed to go through the sequence and split

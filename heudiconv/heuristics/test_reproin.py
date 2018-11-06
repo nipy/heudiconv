@@ -9,12 +9,25 @@ def test_get_dups_marked():
     no_dups = {('some',): [1]}
     assert get_dups_marked(no_dups) == no_dups
 
-    assert get_dups_marked(
-        OrderedDict([
+    info = OrderedDict(
+        [
             (('bu', 'du'), [1, 2]),
             (('smth',), [3]),
             (('smth2',), ['a', 'b', 'c'])
-        ])) == \
+         ]
+    )
+
+    assert get_dups_marked(info) == get_dups_marked(info, True) == \
+        {
+            ('bu__dup-01', 'du'): [1],
+            ('bu', 'du'): [2],
+            ('smth',): [3],
+            ('smth2__dup-01',): ['a'],
+            ('smth2__dup-02',): ['b'],
+            ('smth2',): ['c']
+        }
+
+    assert get_dups_marked(info, per_series=False) == \
         {
             ('bu__dup-01', 'du'): [1],
             ('bu', 'du'): [2],
