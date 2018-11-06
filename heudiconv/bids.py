@@ -24,6 +24,11 @@ from .utils import (
 
 lgr = logging.getLogger(__name__)
 
+
+class BIDSException(Exception):
+    pass
+
+
 def populate_bids_templates(path, defaults={}):
     """Premake BIDS text files with templates"""
 
