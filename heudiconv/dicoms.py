@@ -75,20 +75,9 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
 
         # Workaround for protocol name in private siemens csa header
         try:
-            ProtocolName = mw.dcm_data.ProtocolName
+            mw.dcm_data.ProtocolName
         except AttributeError:
-            mw.dcm_data.ProtocolName = ''
-
-        # try parsing Siemens csa header
-        try:
-            if mw.is_csa and mw.dcm_data.ProtocolName == '':
-                csastr = csareader.get_csa_header(mw.dcm_data, 'series')['tags']['MrPhoenixProtocol']['items'][0]
-                #Make sure dcmstack finds beginning of header.
-                csastr = csastr.replace("### ASCCONV BEGIN", "### ASCCONV BEGIN ### ") #Remove when dmcstack is updated
-                parsedhdr = ds.extract.parse_phoenix_prot('MrPhoenixProtocol', csastr)
-                mw.dcm_data.ProtocolName = parsedhdr['tProtocolName'].replace(" ", "")
-        except:
-            lgr.info("File {} is missing  ProtocolName".format(filename))
+            mw.dcm_data.ProtocolName = parse_private_csa_header(mw.dcm_data, 'ProtocolName', 'tProtocolName') if mw.is_csa else ''
 
         try:
             series_id = (int(mw.dcm_data.SeriesNumber),
@@ -500,3 +489,20 @@ def embed_metadata_from_dicoms(bids, item_dicoms, outname, outname_bids,
     except Exception as exc:
         lgr.error("Embedding failed: %s", str(exc))
         os.chdir(cwd)
+
+def parse_private_csa_header(dcm_data, public_attr, private_attr, default=None):
+    """Doc"""
+    # tProtocolName
+    # TODO: provide mapping to private_attr from public_attr
+    from nibabel.nicom import csareader
+    import dcmstack.extract as dsextract
+    try:
+        # TODO: test with attr besides ProtocolName
+        csastr = csareader.get_csa_header(dcm_data, 'series')['tags']['MrPhoenixProtocol']['items'][0]
+        csastr = csastr.replace("### ASCCONV BEGIN", "### ASCCONV BEGIN ### ")
+        parsedhdr = dsextract.parse_phoenix_prot('MrPhoenixProtocol', csastr)
+        val = parsedhdr[private_attr].replace(' ', '')
+    except Exception as e:
+        lgr.info("Failed to parse CSA header: %s", str(e))
+        val = default if default else ''
+    return val
