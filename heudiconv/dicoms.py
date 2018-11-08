@@ -491,8 +491,25 @@ def embed_metadata_from_dicoms(bids, item_dicoms, outname, outname_bids,
         os.chdir(cwd)
 
 def parse_private_csa_header(dcm_data, public_attr, private_attr, default=None):
-    """Doc"""
-    # tProtocolName
+    """
+    Parses CSA header in cases where value is not defined publicly
+
+    Parameters
+    ----------
+    dcm_data : pydicom Dataset object
+        DICOM metadata
+    public_attr : string
+        non-private DICOM attribute
+    private_attr : string
+        private DICOM attribute
+    default (optional)
+        default value if private_attr not found
+    
+    Returns
+    -------
+    val (default: empty string)
+        private attribute value or default
+    """
     # TODO: provide mapping to private_attr from public_attr
     from nibabel.nicom import csareader
     import dcmstack.extract as dsextract
