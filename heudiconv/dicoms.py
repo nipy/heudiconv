@@ -504,7 +504,7 @@ def parse_private_csa_header(dcm_data, public_attr, private_attr, default=None):
         private DICOM attribute
     default (optional)
         default value if private_attr not found
-    
+
     Returns
     -------
     val (default: empty string)
@@ -520,6 +520,6 @@ def parse_private_csa_header(dcm_data, public_attr, private_attr, default=None):
         parsedhdr = dsextract.parse_phoenix_prot('MrPhoenixProtocol', csastr)
         val = parsedhdr[private_attr].replace(' ', '')
     except Exception as e:
-        lgr.info("Failed to parse CSA header: %s", str(e))
+        lgr.debug("Failed to parse CSA header: %s", str(e))
         val = default if default else ''
     return val
