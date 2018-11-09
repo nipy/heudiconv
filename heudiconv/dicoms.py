@@ -77,7 +77,9 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
         try:
             mw.dcm_data.ProtocolName
         except AttributeError:
-            mw.dcm_data.ProtocolName = parse_private_csa_header(mw.dcm_data, 'ProtocolName', 'tProtocolName') if mw.is_csa else ''
+        if not getattr(mw.dcm_data, 'ProtocolName', '').strip():
+               mw.dcm_data.ProtocolName = parse_private_csa_header(mw.dcm_data, 'ProtocolName', 'tProtocolName') \
+                   if mw.is_csa else ''
 
         try:
             series_id = (int(mw.dcm_data.SeriesNumber),
