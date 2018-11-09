@@ -214,7 +214,7 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
             dcminfo.get('PatientID'),
             dcminfo.get('StudyDescription'),
             refphys,
-            series_desc, #We try to set this further up.
+            series_desc,  # We try to set this further up.
             sequence_name,
             image_type,
             accession_number,
