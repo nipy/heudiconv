@@ -37,7 +37,7 @@ install:
   - git config --global user.name "Travis Almighty"
 
 script:
-  - coverage run `which py.test` -s -v tests heudiconv/heuristics/*.py
+  - coverage run `which py.test` -s -v heudiconv
 
 after_success:
   - codecov
