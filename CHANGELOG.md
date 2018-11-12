@@ -14,6 +14,8 @@ TODO Summary
 - Reproin heuristic: `__dup` indices would now be assigned incrementally
   individually per each sequence, so there is a chance to properly treat
   associate for multi-file (e.g. `fmap`) sequences
+- `tests/` moved under `heudiconv/tests` to ease maintenance and facilitate
+  testing of an installed heudiconv
 
 ### Deprecated
 ### Fixed

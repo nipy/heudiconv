@@ -1,4 +1,3 @@
 [run]
-include = tests/*
-          heudiconv/*
+include = heudiconv/*
           setup.py
