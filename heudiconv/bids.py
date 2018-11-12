@@ -29,7 +29,7 @@ def populate_bids_templates(path, defaults={}):
 
     lgr.info("Populating template files under %s", path)
     descriptor = op.join(path, 'dataset_description.json')
-    if not op.exists(descriptor):
+    if not op.lexists(descriptor):
         save_json(descriptor,
               OrderedDict([
                   ('Name', "TODO: name of the dataset"),
@@ -89,18 +89,22 @@ def populate_bids_templates(path, defaults={}):
         suf = '_bold.json'
         assert fpath.endswith(suf)
         events_file = fpath[:-len(suf)] + '_events.tsv'
-        lgr.debug("Generating %s", events_file)
-        with open(events_file, 'w') as f:
-            f.write("onset\tduration\ttrial_type\tresponse_time\tstim_file\tTODO -- fill in rows and add more tab-separated columns if desired")
+        # do not touch any existing thing, it may be precious
+        if not op.lexists(events_file):
+            lgr.debug("Generating %s", events_file)
+            with open(events_file, 'w') as f:
+                f.write("onset\tduration\ttrial_type\tresponse_time\tstim_file\tTODO -- fill in rows and add more tab-separated columns if desired")
     # extract tasks files stubs
     for task_acq, fields in tasks.items():
         task_file = op.join(path, task_acq + '_bold.json')
-        lgr.debug("Generating %s", task_file)
-        fields["TaskName"] = ("TODO: full task name for %s" %
-                              task_acq.split('_')[0].split('-')[1])
-        fields["CogAtlasID"] = "TODO"
-        with open(task_file, 'w') as f:
-            f.write(json_dumps_pretty(fields, indent=2, sort_keys=True))
+        # do not touch any existing thing, it may be precious
+        if not op.lexists(task_file):
+            lgr.debug("Generating %s", task_file)
+            fields["TaskName"] = ("TODO: full task name for %s" %
+                                  task_acq.split('_')[0].split('-')[1])
+            fields["CogAtlasID"] = "TODO"
+            with open(task_file, 'w') as f:
+                f.write(json_dumps_pretty(fields, indent=2, sort_keys=True))
 
 
 def tuneup_bids_json_files(json_files):
@@ -133,8 +137,9 @@ def tuneup_bids_json_files(json_files):
         json_basename = '_'.join(jsonfile.split('_')[:-1])
         # if we got by now all needed .json files -- we can fix them up
         # unfortunately order of "items" is not guaranteed atm
-        if len(glob(json_basename + '*.json')) == 3:
-            json_phasediffname = json_basename + '_phasediff.json'
+        json_phasediffname = json_basename + '_phasediff.json'
+        json_mag = json_basename + '_magnitude*.json'
+        if op.exists(json_phasediffname) and len(glob(json_mag)) >= 1:
             json_ = load_json(json_phasediffname)
             # TODO: we might want to reorder them since ATM
             # the one for shorter TE is the 2nd one!
@@ -293,10 +298,14 @@ def get_formatted_scans_key_row(item):
                                             force=True))
     # we need to store filenames and acquisition times
     # parse date and time and get it into isoformat
-    date = mw.dcm_data.ContentDate
-    time = mw.dcm_data.ContentTime.split('.')[0]
-    td = time + date
-    acq_time = datetime.strptime(td, '%H%M%S%Y%m%d').isoformat()
+    try:
+        date = mw.dcm_data.ContentDate
+        time = mw.dcm_data.ContentTime.split('.')[0]
+        td = time + date
+        acq_time = datetime.strptime(td, '%H%M%S%Y%m%d').isoformat()
+    except AttributeError as exc:
+        lgr.warning("Failed to get date/time for the content: %s", str(exc))
+        acq_time = None
     # add random string
     randstr = ''.join(map(chr, sample(k=8, population=range(33, 127))))
     try:
@@ -326,6 +335,10 @@ def convert_sid_bids(subject_id):
     """
     cleaner = lambda y: ''.join([x for x in y if x.isalnum()])
     sid = cleaner(subject_id)
+    if not sid:
+        raise ValueError(
+            "Subject ID became empty after cleanup.  Please provide manually "
+            "a suitable alphanumeric subject ID")
     lgr.warning('{0} contained nonalphanumeric character(s), subject '
                 'ID was cleaned to be {1}'.format(subject_id, sid))
     return sid, subject_id

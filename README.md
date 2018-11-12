@@ -23,9 +23,9 @@ HeuDiConv operates using a heuristic, which provides information on
 how your files should be converted. A number of example heuristics are
 provided to address various use-cases
 
-- the [cmrr_heuristic](heuristics/cmrr_heuristic.py) provides an
+- the [cmrr_heuristic](heudiconv/heuristics/cmrr_heuristic.py) provides an
   example for a conversion to [BIDS]
-- the [reproin](heuristics/reproin.py) could be used to establish
+- the [reproin](heudiconv/heuristics/reproin.py) could be used to establish
   a complete imaging center wide automation to convert all acquired
   data to [BIDS] following a simple naming
   [convention](https://goo.gl/o0YASC) for studies and sequences
@@ -36,7 +36,7 @@ provided to address various use-cases
 
 Released versions of HeuDiConv are available from PyPI so you could
 just `pip install heudiconv[all]` for the most complete installation, 
-and it would require manual installation ony
+and it would require manual installation only
 of the [dcm2niix](https://github.com/rordenlab/dcm2niix/).  On
 Debian-based systems we recommend to use
 [NeuroDebian](http://neuro.debian.net) providing
@@ -64,13 +64,18 @@ manager appropriate for your OS.
 ## Tutorial with example conversion to BIDS format using Docker
 Please read this tutorial to understand how heudiconv works in practice.
 
-[Slides here](http://nipy.org/workshops/2017-03-boston/lectures/bids-heudiconv/#1)
+[Slides here](http://nipy.org/heudiconv/#1)
 
 To generate lean BIDS output, consider using both the `-b` and the `--minmeta` flags 
 to your heudiconv command. The `-b` flag generates a json file with BIDS keys, while
 the `--minmeta` flag restricts the json file to only BIDS keys. Without `--minmeta`,
 the json file and the associated Nifti file contains DICOM metadata extracted using
 dicomstack.
+
+### Other tutorials
+
+- YouTube:
+    - ["Heudiconv Example"](https://www.youtube.com/watch?v=O1kZAuR7E00) by [James Kent](https://github.com/jdkent)
 
 ## How it works (in some more detail)
 

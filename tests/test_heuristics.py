@@ -24,12 +24,17 @@ except ImportError:  # pragma: no cover
 
 # this will fail if not in project's root directory
 def test_smoke_convertall(tmpdir):
-    runner(
-        ("-f convertall -c dcm2niix -o %s -b --datalad "
-         "-s fmap_acq-3mm -d %s/{subject}/*"
-         % (tmpdir, TESTS_DATA_PATH)
-        ).split(' ')
-    )
+    args = ("-c dcm2niix -o %s -b --datalad "
+     "-s fmap_acq-3mm -d %s/{subject}/*"
+     % (tmpdir, TESTS_DATA_PATH)
+    ).split(' ')
+
+    # complain if no heurisitic
+    with pytest.raises(RuntimeError):
+        runner(args)
+
+    args.extend(['-f', 'convertall'])
+    runner(args)
 
 
 @pytest.mark.parametrize('heuristic', ['reproin', 'convertall'])

@@ -28,9 +28,10 @@ per each session.
 Sequence names on the scanner must follow this specification to avoid manual
 conversion/handling:
 
-  <seqtype[-label]>[_ses-<SESID>][_task-<TASKID>][_acq-<ACQLABEL>][_run-<RUNID>][_dir-<DIR>][<more BIDS>][__<custom>]
+  [PREFIX:]<seqtype[-label]>[_ses-<SESID>][_task-<TASKID>][_acq-<ACQLABEL>][_run-<RUNID>][_dir-<DIR>][<more BIDS>][__<custom>]
 
 where
+ [PREFIX:] - leading capital letters followed by : are stripped/ignored
  <...> - value to be entered
  [...] - optional -- might be nearly mandatory for some modalities (e.g.,
          run for functional) and very optional for others
@@ -113,6 +114,18 @@ from glob import glob
 
 import logging
 lgr = logging.getLogger('heudiconv')
+
+# Terminology to hamornise and use to name variables etc
+# experiment
+#  subject
+#   [session]
+#    exam (AKA scanning session) - currently seqinfo, unless brought together from multiple
+#     series  (AKA protocol?)
+#      - series_spec - deduced from fields the spec (literal value)
+#      - series_info - the dictionary with fields parsed from series_spec
+
+# Which fields in seqinfo (in this order) to check for the ReproIn spec
+series_spec_fields = ('protocol_name', 'series_description')
 
 # dictionary from accession-number to runs that need to be marked as bad
 # NOTE: even if filename has number that is 0-padded, internally no padding
@@ -227,7 +240,6 @@ protocols2fix = {
             ('_test', ''),
         ],
 }
-keys2replace = ['protocol_name', 'series_description']
 
 # list containing StudyInstanceUID to skip -- hopefully doesn't happen too often
 dicoms2skip = [
@@ -341,13 +353,13 @@ def fix_canceled_runs(seqinfo, accession2run=fix_accession2run):
             if re.match(badruns_pattern, s.series_id):
                 lgr.info('Fixing bad run {0}'.format(s.series_id))
                 fixedkwargs = dict()
-                for key in keys2replace:
+                for key in series_spec_fields:
                     fixedkwargs[key] = 'cancelme_' + getattr(s, key)
                 seqinfo[i] = s._replace(**fixedkwargs)
     return seqinfo
 
 
-def fix_dbic_protocol(seqinfo, keys=keys2replace, subsdict=protocols2fix):
+def fix_dbic_protocol(seqinfo, keys=series_spec_fields, subsdict=protocols2fix):
     """Ad-hoc fixup for existing protocols
     """
     study_hash = get_study_hash(seqinfo)
@@ -413,12 +425,13 @@ def infotodict(seqinfo):
     skipped, skipped_unknown = [], []
     current_run = 0
     run_label = None   # run-
-    image_data_type = None
+    dcm_image_iod_spec = None
+    skip_derived = False
     for s in seqinfo:
         # XXX: skip derived sequences, we don't store them to avoid polluting
         # the directory, unless it is the motion corrected ones
         # (will get _rec-moco suffix)
-        if s.is_derived and not s.is_motion_corrected:
+        if skip_derived and s.is_derived and not s.is_motion_corrected:
             skipped.append(s.series_id)
             lgr.debug("Ignoring derived data %s", s.series_id)
             continue
@@ -433,40 +446,56 @@ def infotodict(seqinfo):
 
         # figure out type of image from s.image_info -- just for checking ATM
         # since we primarily rely on encoded in the protocol name information
-        prev_image_data_type = image_data_type
-        image_data_type = s.image_type[2]
-        image_type_seqtype = {
-            'P': 'fmap',   # phase
-            'FMRI': 'func',
-            'MPR': 'anat',
-            # 'M': 'func',  "magnitude"  -- can be for scout, anat, bold, fmap
-            'DIFFUSION': 'dwi',
-            'MIP_SAG': 'anat',  # angiography
-            'MIP_COR': 'anat',  # angiography
-            'MIP_TRA': 'anat',  # angiography
-        }.get(image_data_type, None)
+        prev_dcm_image_iod_spec = dcm_image_iod_spec
+        if len(s.image_type) > 2:
+            # https://dicom.innolitics.com/ciods/cr-image/general-image/00080008
+            # 0 - ORIGINAL/DERIVED
+            # 1 - PRIMARY/SECONDARY
+            # 3 - Image IOD specific specialization (optional)
+            dcm_image_iod_spec = s.image_type[2]
+            image_type_seqtype = {
+                'P': 'fmap',   # phase
+                'FMRI': 'func',
+                'MPR': 'anat',
+                # 'M': 'func',  "magnitude"  -- can be for scout, anat, bold, fmap
+                'DIFFUSION': 'dwi',
+                'MIP_SAG': 'anat',  # angiography
+                'MIP_COR': 'anat',  # angiography
+                'MIP_TRA': 'anat',  # angiography
+            }.get(dcm_image_iod_spec, None)
+        else:
+            dcm_image_iod_spec = image_type_seqtype = None
 
-        protocol_name_tuned = s.protocol_name
-        # Few common replacements
-        if protocol_name_tuned in {'AAHead_Scout'}:
-            protocol_name_tuned = 'anat-scout'
+        series_info = {}  # For please lintian and its friends
+        for sfield in series_spec_fields:
+            svalue = getattr(s, sfield)
+            series_info = parse_series_spec(svalue)
+            if series_info:  # looks like a valid spec - we are done
+                series_spec = svalue
+                break
+            else:
+                lgr.debug(
+                    "Failed to parse reproin spec in .%s=%r",
+                    sfield, svalue)
 
-        regd = parse_dbic_protocol_name(protocol_name_tuned)
-
-        if image_data_type.startswith('MIP'):
-            regd['acq'] = regd.get('acq', '') + sanitize_str(image_data_type)
-
-        if not regd:
+        if not series_info:
+            series_spec = None  # we cannot know better
+            lgr.warning(
+                "Could not determine the series name by looking at "
+                "%s fields", ', '.join(series_spec_fields))
             skipped_unknown.append(s.series_id)
             continue
 
-        seqtype = regd.pop('seqtype')
-        seqtype_label = regd.pop('seqtype_label', None)
+        if dcm_image_iod_spec and dcm_image_iod_spec.startswith('MIP'):
+            series_info['acq'] = series_info.get('acq', '') + sanitize_str(dcm_image_iod_spec)
+
+        seqtype = series_info.pop('seqtype')
+        seqtype_label = series_info.pop('seqtype_label', None)
 
         if image_type_seqtype and seqtype != image_type_seqtype:
             lgr.warning(
                 "Deduced seqtype to be %s from DICOM, but got %s out of %s",
-                image_type_seqtype, seqtype, protocol_name_tuned)
+                image_type_seqtype, seqtype, series_spec)
 
         # if s.is_derived:
         #     # Let's for now stash those close to original images
@@ -483,32 +512,34 @@ def infotodict(seqinfo):
 
         # analyze s.protocol_name (series_id is based on it) for full name mapping etc
         if seqtype == 'func' and not seqtype_label:
-            if '_pace_' in protocol_name_tuned:
+            if '_pace_' in series_spec:
                 seqtype_label = 'pace'  # or should it be part of seq-
             else:
                 # assume bold by default
                 seqtype_label = 'bold'
 
         if seqtype == 'fmap' and not seqtype_label:
+            if not dcm_image_iod_spec:
+                raise ValueError("Do not know image data type yet to make decision")
             seqtype_label = {
                 'M': 'magnitude',  # might want explicit {file_index}  ?
                 'P': 'phasediff',
                 'DIFFUSION': 'epi', # according to KODI those DWI are the EPIs we need
-            }[image_data_type]
+            }[dcm_image_iod_spec]
 
         # label for dwi as well
         if seqtype == 'dwi' and not seqtype_label:
             seqtype_label = 'dwi'
 
-        run = regd.get('run')
+        run = series_info.get('run')
         if run is not None:
             # so we have an indicator for a run
             if run == '+':
                 # some sequences, e.g.  fmap, would generate two (or more?)
                 # sequences -- e.g. one for magnitude(s) and other ones for
                 # phases.  In those we must not increment run!
-                if image_data_type == 'P':
-                    if prev_image_data_type != 'M':
+                if dcm_image_iod_spec and dcm_image_iod_spec == 'P':
+                    if prev_dcm_image_iod_spec != 'M':
                         # XXX if we have a known earlier study, we need to always
                         # increase the run counter for phasediff because magnitudes
                         # were not acquired
@@ -517,7 +548,7 @@ def infotodict(seqinfo):
                         else:
                             raise RuntimeError(
                                 "Was expecting phase image to follow magnitude "
-                                "image, but previous one was %r", prev_image_data_type)
+                                "image, but previous one was %r", prev_dcm_image_iod_spec)
                         # else we do nothing special
                 else:  # and otherwise we go to the next run
                     current_run += 1
@@ -547,16 +578,16 @@ def infotodict(seqinfo):
         # if s.is_motion_corrected:
         #     assert s.is_derived, "Motion corrected images must be 'derived'"
 
-        if s.is_motion_corrected and 'rec-' in regd.get('bids', ''):
+        if s.is_motion_corrected and 'rec-' in series_info.get('bids', ''):
             raise NotImplementedError("want to add _acq-moco but there is _acq- already")
 
         suffix_parts = [
-            None if not regd.get('task') else "task-%s" % regd['task'],
-            None if not regd.get('acq') else "acq-%s" % regd['acq'],
+            None if not series_info.get('task') else "task-%s" % series_info['task'],
+            None if not series_info.get('acq') else "acq-%s" % series_info['acq'],
             # But we want to add an indicator in case it was motion corrected
             # in the magnet. ref sample  /2017/01/03/qa
             None if not s.is_motion_corrected else 'rec-moco',
-            regd.get('bids'),
+            series_info.get('bids'),
             run_label,
             seqtype_label,
         ]
@@ -664,7 +695,7 @@ def infotoids(seqinfos, outdir):
 
     # So -- use `outdir` and locator etc to see if for a given locator/subject
     # and possible ses+ in the sequence names, so we would provide a sequence
-    # So might need to go through  parse_dbic_protocol_name(s.protocol_name)
+    # So might need to go through  parse_series_spec(s.protocol_name)
     # to figure out presence of sessions.
     ses_markers = []
 
@@ -675,7 +706,7 @@ def infotoids(seqinfos, outdir):
     for s in seqinfos:
         if s.is_derived:
             continue
-        session_ = parse_dbic_protocol_name(s.protocol_name).get('session', None)
+        session_ = parse_series_spec(s.protocol_name).get('session', None)
         if session_ and '{' in session_:
             # there was a marker for something we could provide from our seqinfo
             # e.g. {date}
@@ -745,22 +776,31 @@ def sanitize_str(value):
     return _delete_chars(value, '#!@$%^&.,:;_-')
 
 
-def parse_dbic_protocol_name(protocol_name):
+def parse_series_spec(series_spec):
     """Parse protocol name according to our convention with minimal set of fixups
     """
     # Since Yarik didn't know better place to put it in, but could migrate outside
-    # at some point
-    protocol_name = protocol_name.replace("anat_T1w", "anat-T1w")
-    protocol_name = protocol_name.replace("hardi_64", "dwi_acq-hardi64")
+    # at some point. TODO
+    series_spec = series_spec.replace("anat_T1w", "anat-T1w")
+    series_spec = series_spec.replace("hardi_64", "dwi_acq-hardi64")
+    series_spec = series_spec.replace("AAHead_Scout", "anat-scout")
 
-    # Parse the name according to our convention
-    # https://docs.google.com/document/d/1R54cgOe481oygYVZxI7NHrifDyFUZAjOBwCTu7M7y48/edit?usp=sharing
+    # Parse the name according to our convention/specification
+
+    # leading or trailing spaces do not matter
+    series_spec = series_spec.strip(' ')
+
+    # Strip off leading CAPITALS: prefix to accommodate some reported usecases:
+    # https://github.com/ReproNim/reproin/issues/14
+    # where PU: prefix is added by the scanner
+    series_spec = re.sub("^[A-Z]*:", "", series_spec)
+
     # Remove possible suffix we don't care about after __
-    protocol_name = protocol_name.split('__', 1)[0]
+    series_spec = series_spec.split('__', 1)[0]
 
     bids = None  # we don't know yet for sure
     # We need to figure out if it is a valid bids
-    split = protocol_name.split('_')
+    split = series_spec.split('_')
     prefix = split[0]
 
     # Fixups
@@ -940,8 +980,8 @@ def test_fixupsubjectid():
     assert fixup_subjectid("SID30") == "sid000030"
 
 
-def test_parse_dbic_protocol_name():
-    pdpn = parse_dbic_protocol_name
+def test_parse_series_spec():
+    pdpn = parse_series_spec
 
     assert pdpn("nondbic_func-bold") == {}
     assert pdpn("cancelme_func-bold") == {}
@@ -951,8 +991,11 @@ def test_parse_dbic_protocol_name():
            {'seqtype': 'func', 'seqtype_label': 'bold'}
 
     # pdpn("bids_func_ses+_task-boo_run+") == \
-    # order should not matter
-    assert pdpn("bids_func_ses+_run+_task-boo") == \
+    # order and PREFIX: should not matter, as well as trailing spaces
+    assert \
+        pdpn(" PREFIX:bids_func_ses+_task-boo_run+  ") == \
+        pdpn("PREFIX:bids_func_ses+_task-boo_run+") == \
+        pdpn("bids_func_ses+_run+_task-boo") == \
            {
                'seqtype': 'func',
                # 'seqtype_label': 'bold',
@@ -960,6 +1003,7 @@ def test_parse_dbic_protocol_name():
                'run': '+',
                'task': 'boo',
             }
+
     # TODO: fix for that
     assert pdpn("bids_func-pace_ses-1_task-boo_acq-bu_bids-please_run-2__therest") == \
            pdpn("bids_func-pace_ses-1_run-2_task-boo_acq-bu_bids-please__therest") == \

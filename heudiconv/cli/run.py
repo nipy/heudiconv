@@ -99,6 +99,11 @@ def process_extra_commands(outdir, args):
 def main(argv=None):
     parser = get_parser()
     args = parser.parse_args(argv)
+    # exit if nothing to be done
+    if not args.files and not args.dicom_dir_template and not args.command:
+        lgr.warning("Nothing to be done - displaying usage help")
+        parser.print_help()
+        sys.exit(1)
     # To be done asap so anything random is deterministic
     if args.random_seed is not None:
         import random
@@ -237,6 +242,9 @@ def process_args(args):
     #
     # Load heuristic -- better do it asap to make sure it loads correctly
     #
+    if not args.heuristic:
+        raise RuntimeError("No heuristic specified - add to arguments and rerun")
+
     heuristic = load_heuristic(args.heuristic)
 
     study_sessions = get_study_sessions(args.dicom_dir_template, args.files,

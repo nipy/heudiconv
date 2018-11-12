@@ -19,7 +19,9 @@ def main():
     # Get version and release info, which is all stored in heudiconv/info.py
     info_file = op.join(thispath, 'heudiconv', 'info.py')
     with open(info_file) as infofile:
-        exec(infofile.read(), globals(), ldict)
+        # exec(infofile.read(), globals(), ldict)
+        # Workaround for python 2.7 prior 2.7.8
+        eval(compile(infofile.read(), '<string>', 'exec'), globals(), ldict)
 
 
     def findsome(subdir, extensions):

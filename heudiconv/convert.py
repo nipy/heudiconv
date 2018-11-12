@@ -87,8 +87,12 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
     else:
         raise ValueError("neither dicoms nor seqinfo dict was provided")
 
-    if bids and not sid.isalnum(): # alphanumeric only
-        sid, old_sid = convert_sid_bids(sid)
+    if bids:
+        if not sid:
+            raise ValueError(
+                "BIDS requires alphanumeric subject ID. Got an empty value")
+        if not sid.isalnum():  # alphanumeric only
+            sid, old_sid = convert_sid_bids(sid)
 
     if not anon_sid:
         anon_sid = sid
@@ -111,6 +115,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
 
     # if conversion table(s) do not exist -- we need to prepare them
     # (the *prepare* stage in https://github.com/nipy/heudiconv/issues/134)
+    # if overwrite - recalculate this anyways
     reuse_conversion_table = op.exists(edit_file)
     # We also might need to redo it if changes in the heuristic file
     # detected
@@ -121,17 +126,15 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
     #  1. add a test
     #  2. possibly extract into a dedicated function for easier logic flow here
     #     and a dedicated unittest
-    if not reuse_conversion_table and \
-        op.exists(target_heuristic_filename) and \
-        file_md5sum(target_heuristic_filename) != file_md5sum(heuristic.filename):
+    if (op.exists(target_heuristic_filename) and
+        file_md5sum(target_heuristic_filename) != file_md5sum(heuristic.filename)):
+        # remake conversion table
         reuse_conversion_table = False
         lgr.info(
             "Will not reuse existing conversion table files because heuristic "
             "has changed"
         )
 
-    # MG - maybe add an option to force rerun?
-    # related issue : https://github.com/nipy/heudiconv/issues/84
     if reuse_conversion_table:
         lgr.info("Reloading existing filegroup.json "
                  "because %s exists", edit_file)
@@ -390,12 +393,13 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir):
 
     item_dicoms = list(map(op.abspath, item_dicoms)) # absolute paths
 
+    dicom_dir = op.dirname(item_dicoms[0]) if item_dicoms else None
+
     convertnode = Node(Dcm2niix(), name='convert')
     convertnode.base_dir = tmpdir
     convertnode.inputs.source_names = item_dicoms
     convertnode.inputs.out_filename = op.basename(op.dirname(prefix))
-    # nipype 1.0.0 causes dcm2niix run with -o PWD (not base_dir even)
-    convertnode.inputs.output_dir = tmpdir
+
     if nipype.__version__.split('.')[0] == '0':
         # deprecated since 1.0, might be needed(?) before
         convertnode.inputs.terminal_output = 'allatonce'
