@@ -100,7 +100,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
         anon_outdir = outdir
 
     # Generate heudiconv info folder
-    idir = op.join(outdir, '.heudiconv', sid)
+    idir = op.join(outdir, '.heudiconv', anon_sid)
     if bids and ses:
         idir = op.join(idir, 'ses-%s' % str(ses))
     if anon_outdir == outdir:

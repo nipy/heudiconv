@@ -94,6 +94,7 @@ RUN export PATH="/opt/miniconda-latest/bin:$PATH" \
            'traits>=4.6.0' \
            'scipy' \
            'numpy' \
+           'pandas' \
            'nomkl' \
     && sync && conda clean -tipsy && sync \
     && bash -c "source activate base \
