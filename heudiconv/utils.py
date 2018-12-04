@@ -104,15 +104,36 @@ def docstring_parameter(*sub):
 
 def anonymize_sid(sid, anon_sid_cmd):
     from subprocess import check_output
+
+    import re, sys
+    from doctest import OutputChecker, DocTestSuite
+
+    class Py23DocChecker(OutputChecker):
+        def check_output(self, want, got, optionflags):
+            if sys.version_info[0] < 3:
+                # if running on py2, attempt to prefix all the strings
+                # with "u" to signify that they're unicode literals
+                want = re.sub("'(.*?)'", "u'\\1'", want)
+            return OutputChecker.check_output(self, want, got, optionflags)
+
+    def load_tests(loader, tests, ignore):
+        tests.addTests(DocTestSuite(mymodule, checker=Py23DocChecker()))
+        return tests
+    
+    import os
+    import os.path
     cmd = [anon_sid_cmd, sid]
-    shell_out = check_output(cmd).strip()
+    print("CUSTOMDEBUG2")
+    print(os.getcwd())
+    shell_out = check_output(cmd)
+    print(shell_out)
     if isinstance(shell_out, bytes):
         anon_sid = shell_out.decode()
     elif isinstance(shell_out, str):
         anon_sid = shell_out
     else:
-        raise 'subprocess did not return a valid string'
-    return anon_sid
+        raise TypeError("subprocess did not return a valid string")
+    return anon_sid.strip()
 
 
 def create_file_if_missing(filename, content):
