@@ -14,12 +14,9 @@ def gen_heudiconv_args(datadir, outdir, subject, heuristic_file, anon_cmd=None, 
             "-f", heuristic,
             "--bids",]
     if anon_cmd:
-        args += ["--anon-cmd", op.join(op.dirname(__file__), 'data', anon_cmd), "-a", outdir]
+        args += ["--anon-cmd", op.join(op.dirname(__file__), anon_cmd), "-a", outdir]
     if xargs:
         args += xargs
-    
-    print("DEBUGC-args")
-    print(args)
 
     return args
 

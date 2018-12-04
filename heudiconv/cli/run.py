@@ -8,7 +8,7 @@ from ..parser import get_study_sessions
 from ..utils import load_heuristic, anonymize_sid, treat_infofile, SeqInfo
 from ..convert import prep_conversion
 from ..bids import populate_bids_templates, tuneup_bids_json_files
-from ..slurmqueue import queue_conversion
+from ..queue import queue_conversion
 
 import inspect
 import logging
@@ -306,12 +306,7 @@ def process_args(args):
 
         anon_sid = anonymize_sid(sid, args.anon_cmd) if args.anon_cmd else None
         if args.anon_cmd:
-            import sys
-            lgr.info('DEBUGC-version {}'.format(sys.version))
-            lgr.info('DEBUGC-execpath {}'.format(sys.executable))
             lgr.info('Anonymized {} to {}'.format(sid, anon_sid))
-            lgr.info('DEBUGC-type_to_match {}'.format(type(sid)))
-            lgr.info('DEBUGC-type_returned {}'.format(type(anon_sid)))
 
         study_outdir = op.join(outdir, locator or '')
         anon_outdir = args.conv_outdir or outdir

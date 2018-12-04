@@ -71,7 +71,6 @@ RUN apt-get update -qq \
            libc-dev \
            git-annex-standalone \
            netbase \
-           vim \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
@@ -148,6 +147,7 @@ RUN echo '{ \
     \n          "traits>=4.6.0", \
     \n          "scipy", \
     \n          "numpy", \
+    \n          "pandas", \
     \n          "nomkl" \
     \n        ], \
     \n        "pip_install": [ \
