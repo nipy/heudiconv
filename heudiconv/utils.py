@@ -104,8 +104,29 @@ def docstring_parameter(*sub):
 
 def anonymize_sid(sid, anon_sid_cmd):
     from subprocess import check_output
+    import sys
+    print('DEBUGC-version {}'.format(sys.version))
+    print('DEBUGC-execpath {}'.format(sys.executable))
+
+    type_to_match = type(sid)
+    
     cmd = [anon_sid_cmd, sid]
-    anon_sid = check_output(cmd)
+    shell_return = check_output(cmd)
+    
+    type_returned = type(shell_return)
+
+    print('DEBUGC-type_to_match {}'.format(type_to_match))
+    print('DEBUGC-type_returned {}'.format(type_returned))
+    
+    # if type_to_match not type_returned:
+    #     if sys.version_info[0] < 3:
+    #         if type_to_match
+
+    if all([sys.version_info[0] > 2, isinstance(shell_return, bytes), isinstance(sid, str)]):
+        anon_sid = shell_return.decode()
+    else:
+        anon_sid = shell_return
+    
     return anon_sid.strip()
 
 

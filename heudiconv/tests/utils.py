@@ -18,7 +18,7 @@ def gen_heudiconv_args(datadir, outdir, subject, heuristic_file, anon_cmd=None, 
     if xargs:
         args += xargs
     
-    print("DEBUGCUSTOM1")
+    print("DEBUGC-args")
     print(args)
 
     return args

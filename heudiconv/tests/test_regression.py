@@ -19,7 +19,8 @@ from .utils import fetch_data, gen_heudiconv_args
 
 @pytest.mark.parametrize('subject', ['sub-sid000143'])
 @pytest.mark.parametrize('heuristic', ['reproin.py'])
-@pytest.mark.parametrize('anon_cmd', [None]) # ['anonymize_script.py']
+# @pytest.mark.parametrize('anon_cmd', [None]) # ['anonymize_script.py']
+@pytest.mark.parametrize('anon_cmd', [None, 'anonymize_script.py']) #
 @pytest.mark.skipif(not have_datalad, reason="no datalad")
 def test_conversion(tmpdir, subject, heuristic, anon_cmd):
     tmpdir.chdir()
