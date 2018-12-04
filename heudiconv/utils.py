@@ -105,7 +105,14 @@ def docstring_parameter(*sub):
 def anonymize_sid(sid, anon_sid_cmd):
     from subprocess import check_output
     cmd = [anon_sid_cmd, sid]
-    return check_output(cmd).decode().strip()
+    shell_out = check_output(cmd).strip()
+    if isinstance(shell_out, bytes):
+        anon_sid = shell_out.decode()
+    elif isinstance(shell_out, str):
+        anon_sid = shell_out
+    else:
+        raise 'subprocess did not return a valid string'
+    return anon_sid
 
 
 def create_file_if_missing(filename, content):
