@@ -107,7 +107,8 @@ def anonymize_sid(sid, anon_sid_cmd):
     from subprocess import check_output
     
     cmd = [anon_sid_cmd, sid]
-    shell_return = check_output(cmd)
+   kwargs = {'encoding': 'utf-8'} if sys.version_info[0] >= 3 else {}
+   return check_output(cmd, **kwargs).strip()
     
     type_to_match = type(sid)
     type_returned = type(shell_return)
