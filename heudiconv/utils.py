@@ -107,19 +107,8 @@ def anonymize_sid(sid, anon_sid_cmd):
     from subprocess import check_output
     
     cmd = [anon_sid_cmd, sid]
-   kwargs = {'encoding': 'utf-8'} if sys.version_info[0] >= 3 else {}
-   return check_output(cmd, **kwargs).strip()
-    
-    type_to_match = type(sid)
-    type_returned = type(shell_return)
-
-    ### Handle subprocess returning a bytes literal string to a python3 interpreter
-    if all([sys.version_info[0] > 2, isinstance(shell_return, bytes), isinstance(sid, str)]):
-        anon_sid = shell_return.decode()
-    else:
-        anon_sid = shell_return
-    
-    return anon_sid.strip()
+    kwargs = {'encoding': 'utf-8'} if sys.version_info[0] >= 3 else {}
+    return check_output(cmd, **kwargs).strip()
 
 
 def create_file_if_missing(filename, content):
