@@ -1,0 +1,56 @@
+# vim ft=yaml
+# CI on Windows via appveyor
+# Borrowed initially from nibabel with pieces from datalad
+
+environment:
+
+  matrix:
+    - PYTHON: C:\Python27
+    - PYTHON: C:\Python27-x64
+    - PYTHON: C:\Python34
+    - PYTHON: C:\Python34-x64
+    - PYTHON: C:\Python35
+    - PYTHON: C:\Python35-x64
+    - PYTHON: C:\Python36
+    - PYTHON: C:\Python36-x64
+    - PYTHON: C:\Python37
+    - PYTHON: C:\Python37-x64
+
+install:
+  # Prepend newly installed Python to the PATH of this build (this cannot be
+  # done from inside the powershell script as it would require to restart
+  # the parent CMD process).
+  - SET PATH=%PYTHON%;%PYTHON%\Scripts;%PATH%
+
+  # LATER
+  ## git annex setup for datalad
+  #- appveyor DownloadFile https://downloads.kitenet.net/git-annex/windows/current/git-annex-installer.exe -FileName resources\git-annex-installer.exe
+  ## extract git annex into the system Git installation path
+  #- 7z x -o"C:\\Program Files\Git" resources\git-annex-installer.exe
+  - pip --version # check again since seems that python_requires='>=3.5' in secretstorage is not in effect
+  - python --version # just to check
+  # Install the dependencies and the project.
+  - pip install -r requirements.txt
+  - pip install -r dev-requirements.txt
+  - pip install requests # below installs pyld but that assumes we have requests already
+  #- pip install datalad
+  - pip install codecov pytest
+
+
+build: false  # Not a C# project, build stuff at the test step instead.
+
+test_script:
+  - coverage run `which py.test` -s -v heudiconv
+
+  # TODO consider  nose options of datalad-revolution which make codecov submission work  --cover-xml --cover-xml-file=coverage.xml
+
+#after_test:
+#  - ps: |
+#      $env:PATH = 'C:\msys64\usr\bin;' + $env:PATH
+#      Invoke-WebRequest -Uri 'https://codecov.io/bash' -OutFile codecov.sh
+#      bash codecov.sh -f "coverage.xml"
+
+on_finish:
+  # enable the next to let the build VM block for up to 60min to log in via RDP and debug
+  #- ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+
