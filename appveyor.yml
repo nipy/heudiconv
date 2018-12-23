@@ -40,9 +40,7 @@ install:
 build: false  # Not a C# project, build stuff at the test step instead.
 
 test_script:
-  - coverage run `which py.test` -s -v heudiconv
-
-  # TODO consider  nose options of datalad-revolution which make codecov submission work  --cover-xml --cover-xml-file=coverage.xml
+  - pytest --cov-report xml --cov=heudiconv -s -v heudiconv
 
 #after_test:
 #  - ps: |
