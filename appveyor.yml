@@ -34,7 +34,7 @@ install:
   - pip install -r dev-requirements.txt
   - pip install requests # below installs pyld but that assumes we have requests already
   #- pip install datalad
-  - pip install codecov pytest
+  - pip install codecov pytest pytest-cov
 
 
 build: false  # Not a C# project, build stuff at the test step instead.
