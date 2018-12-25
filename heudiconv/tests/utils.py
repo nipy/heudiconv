@@ -5,7 +5,7 @@ HEURISTICS_PATH = op.join(heudiconv.heuristics.__path__[0])
 TESTS_DATA_PATH = op.join(op.dirname(__file__), 'data')
 
 
-def gen_heudiconv_args(datadir, outdir, subject, heuristic_file, xargs=None):
+def gen_heudiconv_args(datadir, outdir, subject, heuristic_file, anon_cmd=None, xargs=None):
     heuristic = op.realpath(op.join(HEURISTICS_PATH, heuristic_file))
     args = ["-d", op.join(datadir, 'sourcedata/{subject}/*/*/*.tgz'),
             "-c", "dcm2niix",
@@ -13,6 +13,8 @@ def gen_heudiconv_args(datadir, outdir, subject, heuristic_file, xargs=None):
             "-s", subject,
             "-f", heuristic,
             "--bids",]
+    if anon_cmd:
+        args += ["--anon-cmd", op.join(op.dirname(__file__), anon_cmd), "-a", outdir]
     if xargs:
         args += xargs
 

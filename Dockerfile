@@ -94,6 +94,7 @@ RUN export PATH="/opt/miniconda-latest/bin:$PATH" \
            'traits>=4.6.0' \
            'scipy' \
            'numpy' \
+           'pandas' \
            'nomkl' \
     && sync && conda clean -tipsy && sync \
     && bash -c "source activate base \
@@ -146,6 +147,7 @@ RUN echo '{ \
     \n          "traits>=4.6.0", \
     \n          "scipy", \
     \n          "numpy", \
+    \n          "pandas", \
     \n          "nomkl" \
     \n        ], \
     \n        "pip_install": [ \
