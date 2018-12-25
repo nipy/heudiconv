@@ -22,9 +22,9 @@ install:
 
   # LATER
   ## git annex setup for datalad
-  - appveyor DownloadFile https://downloads.kitenet.net/git-annex/windows/current/git-annex-installer.exe -FileName resources\git-annex-installer.exe
+  - appveyor DownloadFile https://downloads.kitenet.net/git-annex/windows/current/git-annex-installer.exe -FileName git-annex-installer.exe
   ## extract git annex into the system Git installation path
-  - 7z x -o"C:\\Program Files\Git" resources\git-annex-installer.exe
+  - 7z x -o"C:\\Program Files\Git" git-annex-installer.exe
   - pip --version # check again since seems that python_requires='>=3.5' in secretstorage is not in effect
   - python --version # just to check
   # Install the dependencies and the project.
