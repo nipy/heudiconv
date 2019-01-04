@@ -8,9 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 A variety of bugfixes
 
-### Added
 ### Changed
-
 - Reproin heuristic: `__dup` indices would now be assigned incrementally
   individually per each sequence, so there is a chance to properly treat
   associate for multi-file (e.g. `fmap`) sequences
@@ -19,20 +17,16 @@ A variety of bugfixes
   testing of an installed heudiconv
 - Protocol name will also be accessed from private Siemens
   csa.tProtocolName header field if not present in public one
+- nipype>=0.12.0 is required now
 
-### Deprecated
 ### Fixed
-
 - Multiple files produced by dcm2niix are first sorted to guarantee
   correct order e.g. of magnitude files in fieldmaps, which otherwise
   resulted in incorrect according to BIDS ordering of them
 - Aggregated top level .json files now would contain only the fields
   with the same values from all scanned files. In prior versions,
   those files were not regenerated after an initial conversion
-
-### Removed
-### Security
-
+- Unicode handling in anonimization scripts
 
 ## [0.5.1] - 2018-07-05
 Bugfix release
