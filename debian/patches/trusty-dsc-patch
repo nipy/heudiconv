@@ -1,6 +1,0 @@
-diff --git a/debian/patches/series b/debian/patches/series
-index e69de29..1bc74a4 100644
---- a/debian/patches/series
-+++ b/debian/patches/series
-@@ -0,0 +1 @@
-+deb_old_python2
