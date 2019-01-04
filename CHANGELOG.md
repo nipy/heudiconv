@@ -4,9 +4,9 @@ All notable changes to this project will be documented (for humans) in this file
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [0.5.2] - Date
+## [0.5.2] - 2019-01-04
 
-TODO Summary
+A variety of bugfixes
 
 ### Added
 ### Changed
@@ -14,11 +14,22 @@ TODO Summary
 - Reproin heuristic: `__dup` indices would now be assigned incrementally
   individually per each sequence, so there is a chance to properly treat
   associate for multi-file (e.g. `fmap`) sequences
+- Reproin heuristic: also split StudyDescription by space not only by ^
 - `tests/` moved under `heudiconv/tests` to ease maintenance and facilitate
   testing of an installed heudiconv
+- Protocol name will also be accessed from private Siemens
+  csa.tProtocolName header field if not present in public one
 
 ### Deprecated
 ### Fixed
+
+- Multiple files produced by dcm2niix are first sorted to guarantee
+  correct order e.g. of magnitude files in fieldmaps, which otherwise
+  resulted in incorrect according to BIDS ordering of them
+- Aggregated top level .json files now would contain only the fields
+  with the same values from all scanned files. In prior versions,
+  those files were not regenerated after an initial conversion
+
 ### Removed
 ### Security
 
