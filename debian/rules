@@ -33,7 +33,7 @@ override_dh_auto_install:
 clean::
 	dh_clean
 	# Ahhhhhhh!
-	rm -rf .pybuild build
+	rm -rf .pybuild build .pytest_cache/
 	-rm -rf heudiconv.egg-info/
 
 # make orig tarball from repository content
