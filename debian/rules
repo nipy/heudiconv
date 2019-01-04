@@ -13,6 +13,10 @@ gitver = $(shell [ -x /usr/bin/git ] && git describe --tags --match 'v[0-9].*' $
 export DH_VERBOSE = 1
 export PYBUILD_NAME = heudiconv
 
+# for paranoid
+export  http_proxy=http://127.0.0.1:9/
+
+
 # one ring to rule them all ...
 %:
 	dh $@ --buildsystem=pybuild
