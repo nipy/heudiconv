@@ -1,4 +1,10 @@
-heudiconv (0.5.1-1) unstable; urgency=medium
+heudiconv (0.5.2-1) unstable; urgency=medium
+
+  * New upstream release
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 04 Jan 2019 10:35:47 -0500
+
+heudiconv (0.5.1-1) neurodebian; urgency=medium
 
   * New upstream release
 
