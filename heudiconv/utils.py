@@ -181,7 +181,7 @@ def assure_no_file_exists(path):
         os.unlink(path)
 
 
-def save_json(filename, data, indent=4):
+def save_json(filename, data, indent=4, sort_keys=True, pretty=False):
     """Save data to a json file
 
     Parameters
@@ -190,11 +190,17 @@ def save_json(filename, data, indent=4):
         Filename to save data in.
     data : dict
         Dictionary to save in json file.
+    indent : int, optional
+    sort_keys : bool, optional
+    pretty : bool, optional
 
     """
     assure_no_file_exists(filename)
     with open(filename, 'w') as fp:
-        fp.write(_canonical_dumps(data, sort_keys=True, indent=indent))
+        fp.write(
+            (json_dumps_pretty if pretty else _canonical_dumps)(
+                data, sort_keys=sort_keys, indent=indent)
+        )
 
 
 def json_dumps_pretty(j, indent=2, sort_keys=True):
