@@ -1,5 +1,6 @@
 """Handle BIDS specific operations"""
 
+import hashlib
 import os
 import os.path as op
 import logging
@@ -68,13 +69,37 @@ def populate_bids_templates(path, defaults={}):
         "TODO: Provide description for the dataset -- basic details about the "
         "study, possibly pointing to pre-registration (if public or embargoed)")
 
+    populate_aggregated_jsons(path)
+
+
+def populate_aggregated_jsons(path):
+    """Aggregate across the entire BIDS dataset .json's into top level .json's
+
+    Top level .json files would contain only the fields which are
+    common to all subject[/session]/type/*_modality.json's.
+
+    ATM aggregating only for *_task*_bold.json files. Only the task- and
+    OPTIONAL _acq- field is retained within the aggregated filename.  The other
+    BIDS _key-value pairs are "aggregated over".
+
+    Parameters
+    ----------
+    path: str
+      Path to the top of the BIDS dataset
+    """
     # TODO: collect all task- .json files for func files to
     tasks = {}
     # way too many -- let's just collect all which are the same!
     # FIELDS_TO_TRACK = {'RepetitionTime', 'FlipAngle', 'EchoTime',
     #                    'Manufacturer', 'SliceTiming', ''}
     for fpath in find_files('.*_task-.*\_bold\.json', topdir=path,
-                        exclude_vcs=True, exclude="/\.(datalad|heudiconv)/"):
+                            exclude_vcs=True,
+                            exclude="/\.(datalad|heudiconv)/"):
+        #
+        # According to BIDS spec I think both _task AND _acq (may be more?
+        # _rec, _dir, ...?) should be retained?
+        # TODO: if we are to fix it, then old ones (without _acq) should be
+        # removed first
         task = re.sub('.*_(task-[^_\.]*(_acq-[^_\.]*)?)_.*', r'\1', fpath)
         json_ = load_json(fpath)
         if task not in tasks:
@@ -93,18 +118,36 @@ def populate_bids_templates(path, defaults={}):
         if not op.lexists(events_file):
             lgr.debug("Generating %s", events_file)
             with open(events_file, 'w') as f:
-                f.write("onset\tduration\ttrial_type\tresponse_time\tstim_file\tTODO -- fill in rows and add more tab-separated columns if desired")
+                f.write(
+                    "onset\tduration\ttrial_type\tresponse_time\tstim_file"
+                    "\tTODO -- fill in rows and add more tab-separated "
+                    "columns if desired")
     # extract tasks files stubs
     for task_acq, fields in tasks.items():
         task_file = op.join(path, task_acq + '_bold.json')
-        # do not touch any existing thing, it may be precious
-        if not op.lexists(task_file):
-            lgr.debug("Generating %s", task_file)
-            fields["TaskName"] = ("TODO: full task name for %s" %
-                                  task_acq.split('_')[0].split('-')[1])
-            fields["CogAtlasID"] = "TODO"
-            with open(task_file, 'w') as f:
-                f.write(json_dumps_pretty(fields, indent=2, sort_keys=True))
+        # Since we are pulling all unique fields we have to possibly
+        # rewrite this file to guarantee consistency.
+        # See https://github.com/nipy/heudiconv/issues/277 for a usecase/bug
+        # when we didn't touch existing one.
+        # But the fields we enter (TaskName and CogAtlasID) might need need
+        # to be populated from the file if it already exists
+        placeholders = {
+            "TaskName": ("TODO: full task name for %s" %
+                         task_acq.split('_')[0].split('-')[1]),
+            "CogAtlasID": "TODO",
+        }
+        if op.lexists(task_file):
+            j = load_json(task_file)
+            # Retain possibly modified placeholder fields
+            for f in placeholders:
+                if f in j:
+                    placeholders[f] = j[f]
+            act = "Regenerating"
+        else:
+            act = "Generating"
+        lgr.debug("%s %s", act, task_file)
+        fields.update(placeholders)
+        save_json(task_file, fields, indent=2, sort_keys=True, pretty=True)
 
 
 def tuneup_bids_json_files(json_files):
@@ -196,7 +239,7 @@ def save_scans_key(item, bids_files):
     """
     Parameters
     ----------
-    items:
+    item:
     bids_files: str or list
 
     Returns
@@ -214,7 +257,7 @@ def save_scans_key(item, bids_files):
         # get filenames
         f_name = '/'.join(bids_file.split('/')[-2:])
         f_name = f_name.replace('json', 'nii.gz')
-        rows[f_name] = get_formatted_scans_key_row(item)
+        rows[f_name] = get_formatted_scans_key_row(item[-1][0])
         subj_, ses_ = find_subj_ses(f_name)
         if not subj_:
             lgr.warning(
@@ -279,7 +322,7 @@ def add_rows_to_scans_keys_file(fn, newrows):
         writer.writerows([header] + data_rows_sorted)
 
 
-def get_formatted_scans_key_row(item):
+def get_formatted_scans_key_row(dcm_fn):
     """
     Parameters
     ----------
@@ -291,25 +334,27 @@ def get_formatted_scans_key_row(item):
         [ISO acquisition time, performing physician name, random string]
 
     """
-    dcm_fn = item[-1][0]
-    from heudiconv.external.dcmstack import ds
-    mw = ds.wrapper_from_data(dcm.read_file(dcm_fn,
-                                            stop_before_pixels=True,
-                                            force=True))
+    dcm_data = dcm.read_file(dcm_fn, stop_before_pixels=True, force=True)
     # we need to store filenames and acquisition times
     # parse date and time and get it into isoformat
     try:
-        date = mw.dcm_data.ContentDate
-        time = mw.dcm_data.ContentTime.split('.')[0]
+        date = dcm_data.ContentDate
+        time = dcm_data.ContentTime.split('.')[0]
         td = time + date
         acq_time = datetime.strptime(td, '%H%M%S%Y%m%d').isoformat()
     except AttributeError as exc:
         lgr.warning("Failed to get date/time for the content: %s", str(exc))
         acq_time = None
     # add random string
-    randstr = ''.join(map(chr, sample(k=8, population=range(33, 127))))
+    # But let's make it reproducible by using all UIDs
+    # (might change across versions?)
+    randcontent = u''.join(
+        [getattr(dcm_data, f) or '' for f in sorted(dir(dcm_data))
+         if f.endswith('UID')]
+    )
+    randstr = hashlib.md5(randcontent.encode()).hexdigest()[:8]
     try:
-        perfphys = mw.dcm_data.PerformingPhysicianName
+        perfphys = dcm_data.PerformingPhysicianName
     except AttributeError:
         perfphys = ''
     row = [acq_time, perfphys, randstr]

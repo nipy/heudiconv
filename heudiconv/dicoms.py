@@ -4,7 +4,7 @@ import os.path as op
 import logging
 from collections import OrderedDict
 import tarfile
-
+from nibabel.nicom import csareader
 from heudiconv.external.pydicom import dcm
 
 from .utils import SeqInfo, load_json, set_readonly
@@ -72,6 +72,15 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
         except AttributeError:
             lgr.info("File {} is missing any StudyInstanceUID".format(filename))
             file_studyUID = None
+
+        # Workaround for protocol name in private siemens csa header
+        try:
+            mw.dcm_data.ProtocolName
+        except AttributeError:
+            if not getattr(mw.dcm_data, 'ProtocolName', '').strip():
+                mw.dcm_data.ProtocolName = parse_private_csa_header(
+                    mw.dcm_data, 'ProtocolName', 'tProtocolName'
+                    ) if mw.is_csa else ''
 
         try:
             series_id = (int(mw.dcm_data.SeriesNumber),
@@ -208,7 +217,7 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
             dcminfo.get('PatientID'),
             dcminfo.get('StudyDescription'),
             refphys,
-            dcminfo.get('SeriesDescription'),
+            series_desc,  # We try to set this further up.
             sequence_name,
             image_type,
             accession_number,
@@ -232,7 +241,7 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
         lgr.debug("%30s %30s %27s %27s %5s nref=%-2d nsrc=%-2d %s" % (
             key,
             info.series_id,
-            dcminfo.SeriesDescription,
+            series_desc,
             dcminfo.ProtocolName,
             info.is_derived,
             len(dcminfo.get('ReferencedImageSequence', '')),
@@ -483,3 +492,37 @@ def embed_metadata_from_dicoms(bids, item_dicoms, outname, outname_bids,
     except Exception as exc:
         lgr.error("Embedding failed: %s", str(exc))
         os.chdir(cwd)
+
+def parse_private_csa_header(dcm_data, public_attr, private_attr, default=None):
+    """
+    Parses CSA header in cases where value is not defined publicly
+
+    Parameters
+    ----------
+    dcm_data : pydicom Dataset object
+        DICOM metadata
+    public_attr : string
+        non-private DICOM attribute
+    private_attr : string
+        private DICOM attribute
+    default (optional)
+        default value if private_attr not found
+
+    Returns
+    -------
+    val (default: empty string)
+        private attribute value or default
+    """
+    # TODO: provide mapping to private_attr from public_attr
+    from nibabel.nicom import csareader
+    import dcmstack.extract as dsextract
+    try:
+        # TODO: test with attr besides ProtocolName
+        csastr = csareader.get_csa_header(dcm_data, 'series')['tags']['MrPhoenixProtocol']['items'][0]
+        csastr = csastr.replace("### ASCCONV BEGIN", "### ASCCONV BEGIN ### ")
+        parsedhdr = dsextract.parse_phoenix_prot('MrPhoenixProtocol', csastr)
+        val = parsedhdr[private_attr].replace(' ', '')
+    except Exception as e:
+        lgr.debug("Failed to parse CSA header: %s", str(e))
+        val = default if default else ''
+    return val

@@ -239,7 +239,26 @@ protocols2fix = {
             ('fmap_acq-discorr-dti-', 'fmap_acq-dwi_dir-'),
             ('_test', ''),
         ],
+    '1996f745c30c1df1d3851844e56d294f':
+        [
+            ('fmap_acq-discorr-dti-', 'fmap_acq-dwi_dir-'),
+        ],
+    #'022969bfde39c2940c114edf1db3fabc':
+    #    [  # should be applied only for ses-03!
+    #        ('_acq-MPRAGE_ses-02', '_acq-MPRAGE_ses-03'),
+    #    ],
+    # to be used only once for one interrupted accession but we cannot
+    # fix per accession yet
+    #    '23763823d2b9b4b09dafcadc8e8edf21':
+    #        [
+    #            ('anat-T1w_acq-MPRAGE', 'anat-T1w_acq-MPRAGE_run-06'), 
+    #            ('anat_T2w', 'anat_T2w_run-06'),
+    #            ('fmap_acq-3mm', 'fmap_acq-3mm_run-06'),
+    #        ],
 }
+# there was also screw up in the locator specification
+# so we need to fix in both
+#protocols2fix['67ae5e641ea9d487b6fdf56fb91aeb93'] = protocols2fix['022969bfde39c2940c114edf1db3fabc']
 
 # list containing StudyInstanceUID to skip -- hopefully doesn't happen too often
 dicoms2skip = [
@@ -634,7 +653,23 @@ def infotodict(seqinfo):
     return info
 
 
-def get_dups_marked(info):
+def get_dups_marked(info, per_series=True):
+    """
+
+    Parameters
+    ----------
+    info
+    per_series: bool
+      If set to False, it would create growing index through all series. That
+      could lead to non-desired effects if some "multi file" scans (such as
+      fmap with magnitude{1,2} and phasediff) would not be able to associate
+      multiple files for the same acquisition.   By default (True) dup indices
+      would be per each series (change introduced in 0.5.2)
+
+    Returns
+    -------
+
+    """
     # analyze for "cancelled" runs, if run number was explicitly specified and
     # thus we ended up with multiple entries which would mean that older ones
     #  were "cancelled"
@@ -645,13 +680,20 @@ def get_dups_marked(info):
             lgr.warning("Detected %d duplicated run(s) for template %s: %s",
                         len(series_ids) - 1, template[0], series_ids[:-1])
             # copy the duplicate ones into separate ones
+            if per_series:
+                dup_id = 0  # reset since declared per series
             for dup_series_id in series_ids[:-1]:
                 dup_id += 1
                 dup_template = (
                     '%s__dup-%02d' % (template[0], dup_id),
                     ) + template[1:]
                 # There must have not been such a beast before!
-                assert dup_template not in info
+                if dup_template in info:
+                    raise AssertionError(
+                        "{} is already known to info={}. "
+                        "May be a bug for per_series=True handling?"
+                        "".format(dup_template, info)
+                    )
                 info[dup_template] = [dup_series_id]
             info[template] = series_ids[-1:]
         assert len(info[template]) == 1
@@ -681,7 +723,8 @@ def infotoids(seqinfos, outdir):
     subject = fixup_subjectid(get_unique(seqinfos, 'patient_id'))
     # TODO:  fix up subject id if missing some 0s
     if study_description:
-        split = study_description.split('^', 1)
+        # Generally it is a ^ but if entered manually, ppl place space in it
+        split = re.split('[ ^]', study_description, 1)
         # split first one even more, since couldbe PI_Student or PI-Student
         split = re.split('-|_', split[0], 1) + split[1:]
 
@@ -732,7 +775,11 @@ def infotoids(seqinfos, outdir):
                 raise NotImplementedError(
                     "Should not mix hardcoded session markers with incremental ones (+=)"
                 )
-            assert len(ses_markers) == 1
+            if not len(ses_markers) == 1:
+                raise NotImplementedError(
+                    "Should have got a single session marker.  Got following: %s"
+                    % ', '.join(map(repr, ses_markers))
+                )
             session = ses_markers[0]
         else:
             # TODO - I think we are doomed to go through the sequence and split
@@ -875,159 +922,3 @@ def fixup_subjectid(subjectid):
         # just filter out possible _- in it
         return re.sub('[-_]', '', subjectid)
     return "sid%06d" % int(reg.groups()[0])
-
-
-def test_filter_files():
-    # Filtering is currently disabled -- any sequence directory is Ok
-    assert(filter_files('/home/mvdoc/dbic/09-run_func_meh/0123432432.dcm'))
-    assert(filter_files('/home/mvdoc/dbic/run_func_meh/012343143.dcm'))
-
-
-def test_md5sum():
-    assert md5sum('cryptonomicon') == '1cd52edfa41af887e14ae71d1db96ad1'
-    assert md5sum('mysecretmessage') == '07989808231a0c6f522f9d8e34695794'
-
-
-def test_fix_canceled_runs():
-    from collections import namedtuple
-    FakeSeqInfo = namedtuple('FakeSeqInfo',
-                             ['accession_number', 'series_id',
-                              'protocol_name', 'series_description'])
-
-    seqinfo = []
-    runname = 'func_run+'
-    for i in range(1, 6):
-        seqinfo.append(
-            FakeSeqInfo('accession1',
-                        '{0:02d}-'.format(i) + runname,
-                        runname, runname)
-        )
-
-    fake_accession2run = {
-        'accession1': ['^01-', '^03-']
-    }
-
-    seqinfo_ = fix_canceled_runs(seqinfo, fake_accession2run)
-
-    for i, s in enumerate(seqinfo_, 1):
-        output = runname
-        if i == 1 or i == 3:
-            output = 'cancelme_' + output
-        for key in ['series_description', 'protocol_name']:
-            value = getattr(s, key)
-            assert(value == output)
-        # check we didn't touch series_id
-        assert(s.series_id == '{0:02d}-'.format(i) + runname)
-
-
-def test_fix_dbic_protocol():
-    from collections import namedtuple
-    FakeSeqInfo = namedtuple('FakeSeqInfo',
-                             ['accession_number', 'study_description',
-                              'field1', 'field2'])
-    accession_number = 'A003'
-    seq1 = FakeSeqInfo(accession_number,
-                       'mystudy',
-                       '02-anat-scout_run+_MPR_sag',
-                       '11-func_run-life2_acq-2mm692')
-    seq2 = FakeSeqInfo(accession_number,
-                       'mystudy',
-                       'nochangeplease',
-                       'nochangeeither')
-
-
-    seqinfos = [seq1, seq2]
-    keys = ['field1']
-    subsdict = {
-        md5sum('mystudy'):
-            [('scout_run\+', 'scout'),
-             ('run-life[0-9]', 'run+_task-life')],
-    }
-
-    seqinfos_ = fix_dbic_protocol(seqinfos, keys=keys, subsdict=subsdict)
-    assert(seqinfos[1] == seqinfos_[1])
-    # field2 shouldn't have changed since I didn't pass it
-    assert(seqinfos_[0] == FakeSeqInfo(accession_number,
-                                       'mystudy',
-                                       '02-anat-scout_MPR_sag',
-                                       seq1.field2))
-
-    # change also field2 please
-    keys = ['field1', 'field2']
-    seqinfos_ = fix_dbic_protocol(seqinfos, keys=keys, subsdict=subsdict)
-    assert(seqinfos[1] == seqinfos_[1])
-    # now everything should have changed
-    assert(seqinfos_[0] == FakeSeqInfo(accession_number,
-                                       'mystudy',
-                                       '02-anat-scout_MPR_sag',
-                                       '11-func_run+_task-life_acq-2mm692'))
-
-
-def test_sanitize_str():
-    assert sanitize_str('super@duper.faster') == 'superduperfaster'
-    assert sanitize_str('perfect') == 'perfect'
-    assert sanitize_str('never:use:colon:!') == 'neverusecolon'
-
-
-def test_fixupsubjectid():
-    assert fixup_subjectid("abra") == "abra"
-    assert fixup_subjectid("sub") == "sub"
-    assert fixup_subjectid("sid") == "sid"
-    assert fixup_subjectid("sid000030") == "sid000030"
-    assert fixup_subjectid("sid0000030") == "sid000030"
-    assert fixup_subjectid("sid00030") == "sid000030"
-    assert fixup_subjectid("sid30") == "sid000030"
-    assert fixup_subjectid("SID30") == "sid000030"
-
-
-def test_parse_series_spec():
-    pdpn = parse_series_spec
-
-    assert pdpn("nondbic_func-bold") == {}
-    assert pdpn("cancelme_func-bold") == {}
-
-    assert pdpn("bids_func-bold") == \
-           pdpn("func-bold") == \
-           {'seqtype': 'func', 'seqtype_label': 'bold'}
-
-    # pdpn("bids_func_ses+_task-boo_run+") == \
-    # order and PREFIX: should not matter, as well as trailing spaces
-    assert \
-        pdpn(" PREFIX:bids_func_ses+_task-boo_run+  ") == \
-        pdpn("PREFIX:bids_func_ses+_task-boo_run+") == \
-        pdpn("bids_func_ses+_run+_task-boo") == \
-           {
-               'seqtype': 'func',
-               # 'seqtype_label': 'bold',
-               'session': '+',
-               'run': '+',
-               'task': 'boo',
-            }
-
-    # TODO: fix for that
-    assert pdpn("bids_func-pace_ses-1_task-boo_acq-bu_bids-please_run-2__therest") == \
-           pdpn("bids_func-pace_ses-1_run-2_task-boo_acq-bu_bids-please__therest") == \
-           pdpn("func-pace_ses-1_task-boo_acq-bu_bids-please_run-2") == \
-           {
-               'seqtype': 'func', 'seqtype_label': 'pace',
-               'session': '1',
-               'run': '2',
-               'task': 'boo',
-               'acq': 'bu',
-               'bids': 'bids-please'
-           }
-
-    assert pdpn("bids_anat-scout_ses+") == \
-           {
-               'seqtype': 'anat',
-               'seqtype_label': 'scout',
-               'session': '+',
-           }
-
-    assert pdpn("anat_T1w_acq-MPRAGE_run+") == \
-           {
-                'seqtype': 'anat',
-                'run': '+',
-                'acq': 'MPRAGE',
-                'seqtype_label': 'T1w'
-           }
