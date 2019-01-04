@@ -16,18 +16,14 @@ export PYBUILD_NAME = heudiconv
 # for paranoid
 export  http_proxy=http://127.0.0.1:9/
 
-export HOME=$(CURDIR)/build
+# to please datalad and git
+export EMAIL=debian@example.com
+export GIT_AUTHOR_NAME="The Name"
+export GIT_COMMITTER_NAME=$(GIT_AUTHOR_NAME)
 
 # one ring to rule them all ...
 %:
 	dh $@ --buildsystem=pybuild
-
-override_dh_auto_configure:
-	dh_auto_configure
-	# Needed for git/datalad to function correctly
-	mkdir -p "$(HOME)"
-	git config --global user.email "debian@example.com"
-	git config --global user.name "His Name"
 
 override_dh_auto_install:
 	dh_auto_install
