@@ -55,7 +55,10 @@ def main():
         install_requires=ldict['REQUIRES'],
         extras_require=ldict['EXTRA_REQUIRES'],
         package_data={
-            'heudiconv.tests': [op.join('data', '*'), op.join('data', '*', '*')],
+            'heudiconv.tests': [
+                        op.join('data', '*.dcm'),
+                        op.join('data', '*', '*.dcm')
+            ],
         }
     )
 
