@@ -1,4 +1,4 @@
-__version__ = "0.5.2-dev"
+__version__ = "0.5.3-dev"
 __author__ = "HeuDiConv team and contributors"
 __url__ = "https://github.com/nipy/heudiconv"
 __packagename__ = 'heudiconv'
@@ -11,7 +11,7 @@ tarballs into collections of NIfTI files following pre-defined heuristic(s)."""
 REQUIRES = [
     'nibabel',
     'pydicom',
-    'nipype',
+    'nipype>=0.12.0',
     'pathlib',
     'dcmstack>=0.7',
 ]

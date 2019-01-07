@@ -101,7 +101,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
         anon_outdir = outdir
 
     # Generate heudiconv info folder
-    idir = op.join(outdir, '.heudiconv', sid)
+    idir = op.join(outdir, '.heudiconv', anon_sid)
     if bids and ses:
         idir = op.join(idir, 'ses-%s' % str(ses))
     if anon_outdir == outdir:
@@ -458,6 +458,7 @@ def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids, 
         safe_copyfile(res.outputs.bvals, outname_bvals, overwrite)
 
     if isinstance(res_files, list):
+        res_files = sorted(res_files)
         # we should provide specific handling for fmap,
         # dwi etc which might spit out multiple files
 
@@ -473,7 +474,7 @@ def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids, 
 
         # Also copy BIDS files although they might need to
         # be merged/postprocessed later
-        bids_files = (res.outputs.bids
+        bids_files = sorted(res.outputs.bids
                       if len(res.outputs.bids) == len(res_files)
                       else [None] * len(res_files))
 
