@@ -68,9 +68,6 @@ def test_reproin_largely_smoke(tmpdir, heuristic, invocation):
             with pytest.raises(NotImplementedError):
                 runner(args)
 
-            # but run successful when provided
-            runner(args + ['--subjects', 'sub1'])
-            return
     runner(args)
     ds = Dataset(str(tmpdir))
     assert ds.is_installed()
