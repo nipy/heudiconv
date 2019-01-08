@@ -168,9 +168,18 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
             grouping=grouping)
 
         if not getattr(heuristic, 'infotoids', None):
-            raise NotImplementedError(
-                "For now, if no subj template is provided, requiring "
-                "heuristic to have infotoids")
+            lgr.warn("Heuristic is missing an `infotoids` method, assigning "
+                     "empty method. For best results, define an `infotoids`")
+            def infotoids(seqinfos, outdir):
+                return {
+                    'locator': None,
+                    'session': None,
+                    'subject': None
+                    }
+            heuristic.infotoids = infotoids
+            # raise NotImplementedError(
+            #     "For now, if no subj template is provided, requiring "
+            #     "heuristic to have infotoids")
 
         if sids:
             if not (len(sids) == 1 and len(seqinfo_dict) == 1):
