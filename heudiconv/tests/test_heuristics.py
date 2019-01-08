@@ -67,6 +67,7 @@ def test_reproin_largely_smoke(tmpdir, heuristic, invocation):
             # if subject is not overriden, raise error
             with pytest.raises(NotImplementedError):
                 runner(args)
+            return
 
     runner(args)
     ds = Dataset(str(tmpdir))

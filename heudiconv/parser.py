@@ -184,7 +184,7 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
             if not sid:
                 raise NotImplementedError("Cannot guarantee subject id - add "
                                           "`infotoids` to heuristic file or "
-                                          "provide `--subject` argument")
+                                          "provide `--subjects` option")
             lgr.warn("Heuristic is missing an `infotoids` method, assigning "
                      "empty method and using provided subject id", sid,
                      "Provide `session` and `locator` fields for best results.")
