@@ -64,9 +64,12 @@ def test_reproin_largely_smoke(tmpdir, heuristic, invocation):
             runner(args + ['--subjects', 'sub1', 'sub2'])
 
         if heuristic != 'reproin':
-            # none other heuristic has mighty infotoids atm
+            # if subject is not overriden, raise error
             with pytest.raises(NotImplementedError):
                 runner(args)
+
+            # but run successful when provided
+            runner(args + ['--subjects', 'sub1'])
             return
     runner(args)
     ds = Dataset(str(tmpdir))
