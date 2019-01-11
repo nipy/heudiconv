@@ -24,7 +24,7 @@ from .bids import (
     save_scans_key,
     tuneup_bids_json_files,
     add_participant_record,
-    BIDSException
+    BIDSError
 )
 from .dicoms import (
     group_dicoms_into_seqinfos,
@@ -529,7 +529,7 @@ def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids, 
 
                     # If "_rec-" is specified, prepend the 'mag_or_phase' value.
                     if ('_rec-' in this_prefix_basename):
-                        raise BIDSException(
+                        raise BIDSError(
                         "Reconstruction label for multi-echo single-band"
                         " reference images will be automatically set, remove"
                         " from heuristic"

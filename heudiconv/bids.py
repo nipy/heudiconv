@@ -26,7 +26,7 @@ from .utils import (
 lgr = logging.getLogger(__name__)
 
 
-class BIDSException(Exception):
+class BIDSError(Exception):
     pass
 
 
