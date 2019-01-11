@@ -15,4 +15,5 @@ Choose one:
 - [ ] Container
 <!-- If selected, please provide container name and tag"-->
 
-- Heudiconv version: <!-- Command: heudiconv --version -->
+- Heudiconv version: 
+<!-- Command: heudiconv --version -->
