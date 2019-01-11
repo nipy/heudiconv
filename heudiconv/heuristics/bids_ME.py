@@ -1,4 +1,9 @@
-import os
+"""Heuristic demonstrating conversion of the Multi-Echo sequences.
+
+It only cares about converting sequences which have _ME_ in their
+series_description and outputs to BIDS.
+"""
+
 
 def create_key(template, outtype=('nii.gz',), annotation_classes=None):
     if template is None or not template:
