@@ -53,7 +53,7 @@ def test_conversion(tmpdir, subject, heuristic, anon_cmd):
         assert orig[key] == conv[key]
 
 @pytest.mark.skipif(not have_datalad, reason="no datalad")
-def test_multiecho(tmpdir, subject='MEEPI', heuristic='bids-ME.py'):
+def test_multiecho(tmpdir, subject='MEEPI', heuristic='bids_ME.py'):
     tmpdir.chdir()
     try:
         datadir = fetch_data(tmpdir.strpath, "dicoms/velasco/MEEPI")
