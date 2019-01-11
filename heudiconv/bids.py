@@ -119,14 +119,17 @@ def populate_aggregated_jsons(path):
         suf = '_bold.json'
         assert fpath.endswith(suf)
         # specify the name of the '_events.tsv' file:
-        if ( '_echo-' in fpath ):
+        if '_echo-' in fpath:
             # multi-echo sequence: bids (1.1.0) specifies just one '_events.tsv'
             #   file, common for all echoes.  The name will not include _echo-.
+            # TODO: RF to use re.match for better readability/robustness
             # So, find out the echo number:
-            fpath_split = fpath.split('_echo-')         # split fpath using '_echo-'
-            fpath_split_2 = fpath_split[1].split('_')   # split the second part of fpath_split using '_'
-            echoNo = fpath_split_2[0]                   # get echo number
-            if ( echoNo == '1' ):
+            fpath_split = fpath.split('_echo-', 1)         # split fpath using '_echo-'
+            fpath_split_2 = fpath_split[1].split('_', 1)   # split the second part of fpath_split using '_'
+            echoNo = fpath_split_2[0]                      # get echo number
+            if echoNo == '1':
+                if len(fpath_split_2) != 2:
+                    raise ValueError("Found no trailer after _echo-")
                 # we modify fpath to exclude '_echo-' + echoNo:
                 fpath = fpath_split[0] + '_' + fpath_split_2[1]
             else:
