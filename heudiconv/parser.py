@@ -186,8 +186,9 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
                                           "`infotoids` to heuristic file or "
                                           "provide `--subjects` option")
             lgr.warn("Heuristic is missing an `infotoids` method, assigning "
-                     "empty method and using provided subject id", sid,
-                     "Provide `session` and `locator` fields for best results.")
+                     "empty method and using provided subject id %s."
+                     "Provide `session` and `locator` fields for best results."
+                     , sid)
             def infotoids(seqinfos, outdir):
                 return {
                     'locator': None,
