@@ -52,3 +52,10 @@ def test_json_dumps_pretty():
         == '{\n  "a": -1,\n  "b": "123",\n  "c": [1, 2, 3],\n  "d": ["1.0", "2.0"]\n}'
     assert pretty({'a': ["0.3", "-1.9128906358217845e-12", "0.2"]}) \
         == '{\n  "a": ["0.3", "-1.9128906358217845e-12", "0.2"]\n}'
+    # original, longer string
+    tstr = 'f9a7d4be-a7d7-47d2-9de0-b21e9cd10755||' \
+          'Sequence: ve11b/master r/50434d5; ' \
+          'Mar  3 2017 10:46:13 by eja'
+    # just the date which reveals the issue
+    # tstr = 'Mar  3 2017 10:46:13 by eja'
+    assert pretty({'WipMemBlock': tstr}) == '{\n  "WipMemBlock": "%s"\n}' % tstr
