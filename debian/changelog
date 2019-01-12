@@ -1,3 +1,9 @@
+heudiconv (0.5.3-1) unstable; urgency=medium
+
+  * Fresh minor bugfix release
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Sat, 12 Jan 2019 09:54:18 -0500
+
 heudiconv (0.5.2-1) unstable; urgency=medium
 
   * New upstream release
