@@ -4,21 +4,12 @@ All notable changes to this project will be documented (for humans) in this file
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [0.5.3] - Date
+## [0.5.3] - 2019-01-12
 
-TODO Summary
-
-### Added
-
-### Changed
-
-### Deprecated
+Minor hot bugfix release
 
 ### Fixed
-
-### Removed
-
-### Security
+- Do not shorten spaces in the dates while pretty printing .json
 
 ## [0.5.2] - 2019-01-04
 
