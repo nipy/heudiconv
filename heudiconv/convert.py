@@ -563,13 +563,6 @@ def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids, 
                         )
                         break
 
-            # For Scout runs with multiple NIfTI images per run:
-            if bids and 'scout' in this_prefix_basename.lower():
-                # in some cases (more than one slice slab), there are several
-                #   NIfTI images in the scout run, so distinguish them with "_acq-"
-                spt = this_prefix_basename.split('_acq-Scout', 1)
-                this_prefix_basename = "%s%s%s%s" % (spt[0], '_acq-Scout', suffix, spt[1])
-
             # Fallback option:
             # If we have failed to modify this_prefix_basename, because it didn't fall
             #   into any of the options above, just add the suffix at the end:
