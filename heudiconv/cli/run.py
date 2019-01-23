@@ -212,6 +212,8 @@ def get_parser():
                         'jsons')
     parser.add_argument('--random-seed', type=int, default=None,
                         help='Random seed to initialize RNG')
+    parser.add_argument('--dcmconfig', default=None,
+                        help='JSON file for additional dcm2niix configuration')
     submission = parser.add_argument_group('Conversion submission options')
     submission.add_argument('-q', '--queue', default=None,
                             help='select batch system to submit jobs to instead'
@@ -231,14 +233,12 @@ def process_args(args):
 
     outdir = op.abspath(args.outdir)
 
-    if args.command:
-        process_extra_commands(outdir, args)
-        return
-
     lgr.info(INIT_MSG(packname=__packagename__,
                       version=__version__))
 
-
+    if args.command:
+        process_extra_commands(outdir, args)
+        return
     #
     # Load heuristic -- better do it asap to make sure it loads correctly
     #
@@ -335,7 +335,8 @@ def process_args(args):
                         bids=args.bids,
                         seqinfo=seqinfo,
                         min_meta=args.minmeta,
-                        overwrite=args.overwrite,)
+                        overwrite=args.overwrite,
+                        dcmconfig=args.dcmconfig,)
 
         lgr.info("PROCESSING DONE: {0}".format(
             str(dict(subject=sid, outdir=study_outdir, session=session))))
