@@ -76,6 +76,8 @@ dicomstack.
 
 - YouTube:
     - ["Heudiconv Example"](https://www.youtube.com/watch?v=O1kZAuR7E00) by [James Kent](https://github.com/jdkent)
+- Blog post:
+    - ["BIDS Tutorial Series: HeuDiConv Walkthrough"](http://reproducibility.stanford.edu/bids-tutorial-series-part-2a/) by the [Stanford Center for Reproducible Neuroscience](http://reproducibility.stanford.edu/)
 
 ## How it works (in some more detail)
 
