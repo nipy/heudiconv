@@ -24,6 +24,7 @@ from .bids import (
     save_scans_key,
     tuneup_bids_json_files,
     add_participant_record,
+    BIDSError
 )
 from .dicoms import (
     group_dicoms_into_seqinfos,
@@ -243,7 +244,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
         if not isinstance(outtypes, (list, tuple)):
             outtypes = (outtypes,)
 
-        prefix_dirname = op.dirname(prefix + '.ext')
+        prefix_dirname = op.dirname(prefix)
         outname_bids = prefix + '.json'
         bids_outfiles = []
         lgr.info('Converting %s (%d DICOMs) -> %s . '
@@ -462,6 +463,8 @@ def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids, 
     """
     from nipype.interfaces.base import isdefined
 
+    prefix_dirname, prefix_basename = op.split(prefix)
+
     bids_outfiles = []
     res_files = res.outputs.converted_files
 
@@ -492,16 +495,112 @@ def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids, 
         # Also copy BIDS files although they might need to
         # be merged/postprocessed later
         bids_files = sorted(res.outputs.bids
-                      if len(res.outputs.bids) == len(res_files)
-                      else [None] * len(res_files))
+                     if len(res.outputs.bids) == len(res_files)
+                     else [None] * len(res_files))
 
-        for fl, suffix, bids_file in zip(res_files, suffixes, bids_files):
-            outname = "%s%s.%s" % (prefix, suffix, outtype)
-            safe_copyfile(fl, outname, overwrite)
+        ###   Do we have a multi-echo series?   ###
+        #   Some Siemens sequences (e.g. CMRR's MB-EPI) set the label 'TE1',
+        #   'TE2', etc. in the 'ImageType' field. However, other seqs do not
+        #   (e.g. MGH ME-MPRAGE). They do set a 'EchoNumber', but not for the
+        #   first echo.  To compound the problem, the echoes are NOT in order,
+        #   so the first NIfTI file does not correspond to echo-1, etc. So, we
+        #   need to know, beforehand, whether we are dealing with a multi-echo
+        #   series. To do that, the most straightforward way is to read the
+        #   echo times for all bids_files and see if they are all the same or not.
+
+        # Check for echotime information
+        echo_times = set()
+
+        for bids_file in bids_files:
             if bids_file:
-                outname_bids_file = "%s%s.json" % (prefix, suffix)
+                # check for varying EchoTimes
+                echot = load_json(bids_file).get('EchoTime', None)
+                if echot is not None:
+                    echo_times.add(echot)
+
+        # To see if the echo times are the same, convert it to a set and see if
+        # only one remains:
+        is_multiecho = len(echo_times) >= 1 if echo_times else False
+
+        ### Loop through the bids_files, set the output name and save files
+        for fl, suffix, bids_file in zip(res_files, suffixes, bids_files):
+
+            # TODO: monitor conversion duration
+            if bids_file:
+                fileinfo = load_json(bids_file)
+
+            # set the prefix basename for this specific file (we'll modify it,
+            # and we don't want to modify it for all the bids_files):
+            this_prefix_basename = prefix_basename
+
+            # _sbref sequences reconstructing magnitude and phase generate
+            # two NIfTI files IN THE SAME SERIES, so we cannot just add
+            # the suffix, if we want to be bids compliant:
+            if bids_file and this_prefix_basename.endswith('_sbref'):
+                # Check to see if it is magnitude or phase reconstruction:
+                if 'M' in fileinfo.get('ImageType'):
+                    mag_or_phase = 'magnitude'
+                elif 'P' in fileinfo.get('ImageType'):
+                    mag_or_phase = 'phase'
+                else:
+                    mag_or_phase = suffix
+
+                # Insert reconstruction label
+                if not ("_rec-%s" % mag_or_phase) in this_prefix_basename:
+
+                    # If "_rec-" is specified, prepend the 'mag_or_phase' value.
+                    if ('_rec-' in this_prefix_basename):
+                        raise BIDSError(
+                        "Reconstruction label for multi-echo single-band"
+                        " reference images will be automatically set, remove"
+                        " from heuristic"
+                        )
+
+                    # If not, insert "_rec-" + 'mag_or_phase' into the prefix_basename
+                    #   **before** "_run", "_echo" or "_sbref", whichever appears first:
+                    for label in ['_run', '_echo', '_sbref']:
+                        if (label in this_prefix_basename):
+                            this_prefix_basename = this_prefix_basename.replace(
+                                label, "_rec-%s%s" % (mag_or_phase, label)
+                            )
+                            break
+
+            # Now check if this run is multi-echo
+            # (Note: it can be _sbref and multiecho, so don't use "elif"):
+            # For multi-echo sequences, we have to specify the echo number in
+            # the file name:
+            if bids_file and is_multiecho:
+                # Get the EchoNumber from json file info.  If not present, it's echo-1
+                echo_number = fileinfo.get('EchoNumber', 1)
+
+
+                supported_multiecho = ['_bold', '_epi', '_sbref', '_T1w']
+                # Now, decide where to insert it.
+                # Insert it **before** the following string(s), whichever appears first.
+                for imgtype in supported_multiecho:
+                    if (imgtype in this_prefix_basename):
+                        this_prefix_basename = this_prefix_basename.replace(
+                            imgtype, "_echo-%d%s" % (echo_number, imgtype)
+                        )
+                        break
+
+            # Fallback option:
+            # If we have failed to modify this_prefix_basename, because it didn't fall
+            #   into any of the options above, just add the suffix at the end:
+            if this_prefix_basename == prefix_basename:
+                this_prefix_basename += suffix
+
+            # Finally, form the outname by stitching the directory and outtype:
+            outname = op.join(prefix_dirname, this_prefix_basename)
+            outfile = outname + '.' + outtype
+
+            # Write the files needed:
+            safe_copyfile(fl, outfile, overwrite)
+            if bids_file:
+                outname_bids_file = "%s.json" % (outname)
                 safe_copyfile(bids_file, outname_bids_file, overwrite)
                 bids_outfiles.append(outname_bids_file)
+
     # res_files is not a list
     else:
         outname = "{}.{}".format(prefix, outtype)
