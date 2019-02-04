@@ -293,7 +293,7 @@ def process_args(args):
 
             queue_conversion(progname,
                              args.queue,
-                             study_outdir,
+                             outdir,
                              heuristic.filename,
                              dicoms,
                              sid,
