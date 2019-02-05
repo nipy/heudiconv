@@ -4,7 +4,6 @@ import os.path as op
 import logging
 from collections import OrderedDict
 import tarfile
-from nibabel.nicom import csareader
 from heudiconv.external.pydicom import dcm
 
 from .utils import SeqInfo, load_json, set_readonly
