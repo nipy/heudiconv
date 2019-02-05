@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import os
 import os.path as op
 from argparse import ArgumentParser
@@ -215,12 +217,11 @@ def get_parser():
     parser.add_argument('--dcmconfig', default=None,
                         help='JSON file for additional dcm2niix configuration')
     submission = parser.add_argument_group('Conversion submission options')
-    submission.add_argument('-q', '--queue', default=None,
-                            help='select batch system to submit jobs to instead'
-                                 ' of running the conversion serially')
-    submission.add_argument('--sbargs', dest='sbatch_args', default=None,
-                            help='Additional sbatch arguments if running with '
-                                 'queue arg')
+    submission.add_argument('-q', '--queue', choices=("SLURM", None),
+                            default=None,
+                            help='batch system to submit jobs in parallel')
+    submission.add_argument('--queue-args', dest='queue_args', default=None,
+                            help='Additional queue arguments')
     return parser
 
 
@@ -281,27 +282,28 @@ def process_args(args):
             continue
 
         if args.queue:
-            if seqinfo and not dicoms:
-                # flatten them all and provide into batching, which again
-                # would group them... heh
-                dicoms = sum(seqinfo.values(), [])
-                raise NotImplementedError(
-                    "we already grouped them so need to add a switch to avoid "
-                    "any grouping, so no outdir prefix doubled etc")
+            # if seqinfo and not dicoms:
+            #     # flatten them all and provide into batching, which again
+            #     # would group them... heh
+            #     dicoms = sum(seqinfo.values(), [])
+            #     raise NotImplementedError(
+            #         "we already grouped them so need to add a switch to avoid "
+            #         "any grouping, so no outdir prefix doubled etc")
 
-            progname = op.abspath(inspect.getfile(inspect.currentframe()))
+            pyscript = op.abspath(inspect.getfile(inspect.currentframe()))
 
-            queue_conversion(progname,
+            studyid = sid
+            if session:
+                studyid += "-%s" % session
+            if locator:
+                studyid += "-%s" % locator
+            # remove any separators
+            studyid = studyid.replace(op.sep, '_')
+
+            queue_conversion(pyscript,
                              args.queue,
-                             outdir,
-                             heuristic.filename,
-                             dicoms,
-                             sid,
-                             args.anon_cmd,
-                             args.converter,
-                             session,
-                             args.with_prov,
-                             args.bids)
+                             studyid,
+                             args.queue_args)
             continue
 
         anon_sid = anonymize_sid(sid, args.anon_cmd) if args.anon_cmd else None
