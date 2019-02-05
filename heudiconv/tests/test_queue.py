@@ -17,17 +17,16 @@ def test_queue_no_slurm(tmpdir, invocation):
     tmpdir.chdir()
     hargs = invocation.split(" ")
     hargs.extend(["-f", "reproin", "-b", "--minmeta", "--queue", "SLURM"])
-    print(hargs)
 
     # simulate command-line call
     _sys_args = sys.argv
     sys.argv = ['heudiconv'] + hargs
 
     try:
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(OSError):
             runner(hargs)
         # should have generated a slurm submission script
-        slurm_cmd_file = tmpdir / 'heudiconv-SLURM.sh'
+        slurm_cmd_file = (tmpdir / 'heudiconv-SLURM.sh').strpath
         assert slurm_cmd_file
         # check contents and ensure args match
         with open(slurm_cmd_file) as fp:

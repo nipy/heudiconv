@@ -1,5 +1,6 @@
 import subprocess
 import sys
+import os
 
 import logging
 
@@ -32,7 +33,6 @@ def queue_conversion(pyscript, queue, studyid, queue_args=None):
             raise NotImplementedError("Queuing with %s is not supported", queue)
 
         args = sys.argv[1:]
-        print(sys.argv)
         # search args for queue flag
         for i, arg in enumerate(args):
             if arg in ["-q", "--queue"]:
@@ -51,7 +51,7 @@ def queue_conversion(pyscript, queue, studyid, queue_args=None):
         convertcmd = " ".join(args)
 
         # will overwrite across subjects
-        queue_file = 'heudiconv-%s.sh' % queue
+        queue_file = os.path.abspath('heudiconv-%s.sh' % queue)
         with open(queue_file, 'wt') as fp:
             fp.writelines(['#!/bin/bash\n', convertcmd, '\n'])
 
