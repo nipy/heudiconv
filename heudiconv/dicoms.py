@@ -353,7 +353,7 @@ def compress_dicoms(dicom_list, out_prefix, tempdirs, overwrite):
     return outtar
 
 
-def embed_nifti(dcmfiles, niftifile, infofile, bids_info, force, min_meta):
+def embed_nifti(dcmfiles, niftifile, infofile, bids_info, min_meta):
     """
 
     If `niftifile` doesn't exist, it gets created out of the `dcmfiles` stack,
@@ -370,7 +370,6 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info, force, min_meta):
     niftifile
     infofile
     bids_info
-    force
     min_meta
 
     Returns
@@ -387,10 +386,11 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info, force, min_meta):
 
     if not min_meta:
         import dcmstack as ds
-        stack = ds.parse_and_stack(dcmfiles, force=force).values()
+        stack = ds.parse_and_stack(dcmfiles, force=True).values()
         if len(stack) > 1:
             raise ValueError('Found multiple series')
-        stack = stack[0]
+        # may be odict now - iter to be safe
+        stack = next(iter(stack))
 
         #Create the nifti image using the data array
         if not op.exists(niftifile):
@@ -458,7 +458,7 @@ def embed_metadata_from_dicoms(bids, item_dicoms, outname, outname_bids,
     item_dicoms = list(map(op.abspath, item_dicoms))
 
     embedfunc = Node(Function(input_names=['dcmfiles', 'niftifile', 'infofile',
-                                           'bids_info', 'force', 'min_meta'],
+                                           'bids_info', 'min_meta'],
                               output_names=['outfile', 'meta'],
                               function=embed_nifti),
                      name='embedder')
@@ -466,13 +466,10 @@ def embed_metadata_from_dicoms(bids, item_dicoms, outname, outname_bids,
     embedfunc.inputs.niftifile = op.abspath(outname)
     embedfunc.inputs.infofile = op.abspath(scaninfo)
     embedfunc.inputs.min_meta = min_meta
-    if bids:
-        embedfunc.inputs.bids_info = load_json(op.abspath(outname_bids))
-    else:
-        embedfunc.inputs.bids_info = None
-    embedfunc.inputs.force = True
+    embedfunc.inputs.bids_info = load_json(op.abspath(outname_bids)) if bids else None
     embedfunc.base_dir = tmpdir
     cwd = os.getcwd()
+
     lgr.debug("Embedding into %s based on dicoms[0]=%s for nifti %s",
               scaninfo, item_dicoms[0], outname)
     try:
