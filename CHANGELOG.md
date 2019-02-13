@@ -16,6 +16,10 @@ TODO Summary
 
 ### Fixed
 
+- correctly handle the case when `outtype` of heuristic has "dicom"
+  before '.nii.gz'. Previously would have lead to absent additional metadata
+  extraction etc
+
 ### Removed
 
 ### Security
