@@ -12,6 +12,11 @@ TODO Summary
 
 ### Changed
 
+- RF `embed_nifti` into `extract_more_metadata_for_nifti` and
+  drop functionality for embedding using dcmstack.  This code was not reachable
+  from cmdline, and collides with the use of `--converter` which ATM supports
+  only dcm2niix and none. 
+
 ### Deprecated
 
 ### Fixed

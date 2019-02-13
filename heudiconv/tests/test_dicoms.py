@@ -5,7 +5,7 @@ import pytest
 
 from heudiconv.external.pydicom import dcm
 from heudiconv.cli.run import main as runner
-from heudiconv.dicoms import parse_private_csa_header, embed_nifti
+from heudiconv.dicoms import parse_private_csa_header, extract_more_metadata_for_nifti
 from .utils import TESTS_DATA_PATH
 
 # Public: Private DICOM tags
@@ -33,28 +33,31 @@ def test_nifti_embed(tmpdir):
     dcmfiles = [op.join(TESTS_DATA_PATH, 'axasc35.dcm')]
     infofile = 'infofile.json'
 
-    # 1) nifti does not exist
-    out = embed_nifti(dcmfiles, 'nifti.nii', 'infofile.json', None, False)
-    # string -> json
-    out = json.loads(out)
-    # should have created nifti file
-    assert op.exists('nifti.nii')
+    # 1) nifti does not exist - no longer supported, not used
+    with pytest.raises(IOError):
+        out = extract_more_metadata_for_nifti(dcmfiles, 'nifti.nii', 'infofile.json', None, False)
+    # should have NOT created nifti file
+    assert not op.exists('nifti.nii')
 
     # 2) nifti exists
-    nifti, info = embed_nifti(dcmfiles, 'nifti.nii', 'infofile.json', None, False)
+    # First - convert
+    from heudiconv.convert import nipype_convert
+    res, _ = nipype_convert(dcmfiles, str(tmpdir/'nifti'), tmpdir=str(tmpdir/'nipype'))
+    nifti = res.outputs.converted_files
     assert op.exists(nifti)
+    info = extract_more_metadata_for_nifti(dcmfiles, nifti, 'infofile.json', None, False)
     assert op.exists(info)
     with open(info) as fp:
-        out2 = json.load(fp)
+        out = json.load(fp)
 
-    assert out == out2
+    assert out
 
     # 3) with existing metadata
     bids = {"existing": "data"}
-    nifti, info = embed_nifti(dcmfiles, 'nifti.nii', 'infofile.json', bids, False)
+    info = extract_more_metadata_for_nifti(dcmfiles, nifti, 'infofile.json', bids, False)
     with open(info) as fp:
-        out3 = json.load(fp)
+        out2 = json.load(fp)
 
-    assert out3["existing"]
-    del out3["existing"]
-    assert out3 == out2 == out
+    assert out2["existing"]
+    del out2["existing"]
+    assert out2 == out

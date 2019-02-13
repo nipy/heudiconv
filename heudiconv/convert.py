@@ -385,7 +385,8 @@ def convert_dicom(item_dicoms, bids, prefix,
                 shutil.copyfile(filename, outfile)
 
 
-def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir, dcmconfig=None):
+def nipype_convert(item_dicoms, prefix,
+                   with_prov=False, bids=False, tmpdir=None, dcmconfig=None):
     """
     Converts DICOMs grouped from heuristic using Nipype's Dcm2niix interface.
 
@@ -394,7 +395,7 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir, dcmconfig=None)
     item_dicoms : List
         DICOM files to convert
     prefix : String
-        Heuristic output path
+        Only the base (filename) pointed by the prefix is used as output prefix
     with_prov : Bool
         Store provenance information
     bids : Bool
@@ -410,6 +411,9 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir, dcmconfig=None)
         config.enable_provenance()
     from nipype import Node
     from nipype.interfaces.dcm2nii import Dcm2niix
+
+    if not tmpdir:
+        raise ValueError("tmpdir argument is mandatory")
 
     item_dicoms = list(map(op.abspath, item_dicoms)) # absolute paths
 
@@ -428,7 +432,8 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir, dcmconfig=None)
     else:
         convertnode.terminal_output = 'allatonce'
     convertnode.inputs.bids_format = bids
-    eg = convertnode.run()
+
+    res = convertnode.run()
 
     # prov information
     prov_file = prefix + '_prov.ttl' if with_prov else None
@@ -438,7 +443,7 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir, dcmconfig=None)
                               'provenance.ttl'),
                       prov_file)
 
-    return eg, prov_file
+    return res, prov_file
 
 
 def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids, overwrite):
