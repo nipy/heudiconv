@@ -247,6 +247,9 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
         prefix_dirname = op.dirname(prefix)
         outname_bids = prefix + '.json'
         bids_outfiles = []
+        # set empty outname and scaninfo in case we only want dicoms
+        outname = ''
+        scaninfo = ''
         lgr.info('Converting %s (%d DICOMs) -> %s . '
                  'Converter: %s . Output types: %s',
                  prefix, len(item_dicoms), prefix_dirname, converter, outtypes)
@@ -261,11 +264,6 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                      len(item_dicoms), outtype, overwrite)
             lgr.debug("Includes the following dicoms: %s", item_dicoms)
 
-            seqtype = op.basename(op.dirname(prefix)) if bids else None
-
-            # set empty outname and scaninfo in case we only want dicoms
-            outname = ''
-            scaninfo = ''
             if outtype == 'dicom':
                 convert_dicom(item_dicoms, bids, prefix,
                               outdir, tempdirs, symlink, overwrite)
