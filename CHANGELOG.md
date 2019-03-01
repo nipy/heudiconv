@@ -16,14 +16,14 @@ TODO Summary
 
 ### Fixed
 
-- TODO: fix: embedding issue (#306)
-- TODO: (#304) from mgxd/fix/queue
-- TODO: (#301) from franklin-feingold/master
+- TODO: fix: embedding issue ([#306])
+- TODO: ([#304]) from mgxd/fix/queue
+- TODO: ([#301]) from franklin-feingold/master
 - TODO: fix/queue
-- TODO: (#293) from mgxd/multiecho
+- TODO: ([#293]) from mgxd/multiecho
 - correctly handle the case when `outtype` of heuristic has "dicom"
   before '.nii.gz'. Previously would have lead to absent additional metadata
-  extraction etc (#310)
+  extraction etc ([#310])
 
 ### Removed
 
@@ -178,3 +178,8 @@ TODO Summary
 [DBIC]: http://dbic.dartmouth.edu
 [datalad]: http://datalad.org
 [dcm2niix]: https://github.com/rordenlab/dcm2niix
+[#293]: https://github.com/nipy/heudiconv/issues/293
+[#301]: https://github.com/nipy/heudiconv/issues/301
+[#304]: https://github.com/nipy/heudiconv/issues/304
+[#306]: https://github.com/nipy/heudiconv/issues/306
+[#310]: https://github.com/nipy/heudiconv/issues/310
