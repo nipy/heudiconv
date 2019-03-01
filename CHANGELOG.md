@@ -16,9 +16,10 @@ TODO Summary
 
 ### Fixed
 
+- TODO: fix: embedding issue ???
 - correctly handle the case when `outtype` of heuristic has "dicom"
   before '.nii.gz'. Previously would have lead to absent additional metadata
-  extraction etc
+  extraction etc (#310)
 
 ### Removed
 
