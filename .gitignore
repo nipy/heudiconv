@@ -3,3 +3,4 @@
 .coverage
 *.egg-info/
 .idea/
+venvs/
