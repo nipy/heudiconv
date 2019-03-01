@@ -16,7 +16,11 @@ TODO Summary
 
 ### Fixed
 
-- TODO: fix: embedding issue ???
+- TODO: fix: embedding issue (#306)
+- TODO: (#304) from mgxd/fix/queue
+- TODO: (#301) from franklin-feingold/master
+- TODO: fix/queue
+- TODO: (#293) from mgxd/multiecho
 - correctly handle the case when `outtype` of heuristic has "dicom"
   before '.nii.gz'. Previously would have lead to absent additional metadata
   extraction etc (#310)
