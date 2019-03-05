@@ -48,7 +48,8 @@ seqinfo_fields = [
     'date',                  # 24
     'series_uid',            # 25
     'time',                  # 26
-]
+    'example_dcm_file_path',  # 27
+ ]
 
 SeqInfo = namedtuple('SeqInfo', seqinfo_fields)
 
@@ -197,7 +198,7 @@ def load_json(filename, retry=0):
             continue
 
     return data
-    
+
 
 def assure_no_file_exists(path):
     """Check if file or symlink (git-annex?) exists, and if so -- remove"""

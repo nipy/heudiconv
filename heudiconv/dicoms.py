@@ -91,6 +91,7 @@ def create_seqinfo(mw, series_files, series_id):
         date=dcminfo.get('AcquisitionDate'),
         series_uid=dcminfo.get('SeriesInstanceUID'),
         time=dcminfo.get('AcquisitionTime'),
+        example_dcm_file_path=series_files[0],
     )
     return seqinfo
 
