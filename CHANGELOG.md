@@ -6,22 +6,32 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [0.5.4] - Date
 
-TODO Summary
+This release includes fixes to BIDS multi-echo conversions, the
+ re-implementation of queuing support (currently just SLURM), as well as
+ some bugfixes.
+
+ Starting today, we will (finally) push versioned releases to DockerHub.
+ Finally, to more accurately reflect on-going development, the `latest`
+ tag has been renamed to `unstable`.
 
 ### Added
+- Additional Stanford tutorial added to README ([#301])
 
 ### Changed
+- `--sbargs` argument was renamed to `--queue-args` ([#304])
+- Allow usage of `--files` with basic heuristics. This requires
+  use of `--subject` flag, and is limited to one subject. ([#293])
 
 ### Deprecated
 
 ### Fixed
 
-- TODO: fix: embedding issue ([#306])
-- TODO: ([#304]) from mgxd/fix/queue
-- TODO: ([#301]) from franklin-feingold/master
-- TODO: fix/queue
-- TODO: ([#293]) from mgxd/multiecho
-- correctly handle the case when `outtype` of heuristic has "dicom"
+- Fixed an issue where generated BIDS sidecar files were missing additional
+  information - treating all conversions as if the `--minmeta` flag was
+  used ([#306])
+- Re-enable SLURM queuing support ([#304])
+- BIDS multi-echo support for EPI + T1 images ([#293])
+- Correctly handle the case when `outtype` of heuristic has "dicom"
   before '.nii.gz'. Previously would have lead to absent additional metadata
   extraction etc ([#310])
 
