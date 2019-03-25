@@ -1,4 +1,4 @@
-heudiconv: A Heuristic-centric DICOM Converter
+.. topic:: `HeuDiConv`: a heuristic-centric DICOM converter
 
 .. image:: https://img.shields.io/badge/docker-nipy/heudiconv:unstable-brightgreen.svg?logo=docker&style=flat
   :target: https://hub.docker.com/r/nipy/heudiconv/tags/
@@ -29,7 +29,7 @@ About
 - using dcm2niix under the hood, it's fast
 - it can track the provenance of the conversion from DICOM to NIfTI in W3C
   PROV format
-- it provides assistance in converting to `BIDS <http://bids.neuroimaging.io/>`
-- it integrates with `DataLad <https://www.datalad.org/>` to place converted and
+- it provides assistance in converting to `BIDS <http://bids.neuroimaging.io/>`_.
+- it integrates with `DataLad <https://www.datalad.org/>`_ to place converted and
   original data under git/git-annex version control, while automatically
   annotating files with sensitive information (e.g., non-defaced anatomicals, etc)
