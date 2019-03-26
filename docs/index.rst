@@ -12,8 +12,8 @@ Contents
    :maxdepth: 2
    
    installation
-   ../CHANGELOG
+   changes
    usage
    heuristics
    tutorials
-   API
+   api

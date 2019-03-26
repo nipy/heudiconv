@@ -15,9 +15,9 @@ heuristic file, and some useful functions available when making one.
 Components
 ==========
 
----------------------
-`infotodict(seqinfos)`
----------------------
+------------------------
+``infotodict(seqinfos)``
+------------------------
 
 The only required function for a heuristic, `infotodict` is used to both define 
 the conversion outputs and specify the criteria for scan to output association. 
@@ -26,46 +26,46 @@ used for the basis of outputs, as well as a `tuple` of output types. Valid types
 include `nii`, `nii.gz`, and `dicom`.
 
 .. note::
+    An example conversion key
+    
+    ``('sub-{subject}/func/sub-{subject}_task-test_run-{item}_bold', ('nii.gz', 'dicom'))``
 
-    An example conversion key:
-    ('sub-{subject}/func/sub-{subject}_task-test_run-{item}_bold', ('nii.gz', 'dicom'))
 
-
-The `seqinfos` parameter is a list of namedtuples which serves as a grouped and 
+The ``seqinfos`` parameter is a list of namedtuples which serves as a grouped and 
 stacked record of the DICOMs passed in. Each item in `seqinfo` contains DICOM 
 metadata that can be used to isolate the series, and assign it to a conversion 
 key.
 
-A dictionary of {conversion key: seqinfo} is returned.
+A dictionary of {``conversion key``: ``seqinfo``} is returned.
 
--------------------------------
-`create_key(template, outtype)`
--------------------------------
+---------------------------------
+``create_key(template, outtype)``
+---------------------------------
 
-A common helper function used to create the conversion key in `infotodict`. 
+A common helper function used to create the conversion key in ``infotodict``. 
 
-------------------
-`filter_files(fl)`
-------------------
+--------------------
+``filter_files(fl)``
+--------------------
 
 A utility function used to filter any input files.
 
 If this function is included, every file found will go through this filter. Any 
-files where this function returns `True` will be filtered out.
+files where this function returns ``True`` will be filtered out.
 
-------------------------
-`filter_dicom(dcm_data)`
-------------------------
+--------------------------
+``filter_dicom(dcm_data)``
+--------------------------
 
 A utility function used to filter any DICOMs.
 
 If this function is included, every DICOM found will go through this filter. Any 
-DICOMs where this function returns `True` will be filtered out.
+DICOMs where this function returns ``True`` will be filtered out.
 
-----------------------------
-`infotoids(seqinfos, outdir)`
-----------------------------
+-------------------------------
+``infotoids(seqinfos, outdir)``
+-------------------------------
 
-Further processing on `seqinfos` to deduce/customize subject, session, and locator.
+Further processing on ``seqinfos`` to deduce/customize subject, session, and locator.
 
 A dictionary of {"locator": locator, "session": session, "subject": subject} is returned.

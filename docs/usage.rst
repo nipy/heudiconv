@@ -1,4 +1,44 @@
-## How it works (in some more detail)
+=====
+Usage
+=====
+
+``heudiconv`` processes DICOM files and converts the output into user defined 
+paths.
+
+CommandLine Arguments
+======================
+
+.. argparse::
+   :ref: heudiconv.cli.run.get_parser
+   :prog: heudiconv
+   :nodefault:
+   :nodefaultconst:
+   
+
+Support
+=======
+
+All bugs, concerns and enhancement requests for this software can be submitted here:
+https://github.com/nipy/heudiconv/issues.
+
+If you have a problem or would like to ask a question about how to use ``heudiconv``,
+please submit a question to `NeuroStars.org <http://neurostars.org/tags/heudiconv>`_ with a ``heudiconv`` tag.
+NeuroStars.org is a platform similar to StackOverflow but dedicated to neuroinformatics.
+
+All previous ``heudiconv`` questions are available here:
+http://neurostars.org/tags/heudiconv/
+
+
+Batch example
+=============
+
+``heudiconv`` can greatly facilitate large scale conversions
+
+
+*******************************************************************************************
+*******************************************************************************************
+*******************************************************************************************
+*******************************************************************************************
 
 Call `heudiconv` like this:
 
