@@ -1,12 +1,12 @@
-
+============
 Installation
-------------
+============
 
 ``Heudiconv`` is packaged and available from many different sources.
 
 
 Local
------
+=====
 Released versions of HeuDiConv are available on `PyPI <https://pypi.org/project/heudiconv/>`_
  and `conda <https://github.com/conda-forge/heudiconv-feedstock#installing-heudiconv>`_.
  If installing through ``PyPI``, eg::
@@ -21,7 +21,7 @@ Manual installation of `dcm2niix <https://github.com/rordenlab/dcm2niix#install>
 
 
 Docker
-------
+======
 If `Docker <https://docs.docker.com/install/>`_ is available on your system, you
  can visit `our page on Docker Hub <https://hub.docker.com/r/nipy/heudiconv/tags>`_
  to view available releases. To pull the latest release, run::
@@ -30,7 +30,7 @@ If `Docker <https://docs.docker.com/install/>`_ is available on your system, you
 
 
 Singularity
------------
+===========
 If `Singularity <https://www.sylabs.io/singularity/>`_ is available on your system,
  you can use it to pull and convert our Docker images! For example, to pull and
  build the latest release, you can run::

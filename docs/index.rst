@@ -9,11 +9,11 @@ Contents
 --------
 
 .. toctree::
-   :maxdepth: 1
-
+   :maxdepth: 2
+   
    installation
-   ../CHANGELOG.md
+   ../CHANGELOG
    usage
    heuristics
    tutorials
-   reference
+   API
