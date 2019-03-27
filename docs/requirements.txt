@@ -1,2 +1,3 @@
 sphinx-argparse
 recommonmark
+-r ../dev-requirements.txt
