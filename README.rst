@@ -19,17 +19,17 @@
 About
 -----
 
-``heudiconv`` is a flexible DICOM converter for organizing brain imaging data
- into structured directory layouts.
+``heudiconv`` is a flexible DICOM converter for organizing brain imaging data 
+into structured directory layouts.
 
-- it allows flexible directory layouts and naming schemes through
-  customizable heuristics implementations
+- it allows flexible directory layouts and naming schemes through 
+customizable heuristics implementations
 - it only converts the necessary DICOMs, not everything in a directory
 - you can keep links to DICOM files in the participant layout
 - using dcm2niix under the hood, it's fast
-- it can track the provenance of the conversion from DICOM to NIfTI in W3C
-  PROV format
+- it can track the provenance of the conversion from DICOM to NIfTI in W3C 
+PROV format
 - it provides assistance in converting to `BIDS <http://bids.neuroimaging.io/>`_.
-- it integrates with `DataLad <https://www.datalad.org/>`_ to place converted and
-  original data under git/git-annex version control, while automatically
-  annotating files with sensitive information (e.g., non-defaced anatomicals, etc)
+- it integrates with `DataLad <https://www.datalad.org/>`_ to place converted and 
+original data under git/git-annex version control, while automatically 
+annotating files with sensitive information (e.g., non-defaced anatomicals, etc)

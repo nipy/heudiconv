@@ -41,6 +41,7 @@ release = '0.5.4'
 extensions = [
     'sphinx.ext.autodoc',
     'recommonmark',
+    'sphinx-argparse',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
