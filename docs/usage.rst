@@ -56,7 +56,7 @@ The first script aggregates the DICOM directories and submits them to
     DCMDIRS=(`find ${DCMROOT} -maxdepth 1 -name voice* -type d`)
 
     # submit to another script as a job array on SLURM
-    sbatch --array=0-$len run_heudiconv.sh ${OUTPUT} ${DCMDIRS[@]}
+    sbatch --array=0-`expr ${#DCMDIRS[@]} - 1` run_heudiconv.sh ${OUTPUT} ${DCMDIRS[@]}
 
 
 The second script processes a DICOM directory with ``heudiconv`` using the built-in
