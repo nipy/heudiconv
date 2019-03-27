@@ -2,7 +2,7 @@
 Usage
 =====
 
-``heudiconv`` processes DICOM files and converts the output into user defined 
+``heudiconv`` processes DICOM files and converts the output into user defined
 paths.
 
 CommandLine Arguments
@@ -13,7 +13,7 @@ CommandLine Arguments
    :prog: heudiconv
    :nodefault:
    :nodefaultconst:
-   
+
 
 Support
 =======
@@ -29,39 +29,51 @@ All previous ``heudiconv`` questions are available here:
 http://neurostars.org/tags/heudiconv/
 
 
-Batch example
-=============
+Batch jobs
+==========
 
-``heudiconv`` can greatly facilitate large scale conversions
+``heudiconv`` can natively handle multi-subject, multi-session conversions,
+although it will process these linearly. To speed this up, multiple ``heudiconv``
+processes can be spawned concurrently, each converting a different subject and/or
+session.
+
+The following example uses SLURM and Singularity to submit every subjects'
+DICOMs as an independent ``heudiconv`` execution.
+
+The first script aggregates the DICOM directories and submits them to
+``run_heudiconv.sh`` with SLURM as a job array.::
+
+    #!/bin/bash
+
+    set -eu
+
+    # where the DICOMs are located
+    DCMROOT=/dicom/storage/voice
+    # where we want to output the data
+    OUTPUT=/converted/data/voice
+
+    # find all DICOM directories that start with "voice"
+    DCMDIRS=(`find ${DCMROOT} -maxdepth 1 -name voice* -type d`)
+
+    # submit to another script as a job array on SLURM
+    sbatch --array=0-$len run_heudiconv.sh ${OUTPUT} ${DCMDIRS[@]}
 
 
-*******************************************************************************************
-*******************************************************************************************
-*******************************************************************************************
-*******************************************************************************************
+The second script processes a DICOM directory with ``heudiconv`` using the built-in
+`reproin` heuristic.::
 
-Call `heudiconv` like this:
+    #!/bin/bash
+    set -eu
 
-    heudiconv -d '{subject}*.tar*' -s xx05 -f ~/myheuristics/convertall.py
+    OUTDIR=${1}
+    # receive all directories, and index them per job array
+    DCMDIRS=(${@:2})
+    DCMDIR=${DCMDIRS[${SLURM_ARRAY_TASK_ID}]}
+    echo Submitted directory: ${DCMDIR}
 
-where `-d '{subject}*tar*'` is an expression used to find DICOM files
-(`{subject}` expands to a subject ID so that the expression will match any
-`.tar` files, compressed or not that start with the subject ID in their name).
-An additional flag for session (`{session}`) can be included in the expression
-as well. `-s od05` specifies a subject ID for the conversion (this could be a
-list of multiple IDs), and `-f ~/myheuristics/convertall.py` identifies a
-heuristic implementation for this conversion (see below) for details.
+    IMG="/singularity-images/heudiconv-0.5.4-dev.sif"
+    CMD="singularity run -B ${DCMDIR}:/dicoms:ro -B ${OUTDIR}:/output -e ${IMG} --files /dicoms/ -o /output -f reproin -c dcm2niix -b --minmeta -l ."
 
-This call will locate the DICOMs (in any number of matching tarballs), extract
-them to a temporary directory, search for any DICOM series it can find, and
-attempts a conversion storing output in the current directory. The output
-directory will contain a subdirectory per subject, which in turn contains an
-`info` directory with a full protocol of detected DICOM series, and how their
-are converted.
-
-
-To generate lean BIDS output, consider using both the `-b` and the `--minmeta` flags
-to your heudiconv command. The `-b` flag generates a json file with BIDS keys, while
-the `--minmeta` flag restricts the json file to only BIDS keys. Without `--minmeta`,
-the json file and the associated Nifti file contains DICOM metadata extracted using
-dicomstack.
+    printf "Command:\n${CMD}\n"
+    ${CMD}
+    echo "Successful process"

@@ -1,1 +1,5 @@
-.. include:: ../CHANGELOG.md
+=======
+Changes
+=======
+
+.. mdinclude:: ../CHANGELOG.md

@@ -41,7 +41,7 @@ release = '0.5.4'
 extensions = [
     'sphinx.ext.autodoc',
     'sphinxarg.ext',
-    'recommonmark',
+    'm2r',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -177,3 +177,5 @@ epub_exclude_files = ['search.html']
 
 
 # -- Extension configuration -------------------------------------------------
+autodoc_default_options={
+          'members': None}
