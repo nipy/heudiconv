@@ -40,8 +40,8 @@ release = '0.5.4'
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
+    'sphinxarg.ext',
     'recommonmark',
-    'sphinx-argparse',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
