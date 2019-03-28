@@ -10,4 +10,4 @@ API Reference
    api/dicoms
    api/parser
    api/queue
-   api/util
+   api/utils

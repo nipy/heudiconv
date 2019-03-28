@@ -41,7 +41,9 @@ The following example uses SLURM and Singularity to submit every subjects'
 DICOMs as an independent ``heudiconv`` execution.
 
 The first script aggregates the DICOM directories and submits them to
-``run_heudiconv.sh`` with SLURM as a job array.::
+``run_heudiconv.sh`` with SLURM as a job array.
+
+.. code:: shell
 
     #!/bin/bash
 
@@ -60,7 +62,9 @@ The first script aggregates the DICOM directories and submits them to
 
 
 The second script processes a DICOM directory with ``heudiconv`` using the built-in
-`reproin` heuristic.::
+`reproin` heuristic.
+
+.. code:: shell
 
     #!/bin/bash
     set -eu
