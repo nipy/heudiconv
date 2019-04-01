@@ -1,0 +1,5 @@
+======
+DICOMS
+======
+
+.. automodule:: heudiconv.dicoms
