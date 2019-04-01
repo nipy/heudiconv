@@ -4,9 +4,9 @@ import os.path as op
 import logging
 from collections import OrderedDict
 import tarfile
-from heudiconv.external.pydicom import dcm
 
-from .utils import SeqInfo, load_json, set_readonly
+from heudiconv.external.pydicom import dcm
+from heudiconv.utils import SeqInfo, load_json, set_readonly
 
 lgr = logging.getLogger(__name__)
 

@@ -13,8 +13,8 @@ from glob import glob
 
 from heudiconv.external.pydicom import dcm
 
-from .parser import find_files
-from .utils import (
+from heudiconv.parser import find_files
+from heudiconv.utils import (
     load_json,
     save_json,
     create_file_if_missing,

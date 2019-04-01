@@ -5,12 +5,12 @@ import os.path as op
 from argparse import ArgumentParser
 import sys
 
-from .. import __version__, __packagename__
-from ..parser import get_study_sessions
-from ..utils import load_heuristic, anonymize_sid, treat_infofile, SeqInfo
-from ..convert import prep_conversion
-from ..bids import populate_bids_templates, tuneup_bids_json_files
-from ..queue import queue_conversion
+from heudiconv import __version__, __packagename__
+from heudiconv.parser import get_study_sessions
+from heudiconv.utils import load_heuristic, anonymize_sid, treat_infofile, SeqInfo
+from heudiconv.convert import prep_conversion
+from heudiconv.bids import populate_bids_templates, tuneup_bids_json_files
+from heudiconv.queue import queue_conversion
 
 import inspect
 import logging
@@ -84,11 +84,11 @@ def process_extra_commands(outdir, args):
     elif args.command == 'sanitize-jsons':
         tuneup_bids_json_files(args.files)
     elif args.command == 'heuristics':
-        from ..utils import get_known_heuristics_with_descriptions
+        from heudiconv.utils import get_known_heuristics_with_descriptions
         for name_desc in get_known_heuristics_with_descriptions().items():
             print("- %s: %s" % name_desc)
     elif args.command == 'heuristic-info':
-        from ..utils import get_heuristic_description, get_known_heuristic_names
+        from heudiconv.utils import get_heuristic_description, get_known_heuristic_names
         if not args.heuristic:
             raise ValueError("Specify heuristic using -f. Known are: %s"
                              % ', '.join(get_known_heuristic_names()))

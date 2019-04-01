@@ -2,7 +2,7 @@
 
 from __future__ import absolute_import
 
-from .pydicom import dcm  # to assure that we have it one way or another
+from heudiconv.external.pydicom import dcm  # to assure that we have it one way or another
 
 try:
     import dcmstack as ds
