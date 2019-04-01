@@ -1,0 +1,5 @@
+=======
+Parsing
+=======
+
+.. automodule:: heudiconv.parser

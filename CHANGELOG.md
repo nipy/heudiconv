@@ -16,9 +16,14 @@ TODO Summary
 
 ### Fixed
 
+- TODO: fix: embedding issue (([#306][]))
+- TODO: ([#304][]) from mgxd/fix/queue
+- TODO: ([#301][]) from franklin-feingold/master
+- TODO: fix/queue
+- TODO: ([#293][]) from mgxd/multiecho
 - correctly handle the case when `outtype` of heuristic has "dicom"
   before '.nii.gz'. Previously would have lead to absent additional metadata
-  extraction etc
+  extraction etc ([#310][])
 
 ### Removed
 
@@ -122,28 +127,28 @@ The first release after major refactoring:
 - Many other various issues
 
 ## [0.4] - 2017-10-15
-A usable release to support [DBIC] use-case
+A usable release to support [DBIC][] use-case
 ### Added
 - more testing
 ### Changes
-- Dockerfile updates (added pigz, progressed forward [dcm2niix])
+- Dockerfile updates (added pigz, progressed forward [dcm2niix][])
 ### Fixed
 - correct date/time in BIDS `_scans` files
 - sort entries in `_scans` by date and then filename
 
 ## [0.3] - 2017-07-10
-A somewhat working release on the way to support [DBIC] use-case
+A somewhat working release on the way to support [DBIC][] use-case
 ### Added
 - more tests
 - groupping of dicoms by series if provided
 - many more features and fixes
 
 ## [0.2] - 2016-10-20
-An initial release on the way to support [DBIC] use-case
+An initial release on the way to support [DBIC][] use-case
 ### Added
 - basic Python project assets (`setup.py`, etc)
 - basic tests
-- [datalad] support
+- [datalad][] support
 - dbic_bids heuristic
 - `--dbg` command line flag to enter `pdb` environment upon failure
 ## Fixed
@@ -173,3 +178,8 @@ TODO Summary
 [DBIC]: http://dbic.dartmouth.edu
 [datalad]: http://datalad.org
 [dcm2niix]: https://github.com/rordenlab/dcm2niix
+[#293]: https://github.com/nipy/heudiconv/issues/293
+[#301]: https://github.com/nipy/heudiconv/issues/301
+[#304]: https://github.com/nipy/heudiconv/issues/304
+[#306]: https://github.com/nipy/heudiconv/issues/306
+[#310]: https://github.com/nipy/heudiconv/issues/310
