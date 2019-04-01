@@ -221,7 +221,9 @@ def get_parser():
                             default=None,
                             help='batch system to submit jobs in parallel')
     submission.add_argument('--queue-args', dest='queue_args', default=None,
-                            help='Additional queue arguments')
+                            help='Additional queue arguments passed as '
+                            'single string of Argument=Value pairs space '
+                            'separated.')
     return parser
 
 

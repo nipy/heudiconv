@@ -3,6 +3,7 @@ import sys
 import subprocess
 
 from heudiconv.cli.run import main as runner
+from heudiconv.queue import clean_args
 from .utils import TESTS_DATA_PATH
 import pytest
 from nipype.utils.filemanip import which
@@ -44,3 +45,19 @@ def test_queue_no_slurm(tmpdir, invocation):
     finally:
         # revert before breaking something
         sys.argv = _sys_args
+
+def test_argument_filtering(tmpdir):
+    cmdargs = [
+        'heudiconv', 
+        '--files', 
+        '/fake/path/to/files', 
+        '-f', 
+        'convertall', 
+        '-q', 
+        'SLURM', 
+        '--queue-args', 
+        '--cpus-per-task=4 --contiguous --time=10'
+    ]
+    filtered = cmdargs[:-4]
+
+    assert(clean_args(cmdargs) == filtered)
