@@ -4,7 +4,7 @@ import logging
 import shutil
 import sys
 
-from heudiconv.utils import (
+from .utils import (
     read_config,
     load_json,
     save_json,
@@ -18,7 +18,7 @@ from heudiconv.utils import (
     assure_no_file_exists,
     file_md5sum
 )
-from heudiconv.bids import (
+from .bids import (
     convert_sid_bids,
     populate_bids_templates,
     save_scans_key,
@@ -26,7 +26,7 @@ from heudiconv.bids import (
     add_participant_record,
     BIDSError
 )
-from heudiconv.dicoms import (
+from .dicoms import (
     group_dicoms_into_seqinfos,
     embed_metadata_from_dicoms,
     compress_dicoms

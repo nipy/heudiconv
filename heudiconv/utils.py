@@ -12,6 +12,9 @@ import os.path as op
 from pathlib import Path
 from collections import namedtuple
 from glob import glob
+from subprocess import check_output
+
+from nipype.utils.filemanip import which
 
 import logging
 lgr = logging.getLogger(__name__)
@@ -103,18 +106,17 @@ def docstring_parameter(*sub):
 
 
 def anonymize_sid(sid, anon_sid_cmd):
-    import sys
-    from subprocess import check_output
-    
+
     cmd = [anon_sid_cmd, sid]
     shell_return = check_output(cmd)
 
-    ### Handle subprocess returning a bytes literal string to a python3 interpreter
-    if all([sys.version_info[0] > 2, isinstance(shell_return, bytes), isinstance(sid, str)]):
+    if all([sys.version_info[0] > 2,
+            isinstance(shell_return, bytes),
+            isinstance(sid, str)]):
         anon_sid = shell_return.decode()
     else:
         anon_sid = shell_return
-    
+
     return anon_sid.strip()
 
 

@@ -5,8 +5,8 @@ import logging
 from collections import OrderedDict
 import tarfile
 
-from heudiconv.external.pydicom import dcm
-from heudiconv.utils import SeqInfo, load_json, set_readonly
+from .external.pydicom import dcm
+from .utils import SeqInfo, load_json, set_readonly
 
 lgr = logging.getLogger(__name__)
 
@@ -55,10 +55,10 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
         lgr.info('Filtering out {0} dicoms based on their filename'.format(
             nfl_before-nfl_after))
     for fidx, filename in enumerate(files):
-        from heudiconv.external.dcmstack import ds
+        import nibabel.nicom.dicomwrappers as dw
         # TODO after getting a regression test check if the same behavior
         #      with stop_before_pixels=True
-        mw = ds.wrapper_from_data(dcm.read_file(filename, force=True))
+        mw = dw.wrapper_from_data(dcm.read_file(filename, force=True))
 
         for sig in ('iop', 'ICE_Dims', 'SequenceName'):
             try:
@@ -385,7 +385,7 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info, min_meta):
     import re
 
     if not min_meta:
-        import dcmstack as ds
+        from .external.dcmstack import ds
         stack = ds.parse_and_stack(dcmfiles, force=True).values()
         if len(stack) > 1:
             raise ValueError('Found multiple series')

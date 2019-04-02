@@ -11,10 +11,10 @@ import csv
 from random import sample
 from glob import glob
 
-from heudiconv.external.pydicom import dcm
+from .external.pydicom import dcm
 
-from heudiconv.parser import find_files
-from heudiconv.utils import (
+from .parser import find_files
+from .utils import (
     load_json,
     save_json,
     create_file_if_missing,

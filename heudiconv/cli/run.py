@@ -5,12 +5,12 @@ import os.path as op
 from argparse import ArgumentParser
 import sys
 
-from heudiconv import __version__, __packagename__
-from heudiconv.parser import get_study_sessions
-from heudiconv.utils import load_heuristic, anonymize_sid, treat_infofile, SeqInfo
-from heudiconv.convert import prep_conversion
-from heudiconv.bids import populate_bids_templates, tuneup_bids_json_files
-from heudiconv.queue import queue_conversion
+from .. import __version__, __packagename__
+from ..parser import get_study_sessions
+from ..utils import load_heuristic, anonymize_sid, treat_infofile, SeqInfo
+from ..convert import prep_conversion
+from ..bids import populate_bids_templates, tuneup_bids_json_files
+from ..queue import queue_conversion
 
 import inspect
 import logging
@@ -84,11 +84,11 @@ def process_extra_commands(outdir, args):
     elif args.command == 'sanitize-jsons':
         tuneup_bids_json_files(args.files)
     elif args.command == 'heuristics':
-        from heudiconv.utils import get_known_heuristics_with_descriptions
+        from .utils import get_known_heuristics_with_descriptions
         for name_desc in get_known_heuristics_with_descriptions().items():
             print("- %s: %s" % name_desc)
     elif args.command == 'heuristic-info':
-        from heudiconv.utils import get_heuristic_description, get_known_heuristic_names
+        from .utils import get_heuristic_description, get_known_heuristic_names
         if not args.heuristic:
             raise ValueError("Specify heuristic using -f. Known are: %s"
                              % ', '.join(get_known_heuristic_names()))
@@ -284,15 +284,6 @@ def process_args(args):
             continue
 
         if args.queue:
-            # if seqinfo and not dicoms:
-            #     # flatten them all and provide into batching, which again
-            #     # would group them... heh
-            #     dicoms = sum(seqinfo.values(), [])
-            #     raise NotImplementedError(
-            #         "we already grouped them so need to add a switch to avoid "
-            #         "any grouping, so no outdir prefix doubled etc")
-
-            pyscript = op.abspath(inspect.getfile(inspect.currentframe()))
 
             studyid = sid
             if session:
@@ -302,8 +293,7 @@ def process_args(args):
             # remove any separators
             studyid = studyid.replace(op.sep, '_')
 
-            queue_conversion(pyscript,
-                             args.queue,
+            queue_conversion(args.queue,
                              studyid,
                              args.queue_args)
             continue

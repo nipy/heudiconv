@@ -1,7 +1,7 @@
 # set logger handler
 import logging
 import os
-from heudiconv.info import (__version__, __packagename__)
+from .info import (__version__, __packagename__)
 
 # Rudimentary logging support.
 lgr = logging.getLogger(__name__)

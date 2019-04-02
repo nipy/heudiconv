@@ -9,8 +9,8 @@ from collections import defaultdict
 import tarfile
 from tempfile import mkdtemp
 
-from heudiconv.dicoms import group_dicoms_into_seqinfos
-from heudiconv.utils import (
+from .dicoms import group_dicoms_into_seqinfos
+from .utils import (
     docstring_parameter,
     StudySessionInfo,
 )

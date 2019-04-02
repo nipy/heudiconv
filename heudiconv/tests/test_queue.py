@@ -3,10 +3,9 @@ import sys
 import subprocess
 
 from heudiconv.cli.run import main as runner
-from heudiconv.queue import clean_args
+from heudiconv.queue import clean_args, which
 from .utils import TESTS_DATA_PATH
 import pytest
-from nipype.utils.filemanip import which
 
 @pytest.mark.skipif(which("sbatch"), reason="skip a real slurm call")
 @pytest.mark.parametrize(

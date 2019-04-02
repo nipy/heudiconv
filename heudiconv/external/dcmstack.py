@@ -2,12 +2,12 @@
 
 from __future__ import absolute_import
 
-from heudiconv.external.pydicom import dcm  # to assure that we have it one way or another
+from .pydicom import dcm  # to assure that we have it one way or another
 
 try:
     import dcmstack as ds
 except ImportError as e:
-    from heudiconv import lgr
+    from .. import lgr
     # looks different between py2 and 3 so we go for very rudimentary matching
     e_str = str(e)
     # there were changes from how

@@ -1,20 +1,19 @@
 import subprocess
 import sys
 import os
-
 import logging
+
+from .utils import which
 
 lgr = logging.getLogger(__name__)
 
-def queue_conversion(pyscript, queue, studyid, queue_args=None):
+def queue_conversion(queue, studyid, queue_args=None):
     """
     Write out conversion arguments to file and submit to a job scheduler.
     Parses `sys.argv` for heudiconv arguments.
 
     Parameters
     ----------
-    pyscript: file
-        path to `heudiconv` script
     queue: string
         batch scheduler to use
     studyid: string
@@ -34,9 +33,8 @@ def queue_conversion(pyscript, queue, studyid, queue_args=None):
 
     args = clean_args(sys.argv[1:])
     # make arguments executable
-    args.insert(0, pyscript)
-    pypath = sys.executable or "python"
-    args.insert(0, pypath)
+    heudiconv_exec = which("heudiconv") or "heudiconv"
+    args.insert(0, heudiconv_exec)
     convertcmd = " ".join(args)
 
     # will overwrite across subjects
