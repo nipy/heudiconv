@@ -23,7 +23,7 @@ def test_queue_no_slurm(tmpdir, invocation):
     sys.argv = ['heudiconv'] + hargs
 
     try:
-        with pytest.raises(OSError):
+        with pytest.raises(OSError):  # SLURM should not be installed
             runner(hargs)
         # should have generated a slurm submission script
         slurm_cmd_file = (tmpdir / 'heudiconv-SLURM.sh').strpath
@@ -46,17 +46,48 @@ def test_queue_no_slurm(tmpdir, invocation):
         sys.argv = _sys_args
 
 def test_argument_filtering(tmpdir):
-    cmdargs = [
-        'heudiconv', 
-        '--files', 
-        '/fake/path/to/files', 
-        '-f', 
-        'convertall', 
-        '-q', 
-        'SLURM', 
-        '--queue-args', 
+    cmd_files = [
+        'heudiconv',
+        '--files',
+        '/fake/path/to/files',
+        '/another/fake/path',
+        '-f',
+        'convertall',
+        '-q',
+        'SLURM',
+        '--queue-args',
         '--cpus-per-task=4 --contiguous --time=10'
     ]
-    filtered = cmdargs[:-4]
+    filtered = [
+        'heudiconv',
+        '--files',
+        '/another/fake/path',
+        '-f',
+        'convertall',
+    ]
+    assert clean_args(cmd_files, 'files', 1) == filtered
 
-    assert(clean_args(cmdargs) == filtered)
+    cmd_subjects = [
+        'heudiconv',
+        '-d',
+        '/some/{subject}/path',
+        '--queue',
+        'SLURM',
+        '--subjects',
+        'sub1',
+        'sub2',
+        'sub3',
+        'sub4',
+        '-f',
+        'convertall'
+    ]
+    filtered = [
+        'heudiconv',
+        '-d',
+        '/some/{subject}/path',
+        '--subjects',
+        'sub3',
+        '-f',
+        'convertall'
+    ]
+    assert clean_args(cmd_subjects, 'subjects', 2) == filtered

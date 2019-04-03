@@ -246,6 +246,13 @@ def process_args(args):
     if not args.heuristic:
         raise RuntimeError("No heuristic specified - add to arguments and rerun")
 
+    if args.queue:
+        lgr.info("Queuing %s conversion", args.queue)
+        iterarg, iterables = ("files", len(args.files)) if args.files else \
+                             ("subjects", len(args.subjs))
+        queue_conversion(args.queue, iterarg, iterables, args.queue_args)
+        sys.exit(0)
+
     heuristic = load_heuristic(args.heuristic)
 
     study_sessions = get_study_sessions(args.dicom_dir_template, args.files,
@@ -279,21 +286,6 @@ def process_args(args):
 
         if locator == 'unknown':
             lgr.warning("Skipping unknown locator dataset")
-            continue
-
-        if args.queue:
-
-            studyid = sid
-            if session:
-                studyid += "-%s" % session
-            if locator:
-                studyid += "-%s" % locator
-            # remove any separators
-            studyid = studyid.replace(op.sep, '_')
-
-            queue_conversion(args.queue,
-                             studyid,
-                             args.queue_args)
             continue
 
         anon_sid = anonymize_sid(sid, args.anon_cmd) if args.anon_cmd else None
