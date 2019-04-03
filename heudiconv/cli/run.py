@@ -84,11 +84,11 @@ def process_extra_commands(outdir, args):
     elif args.command == 'sanitize-jsons':
         tuneup_bids_json_files(args.files)
     elif args.command == 'heuristics':
-        from .utils import get_known_heuristics_with_descriptions
+        from ..utils import get_known_heuristics_with_descriptions
         for name_desc in get_known_heuristics_with_descriptions().items():
             print("- %s: %s" % name_desc)
     elif args.command == 'heuristic-info':
-        from .utils import get_heuristic_description, get_known_heuristic_names
+        from ..utils import get_heuristic_description, get_known_heuristic_names
         if not args.heuristic:
             raise ValueError("Specify heuristic using -f. Known are: %s"
                              % ', '.join(get_known_heuristic_names()))
@@ -142,7 +142,7 @@ def get_parser():
     group.add_argument('--files', nargs='*',
                        help='Files (tarballs, dicoms) or directories '
                        'containing files to process. Cannot be provided if '
-                       'using --dicom_dir_template or --subjects')
+                       'using --dicom_dir_template.')
     parser.add_argument('-s', '--subjects', dest='subjs', type=str, nargs='*',
                         help='list of subjects - required for dicom template. '
                         'If not provided, DICOMS would first be "sorted" and '
@@ -173,8 +173,6 @@ def get_parser():
                         'single argument and return a single anonymized ID. '
                         'Also see --conv-outdir')
     parser.add_argument('-f', '--heuristic', dest='heuristic',
-                        # some commands might not need heuristic
-                        # required=True,
                         help='Name of a known heuristic or path to the Python'
                              'script containing heuristic')
     parser.add_argument('-p', '--with-prov', action='store_true',
