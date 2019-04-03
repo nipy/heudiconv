@@ -36,7 +36,6 @@ def queue_conversion(queue, iterarg, iterables, queue_args=None):
         args.insert(0, heudiconv_exec)
         convertcmd = " ".join(args)
 
-        print(convertcmd)
         # will overwrite across subjects
         queue_file = os.path.abspath('heudiconv-%s.sh' % queue)
         with open(queue_file, 'wt') as fp:
