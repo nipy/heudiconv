@@ -11,7 +11,7 @@ import csv
 from random import sample
 from glob import glob
 
-from heudiconv.external.pydicom import dcm
+from .external.pydicom import dcm
 
 from .parser import find_files
 from .utils import (
