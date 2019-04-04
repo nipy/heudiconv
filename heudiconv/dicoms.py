@@ -385,7 +385,7 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info, min_meta):
     import re
 
     if not min_meta:
-        from .external.dcmstack import ds
+        from heudiconv.external.dcmstack import ds
         stack = ds.parse_and_stack(dcmfiles, force=True).values()
         if len(stack) > 1:
             raise ValueError('Found multiple series')
