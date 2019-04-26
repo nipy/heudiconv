@@ -23,8 +23,9 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
       kept, False otherwise.
     dcmfilter : callable, optional
       If called on dcm_data and returns True, it is used to set series_id
-    grouping : {'studyUID', 'accession_number', None}, optional
-        what to group by: studyUID or accession_number
+    grouping : {'studyUID', 'accession_number', allasone}, optional
+        what to group by: studyUID or accession_number or all files as one
+
     Returns
     -------
     seqinfo : list of list
@@ -33,11 +34,11 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
     filegrp : dict
       `filegrp` is a dictionary with files groupped per each sequence
     """
-    allowed_groupings = ['studyUID', 'accession_number', None]
+    allowed_groupings = ['studyUID', 'accession_number', 'allasone', None]
     if grouping not in allowed_groupings:
         raise ValueError('I do not know how to group by {0}'.format(grouping))
     per_studyUID = grouping == 'studyUID'
-    per_accession_number = grouping == 'accession_number'
+    # per_accession_number = grouping == 'accession_number'
     lgr.info("Analyzing %d dicoms", len(files))
 
     groups = [[], []]
@@ -90,7 +91,7 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
                 # verify that we are working with a single study
                 if studyUID is None:
                     studyUID = file_studyUID
-                elif not per_accession_number:
+                elif grouping not in ['allasone', 'accession_number']:
                     assert studyUID == file_studyUID, (
                     "Conflicting study identifiers found [{}, {}].".format(
                     studyUID, file_studyUID
@@ -120,8 +121,9 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
             # same = mw.is_same_series(mwgroup[idx])
             if mw.is_same_series(mwgroup[idx]):
                 # the same series should have the same study uuid
-                assert (mwgroup[idx].dcm_data.get('StudyInstanceUID', None)
-                        == file_studyUID)
+                if grouping != 'allasone':
+                    assert (mwgroup[idx].dcm_data.get('StudyInstanceUID', None)
+                            == file_studyUID)
                 ingrp = True
                 if series_id[0] >= 0:
                     series_id = (mwgroup[idx].dcm_data.SeriesNumber,
@@ -233,7 +235,7 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
         # FOR demographics
         if per_studyUID:
             key = studyUID.split('.')[-1]
-        elif per_accession_number:
+        elif grouping == 'accession_number':
             key = accession_number
         else:
             key = ''
@@ -251,17 +253,21 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
             if studyUID not in seqinfo:
                 seqinfo[studyUID] = OrderedDict()
             seqinfo[studyUID][info] = series_files
-        elif per_accession_number:
+        elif grouping == 'accession_number':
             if accession_number not in seqinfo:
                 seqinfo[accession_number] = OrderedDict()
             seqinfo[accession_number][info] = series_files
+        elif grouping == 'allasone':
+            if not seqinfo.get('all'):
+                seqinfo['all'] = OrderedDict()
+            seqinfo['all'][info] = series_files
         else:
             seqinfo[info] = series_files
 
     if per_studyUID:
         lgr.info("Generated sequence info for %d studies with %d entries total",
                  len(seqinfo), sum(map(len, seqinfo.values())))
-    elif per_accession_number:
+    elif grouping == 'accession_number':
         lgr.info("Generated sequence info for %d accession numbers with %d "
                  "entries total", len(seqinfo), sum(map(len, seqinfo.values())))
     else:

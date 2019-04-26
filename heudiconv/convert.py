@@ -80,7 +80,7 @@ def conversion_info(subject, outdir, info, filegroup, ses):
 
 def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                    anon_outdir, with_prov, ses, bids, seqinfo, min_meta,
-                   overwrite, dcmconfig):
+                   overwrite, dcmconfig, grouping):
     if dicoms:
         lgr.info("Processing %d dicoms", len(dicoms))
     elif seqinfo:
@@ -148,8 +148,6 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
         # So either it would need to be brought back or reconsidered altogether
         # (since no sample data to test on etc)
     else:
-        # TODO -- might have been done outside already!
-        # MG -- will have to try with both dicom template, files
         assure_no_file_exists(target_heuristic_filename)
         safe_copyfile(heuristic.filename, idir)
         if dicoms:
@@ -157,8 +155,11 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                 dicoms,
                 file_filter=getattr(heuristic, 'filter_files', None),
                 dcmfilter=getattr(heuristic, 'filter_dicom', None),
-                grouping=None)
+                grouping=grouping)
+
+
         seqinfo_list = list(seqinfo.keys())
+        import pdb; pdb.set_trace()
         filegroup = {si.series_id: x for si, x in seqinfo.items()}
         dicominfo_file = op.join(idir, 'dicominfo%s.tsv' % ses_suffix)
         # allow to overwrite even if was present under git-annex already

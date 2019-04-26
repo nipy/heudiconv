@@ -168,7 +168,9 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
             grouping=grouping)
 
         if sids:
-            if not (len(sids) == 1 and len(seqinfo_dict) == 1):
+            if (grouping != 'allasone' and
+                    not len(sids) == 1 and
+                    len(seqinfo_dict) == 1):
                 raise RuntimeError(
                     "We were provided some subjects (%s) but "
                     "we can deal only "
@@ -219,6 +221,10 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
                 lgr.warning(
                     "We already have a study session with the same value %s"
                     % repr(study_session_info))
-                continue # skip for now
+                if grouping != 'allasone':
+                    continue # skip for now
+
             study_sessions[study_session_info] = seqinfo
+
+    print(study_sessions)
     return study_sessions
