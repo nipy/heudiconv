@@ -15,30 +15,28 @@ This release includes fixes to BIDS multi-echo conversions, the
  tag has been renamed to `unstable`.
 
 ### Added
-- Additional Stanford tutorial added to README ([#301])
-- Readthedocs documentation ([#327])
+- Readthedocs documentation ([#327][])
 
 ### Changed
-- Update Docker dcm2niix to v.1.0.20190410 ([#334])
+- Update Docker dcm2niix to v.1.0.20190410 ([#334][])
 - Allow usage of `--files` with basic heuristics. This requires
-  use of `--subject` flag, and is limited to one subject. ([#293])
+  use of `--subject` flag, and is limited to one subject. ([#293][])
 
 ### Deprecated
-- `--sbargs` argument was renamed to `--queue-args` ([#304])
 
 ### Fixed
-
-- Improve support for multiple `--queue-args` ([#328])
+- Improve support for multiple `--queue-args` ([#328][])
 - Fixed an issue where generated BIDS sidecar files were missing additional
   information - treating all conversions as if the `--minmeta` flag was
-  used ([#306])
-- Re-enable SLURM queuing support ([#304])
-- BIDS multi-echo support for EPI + T1 images ([#293])
+  used ([#306][])
+- Re-enable SLURM queuing support ([#304][])
+- BIDS multi-echo support for EPI + T1 images ([#293][])
 - Correctly handle the case when `outtype` of heuristic has "dicom"
   before '.nii.gz'. Previously would have lead to absent additional metadata
-  extraction etc ([#310])
+  extraction etc ([#310][])
 
 ### Removed
+- `--sbargs` argument was renamed to `--queue-args` ([#304][])
 
 ### Security
 
