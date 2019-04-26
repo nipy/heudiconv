@@ -1,0 +1,5 @@
+=======
+Utility
+=======
+
+.. automodule:: heudiconv.utils

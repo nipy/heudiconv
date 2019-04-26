@@ -1,0 +1,5 @@
+====
+BIDS
+====
+
+.. automodule:: heudiconv.bids

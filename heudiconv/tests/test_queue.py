@@ -3,9 +3,9 @@ import sys
 import subprocess
 
 from heudiconv.cli.run import main as runner
+from heudiconv.queue import clean_args, which
 from .utils import TESTS_DATA_PATH
 import pytest
-from nipype.utils.filemanip import which
 
 @pytest.mark.skipif(which("sbatch"), reason="skip a real slurm call")
 @pytest.mark.parametrize(
@@ -23,7 +23,7 @@ def test_queue_no_slurm(tmpdir, invocation):
     sys.argv = ['heudiconv'] + hargs
 
     try:
-        with pytest.raises(OSError):
+        with pytest.raises(OSError):  # SLURM should not be installed
             runner(hargs)
         # should have generated a slurm submission script
         slurm_cmd_file = (tmpdir / 'heudiconv-SLURM.sh').strpath
@@ -44,3 +44,50 @@ def test_queue_no_slurm(tmpdir, invocation):
     finally:
         # revert before breaking something
         sys.argv = _sys_args
+
+def test_argument_filtering(tmpdir):
+    cmd_files = [
+        'heudiconv',
+        '--files',
+        '/fake/path/to/files',
+        '/another/fake/path',
+        '-f',
+        'convertall',
+        '-q',
+        'SLURM',
+        '--queue-args',
+        '--cpus-per-task=4 --contiguous --time=10'
+    ]
+    filtered = [
+        'heudiconv',
+        '--files',
+        '/another/fake/path',
+        '-f',
+        'convertall',
+    ]
+    assert clean_args(cmd_files, 'files', 1) == filtered
+
+    cmd_subjects = [
+        'heudiconv',
+        '-d',
+        '/some/{subject}/path',
+        '--queue',
+        'SLURM',
+        '--subjects',
+        'sub1',
+        'sub2',
+        'sub3',
+        'sub4',
+        '-f',
+        'convertall'
+    ]
+    filtered = [
+        'heudiconv',
+        '-d',
+        '/some/{subject}/path',
+        '--subjects',
+        'sub3',
+        '-f',
+        'convertall'
+    ]
+    assert clean_args(cmd_subjects, 'subjects', 2) == filtered

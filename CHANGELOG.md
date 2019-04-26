@@ -4,7 +4,7 @@ All notable changes to this project will be documented (for humans) in this file
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [0.5.4] - Date
+## [0.5.4] - 2019-04-29
 
 This release includes fixes to BIDS multi-echo conversions, the
  re-implementation of queuing support (currently just SLURM), as well as
@@ -16,16 +16,19 @@ This release includes fixes to BIDS multi-echo conversions, the
 
 ### Added
 - Additional Stanford tutorial added to README ([#301])
+- Readthedocs documentation ([#327])
 
 ### Changed
-- `--sbargs` argument was renamed to `--queue-args` ([#304])
+- Update Docker dcm2niix to v.1.0.20190410 ([#334])
 - Allow usage of `--files` with basic heuristics. This requires
   use of `--subject` flag, and is limited to one subject. ([#293])
 
 ### Deprecated
+- `--sbargs` argument was renamed to `--queue-args` ([#304])
 
 ### Fixed
 
+- Improve support for multiple `--queue-args` ([#328])
 - Fixed an issue where generated BIDS sidecar files were missing additional
   information - treating all conversions as if the `--minmeta` flag was
   used ([#306])
@@ -137,28 +140,28 @@ The first release after major refactoring:
 - Many other various issues
 
 ## [0.4] - 2017-10-15
-A usable release to support [DBIC] use-case
+A usable release to support [DBIC][] use-case
 ### Added
 - more testing
 ### Changes
-- Dockerfile updates (added pigz, progressed forward [dcm2niix])
+- Dockerfile updates (added pigz, progressed forward [dcm2niix][])
 ### Fixed
 - correct date/time in BIDS `_scans` files
 - sort entries in `_scans` by date and then filename
 
 ## [0.3] - 2017-07-10
-A somewhat working release on the way to support [DBIC] use-case
+A somewhat working release on the way to support [DBIC][] use-case
 ### Added
 - more tests
 - groupping of dicoms by series if provided
 - many more features and fixes
 
 ## [0.2] - 2016-10-20
-An initial release on the way to support [DBIC] use-case
+An initial release on the way to support [DBIC][] use-case
 ### Added
 - basic Python project assets (`setup.py`, etc)
 - basic tests
-- [datalad] support
+- [datalad][] support
 - dbic_bids heuristic
 - `--dbg` command line flag to enter `pdb` environment upon failure
 ## Fixed

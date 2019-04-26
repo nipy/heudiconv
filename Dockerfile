@@ -39,7 +39,7 @@ RUN export ND_ENTRYPOINT="/neurodocker/startup.sh" \
 
 ENTRYPOINT ["/neurodocker/startup.sh"]
 
-ENV PATH="/opt/dcm2niix-v1.0.20180622/bin:$PATH"
+ENV PATH="/opt/dcm2niix-v1.0.20181125/bin:$PATH"
 RUN apt-get update -qq \
     && apt-get install -y -q --no-install-recommends \
            cmake \
@@ -54,10 +54,10 @@ RUN apt-get update -qq \
     && git clone https://github.com/rordenlab/dcm2niix /tmp/dcm2niix \
     && cd /tmp/dcm2niix \
     && git fetch --tags \
-    && git checkout v1.0.20180622 \
+    && git checkout v1.0.20181125 \
     && mkdir /tmp/dcm2niix/build \
     && cd /tmp/dcm2niix/build \
-    && cmake  -DCMAKE_INSTALL_PREFIX:PATH=/opt/dcm2niix-v1.0.20180622 .. \
+    && cmake  -DCMAKE_INSTALL_PREFIX:PATH=/opt/dcm2niix-v1.0.20181125 .. \
     && make \
     && make install \
     && rm -rf /tmp/dcm2niix
