@@ -13,7 +13,9 @@ layout: false
 ## Prerequisites
 
 * Docker
-* Heudiconv image (`docker pull nipy/heudiconv:latest`)
+* Heudiconv image 
+  * in this case we're using version `0.5.4`
+  * `docker pull nipy/heudiconv:0.5.4`
 
 ---
 ## Before we start
@@ -23,7 +25,7 @@ If you wish to follow along, these DICOMs can downloaded using datalad.
 
 ```
 docker run -it --rm -v /local/path/to/store/dicoms:/dicoms \
---entrypoint=bash nipy/heudiconv:latest
+--entrypoint=bash nipy/heudiconv:0.5.4
 
 # Inside container
 source activate neuro && cd /dicoms
@@ -45,7 +47,7 @@ into series.
 
 ```bash
 docker run --rm -it -v /path/to/dicoms:/data:ro \
--v /path/to/output/directory:/output nipy/heudiconv:latest
+-v /path/to/output/directory:/output nipy/heudiconv:0.5.4
 ...
 ```
 
@@ -57,7 +59,7 @@ into series.
 
 ```bash
 docker run --rm -it -v /path/to/dicoms:/data:ro \
--v /path/to/output/directory:/output nipy/heudiconv:latest
+-v /path/to/output/directory:/output nipy/heudiconv:0.5.4
 -d /data/{subject}/YAROSLAV_DBIC-TEST1/*/*/*IMA -s PHANTOM1_3
 ...
 ```
@@ -70,7 +72,7 @@ into series.
 
 ```bash
 docker run --rm -it -v /path/to/dicoms:/data:ro \
--v /path/to/output/directory:/output nipy/heudiconv:latest
+-v /path/to/output/directory:/output nipy/heudiconv:0.5.4
 -d /data/{subject}/YAROSLAV_DBIC-TEST1/*/*/*IMA -s PHANTOM1_3
 -f convertall -c none -o /output
 ```
@@ -289,7 +291,7 @@ def infotodict(seqinfo):
 
 ```bash
 docker run --rm -it -v /path/to/dicoms:/data:ro \
--v /path/to/output/directory:/output nipy/heudiconv:latest \
+-v /path/to/output/directory:/output nipy/heudiconv:0.5.4 \
 -d /data/{subject}/YAROSLAV_DBIC-TEST1/*/*/*IMA -s PHANTOM1_3 \
 -f /data/phantom_heuristic.py -b -o /output
 ```
