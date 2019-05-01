@@ -339,7 +339,11 @@ def add_rows_to_scans_keys_file(fn, newrows):
     # prepare all the data rows
     data_rows = [[k] + v for k, v in fnames2info.items()]
     # sort by the date/filename
-    data_rows_sorted = sorted(data_rows, key=lambda x: (x[1], x[0]))
+    try:
+        data_rows_sorted = sorted(data_rows, key=lambda x: (x[1], x[0]))
+    except TypeError as exc:
+        lgr.warning("Sorting scans by date failed: %s", str(exc))
+        data_rows_sorted = sorted(data_rows)
     # save
     with open(fn, 'a') as csvfile:
         writer = csv.writer(csvfile, delimiter='\t')
