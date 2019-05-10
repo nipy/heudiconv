@@ -1,3 +1,8 @@
+<!-- DO NOT DELETE THIS! 
+This template is used to facilitate issue resolution.
+All text in <!-> tags will not be displayed.
+-->
+
 ### Summary
 <!-- If you are having conversion troubles, please share as much
 relevant information as possible. This includes, but is not limited to:
@@ -16,4 +21,4 @@ Choose one:
 <!-- If selected, please provide container name and tag"-->
 
 - Heudiconv version: 
-<!-- Command: heudiconv --version -->
+<!-- To check: run heudiconv with just the --version flag -->

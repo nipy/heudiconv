@@ -4,9 +4,8 @@ import os.path as op
 import logging
 from collections import OrderedDict
 import tarfile
-from nibabel.nicom import csareader
-from heudiconv.external.pydicom import dcm
 
+from .external.pydicom import dcm
 from .utils import SeqInfo, load_json, set_readonly
 
 lgr = logging.getLogger(__name__)
@@ -56,10 +55,10 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
         lgr.info('Filtering out {0} dicoms based on their filename'.format(
             nfl_before-nfl_after))
     for fidx, filename in enumerate(files):
-        from heudiconv.external.dcmstack import ds
+        import nibabel.nicom.dicomwrappers as dw
         # TODO after getting a regression test check if the same behavior
         #      with stop_before_pixels=True
-        mw = ds.wrapper_from_data(dcm.read_file(filename, force=True))
+        mw = dw.wrapper_from_data(dcm.read_file(filename, force=True))
 
         for sig in ('iop', 'ICE_Dims', 'SequenceName'):
             try:
@@ -354,7 +353,7 @@ def compress_dicoms(dicom_list, out_prefix, tempdirs, overwrite):
     return outtar
 
 
-def embed_nifti(dcmfiles, niftifile, infofile, bids_info, force, min_meta):
+def embed_nifti(dcmfiles, niftifile, infofile, bids_info, min_meta):
     """
 
     If `niftifile` doesn't exist, it gets created out of the `dcmfiles` stack,
@@ -371,7 +370,6 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info, force, min_meta):
     niftifile
     infofile
     bids_info
-    force
     min_meta
 
     Returns
@@ -387,11 +385,12 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info, force, min_meta):
     import re
 
     if not min_meta:
-        import dcmstack as ds
-        stack = ds.parse_and_stack(dcmfiles, force=force).values()
+        from heudiconv.external.dcmstack import ds
+        stack = ds.parse_and_stack(dcmfiles, force=True).values()
         if len(stack) > 1:
             raise ValueError('Found multiple series')
-        stack = stack[0]
+        # may be odict now - iter to be safe
+        stack = next(iter(stack))
 
         #Create the nifti image using the data array
         if not op.exists(niftifile):
@@ -459,7 +458,7 @@ def embed_metadata_from_dicoms(bids, item_dicoms, outname, outname_bids,
     item_dicoms = list(map(op.abspath, item_dicoms))
 
     embedfunc = Node(Function(input_names=['dcmfiles', 'niftifile', 'infofile',
-                                           'bids_info', 'force', 'min_meta'],
+                                           'bids_info', 'min_meta'],
                               output_names=['outfile', 'meta'],
                               function=embed_nifti),
                      name='embedder')
@@ -467,13 +466,10 @@ def embed_metadata_from_dicoms(bids, item_dicoms, outname, outname_bids,
     embedfunc.inputs.niftifile = op.abspath(outname)
     embedfunc.inputs.infofile = op.abspath(scaninfo)
     embedfunc.inputs.min_meta = min_meta
-    if bids:
-        embedfunc.inputs.bids_info = load_json(op.abspath(outname_bids))
-    else:
-        embedfunc.inputs.bids_info = None
-    embedfunc.inputs.force = True
+    embedfunc.inputs.bids_info = load_json(op.abspath(outname_bids)) if bids else None
     embedfunc.base_dir = tmpdir
     cwd = os.getcwd()
+
     lgr.debug("Embedding into %s based on dicoms[0]=%s for nifti %s",
               scaninfo, item_dicoms[0], outname)
     try:

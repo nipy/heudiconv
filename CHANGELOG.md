@@ -4,6 +4,43 @@ All notable changes to this project will be documented (for humans) in this file
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.5.4] - 2019-04-29
+
+This release includes fixes to BIDS multi-echo conversions, the
+ re-implementation of queuing support (currently just SLURM), as well as
+ some bugfixes.
+
+ Starting today, we will (finally) push versioned releases to DockerHub.
+ Finally, to more accurately reflect on-going development, the `latest`
+ tag has been renamed to `unstable`.
+
+### Added
+- Readthedocs documentation ([#327][])
+
+### Changed
+- Update Docker dcm2niix to v.1.0.20190410 ([#334][])
+- Allow usage of `--files` with basic heuristics. This requires
+  use of `--subject` flag, and is limited to one subject. ([#293][])
+
+### Deprecated
+
+### Fixed
+- Improve support for multiple `--queue-args` ([#328][])
+- Fixed an issue where generated BIDS sidecar files were missing additional
+  information - treating all conversions as if the `--minmeta` flag was
+  used ([#306][])
+- Re-enable SLURM queuing support ([#304][])
+- BIDS multi-echo support for EPI + T1 images ([#293][])
+- Correctly handle the case when `outtype` of heuristic has "dicom"
+  before '.nii.gz'. Previously would have lead to absent additional metadata
+  extraction etc ([#310][])
+
+### Removed
+- `--sbargs` argument was renamed to `--queue-args` ([#304][])
+
+### Security
+
+
 ## [0.5.3] - 2019-01-12
 
 Minor hot bugfix release
@@ -101,28 +138,28 @@ The first release after major refactoring:
 - Many other various issues
 
 ## [0.4] - 2017-10-15
-A usable release to support [DBIC] use-case
+A usable release to support [DBIC][] use-case
 ### Added
 - more testing
 ### Changes
-- Dockerfile updates (added pigz, progressed forward [dcm2niix])
+- Dockerfile updates (added pigz, progressed forward [dcm2niix][])
 ### Fixed
 - correct date/time in BIDS `_scans` files
 - sort entries in `_scans` by date and then filename
 
 ## [0.3] - 2017-07-10
-A somewhat working release on the way to support [DBIC] use-case
+A somewhat working release on the way to support [DBIC][] use-case
 ### Added
 - more tests
 - groupping of dicoms by series if provided
 - many more features and fixes
 
 ## [0.2] - 2016-10-20
-An initial release on the way to support [DBIC] use-case
+An initial release on the way to support [DBIC][] use-case
 ### Added
 - basic Python project assets (`setup.py`, etc)
 - basic tests
-- [datalad] support
+- [datalad][] support
 - dbic_bids heuristic
 - `--dbg` command line flag to enter `pdb` environment upon failure
 ## Fixed
@@ -152,3 +189,8 @@ TODO Summary
 [DBIC]: http://dbic.dartmouth.edu
 [datalad]: http://datalad.org
 [dcm2niix]: https://github.com/rordenlab/dcm2niix
+[#293]: https://github.com/nipy/heudiconv/issues/293
+[#301]: https://github.com/nipy/heudiconv/issues/301
+[#304]: https://github.com/nipy/heudiconv/issues/304
+[#306]: https://github.com/nipy/heudiconv/issues/306
+[#310]: https://github.com/nipy/heudiconv/issues/310

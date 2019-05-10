@@ -1,0 +1,5 @@
+==========
+Conversion
+==========
+
+.. automodule:: heudiconv.convert

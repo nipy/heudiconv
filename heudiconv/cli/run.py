@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import os
 import os.path as op
 from argparse import ArgumentParser
@@ -140,7 +142,7 @@ def get_parser():
     group.add_argument('--files', nargs='*',
                        help='Files (tarballs, dicoms) or directories '
                        'containing files to process. Cannot be provided if '
-                       'using --dicom_dir_template or --subjects')
+                       'using --dicom_dir_template.')
     parser.add_argument('-s', '--subjects', dest='subjs', type=str, nargs='*',
                         help='list of subjects - required for dicom template. '
                         'If not provided, DICOMS would first be "sorted" and '
@@ -171,8 +173,6 @@ def get_parser():
                         'single argument and return a single anonymized ID. '
                         'Also see --conv-outdir')
     parser.add_argument('-f', '--heuristic', dest='heuristic',
-                        # some commands might not need heuristic
-                        # required=True,
                         help='Name of a known heuristic or path to the Python'
                              'script containing heuristic')
     parser.add_argument('-p', '--with-prov', action='store_true',
@@ -212,13 +212,16 @@ def get_parser():
                         'jsons')
     parser.add_argument('--random-seed', type=int, default=None,
                         help='Random seed to initialize RNG')
+    parser.add_argument('--dcmconfig', default=None,
+                        help='JSON file for additional dcm2niix configuration')
     submission = parser.add_argument_group('Conversion submission options')
-    submission.add_argument('-q', '--queue', default=None,
-                            help='select batch system to submit jobs to instead'
-                                 ' of running the conversion serially')
-    submission.add_argument('--sbargs', dest='sbatch_args', default=None,
-                            help='Additional sbatch arguments if running with '
-                                 'queue arg')
+    submission.add_argument('-q', '--queue', choices=("SLURM", None),
+                            default=None,
+                            help='batch system to submit jobs in parallel')
+    submission.add_argument('--queue-args', dest='queue_args', default=None,
+                            help='Additional queue arguments passed as '
+                            'single string of Argument=Value pairs space '
+                            'separated.')
     return parser
 
 
@@ -231,19 +234,24 @@ def process_args(args):
 
     outdir = op.abspath(args.outdir)
 
-    if args.command:
-        process_extra_commands(outdir, args)
-        return
-
     lgr.info(INIT_MSG(packname=__packagename__,
                       version=__version__))
 
-
+    if args.command:
+        process_extra_commands(outdir, args)
+        return
     #
     # Load heuristic -- better do it asap to make sure it loads correctly
     #
     if not args.heuristic:
         raise RuntimeError("No heuristic specified - add to arguments and rerun")
+
+    if args.queue:
+        lgr.info("Queuing %s conversion", args.queue)
+        iterarg, iterables = ("files", len(args.files)) if args.files else \
+                             ("subjects", len(args.subjs))
+        queue_conversion(args.queue, iterarg, iterables, args.queue_args)
+        sys.exit(0)
 
     heuristic = load_heuristic(args.heuristic)
 
@@ -280,30 +288,6 @@ def process_args(args):
             lgr.warning("Skipping unknown locator dataset")
             continue
 
-        if args.queue:
-            if seqinfo and not dicoms:
-                # flatten them all and provide into batching, which again
-                # would group them... heh
-                dicoms = sum(seqinfo.values(), [])
-                raise NotImplementedError(
-                    "we already grouped them so need to add a switch to avoid "
-                    "any grouping, so no outdir prefix doubled etc")
-
-            progname = op.abspath(inspect.getfile(inspect.currentframe()))
-
-            queue_conversion(progname,
-                             args.queue,
-                             study_outdir,
-                             heuristic.filename,
-                             dicoms,
-                             sid,
-                             args.anon_cmd,
-                             args.converter,
-                             session,
-                             args.with_prov,
-                             args.bids)
-            continue
-
         anon_sid = anonymize_sid(sid, args.anon_cmd) if args.anon_cmd else None
         if args.anon_cmd:
             lgr.info('Anonymized {} to {}'.format(sid, anon_sid))
@@ -335,7 +319,8 @@ def process_args(args):
                         bids=args.bids,
                         seqinfo=seqinfo,
                         min_meta=args.minmeta,
-                        overwrite=args.overwrite,)
+                        overwrite=args.overwrite,
+                        dcmconfig=args.dcmconfig,)
 
         lgr.info("PROCESSING DONE: {0}".format(
             str(dict(subject=sid, outdir=study_outdir, session=session))))

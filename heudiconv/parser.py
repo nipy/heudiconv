@@ -167,11 +167,6 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
             dcmfilter=getattr(heuristic, 'filter_dicom', None),
             grouping=grouping)
 
-        if not getattr(heuristic, 'infotoids', None):
-            raise NotImplementedError(
-                "For now, if no subj template is provided, requiring "
-                "heuristic to have infotoids")
-
         if sids:
             if not (len(sids) == 1 and len(seqinfo_dict) == 1):
                 raise RuntimeError(
@@ -183,6 +178,24 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
             sid = sids[0]
         else:
             sid = None
+
+        if not getattr(heuristic, 'infotoids', None):
+            # allow bypass with subject override
+            if not sid:
+                raise NotImplementedError("Cannot guarantee subject id - add "
+                                          "`infotoids` to heuristic file or "
+                                          "provide `--subjects` option")
+            lgr.warn("Heuristic is missing an `infotoids` method, assigning "
+                     "empty method and using provided subject id %s. "
+                     "Provide `session` and `locator` fields for best results."
+                     , sid)
+            def infotoids(seqinfos, outdir):
+                return {
+                    'locator': None,
+                    'session': None,
+                    'subject': None
+                    }
+            heuristic.infotoids = infotoids
 
         for studyUID, seqinfo in seqinfo_dict.items():
             # so we have a single study, we need to figure out its
