@@ -506,19 +506,14 @@ def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids, 
         #   series. To do that, the most straightforward way is to read the
         #   echo times for all bids_files and see if they are all the same or not.
 
-        # Check for echotime information
-        echo_times = set()
+        # Check for varying echo times
+        echo_times = set(
+            load_json(b).get('EchoTime', None)
+            for b in bids_files
+            if b
+        )
 
-        for bids_file in bids_files:
-            if bids_file:
-                # check for varying EchoTimes
-                echot = load_json(bids_file).get('EchoTime', None)
-                if echot is not None:
-                    echo_times.add(echot)
-
-        # To see if the echo times are the same, convert it to a set and see if
-        # only one remains:
-        is_multiecho = len(echo_times) >= 1 if echo_times else False
+        is_multiecho = len(echo_times) > 1
 
         ### Loop through the bids_files, set the output name and save files
         for fl, suffix, bids_file in zip(res_files, suffixes, bids_files):
