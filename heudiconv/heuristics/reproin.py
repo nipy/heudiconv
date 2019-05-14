@@ -888,8 +888,9 @@ def parse_series_spec(series_spec):
 
         # sanitize values, which must not have _ and - is undesirable ATM as well
         # TODO: BIDSv2.0 -- allows "-" so replace with it instead
-        value = str(value).replace('_', 'X').replace('-', 'X')
-        value = str(value).replace('(', '{').replace(')', '}') # for Philips
+        value = str(value) \
+            .replace('_', 'X').replace('-', 'X') \
+            .replace('(', '{').replace(')', '}')  # for Philips
 
         if key in ['ses', 'run', 'task', 'acq']:
             # those we care about explicitly
