@@ -426,16 +426,15 @@ def ls(study_session, seqinfo):
 # So we just need subdir and file_suffix!
 def infotodict(seqinfo):
     """Heuristic evaluator for determining which runs belong where
-    
-    allowed template fields - follow python string module: 
-    
+
+    allowed template fields - follow python string module:
+
     item: index within category 
     subject: participant id 
     seqitem: run number during scanning
     subindex: sub index within group
     session: scan index for longitudinal acq
     """
-
     seqinfo = fix_seqinfo(seqinfo)
     lgr.info("Processing %d seqinfo entries", len(seqinfo))
     and_dicom = ('dicom', 'nii.gz')
@@ -841,6 +840,7 @@ def parse_series_spec(series_spec):
     # https://github.com/ReproNim/reproin/issues/14
     # where PU: prefix is added by the scanner
     series_spec = re.sub("^[A-Z]*:", "", series_spec)
+    series_spec = re.sub("^WIP ", "", series_spec) # remove Philips WIP prefix
 
     # Remove possible suffix we don't care about after __
     series_spec = series_spec.split('__', 1)[0]
@@ -889,6 +889,7 @@ def parse_series_spec(series_spec):
         # sanitize values, which must not have _ and - is undesirable ATM as well
         # TODO: BIDSv2.0 -- allows "-" so replace with it instead
         value = str(value).replace('_', 'X').replace('-', 'X')
+        value = str(value).replace('(', '{').replace(')', '}') # for Philips
 
         if key in ['ses', 'run', 'task', 'acq']:
             # those we care about explicitly
