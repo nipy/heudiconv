@@ -222,6 +222,10 @@ def get_parser():
                             help='Additional queue arguments passed as '
                             'single string of Argument=Value pairs space '
                             'separated.')
+    parser.add_argument('--skiptop', action='store_true',
+                        help='Skip creating of top-level bids files. '
+                        'Useful when running in batch mode to prevent '
+                        'possible race conditions.')
     return parser
 
 
@@ -320,7 +324,8 @@ def process_args(args):
                         seqinfo=seqinfo,
                         min_meta=args.minmeta,
                         overwrite=args.overwrite,
-                        dcmconfig=args.dcmconfig,)
+                        dcmconfig=args.dcmconfig,
+                        skiptop=args.skiptop,)
 
         lgr.info("PROCESSING DONE: {0}".format(
             str(dict(subject=sid, outdir=study_outdir, session=session))))
