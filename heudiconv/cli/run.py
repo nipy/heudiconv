@@ -138,6 +138,7 @@ def main(argv=None):
         args.bids_options = args.bids
         args.bids = True
     else:
+        args.bids_options = []
         args.bids = False
     if args.debug:
         lgr.setLevel(logging.DEBUG)
