@@ -251,7 +251,17 @@ def treat_infofile(filename):
         j = json.load(f)
 
     j_slim = slim_down_info(j)
-    j_pretty = json_dumps_pretty(j_slim, indent=2, sort_keys=True)
+    dumps_kw = dict(indent=2, sort_keys=True)
+    try:
+        j_pretty = json_dumps_pretty(j_slim, **dumps_kw)
+    except AssertionError as exc:
+        lgr.warning(
+            "Prettyfication of .json failed (%s).  "
+            "Original .json will be kept as is.  Please share (if you could) "
+            "that file (%s) with HeuDiConv developers"
+            % (str(exc), filename)
+        )
+        j_pretty = json.dumps(j_slim, **dumps_kw)
 
     set_readonly(filename, False)
     with open(filename, 'wt') as fp:
