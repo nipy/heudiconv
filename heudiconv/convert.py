@@ -572,7 +572,7 @@ def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids, 
                 echo_number = fileinfo.get('EchoNumber', 1)
 
 
-                supported_multiecho = ['_bold', '_epi', '_sbref', '_T1w']
+                supported_multiecho = ['_bold', '_epi', '_sbref', '_T1w', '_PDT2']
                 # Now, decide where to insert it.
                 # Insert it **before** the following string(s), whichever appears first.
                 for imgtype in supported_multiecho:
