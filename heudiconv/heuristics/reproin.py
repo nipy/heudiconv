@@ -28,10 +28,11 @@ per each session.
 Sequence names on the scanner must follow this specification to avoid manual
 conversion/handling:
 
-  [PREFIX:]<seqtype[-label]>[_ses-<SESID>][_task-<TASKID>][_acq-<ACQLABEL>][_run-<RUNID>][_dir-<DIR>][<more BIDS>][__<custom>]
+  [PREFIX:][WIP ]<seqtype[-label]>[_ses-<SESID>][_task-<TASKID>][_acq-<ACQLABEL>][_run-<RUNID>][_dir-<DIR>][<more BIDS>][__<custom>]
 
 where
  [PREFIX:] - leading capital letters followed by : are stripped/ignored
+ [WIP ] - prefix is stripped/ignored (added by Philips for patch sequences)
  <...> - value to be entered
  [...] - optional -- might be nearly mandatory for some modalities (e.g.,
          run for functional) and very optional for others
@@ -104,6 +105,16 @@ __<custom> (optional)
 
 Although we still support "-" and "+" used within SESID and TASKID, their use is
 not recommended, thus not listed here
+
+## Scanner specifics
+
+We perform following actions regardless of the type of scanner, but applied
+generally to accommodate limitations imposed by different manufacturers/models:
+
+### Philips
+
+- We replace all ( with { and ) with } to be able e.g. to specify session {date}
+- "WIP " prefix unconditionally added by the scanner is stripped
 """
 
 import os
