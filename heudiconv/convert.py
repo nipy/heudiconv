@@ -80,7 +80,7 @@ def conversion_info(subject, outdir, info, filegroup, ses):
 
 def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                    anon_outdir, with_prov, ses, bids, seqinfo, min_meta,
-                   overwrite, dcmconfig, skiptop):
+                   overwrite, dcmconfig, bids_options):
     if dicoms:
         lgr.info("Processing %d dicoms", len(dicoms))
     elif seqinfo:
@@ -201,7 +201,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
     for item_dicoms in filegroup.values():
         clear_temp_dicoms(item_dicoms)
 
-    if bids and not skiptop:
+    if bids and 'notop' not in bids_options:
         if seqinfo:
             keys = list(seqinfo)
             add_participant_record(anon_outdir,

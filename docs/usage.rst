@@ -43,11 +43,12 @@ DICOMs as an independent ``heudiconv`` execution.
 The first script aggregates the DICOM directories and submits them to
 ``run_heudiconv.sh`` with SLURM as a job array.
 
-If using bids, the ``--skiptop`` flag suppresses creation of top-level
-files in the bids directory (e.g., ``dataset_description.json``) to
-avoid possible race conditions.  These files may be generated later
-with ``populate_templates.sh`` below (except for ``participants.tsv``,
-which must be create manually).
+If using bids, the ``notop`` bids option suppresses creation of
+top-level files in the bids directory (e.g.,
+``dataset_description.json``) to avoid possible race conditions.
+These files may be generated later with ``populate_templates.sh``
+below (except for ``participants.tsv``, which must be create
+manually).
 
 .. code:: shell
 
@@ -82,7 +83,7 @@ The second script processes a DICOM directory with ``heudiconv`` using the built
     echo Submitted directory: ${DCMDIR}
 
     IMG="/singularity-images/heudiconv-0.5.4-dev.sif"
-    CMD="singularity run -B ${DCMDIR}:/dicoms:ro -B ${OUTDIR}:/output -e ${IMG} --files /dicoms/ -o /output -f reproin -c dcm2niix -b --minmeta -l . --skiptop"
+    CMD="singularity run -B ${DCMDIR}:/dicoms:ro -B ${OUTDIR}:/output -e ${IMG} --files /dicoms/ -o /output -f reproin -c dcm2niix -b notop --minmeta -l ."
 
     printf "Command:\n${CMD}\n"
     ${CMD}

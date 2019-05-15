@@ -18,6 +18,10 @@ lgr = logging.getLogger(__name__)
 
 INIT_MSG = "Running {packname} version {version}".format
 
+BIDS_OPTIONS = [('notop', 'Skip creating of top-level bids files. '
+                          'Useful when running in batch mode to prevent '
+                          'possible race conditions.')]
+
 
 def is_interactive():
    """Return True if all in/outs are tty"""
@@ -98,9 +102,20 @@ def process_extra_commands(outdir, args):
     return
 
 
+def help_bids():
+    print('bids specific options can be passed after the bids flag.', file=sys.stdout)
+    print('For example, "--bids notop".', file=sys.stdout)
+    print('The currently supported options are:', file=sys.stdout)
+    for option, helpstr in BIDS_OPTIONS:
+        print('{}: {}'.format(option, helpstr), file=sys.stdout)
+
+
 def main(argv=None):
     parser = get_parser()
     args = parser.parse_args(argv)
+    if args.help_bids:
+        help_bids()
+        sys.exit(1)
     # exit if nothing to be done
     if not args.files and not args.dicom_dir_template and not args.command:
         lgr.warning("Nothing to be done - displaying usage help")
@@ -112,6 +127,18 @@ def main(argv=None):
         random.seed(args.random_seed)
         import numpy
         numpy.random.seed(args.random_seed)
+    # Ensure only supported bids options are passed
+    allowed_options = [option for option, _ in BIDS_OPTIONS]
+    if args.bids is not None:
+        for bids_option in args.bids:
+            if bids_option not in allowed_options:
+                lgr.warning("{} is not a valid bids option - displaying bids options help".format(bids_option))
+                help_bids()
+                sys.exit(1)
+        args.bids_options = args.bids
+        args.bids = True
+    else:
+        args.bids = False
     if args.debug:
         lgr.setLevel(logging.DEBUG)
     # Should be possible but only with a single subject -- will be used to
@@ -181,8 +208,11 @@ def get_parser():
     parser.add_argument('-ss', '--ses', dest='session', default=None,
                         help='session for longitudinal study_sessions, default '
                         'is none')
-    parser.add_argument('-b', '--bids', action='store_true',
-                        help='flag for output into BIDS structure')
+    parser.add_argument('-b', '--bids', nargs='*',
+                        metavar=('BIDSOPTION1', 'BIDSOPTION2'),
+                        help='flag for output into BIDS structure. '
+                        'Can also take bids specific options. Use --help-bids '
+                        'for more information.')
     parser.add_argument('--overwrite', action='store_true', default=False,
                         help='flag to allow overwriting existing converted files')
     parser.add_argument('--datalad', action='store_true',
@@ -222,10 +252,8 @@ def get_parser():
                             help='Additional queue arguments passed as '
                             'single string of Argument=Value pairs space '
                             'separated.')
-    parser.add_argument('--skiptop', action='store_true',
-                        help='Skip creating of top-level bids files. '
-                        'Useful when running in batch mode to prevent '
-                        'possible race conditions.')
+    parser.add_argument('--help-bids', action='store_true', dest='help_bids',
+                        help='Display bids specific help.')
     return parser
 
 
@@ -325,7 +353,7 @@ def process_args(args):
                         min_meta=args.minmeta,
                         overwrite=args.overwrite,
                         dcmconfig=args.dcmconfig,
-                        skiptop=args.skiptop,)
+                        bids_options=args.bids_options,)
 
         lgr.info("PROCESSING DONE: {0}".format(
             str(dict(subject=sid, outdir=study_outdir, session=session))))
