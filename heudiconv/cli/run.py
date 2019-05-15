@@ -103,11 +103,11 @@ def process_extra_commands(outdir, args):
 
 
 def help_bids():
-    print('bids specific options can be passed after the bids flag.', file=sys.stdout)
-    print('For example, "--bids notop".', file=sys.stdout)
-    print('The currently supported options are:', file=sys.stdout)
+    sys.stderr.write('bids specific options can be passed after the bids flag.\n'
+                     'For example, "--bids notop".\n'
+                     'The currently supported options are:\n')
     for option, helpstr in BIDS_OPTIONS:
-        print('{}: {}'.format(option, helpstr), file=sys.stdout)
+        sys.stderr.write('{}: {}\n'.format(option, helpstr))
 
 
 def main(argv=None):
