@@ -18,7 +18,8 @@ lgr = logging.getLogger(__name__)
 
 INIT_MSG = "Running {packname} version {version}".format
 
-BIDS_OPTIONS = [('notop', 'Skip creating of top-level bids files. '
+BIDS_OPTIONS = [('help', 'Display this help message'),
+                ('notop', 'Skip creating of top-level bids files. '
                           'Useful when running in batch mode to prevent '
                           'possible race conditions.')]
 
@@ -113,7 +114,7 @@ def help_bids():
 def main(argv=None):
     parser = get_parser()
     args = parser.parse_args(argv)
-    if args.help_bids:
+    if 'help' in args.bids:
         help_bids()
         sys.exit(1)
     # exit if nothing to be done
@@ -212,7 +213,7 @@ def get_parser():
     parser.add_argument('-b', '--bids', nargs='*',
                         metavar=('BIDSOPTION1', 'BIDSOPTION2'),
                         help='flag for output into BIDS structure. '
-                        'Can also take bids specific options. Use --help-bids '
+                        'Can also take bids specific options. Use --bids help '
                         'for more information.')
     parser.add_argument('--overwrite', action='store_true', default=False,
                         help='flag to allow overwriting existing converted files')
@@ -253,8 +254,6 @@ def get_parser():
                             help='Additional queue arguments passed as '
                             'single string of Argument=Value pairs space '
                             'separated.')
-    parser.add_argument('--help-bids', action='store_true', dest='help_bids',
-                        help='Display bids specific help.')
     return parser
 
 
