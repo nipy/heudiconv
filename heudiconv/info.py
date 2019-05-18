@@ -14,6 +14,7 @@ REQUIRES = [
     'nipype>=0.12.0',
     'pathlib',
     'dcmstack>=0.7',
+    'filelock>=3.0.12',
 ]
 
 TESTS_REQUIRES = [

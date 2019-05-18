@@ -1,3 +1,4 @@
+from filelock import SoftFileLock
 import os
 import os.path as op
 import logging
@@ -32,6 +33,8 @@ from .dicoms import (
     compress_dicoms
 )
 
+LOCKFILE = 'heudiconv.lock'
+LOCKFILE_TIMEOUT = 10
 lgr = logging.getLogger(__name__)
 
 
@@ -202,14 +205,16 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
         clear_temp_dicoms(item_dicoms)
 
     if bids:
-        if seqinfo:
-            keys = list(seqinfo)
-            add_participant_record(anon_outdir,
-                                   anon_sid,
-                                   keys[0].patient_age,
-                                   keys[0].patient_sex)
-        populate_bids_templates(anon_outdir,
-                                getattr(heuristic, 'DEFAULT_FIELDS', {}))
+        with SoftFileLock(op.join(anon_outdir, LOCKFILE),
+                          timeout=LOCKFILE_TIMEOUT):
+            if seqinfo:
+                keys = list(seqinfo)
+                add_participant_record(anon_outdir,
+                                       anon_sid,
+                                       keys[0].patient_age,
+                                       keys[0].patient_sex)
+            populate_bids_templates(anon_outdir,
+                                    getattr(heuristic, 'DEFAULT_FIELDS', {}))
 
 
 def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
