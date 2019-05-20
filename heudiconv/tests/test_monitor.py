@@ -1,5 +1,4 @@
 from collections import namedtuple
-import os
 import os.path as op
 import pytest
 from mock import patch
@@ -21,10 +20,7 @@ try:
 
     path2 = watch_path + b"/" + filename + b"/subpath"
 
-    my_events = [
-        (header, type_names, watch_path, filename),
-        (header, type_names, path2, b""),
-    ]
+    my_events = [(header, type_names, watch_path, filename), (header, type_names, path2, b"")]
 except AttributeError:
     # Import of inotify fails on mac os x with error
     # lsym(0x11fbeb780, inotify_init): symbol not found
@@ -60,17 +56,13 @@ def test_monitor(capsys):
     monitor(watch_path.decode(), check_ptrn="")
     out, err = capsys.readouterr()
     desired_output = "{0}/{1} {2}\n".format(watch_path.decode(), filename.decode(), 42)
-    desired_output += "Updating {0}/{1}: {2}\n".format(
-        watch_path.decode(), filename.decode(), 42
-    )
+    desired_output += "Updating {0}/{1}: {2}\n".format(watch_path.decode(), filename.decode(), 42)
     assert out == desired_output
 
 
 @pytest.mark.skip(reason="TODO")
 @patch("time.time", MockTime(42))
-@pytest.mark.parametrize(
-    "side_effect,success", [(None, 1), (CalledProcessError("mycmd", 1), 0)]
-)
+@pytest.mark.parametrize("side_effect,success", [(None, 1), (CalledProcessError("mycmd", 1), 0)])
 def test_process(tmpdir, capsys, side_effect, success):
     db_fn = tmpdir.join("database.json")
     log_dir = tmpdir.mkdir("log")

@@ -18,9 +18,7 @@ def test_get_dups_marked():
     no_dups = {("some",): [1]}
     assert get_dups_marked(no_dups) == no_dups
 
-    info = OrderedDict(
-        [(("bu", "du"), [1, 2]), (("smth",), [3]), (("smth2",), ["a", "b", "c"])]
-    )
+    info = OrderedDict([(("bu", "du"), [1, 2]), (("smth",), [3]), (("smth2",), ["a", "b", "c"])])
 
     assert (
         get_dups_marked(info)
@@ -60,16 +58,13 @@ def test_fix_canceled_runs():
     from collections import namedtuple
 
     FakeSeqInfo = namedtuple(
-        "FakeSeqInfo",
-        ["accession_number", "series_id", "protocol_name", "series_description"],
+        "FakeSeqInfo", ["accession_number", "series_id", "protocol_name", "series_description"]
     )
 
     seqinfo = []
     runname = "func_run+"
     for i in range(1, 6):
-        seqinfo.append(
-            FakeSeqInfo("accession1", "{0:02d}-".format(i) + runname, runname, runname)
-        )
+        seqinfo.append(FakeSeqInfo("accession1", "{0:02d}-".format(i) + runname, runname, runname))
 
     fake_accession2run = {"accession1": ["^01-", "^03-"]}
 
@@ -94,21 +89,13 @@ def test_fix_dbic_protocol():
     )
     accession_number = "A003"
     seq1 = FakeSeqInfo(
-        accession_number,
-        "mystudy",
-        "02-anat-scout_run+_MPR_sag",
-        "11-func_run-life2_acq-2mm692",
+        accession_number, "mystudy", "02-anat-scout_run+_MPR_sag", "11-func_run-life2_acq-2mm692"
     )
     seq2 = FakeSeqInfo(accession_number, "mystudy", "nochangeplease", "nochangeeither")
 
     seqinfos = [seq1, seq2]
     keys = ["field1"]
-    subsdict = {
-        md5sum("mystudy"): [
-            ("scout_run\+", "scout"),
-            ("run-life[0-9]", "run+_task-life"),
-        ]
-    }
+    subsdict = {md5sum("mystudy"): [("scout_run\+", "scout"), ("run-life[0-9]", "run+_task-life")]}
 
     seqinfos_ = fix_dbic_protocol(seqinfos, keys=keys, subsdict=subsdict)
     assert seqinfos[1] == seqinfos_[1]
@@ -123,10 +110,7 @@ def test_fix_dbic_protocol():
     assert seqinfos[1] == seqinfos_[1]
     # now everything should have changed
     assert seqinfos_[0] == FakeSeqInfo(
-        accession_number,
-        "mystudy",
-        "02-anat-scout_MPR_sag",
-        "11-func_run+_task-life_acq-2mm692",
+        accession_number, "mystudy", "02-anat-scout_MPR_sag", "11-func_run+_task-life_acq-2mm692"
     )
 
 
@@ -154,9 +138,7 @@ def test_parse_series_spec():
     assert pdpn("cancelme_func-bold") == {}
 
     assert (
-        pdpn("bids_func-bold")
-        == pdpn("func-bold")
-        == {"seqtype": "func", "seqtype_label": "bold"}
+        pdpn("bids_func-bold") == pdpn("func-bold") == {"seqtype": "func", "seqtype_label": "bold"}
     )
 
     # pdpn("bids_func_ses+_task-boo_run+") == \

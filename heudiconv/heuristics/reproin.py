@@ -236,9 +236,7 @@ protocols2fix = {
         ("fmap_acq-discorr-dti-", "fmap_acq-dwi_dir-"),
         ("_test", ""),
     ],
-    "1996f745c30c1df1d3851844e56d294f": [
-        ("fmap_acq-discorr-dti-", "fmap_acq-dwi_dir-")
-    ],
+    "1996f745c30c1df1d3851844e56d294f": [("fmap_acq-discorr-dti-", "fmap_acq-dwi_dir-")],
     #'022969bfde39c2940c114edf1db3fabc':
     #    [  # should be applied only for ses-03!
     #        ('_acq-MPRAGE_ses-02', '_acq-MPRAGE_ses-03'),
@@ -504,9 +502,7 @@ def infotodict(seqinfo):
             continue
 
         if dcm_image_iod_spec and dcm_image_iod_spec.startswith("MIP"):
-            series_info["acq"] = series_info.get("acq", "") + sanitize_str(
-                dcm_image_iod_spec
-            )
+            series_info["acq"] = series_info.get("acq", "") + sanitize_str(dcm_image_iod_spec)
 
         seqtype = series_info.pop("seqtype")
         seqtype_label = series_info.pop("seqtype_label", None)
@@ -589,9 +585,7 @@ def infotodict(seqinfo):
                     )
                 current_run = current_run_
             else:
-                raise ValueError(
-                    "Don't know how to deal with run specification %s" % repr(run)
-                )
+                raise ValueError("Don't know how to deal with run specification %s" % repr(run))
             if isinstance(current_run, str) and current_run.isdigit():
                 current_run = int(current_run)
             run_label = "run-" + (
@@ -606,9 +600,7 @@ def infotodict(seqinfo):
         #     assert s.is_derived, "Motion corrected images must be 'derived'"
 
         if s.is_motion_corrected and "rec-" in series_info.get("bids", ""):
-            raise NotImplementedError(
-                "want to add _acq-moco but there is _acq- already"
-            )
+            raise NotImplementedError("want to add _acq-moco but there is _acq- already")
 
         suffix_parts = [
             None if not series_info.get("task") else "task-%s" % series_info["task"],
@@ -817,11 +809,7 @@ def infotoids(seqinfos, outdir):
             if ses_markers == ["+"]:
                 session = "%03d" % (len(prior_sessions) + 1)
             elif ses_markers == ["="]:
-                session = (
-                    os.path.basename(prior_sessions[-1])[4:]
-                    if prior_sessions
-                    else "001"
-                )
+                session = os.path.basename(prior_sessions[-1])[4:] if prior_sessions else "001"
             else:
                 session = "001"
 
@@ -893,8 +881,7 @@ def parse_series_spec(series_spec):
         # It is not something we don't consume
         if bids:
             lgr.warning(
-                "It was instructed to be BIDS sequence but unknown " "type %s found",
-                seqtype,
+                "It was instructed to be BIDS sequence but unknown " "type %s found", seqtype
             )
         return {}
 
@@ -912,11 +899,7 @@ def parse_series_spec(series_spec):
         # sanitize values, which must not have _ and - is undesirable ATM as well
         # TODO: BIDSv2.0 -- allows "-" so replace with it instead
         value = (
-            str(value)
-            .replace("_", "X")
-            .replace("-", "X")
-            .replace("(", "{")
-            .replace(")", "}")
+            str(value).replace("_", "X").replace("-", "X").replace("(", "{").replace(")", "}")
         )  # for Philips
 
         if key in ["ses", "run", "task", "acq"]:

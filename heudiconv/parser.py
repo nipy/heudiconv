@@ -14,7 +14,7 @@ from .utils import docstring_parameter, StudySessionInfo
 
 lgr = logging.getLogger(__name__)
 
-_VCS_REGEX = "%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)" % (op.sep, op.sep)
+_VCS_REGEX = r"%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)" % (op.sep, op.sep)
 
 
 @docstring_parameter(_VCS_REGEX)
@@ -134,15 +134,12 @@ def get_study_sessions(
                 if session_ is not None and session:
                     lgr.warning(
                         "We had session specified (%s) but while analyzing "
-                        "files got a new value %r (using it instead)"
-                        % (session, session_)
+                        "files got a new value %r (using it instead)" % (session, session_)
                     )
                 # in this setup we do not care about tracking "studies" so
                 # locator would be the same None
                 study_sessions[
-                    StudySessionInfo(
-                        None, session_ if session_ is not None else session, sid
-                    )
+                    StudySessionInfo(None, session_ if session_ is not None else session, sid)
                 ] = files_
     else:
         # MG - should be caught on initial run
@@ -153,7 +150,7 @@ def get_study_sessions(
         for f in files_opt:
             if op.isdir(f):
                 files += sorted(
-                    find_files(".*", topdir=f, exclude_vcs=True, exclude="/\.datalad/")
+                    find_files(".*", topdir=f, exclude_vcs=True, exclude=r"/\.datalad/")
                 )
             else:
                 files.append(f)

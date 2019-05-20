@@ -5,7 +5,7 @@ from __future__ import absolute_import
 from .pydicom import dcm  # to assure that we have it one way or another
 
 try:
-    import dcmstack as ds
+    import dcmstack
 except ImportError as e:
     from .. import lgr
 
@@ -26,4 +26,6 @@ except ImportError as e:
     lgr.warning("dcmstack without support of pydicom >= 1.0 is detected. Adding a plug")
     sys.modules["dicom"] = dcm
     # and try again
-    import dcmstack as ds
+    import dcmstack
+
+ds = dcmstack

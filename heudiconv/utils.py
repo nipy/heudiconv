@@ -14,8 +14,6 @@ from collections import namedtuple
 from glob import glob
 from subprocess import check_output
 
-from nipype.utils.filemanip import which
-
 import logging
 
 lgr = logging.getLogger(__name__)
@@ -117,9 +115,7 @@ def anonymize_sid(sid, anon_sid_cmd):
     cmd = [anon_sid_cmd, sid]
     shell_return = check_output(cmd)
 
-    if all(
-        [sys.version_info[0] > 2, isinstance(shell_return, bytes), isinstance(sid, str)]
-    ):
+    if all([sys.version_info[0] > 2, isinstance(shell_return, bytes), isinstance(sid, str)]):
         anon_sid = shell_return.decode()
     else:
         anon_sid = shell_return
@@ -154,9 +150,9 @@ def write_config(outfile, info):
 
 
 def _canonical_dumps(json_obj, **kwargs):
-    """ Dump `json_obj` to string, allowing for Python newline bug
+    r"""Dump `json_obj` to string, allowing for Python newline bug
 
-    Runs ``json.dumps(json_obj, \*\*kwargs), then removes trailing whitespaces
+    Runs `json.dumps(json_obj, \*\*kwargs)`, then removes trailing whitespaces
     added when doing indent in some Python versions. See
     https://bugs.python.org/issue16333. Bug seems to be fixed in 3.4, for now
     fixing manually not only for aestetics but also to guarantee the same
@@ -223,28 +219,25 @@ def json_dumps_pretty(j, indent=2, sort_keys=True):
     js = _canonical_dumps(j, indent=indent, sort_keys=sort_keys)
     # trim away \n and spaces between entries of numbers
     js_ = re.sub(
-        '[\n ]+("?[-+.0-9e]+"?,?) *\n(?= *"?[-+.0-9e]+"?)',
-        r" \1",
-        js,
-        flags=re.MULTILINE,
+        r'[\n ]+("?[-+.0-9e]+"?,?) *\n(?= *"?[-+.0-9e]+"?)', r" \1", js, flags=re.MULTILINE
     )
     # uniform no spaces before ]
-    js_ = re.sub(" *\]", "]", js_)
+    js_ = re.sub(r" *\]", "]", js_)
     # uniform spacing before numbers
     # But that thing could screw up dates within strings which would have 2 spaces
     # in a date like Mar  3 2017, so we do negative lookahead to avoid changing
     # in those cases
     # import pdb; pdb.set_trace()
     js_ = re.sub(
-        "(?<!\w{3})"  # negative lookbehind for the month
+        r"(?<!\w{3})"  # negative lookbehind for the month
         '  *("?[-+.0-9e]+"?)'
-        "(?! [123]\d{3})"  # negative lookahead for a year
+        r"(?! [123]\d{3})"  # negative lookahead for a year
         "(?P<space> ?)[ \n]*",
         r" \1\g<space>",
         js_,
     )
     # no spaces after [
-    js_ = re.sub("\[ ", "[", js_)
+    js_ = re.sub(r"\[ ", "[", js_)
     # the load from the original dump and reload from tuned up
     # version should result in identical values since no value
     # must be changed, just formatting.
@@ -252,8 +245,7 @@ def json_dumps_pretty(j, indent=2, sort_keys=True):
     j_tuned = json.loads(js_)
 
     assert j_just_reloaded == j_tuned, (
-        "Values differed when they should have not. "
-        "Report to the heudiconv developers"
+        "Values differed when they should have not. " "Report to the heudiconv developers"
     )
 
     return js_
@@ -313,9 +305,7 @@ def get_known_heuristic_names():
         for hp in heudiconv.heuristics.__path__
         for x in glob(op.join(hp, "*.py")) + glob(op.join(hp, "*.py[co]"))
     }
-    return sorted(
-        filter(lambda c: not (c.startswith("test_") or c.startswith("_")), candidates)
-    )
+    return sorted(filter(lambda c: not (c.startswith("test_") or c.startswith("_")), candidates))
 
 
 def load_heuristic(heuristic):

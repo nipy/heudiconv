@@ -20,22 +20,12 @@ def infotodict(seqinfo):
     t1 = create_key("sub-{subject}/anat/sub-{subject}_T1w")
     t2 = create_key("sub-{subject}/anat/sub-{subject}_T2w")
     rest = create_key("sub-{subject}/func/sub-{subject}_task-rest_run-{item:02d}_bold")
-    rest_sbref = create_key(
-        "sub-{subject}/func/sub-{subject}_task-rest_run-{item:02d}_sbref"
-    )
+    rest_sbref = create_key("sub-{subject}/func/sub-{subject}_task-rest_run-{item:02d}_sbref")
     face = create_key("sub-{subject}/func/sub-{subject}_task-face_run-{item:02d}_bold")
-    face_sbref = create_key(
-        "sub-{subject}/func/sub-{subject}_task-face_run-{item:02d}_sbref"
-    )
-    gamble = create_key(
-        "sub-{subject}/func/sub-{subject}_task-gambling_run-{item:02d}_bold"
-    )
-    gamble_sbref = create_key(
-        "sub-{subject}/func/sub-{subject}_task-gambling_run-{item:02d}_sbref"
-    )
-    conflict = create_key(
-        "sub-{subject}/func/sub-{subject}_task-conflict_run-{item:02d}_bold"
-    )
+    face_sbref = create_key("sub-{subject}/func/sub-{subject}_task-face_run-{item:02d}_sbref")
+    gamble = create_key("sub-{subject}/func/sub-{subject}_task-gambling_run-{item:02d}_bold")
+    gamble_sbref = create_key("sub-{subject}/func/sub-{subject}_task-gambling_run-{item:02d}_sbref")
+    conflict = create_key("sub-{subject}/func/sub-{subject}_task-conflict_run-{item:02d}_bold")
     conflict_sbref = create_key(
         "sub-{subject}/func/sub-{subject}_task-conflict_run-{item:02d}_sbref"
     )

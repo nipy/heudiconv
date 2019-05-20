@@ -1,22 +1,20 @@
 """Testing conversion with conversion saved on datalad"""
-import json
 from glob import glob
 import os.path as op
 
 import pytest
-
-have_datalad = True
-try:
-    from datalad import api  # to pull and grab data
-    from datalad.support.exceptions import IncompleteResultsError
-except ImportError:
-    have_datalad = False
 
 from heudiconv.cli.run import main as runner
 from heudiconv.utils import load_json
 
 # testing utilities
 from .utils import fetch_data, gen_heudiconv_args
+
+have_datalad = True
+try:
+    from datalad.support.exceptions import IncompleteResultsError
+except ImportError:
+    have_datalad = False
 
 
 @pytest.mark.parametrize("subject", ["sub-sid000143"])
@@ -28,8 +26,8 @@ def test_conversion(tmpdir, subject, heuristic, anon_cmd):
     try:
         datadir = fetch_data(
             tmpdir.strpath,
-            "dbic/QA",  # path from datalad database root
-            getpath=op.join("sourcedata", subject),
+            "dbic/QA",
+            getpath=op.join("sourcedata", subject),  # path from datalad database root
         )
     except IncompleteResultsError as exc:
         pytest.skip("Failed to fetch test data: %s" % str(exc))

@@ -21,20 +21,12 @@ def infotodict(seqinfo):
     t2 = create_key("anat/sub-{subject}_T2w")
     rest = create_key("func/sub-{subject}_dir-{acq}_task-rest_run-{item:02d}_bold")
     face = create_key("func/sub-{subject}_task-face_run-{item:02d}_acq-{acq}_bold")
-    gamble = create_key(
-        "func/sub-{subject}_task-gambling_run-{item:02d}_acq-{acq}_bold"
-    )
-    conflict = create_key(
-        "func/sub-{subject}_task-conflict_run-{item:02d}_acq-{acq}_bold"
-    )
+    gamble = create_key("func/sub-{subject}_task-gambling_run-{item:02d}_acq-{acq}_bold")
+    conflict = create_key("func/sub-{subject}_task-conflict_run-{item:02d}_acq-{acq}_bold")
     dwi = create_key("dwi/sub-{subject}_dir-{acq}_run-{item:02d}_dwi")
 
-    fmap_rest = create_key(
-        "fmap/sub-{subject}_acq-func{acq}_dir-{dir}_run-{item:02d}_epi"
-    )
-    fmap_dwi = create_key(
-        "fmap/sub-{subject}_acq-dwi{acq}_dir-{dir}_run-{item:02d}_epi"
-    )
+    fmap_rest = create_key("fmap/sub-{subject}_acq-func{acq}_dir-{dir}_run-{item:02d}_epi")
+    fmap_dwi = create_key("fmap/sub-{subject}_acq-dwi{acq}_dir-{dir}_run-{item:02d}_epi")
 
     info = {
         t1: [],

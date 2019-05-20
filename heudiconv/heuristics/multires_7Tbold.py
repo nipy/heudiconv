@@ -25,17 +25,13 @@ def extract_moco_params(basename, outypes, dicoms):
     from dicom import read_file as dcm_read
 
     # get acquisition time for all dicoms
-    dcm_times = [
-        (d, float(dcm_read(d, stop_before_pixels=True).AcquisitionTime)) for d in dicoms
-    ]
+    dcm_times = [(d, float(dcm_read(d, stop_before_pixels=True).AcquisitionTime)) for d in dicoms]
     # store MoCo info from image comments sorted by acqusition time
     moco = [
         "\t".join(
             [
                 str(float(i))
-                for i in dcm_read(fn, stop_before_pixels=True)
-                .ImageComments.split()[1]
-                .split(",")
+                for i in dcm_read(fn, stop_before_pixels=True).ImageComments.split()[1].split(",")
             ]
         )
         for fn, t in sorted(dcm_times, key=lambda x: x[1])
@@ -60,11 +56,7 @@ def infotodict(seqinfo):
     subindex: sub index within group
     """
 
-    label_map = {
-        "movie": "movielocalizer",
-        "retmap": "retmap",
-        "visloc": "objectcategories",
-    }
+    label_map = {"movie": "movielocalizer", "retmap": "retmap", "visloc": "objectcategories"}
     info = {}
     for s in seqinfo:
         if "_bold_" not in s[12]:
@@ -80,11 +72,7 @@ def infotodict(seqinfo):
         else:
             label = label % ("",)
 
-        templ = "ses-%smm/func/{subject}_ses-%smm_task-%s_bold" % (
-            resolution,
-            resolution,
-            label,
-        )
+        templ = "ses-%smm/func/{subject}_ses-%smm_task-%s_bold" % (resolution, resolution, label)
 
         key = create_key(templ)
 

@@ -8,20 +8,12 @@ import re
 from collections import OrderedDict
 from datetime import datetime
 import csv
-from random import sample
 from glob import glob
 
 from .external.pydicom import dcm
 
 from .parser import find_files
-from .utils import (
-    load_json,
-    save_json,
-    create_file_if_missing,
-    json_dumps_pretty,
-    set_readonly,
-    is_readonly,
-)
+from .utils import load_json, save_json, create_file_if_missing, set_readonly, is_readonly
 
 lgr = logging.getLogger(__name__)
 
@@ -52,15 +44,11 @@ def populate_bids_templates(path, defaults={}):
                     ),
                     (
                         "Authors",
-                        defaults.get(
-                            "Authors", ["TODO:", "First1 Last1", "First2 Last2", "..."]
-                        ),
+                        defaults.get("Authors", ["TODO:", "First1 Last1", "First2 Last2", "..."]),
                     ),
                     (
                         "Acknowledgements",
-                        defaults.get(
-                            "Acknowledgements", "TODO: whom you want to acknowledge"
-                        ),
+                        defaults.get("Acknowledgements", "TODO: whom you want to acknowledge"),
                     ),
                     (
                         "HowToAcknowledge",
@@ -124,17 +112,14 @@ def populate_aggregated_jsons(path):
     # FIELDS_TO_TRACK = {'RepetitionTime', 'FlipAngle', 'EchoTime',
     #                    'Manufacturer', 'SliceTiming', ''}
     for fpath in find_files(
-        ".*_task-.*\_bold\.json",
-        topdir=path,
-        exclude_vcs=True,
-        exclude="/\.(datalad|heudiconv)/",
+        r".*_task-.*\_bold\.json", topdir=path, exclude_vcs=True, exclude=r"/\.(datalad|heudiconv)/"
     ):
         #
         # According to BIDS spec I think both _task AND _acq (may be more?
         # _rec, _dir, ...?) should be retained?
         # TODO: if we are to fix it, then old ones (without _acq) should be
         # removed first
-        task = re.sub(".*_(task-[^_\.]*(_acq-[^_\.]*)?)_.*", r"\1", fpath)
+        task = re.sub(r".*_(task-[^_\.]*(_acq-[^_\.]*)?)_.*", r"\1", fpath)
         json_ = load_json(fpath)
         if task not in tasks:
             tasks[task] = json_
@@ -188,9 +173,7 @@ def populate_aggregated_jsons(path):
         # But the fields we enter (TaskName and CogAtlasID) might need need
         # to be populated from the file if it already exists
         placeholders = {
-            "TaskName": (
-                "TODO: full task name for %s" % task_acq.split("_")[0].split("-")[1]
-            ),
+            "TaskName": ("TODO: full task name for %s" % task_acq.split("_")[0].split("-")[1]),
             "CogAtlasID": "TODO",
         }
         if op.lexists(task_file):
@@ -247,9 +230,9 @@ def tuneup_bids_json_files(json_files):
             lgr.debug("Placing EchoTime fields into phasediff file")
             for i in 1, 2:
                 try:
-                    json_["EchoTime%d" % i] = load_json(
-                        json_basename + "_magnitude%d.json" % i
-                    )["EchoTime"]
+                    json_["EchoTime%d" % i] = load_json(json_basename + "_magnitude%d.json" % i)[
+                        "EchoTime"
+                    ]
                 except IOError as exc:
                     lgr.error("Failed to open magnitude file: %s", exc)
             # might have been made R/O already, but if not -- it will be set
@@ -281,12 +264,7 @@ def add_participant_record(studydir, subject, age, sex):
             "\t".join(
                 map(
                     str,
-                    [
-                        participant_id,
-                        age.lstrip("0").rstrip("Y") if age else "N/A",
-                        sex,
-                        "control",
-                    ],
+                    [participant_id, age.lstrip("0").rstrip("Y") if age else "N/A", sex, "control"],
                 )
             )
             + "\n"
@@ -336,23 +314,19 @@ def save_scans_key(item, bids_files):
             return
         if subj and subj_ != subj:
             raise ValueError(
-                "We found before subject %s but now deduced %s from %s"
-                % (subj, subj_, f_name)
+                "We found before subject %s but now deduced %s from %s" % (subj, subj_, f_name)
             )
         subj = subj_
         if ses and ses_ != ses:
             raise ValueError(
-                "We found before session %s but now deduced %s from %s"
-                % (ses, ses_, f_name)
+                "We found before session %s but now deduced %s from %s" % (ses, ses_, f_name)
             )
         ses = ses_
     # where should we store it?
     output_dir = op.dirname(op.dirname(bids_file))
     # save
     ses = "_ses-%s" % ses if ses else ""
-    add_rows_to_scans_keys_file(
-        op.join(output_dir, "sub-{0}{1}_scans.tsv".format(subj, ses)), rows
-    )
+    add_rows_to_scans_keys_file(op.join(output_dir, "sub-{0}{1}_scans.tsv".format(subj, ses)), rows)
 
 
 def add_rows_to_scans_keys_file(fn, newrows):
@@ -451,7 +425,10 @@ def convert_sid_bids(subject_id):
     subject_id : string
         Original subject ID
     """
-    cleaner = lambda y: "".join([x for x in y if x.isalnum()])
+
+    def cleaner(subjectid):
+        return "".join([ch for ch in subjectid if ch.isalnum()])
+
     sid = cleaner(subject_id)
     if not sid:
         raise ValueError(

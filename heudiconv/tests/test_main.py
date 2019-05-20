@@ -31,10 +31,7 @@ def test_main_help(stdout):
     assert stdout.getvalue().startswith("usage: ")
 
 
-@patch(
-    "sys.stderr" if sys.version_info[:2] <= (3, 3) else "sys.stdout",
-    new_callable=StringIO,
-)
+@patch("sys.stderr" if sys.version_info[:2] <= (3, 3) else "sys.stdout", new_callable=StringIO)
 def test_main_version(std):
     with pytest.raises(SystemExit):
         runner(["--version"])
@@ -62,9 +59,7 @@ def test_populate_bids_templates(tmpdir):
 
     # it should also be available as a command
     os.unlink(str(description_file))
-    runner(
-        ["--command", "populate-templates", "-f", "convertall", "--files", str(tmpdir)]
-    )
+    runner(["--command", "populate-templates", "-f", "convertall", "--files", str(tmpdir)])
     assert "something" not in description_file.read()
     assert "TODO" in description_file.read()
 
@@ -226,21 +221,11 @@ def test_add_rows_to_scans_keys_file(tmpdir):
 
 def test__find_subj_ses():
     assert find_subj_ses(
-        "950_bids_test4/sub-phantom1sid1/fmap/"
-        "sub-phantom1sid1_acq-3mm_phasediff.json"
+        "950_bids_test4/sub-phantom1sid1/fmap/" "sub-phantom1sid1_acq-3mm_phasediff.json"
     ) == ("phantom1sid1", None)
-    assert find_subj_ses("sub-s1/ses-s1/fmap/sub-s1_ses-s1_acq-3mm_phasediff.json") == (
-        "s1",
-        "s1",
-    )
-    assert find_subj_ses("sub-s1/ses-s1/fmap/sub-s1_ses-s1_acq-3mm_phasediff.json") == (
-        "s1",
-        "s1",
-    )
-    assert find_subj_ses("fmap/sub-01-fmap_acq-3mm_acq-3mm_phasediff.nii.gz") == (
-        "01",
-        None,
-    )
+    assert find_subj_ses("sub-s1/ses-s1/fmap/sub-s1_ses-s1_acq-3mm_phasediff.json") == ("s1", "s1")
+    assert find_subj_ses("sub-s1/ses-s1/fmap/sub-s1_ses-s1_acq-3mm_phasediff.json") == ("s1", "s1")
+    assert find_subj_ses("fmap/sub-01-fmap_acq-3mm_acq-3mm_phasediff.nii.gz") == ("01", None)
 
 
 def test_make_readonly(tmpdir):

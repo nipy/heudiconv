@@ -1,6 +1,4 @@
-import os
 import sys
-import subprocess
 
 from heudiconv.cli.run import main as runner
 from heudiconv.queue import clean_args, which
@@ -12,10 +10,8 @@ import pytest
 @pytest.mark.parametrize(
     "invocation",
     [
-        "--files %s/01-fmap_acq-3mm"
-        % TESTS_DATA_PATH,  # our new way with automated groupping
-        "-d %s/{subject}/* -s 01-fmap_acq-3mm"
-        % TESTS_DATA_PATH,  # "old" way specifying subject
+        "--files %s/01-fmap_acq-3mm" % TESTS_DATA_PATH,  # our new way with automated groupping
+        "-d %s/{subject}/* -s 01-fmap_acq-3mm" % TESTS_DATA_PATH,  # "old" way specifying subject
     ],
 )
 def test_queue_no_slurm(tmpdir, invocation):
@@ -81,13 +77,5 @@ def test_argument_filtering(tmpdir):
         "-f",
         "convertall",
     ]
-    filtered = [
-        "heudiconv",
-        "-d",
-        "/some/{subject}/path",
-        "--subjects",
-        "sub3",
-        "-f",
-        "convertall",
-    ]
+    filtered = ["heudiconv", "-d", "/some/{subject}/path", "--subjects", "sub3", "-f", "convertall"]
     assert clean_args(cmd_subjects, "subjects", 2) == filtered

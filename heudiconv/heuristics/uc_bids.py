@@ -25,61 +25,24 @@ def infotodict(seqinfo):
     info = {t1w: [], t2w: [], flair: [], rest: []}
 
     for idx, seq in enumerate(seqinfo):
-        x, y, z, n_vol, protocol, dcm_dir = (
-            seq[6],
-            seq[7],
-            seq[8],
-            seq[9],
-            seq[12],
-            seq[3],
-        )
+        x, y, z, n_vol, protocol, dcm_dir = (seq[6], seq[7], seq[8], seq[9], seq[12], seq[3])
         # t1_mprage --> T1w
-        if (
-            (z == 160)
-            and (n_vol == 1)
-            and ("t1_mprage" in protocol)
-            and ("XX" not in dcm_dir)
-        ):
+        if (z == 160) and (n_vol == 1) and ("t1_mprage" in protocol) and ("XX" not in dcm_dir):
             info[t1w] = [seq[2]]
         # t2_tse --> T2w
-        if (
-            (z == 35)
-            and (n_vol == 1)
-            and ("t2_tse" in protocol)
-            and ("XX" not in dcm_dir)
-        ):
+        if (z == 35) and (n_vol == 1) and ("t2_tse" in protocol) and ("XX" not in dcm_dir):
             info[t2w].append({"item": seq[2], "acq": "TSE"})
         # T2W --> T2w
-        if (
-            (z == 192)
-            and (n_vol == 1)
-            and ("T2W" in protocol)
-            and ("XX" not in dcm_dir)
-        ):
+        if (z == 192) and (n_vol == 1) and ("T2W" in protocol) and ("XX" not in dcm_dir):
             info[t2w].append({"item": seq[2], "acq": "highres"})
         # t2_tirm --> FLAIR
-        if (
-            (z == 35)
-            and (n_vol == 1)
-            and ("t2_tirm" in protocol)
-            and ("XX" not in dcm_dir)
-        ):
+        if (z == 35) and (n_vol == 1) and ("t2_tirm" in protocol) and ("XX" not in dcm_dir):
             info[flair].append({"item": seq[2], "acq": "TIRM"})
         # t2_flair --> FLAIR
-        if (
-            (z == 160)
-            and (n_vol == 1)
-            and ("t2_flair" in protocol)
-            and ("XX" not in dcm_dir)
-        ):
+        if (z == 160) and (n_vol == 1) and ("t2_flair" in protocol) and ("XX" not in dcm_dir):
             info[flair].append({"item": seq[2], "acq": "highres"})
         # T2FLAIR --> FLAIR
-        if (
-            (z == 192)
-            and (n_vol == 1)
-            and ("T2-FLAIR" in protocol)
-            and ("XX" not in dcm_dir)
-        ):
+        if (z == 192) and (n_vol == 1) and ("T2-FLAIR" in protocol) and ("XX" not in dcm_dir):
             info[flair].append({"item": seq[2], "acq": "highres"})
         # EPI (physio-matched) --> bold
         if (

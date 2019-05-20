@@ -20,11 +20,7 @@ def infotodict(seqinfo):
     subindex: sub index within group
     """
 
-    label_map = {
-        "movie": "movielocalizer",
-        "retmap": "retmap",
-        "visloc": "objectcategories",
-    }
+    label_map = {"movie": "movielocalizer", "retmap": "retmap", "visloc": "objectcategories"}
     info = {}
     for s in seqinfo:
         if "EPI_3mm" not in s[12]:

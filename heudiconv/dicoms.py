@@ -53,11 +53,7 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
         nfl_before = len(files)
         files = list(filter(file_filter, files))
         nfl_after = len(files)
-        lgr.info(
-            "Filtering out {0} dicoms based on their filename".format(
-                nfl_before - nfl_after
-            )
-        )
+        lgr.info("Filtering out {0} dicoms based on their filename".format(nfl_before - nfl_after))
     for fidx, filename in enumerate(files):
         import nibabel.nicom.dicomwrappers as dw
 
@@ -68,7 +64,7 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
         for sig in ("iop", "ICE_Dims", "SequenceName"):
             try:
                 del mw.series_signature[sig]
-            except:
+            except Exception:
                 pass
 
         try:
@@ -83,9 +79,7 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
         except AttributeError:
             if not getattr(mw.dcm_data, "ProtocolName", "").strip():
                 mw.dcm_data.ProtocolName = (
-                    parse_private_csa_header(
-                        mw.dcm_data, "ProtocolName", "tProtocolName"
-                    )
+                    parse_private_csa_header(mw.dcm_data, "ProtocolName", "tProtocolName")
                     if mw.is_csa
                     else ""
                 )
@@ -105,9 +99,7 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
                         studyUID, file_studyUID
                     )
         except AttributeError as exc:
-            lgr.warning(
-                'Ignoring %s since not quite a "normal" DICOM: %s', filename, exc
-            )
+            lgr.warning('Ignoring %s since not quite a "normal" DICOM: %s', filename, exc)
             series_id = (-1, "none")
             file_studyUID = None
 
@@ -131,9 +123,7 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
             # same = mw.is_same_series(mwgroup[idx])
             if mw.is_same_series(mwgroup[idx]):
                 # the same series should have the same study uuid
-                assert (
-                    mwgroup[idx].dcm_data.get("StudyInstanceUID", None) == file_studyUID
-                )
+                assert mwgroup[idx].dcm_data.get("StudyInstanceUID", None) == file_studyUID
                 ingrp = True
                 if series_id[0] >= 0:
                     series_id = (
@@ -408,7 +398,6 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info, min_meta):
     """
     # imports for nipype
     import nibabel as nb
-    import os
     import os.path as op
     import json
     import re
@@ -448,9 +437,7 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info, min_meta):
             # meta_info = dict(meta_info.items() + bids_info.items())
         try:
             meta_info["TaskName"] = (
-                re.search("(?<=_task-)\w+", op.basename(infofile))
-                .group(0)
-                .split("_")[0]
+                re.search(r"(?<=_task-)\w+", op.basename(infofile)).group(0).split("_")[0]
             )
         except AttributeError:
             pass
@@ -462,15 +449,7 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info, min_meta):
 
 
 def embed_metadata_from_dicoms(
-    bids,
-    item_dicoms,
-    outname,
-    outname_bids,
-    prov_file,
-    scaninfo,
-    tempdirs,
-    with_prov,
-    min_meta,
+    bids, item_dicoms, outname, outname_bids, prov_file, scaninfo, tempdirs, with_prov, min_meta
 ):
     """
     Enhance sidecar information file with more information from DICOMs
@@ -515,10 +494,7 @@ def embed_metadata_from_dicoms(
     cwd = os.getcwd()
 
     lgr.debug(
-        "Embedding into %s based on dicoms[0]=%s for nifti %s",
-        scaninfo,
-        item_dicoms[0],
-        outname,
+        "Embedding into %s based on dicoms[0]=%s for nifti %s", scaninfo, item_dicoms[0], outname
     )
     try:
         if op.lexists(scaninfo):
@@ -563,9 +539,9 @@ def parse_private_csa_header(dcm_data, public_attr, private_attr, default=None):
 
     try:
         # TODO: test with attr besides ProtocolName
-        csastr = csareader.get_csa_header(dcm_data, "series")["tags"][
-            "MrPhoenixProtocol"
-        ]["items"][0]
+        csastr = csareader.get_csa_header(dcm_data, "series")["tags"]["MrPhoenixProtocol"]["items"][
+            0
+        ]
         csastr = csastr.replace("### ASCCONV BEGIN", "### ASCCONV BEGIN ### ")
         parsedhdr = dsextract.parse_phoenix_prot("MrPhoenixProtocol", csastr)
         val = parsedhdr[private_attr].replace(" ", "")

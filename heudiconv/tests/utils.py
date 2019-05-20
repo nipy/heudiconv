@@ -17,18 +17,7 @@ def gen_heudiconv_args(
         args = ["--files", datadir]
 
     args.extend(
-        [
-            "-c",
-            "dcm2niix",
-            "-o",
-            outdir,
-            "-s",
-            subject,
-            "-f",
-            heuristic,
-            "--bids",
-            "--minmeta",
-        ]
+        ["-c", "dcm2niix", "-o", outdir, "-s", subject, "-f", heuristic, "--bids", "--minmeta"]
     )
     if anon_cmd:
         args += ["--anon-cmd", op.join(op.dirname(__file__), anon_cmd), "-a", outdir]
@@ -60,9 +49,7 @@ def fetch_data(tmpdir, dataset, getpath=None):
     from datalad import api
 
     targetdir = op.join(tmpdir, op.basename(dataset))
-    api.install(
-        path=targetdir, source="http://datasets-tests.datalad.org/{}".format(dataset)
-    )
+    api.install(path=targetdir, source="http://datasets-tests.datalad.org/{}".format(dataset))
 
     getdir = targetdir + (op.sep + getpath if getpath is not None else "")
     api.get(getdir)

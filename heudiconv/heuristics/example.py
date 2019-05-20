@@ -60,11 +60,7 @@ def infotodict(seqinfo):
         elif (nt > 60) and ("ge_func_2x2x2_Resting" in s[12]):
             if not s[13]:
                 info[rs].append(int(s[2]))
-        elif (
-            (nt == 156)
-            and ("ge_functionals_128_PACE_ACPC-30" in s[12])
-            and s[2] < last_run
-        ):
+        elif (nt == 156) and ("ge_functionals_128_PACE_ACPC-30" in s[12]) and s[2] < last_run:
             if not s[13]:
                 info[boldt1].append(s[2])
                 last_run = s[2]

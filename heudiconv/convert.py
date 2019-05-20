@@ -26,11 +26,7 @@ from .bids import (
     add_participant_record,
     BIDSError,
 )
-from .dicoms import (
-    group_dicoms_into_seqinfos,
-    embed_metadata_from_dicoms,
-    compress_dicoms,
-)
+from .dicoms import group_dicoms_into_seqinfos, embed_metadata_from_dicoms, compress_dicoms
 
 lgr = logging.getLogger(__name__)
 
@@ -104,9 +100,7 @@ def prep_conversion(
 
     if bids:
         if not sid:
-            raise ValueError(
-                "BIDS requires alphanumeric subject ID. Got an empty value"
-            )
+            raise ValueError("BIDS requires alphanumeric subject ID. Got an empty value")
         if not sid.isalnum():  # alphanumeric only
             sid, old_sid = convert_sid_bids(sid)
 
@@ -147,10 +141,7 @@ def prep_conversion(
     ) != file_md5sum(heuristic.filename):
         # remake conversion table
         reuse_conversion_table = False
-        lgr.info(
-            "Will not reuse existing conversion table files because heuristic "
-            "has changed"
-        )
+        lgr.info("Will not reuse existing conversion table files because heuristic " "has changed")
 
     if reuse_conversion_table:
         lgr.info("Reloading existing filegroup.json " "because %s exists", edit_file)
@@ -221,9 +212,7 @@ def prep_conversion(
     if bids:
         if seqinfo:
             keys = list(seqinfo)
-            add_participant_record(
-                anon_outdir, anon_sid, keys[0].patient_age, keys[0].patient_sex
-            )
+            add_participant_record(anon_outdir, anon_sid, keys[0].patient_age, keys[0].patient_sex)
         populate_bids_templates(anon_outdir, getattr(heuristic, "DEFAULT_FIELDS", {}))
 
 
@@ -300,13 +289,9 @@ def convert(
             lgr.debug("Includes the following dicoms: %s", item_dicoms)
 
             if outtype == "dicom":
-                convert_dicom(
-                    item_dicoms, bids, prefix, outdir, tempdirs, symlink, overwrite
-                )
+                convert_dicom(item_dicoms, bids, prefix, outdir, tempdirs, symlink, overwrite)
             elif outtype in ["nii", "nii.gz"]:
-                assert converter == "dcm2niix", "Invalid converter " "{}".format(
-                    converter
-                )
+                assert converter == "dcm2niix", "Invalid converter " "{}".format(converter)
 
                 outname, scaninfo = (prefix + "." + outtype, prefix + scaninfo_suffix)
 
@@ -319,13 +304,7 @@ def convert(
                     )
 
                     bids_outfiles = save_converted_files(
-                        res,
-                        item_dicoms,
-                        bids,
-                        outtype,
-                        prefix,
-                        outname_bids,
-                        overwrite=overwrite,
+                        res, item_dicoms, bids, outtype, prefix, outname_bids, overwrite=overwrite
                     )
 
                     # save acquisition time information if it's BIDS
@@ -341,8 +320,7 @@ def convert(
                     tempdirs.rmtree(tmpdir)
                 else:
                     raise RuntimeError(
-                        "was asked to convert into %s but destination already exists"
-                        % (outname)
+                        "was asked to convert into %s but destination already exists" % (outname)
                     )
 
         if len(bids_outfiles) > 1:
@@ -412,15 +390,11 @@ def convert_dicom(item_dicoms, bids, prefix, outdir, tempdirs, symlink, overwrit
         if not op.exists(sourcedir_):
             os.makedirs(sourcedir_)
 
-        compress_dicoms(
-            item_dicoms, op.join(sourcedir_, op.basename(prefix)), tempdirs, overwrite
-        )
+        compress_dicoms(item_dicoms, op.join(sourcedir_, op.basename(prefix)), tempdirs, overwrite)
     else:
         dicomdir = prefix + "_dicom"
         if op.exists(dicomdir):
-            lgr.info(
-                "Found existing DICOM directory {}, " "removing...".format(dicomdir)
-            )
+            lgr.info("Found existing DICOM directory {}, " "removing...".format(dicomdir))
             shutil.rmtree(dicomdir)
         os.mkdir(dicomdir)
         for filename in item_dicoms:
@@ -484,16 +458,12 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir, dcmconfig=None)
     # prov information
     prov_file = prefix + "_prov.ttl" if with_prov else None
     if prov_file:
-        safe_copyfile(
-            op.join(convertnode.base_dir, convertnode.name, "provenance.ttl"), prov_file
-        )
+        safe_copyfile(op.join(convertnode.base_dir, convertnode.name, "provenance.ttl"), prov_file)
 
     return eg, prov_file
 
 
-def save_converted_files(
-    res, item_dicoms, bids, outtype, prefix, outname_bids, overwrite
-):
+def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids, overwrite):
     """Copy converted files from tempdir to output directory.
     Will rename files if necessary.
 
@@ -549,12 +519,10 @@ def save_converted_files(
         # Also copy BIDS files although they might need to
         # be merged/postprocessed later
         bids_files = sorted(
-            res.outputs.bids
-            if len(res.outputs.bids) == len(res_files)
-            else [None] * len(res_files)
+            res.outputs.bids if len(res.outputs.bids) == len(res_files) else [None] * len(res_files)
         )
 
-        ###   Do we have a multi-echo series?   ###
+        #   Do we have a multi-echo series?   ###
         #   Some Siemens sequences (e.g. CMRR's MB-EPI) set the label 'TE1',
         #   'TE2', etc. in the 'ImageType' field. However, other seqs do not
         #   (e.g. MGH ME-MPRAGE). They do set a 'EchoNumber', but not for the
@@ -569,7 +537,7 @@ def save_converted_files(
 
         is_multiecho = len(echo_times) > 1
 
-        ### Loop through the bids_files, set the output name and save files
+        # Loop through the bids_files, set the output name and save files
         for fl, suffix, bids_file in zip(res_files, suffixes, bids_files):
 
             # TODO: monitor conversion duration
@@ -655,6 +623,6 @@ def save_converted_files(
             try:
                 safe_copyfile(res.outputs.bids, outname_bids, overwrite)
                 bids_outfiles.append(outname_bids)
-            except TypeError as exc:  ##catch lists
+            except TypeError:  # catch lists
                 raise TypeError("Multiple BIDS sidecars detected.")
     return bids_outfiles

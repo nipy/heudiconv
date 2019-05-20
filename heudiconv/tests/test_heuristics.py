@@ -43,8 +43,7 @@ def test_smoke_convertall(tmpdir):
     "invocation",
     [
         "--files %s" % TESTS_DATA_PATH,  # our new way with automated groupping
-        "-d %s/{subject}/* -s 01-fmap_acq-3mm"
-        % TESTS_DATA_PATH  # "old" way specifying subject
+        "-d %s/{subject}/* -s 01-fmap_acq-3mm" % TESTS_DATA_PATH  # "old" way specifying subject
         # should produce the same results
     ],
 )
@@ -98,9 +97,8 @@ def test_reproin_largely_smoke(tmpdir, heuristic, invocation):
 
 
 @pytest.mark.parametrize(
-    "invocation",
-    ["--files %s" % TESTS_DATA_PATH],  # our new way with automated groupping
-)
+    "invocation", ["--files %s" % TESTS_DATA_PATH]
+)  # our new way with automated groupping
 def test_scans_keys_reproin(tmpdir, invocation):
     args = "-f reproin -c dcm2niix -o %s -b " % (tmpdir)
     args += invocation
@@ -116,9 +114,7 @@ def test_scans_keys_reproin(tmpdir, invocation):
             assert len(row) == 4
             if i != 0:
                 assert os.path.exists(pjoin(dirname(scans_keys[0]), row[0]))
-                assert re.match(
-                    "^[\d]{4}-[\d]{2}-[\d]{2}T[\d]{2}:[\d]{2}:[\d]{2}$", row[1]
-                )
+                assert re.match(r"^[\d]{4}-[\d]{2}-[\d]{2}T[\d]{2}:[\d]{2}:[\d]{2}$", row[1])
 
 
 @patch("sys.stdout", new_callable=StringIO)
@@ -136,10 +132,7 @@ def test_scout_conversion(tmpdir):
     runner(args)
 
     assert not op.exists(
-        pjoin(
-            tmppath,
-            "Halchenko/Yarik/950_bids_test4/sub-phantom1sid1/ses-localizer/anat",
-        )
+        pjoin(tmppath, "Halchenko/Yarik/950_bids_test4/sub-phantom1sid1/ses-localizer/anat")
     )
 
     assert op.exists(

@@ -1,10 +1,8 @@
 import inspect
-import os
 
 import os.path as op
 import logging
 from glob import glob
-from os import path as op
 
 from ..utils import create_file_if_missing
 
@@ -22,14 +20,10 @@ def prepare_datalad(studydir, outdir, sid, session, seqinfo, dicoms, bids):
         datalad_msg_suf += ", session %s" % session
     if seqinfo:
         datalad_msg_suf += ", %d sequences" % len(seqinfo)
-    datalad_msg_suf += ", %d dicoms" % (
-        len(sum(seqinfo.values(), [])) if seqinfo else len(dicoms)
-    )
+    datalad_msg_suf += ", %d dicoms" % (len(sum(seqinfo.values(), [])) if seqinfo else len(dicoms))
     ds = Dataset(studydir)
     if not op.exists(outdir) or not ds.is_installed():
-        add_to_datalad(
-            outdir, studydir, msg="Preparing for %s" % datalad_msg_suf, bids=bids
-        )
+        add_to_datalad(outdir, studydir, msg="Preparing for %s" % datalad_msg_suf, bids=bids)
     return datalad_msg_suf
 
 
@@ -113,10 +107,7 @@ def add_to_datalad(topdir, studydir, msg, bids):
             # Previously we did not have it as a submodule, and since no
             # automagic migration is implemented, we just need to check first
             # if any path under .heudiconv is already under git control
-            if any(
-                x[0].startswith(".heudiconv/")
-                for x in ds.repo.repo.index.entries.keys()
-            ):
+            if any(x[0].startswith(".heudiconv/") for x in ds.repo.repo.index.entries.keys()):
                 lgr.warning(
                     "%s has .heudiconv not as a submodule from previous"
                     " versions of heudiconv. No automagic migration is "
@@ -137,8 +128,7 @@ def add_to_datalad(topdir, studydir, msg, bids):
             ds.add(
                 ".heudiconv/.gitattributes",
                 to_git=True,
-                message="Added gitattributes to place all .heudiconv content"
-                " under annex",
+                message="Added gitattributes to place all .heudiconv content" " under annex",
             )
     ds.add(
         ".",

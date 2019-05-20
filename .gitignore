@@ -5,3 +5,6 @@
 .idea/
 venvs/
 _build/
+.vscode/
+.ipynb_checkpoints/
+*.ipynb

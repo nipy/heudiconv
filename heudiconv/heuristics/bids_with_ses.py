@@ -23,16 +23,11 @@ def infotodict(seqinfo):
     outdicom = ("dicom", "nii.gz")
 
     t1 = create_key(
-        "{bids_subject_session_dir}/anat/{bids_subject_session_prefix}_T1w",
-        outtype=outdicom,
+        "{bids_subject_session_dir}/anat/{bids_subject_session_prefix}_T1w", outtype=outdicom
     )
     t2 = create_key("{bids_subject_session_dir}/anat/{bids_subject_session_prefix}_T2w")
-    dwi_ap = create_key(
-        "{bids_subject_session_dir}/dwi/{bids_subject_session_prefix}_dir-AP_dwi"
-    )
-    dwi_pa = create_key(
-        "{bids_subject_session_dir}/dwi/{bids_subject_session_prefix}_dir-PA_dwi"
-    )
+    dwi_ap = create_key("{bids_subject_session_dir}/dwi/{bids_subject_session_prefix}_dir-AP_dwi")
+    dwi_pa = create_key("{bids_subject_session_dir}/dwi/{bids_subject_session_prefix}_dir-PA_dwi")
     rs = create_key(
         "{bids_subject_session_dir}/func/{bids_subject_session_prefix}_task-rest_run-{item:02d}_bold",
         outtype=outdicom,
@@ -50,31 +45,14 @@ def infotodict(seqinfo):
         outtype=outdicom,
     )
 
-    info = {
-        t1: [],
-        t2: [],
-        dwi_ap: [],
-        dwi_pa: [],
-        rs: [],
-        boldt1: [],
-        boldt2: [],
-        boldt3: [],
-    }
+    info = {t1: [], t2: [], dwi_ap: [], dwi_pa: [], rs: [], boldt1: [], boldt2: [], boldt3: []}
     last_run = len(seqinfo)
     for s in seqinfo:
-        if (
-            (s.dim3 == 176 or s.dim3 == 352)
-            and (s.dim4 == 1)
-            and ("MEMPRAGE" in s.protocol_name)
-        ):
+        if (s.dim3 == 176 or s.dim3 == 352) and (s.dim4 == 1) and ("MEMPRAGE" in s.protocol_name):
             info[t1] = [s.series_id]
         elif (s.dim4 == 1) and ("MEMPRAGE" in s.protocol_name):
             info[t1] = [s.series_id]
-        elif (
-            (s.dim3 == 176 or s.dim3 == 352)
-            and (s.dim4 == 1)
-            and ("T2_SPACE" in s.protocol_name)
-        ):
+        elif (s.dim3 == 176 or s.dim3 == 352) and (s.dim4 == 1) and ("T2_SPACE" in s.protocol_name):
             info[t2] = [s.series_id]
         elif (s.dim4 >= 70) and ("DIFFUSION_HighRes_AP" in s.protocol_name):
             info[dwi_ap].append([s.series_id])

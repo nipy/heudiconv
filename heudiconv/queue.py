@@ -47,7 +47,7 @@ def queue_conversion(queue, iterarg, iterables, queue_args=None):
             fp.write(convertcmd + "\n")
 
         cmd = [SUPPORTED_QUEUES[queue], queue_file]
-        proc = subprocess.call(cmd)
+        subprocess.call(cmd)
     lgr.info("Submitted %d jobs", iterables)
 
 

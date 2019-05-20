@@ -33,14 +33,14 @@ def test_nifti_embed(tmpdir):
     infofile = "infofile.json"
 
     # 1) nifti does not exist
-    out = embed_nifti(dcmfiles, "nifti.nii", "infofile.json", None, False)
+    out = embed_nifti(dcmfiles, "nifti.nii", infofile, None, False)
     # string -> json
     out = json.loads(out)
     # should have created nifti file
     assert op.exists("nifti.nii")
 
     # 2) nifti exists
-    nifti, info = embed_nifti(dcmfiles, "nifti.nii", "infofile.json", None, False)
+    nifti, info = embed_nifti(dcmfiles, "nifti.nii", infofile, None, False)
     assert op.exists(nifti)
     assert op.exists(info)
     with open(info) as fp:
@@ -50,7 +50,7 @@ def test_nifti_embed(tmpdir):
 
     # 3) with existing metadata
     bids = {"existing": "data"}
-    nifti, info = embed_nifti(dcmfiles, "nifti.nii", "infofile.json", bids, False)
+    nifti, info = embed_nifti(dcmfiles, "nifti.nii", infofile, bids, False)
     with open(info) as fp:
         out3 = json.load(fp)
 

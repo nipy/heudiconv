@@ -12,7 +12,6 @@ from ..convert import prep_conversion
 from ..bids import populate_bids_templates, tuneup_bids_json_files
 from ..queue import queue_conversion
 
-import inspect
 import logging
 
 lgr = logging.getLogger(__name__)
@@ -98,8 +97,7 @@ def process_extra_commands(outdir, args):
 
         if not args.heuristic:
             raise ValueError(
-                "Specify heuristic using -f. Known are: %s"
-                % ", ".join(get_known_heuristic_names())
+                "Specify heuristic using -f. Known are: %s" % ", ".join(get_known_heuristic_names())
             )
         print(get_heuristic_description(args.heuristic, full=True))
     else:
@@ -216,8 +214,7 @@ def get_parser():
         "-f",
         "--heuristic",
         dest="heuristic",
-        help="Name of a known heuristic or path to the Python"
-        "script containing heuristic",
+        help="Name of a known heuristic or path to the Python" "script containing heuristic",
     )
     parser.add_argument(
         "-p",
@@ -268,8 +265,7 @@ def get_parser():
             "sanitize-jsons",
             "treat-jsons",
         ),
-        help="custom actions to be performed on provided "
-        "files instead of regular operation.",
+        help="custom actions to be performed on provided " "files instead of regular operation.",
     )
     parser.add_argument(
         "-g",
@@ -287,9 +283,7 @@ def get_parser():
         "--random-seed", type=int, default=None, help="Random seed to initialize RNG"
     )
     parser.add_argument(
-        "--dcmconfig",
-        default=None,
-        help="JSON file for additional dcm2niix configuration",
+        "--dcmconfig", default=None, help="JSON file for additional dcm2niix configuration"
     )
     submission = parser.add_argument_group("Conversion submission options")
     submission.add_argument(
@@ -394,13 +388,7 @@ def process_args(args):
 
             dlad_sid = sid if not anon_sid else anon_sid
             dl_msg = prepare_datalad(
-                anon_study_outdir,
-                anon_outdir,
-                dlad_sid,
-                session,
-                seqinfo,
-                dicoms,
-                args.bids,
+                anon_study_outdir, anon_outdir, dlad_sid, session, seqinfo, dicoms, args.bids
             )
 
         lgr.info(
