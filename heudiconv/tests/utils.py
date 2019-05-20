@@ -2,11 +2,12 @@ import os.path as op
 import heudiconv.heuristics
 
 HEURISTICS_PATH = op.join(heudiconv.heuristics.__path__[0])
-TESTS_DATA_PATH = op.join(op.dirname(__file__), 'data')
+TESTS_DATA_PATH = op.join(op.dirname(__file__), "data")
 
 
-def gen_heudiconv_args(datadir, outdir, subject, heuristic_file,
-                       anon_cmd=None, template=None, xargs=None):
+def gen_heudiconv_args(
+    datadir, outdir, subject, heuristic_file, anon_cmd=None, template=None, xargs=None
+):
     heuristic = op.realpath(op.join(HEURISTICS_PATH, heuristic_file))
 
     if template:
@@ -15,14 +16,20 @@ def gen_heudiconv_args(datadir, outdir, subject, heuristic_file,
     else:
         args = ["--files", datadir]
 
-    args.extend([
-            "-c", "dcm2niix",
-            "-o", outdir,
-            "-s", subject,
-            "-f", heuristic,
+    args.extend(
+        [
+            "-c",
+            "dcm2niix",
+            "-o",
+            outdir,
+            "-s",
+            subject,
+            "-f",
+            heuristic,
             "--bids",
-            "--minmeta",]
-            )
+            "--minmeta",
+        ]
+    )
     if anon_cmd:
         args += ["--anon-cmd", op.join(op.dirname(__file__), anon_cmd), "-a", outdir]
     if xargs:
@@ -51,10 +58,12 @@ def fetch_data(tmpdir, dataset, getpath=None):
         directory with installed dataset
     """
     from datalad import api
-    targetdir = op.join(tmpdir, op.basename(dataset))
-    api.install(path=targetdir,
-                source='http://datasets-tests.datalad.org/{}'.format(dataset))
 
-    getdir = targetdir + (op.sep + getpath if getpath is not None else '')
+    targetdir = op.join(tmpdir, op.basename(dataset))
+    api.install(
+        path=targetdir, source="http://datasets-tests.datalad.org/{}".format(dataset)
+    )
+
+    getdir = targetdir + (op.sep + getpath if getpath is not None else "")
     api.get(getdir)
     return targetdir

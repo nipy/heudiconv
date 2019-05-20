@@ -10,18 +10,15 @@ import tarfile
 from tempfile import mkdtemp
 
 from .dicoms import group_dicoms_into_seqinfos
-from .utils import (
-    docstring_parameter,
-    StudySessionInfo,
-)
+from .utils import docstring_parameter, StudySessionInfo
 
 lgr = logging.getLogger(__name__)
 
-_VCS_REGEX = '%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (op.sep, op.sep)
+_VCS_REGEX = "%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)" % (op.sep, op.sep)
+
 
 @docstring_parameter(_VCS_REGEX)
-def find_files(regex, topdir=op.curdir, exclude=None,
-               exclude_vcs=True, dirs=False):
+def find_files(regex, topdir=op.curdir, exclude=None, exclude_vcs=True, dirs=False):
     """Generator to find files matching regex
     Parameters
     ----------
@@ -66,7 +63,7 @@ def get_extracted_dicoms(fl):
     # of all files in all tarballs
 
     # cannot use TempDirs since will trigger cleanup with __del__
-    tmpdir = mkdtemp(prefix='heudiconvDCM')
+    tmpdir = mkdtemp(prefix="heudiconvDCM")
 
     sessions = defaultdict(list)
     session = 0
@@ -104,8 +101,9 @@ def get_extracted_dicoms(fl):
     return sessions.items()
 
 
-def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
-                       session, sids, grouping='studyUID'):
+def get_study_sessions(
+    dicom_dir_template, files_opt, heuristic, outdir, session, sids, grouping="studyUID"
+):
     """Given options from cmdline sort files or dicom seqinfos into
     study_sessions which put together files for a single session of a subject
     in a study
@@ -124,10 +122,11 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
         # assert sids
         # expand the input template
 
-        if '{subject}' not in dicom_dir_template:
+        if "{subject}" not in dicom_dir_template:
             raise ValueError(
                 "dicom dir template must have {subject} as a placeholder for a "
-                "subject id.  Got %r" % dicom_dir_template)
+                "subject id.  Got %r" % dicom_dir_template
+            )
         for sid in sids:
             sdir = dicom_dir_template.format(subject=sid, session=session)
             files = sorted(glob(sdir))
@@ -136,12 +135,15 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
                     lgr.warning(
                         "We had session specified (%s) but while analyzing "
                         "files got a new value %r (using it instead)"
-                        % (session, session_))
+                        % (session, session_)
+                    )
                 # in this setup we do not care about tracking "studies" so
                 # locator would be the same None
-                study_sessions[StudySessionInfo(None,
-                        session_ if session_ is not None else session,
-                        sid)] = files_
+                study_sessions[
+                    StudySessionInfo(
+                        None, session_ if session_ is not None else session, sid
+                    )
+                ] = files_
     else:
         # MG - should be caught on initial run
         # YOH - what if it is the initial run?
@@ -150,8 +152,9 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
         files = []
         for f in files_opt:
             if op.isdir(f):
-                files += sorted(find_files(
-                    '.*', topdir=f, exclude_vcs=True, exclude="/\.datalad/"))
+                files += sorted(
+                    find_files(".*", topdir=f, exclude_vcs=True, exclude="/\.datalad/")
+                )
             else:
                 files.append(f)
 
@@ -162,10 +165,12 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
 
         # sort all DICOMS using heuristic
         # TODO:  this one is not grouping by StudyUID but may be we should!
-        seqinfo_dict = group_dicoms_into_seqinfos(files_,
-            file_filter=getattr(heuristic, 'filter_files', None),
-            dcmfilter=getattr(heuristic, 'filter_dicom', None),
-            grouping=grouping)
+        seqinfo_dict = group_dicoms_into_seqinfos(
+            files_,
+            file_filter=getattr(heuristic, "filter_files", None),
+            dcmfilter=getattr(heuristic, "filter_dicom", None),
+            grouping=grouping,
+        )
 
         if sids:
             if not (len(sids) == 1 and len(seqinfo_dict) == 1):
@@ -179,22 +184,24 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
         else:
             sid = None
 
-        if not getattr(heuristic, 'infotoids', None):
+        if not getattr(heuristic, "infotoids", None):
             # allow bypass with subject override
             if not sid:
-                raise NotImplementedError("Cannot guarantee subject id - add "
-                                          "`infotoids` to heuristic file or "
-                                          "provide `--subjects` option")
-            lgr.warn("Heuristic is missing an `infotoids` method, assigning "
-                     "empty method and using provided subject id %s. "
-                     "Provide `session` and `locator` fields for best results."
-                     , sid)
+                raise NotImplementedError(
+                    "Cannot guarantee subject id - add "
+                    "`infotoids` to heuristic file or "
+                    "provide `--subjects` option"
+                )
+            lgr.warn(
+                "Heuristic is missing an `infotoids` method, assigning "
+                "empty method and using provided subject id %s. "
+                "Provide `session` and `locator` fields for best results.",
+                sid,
+            )
+
             def infotoids(seqinfos, outdir):
-                return {
-                    'locator': None,
-                    'session': None,
-                    'subject': None
-                    }
+                return {"locator": None, "session": None, "subject": None}
+
             heuristic.infotoids = infotoids
 
         for studyUID, seqinfo in seqinfo_dict.items():
@@ -210,15 +217,16 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
             # full seqinfo with files which it would place into multiple groups
             lgr.info("Study session for %s" % str(ids))
             study_session_info = StudySessionInfo(
-                ids.get('locator'),
-                ids.get('session', session) or session,
-                sid or ids.get('subject', None)
+                ids.get("locator"),
+                ids.get("session", session) or session,
+                sid or ids.get("subject", None),
             )
             if study_session_info in study_sessions:
-                #raise ValueError(
+                # raise ValueError(
                 lgr.warning(
                     "We already have a study session with the same value %s"
-                    % repr(study_session_info))
-                continue # skip for now
+                    % repr(study_session_info)
+                )
+                continue  # skip for now
             study_sessions[study_session_info] = seqinfo
     return study_sessions

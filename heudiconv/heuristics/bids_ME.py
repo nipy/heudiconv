@@ -5,10 +5,11 @@ series_description and outputs to BIDS.
 """
 
 
-def create_key(template, outtype=('nii.gz',), annotation_classes=None):
+def create_key(template, outtype=("nii.gz",), annotation_classes=None):
     if template is None or not template:
-        raise ValueError('Template must be a valid format string')
+        raise ValueError("Template must be a valid format string")
     return template, outtype, annotation_classes
+
 
 def infotodict(seqinfo):
     """Heuristic evaluator for determining which runs belong where
@@ -20,10 +21,10 @@ def infotodict(seqinfo):
     seqitem: run number during scanning
     subindex: sub index within group
     """
-    bold = create_key('sub-{subject}/func/sub-{subject}_task-test_run-{item}_bold')
+    bold = create_key("sub-{subject}/func/sub-{subject}_task-test_run-{item}_bold")
 
     info = {bold: []}
     for s in seqinfo:
-        if '_ME_' in s.series_description:
+        if "_ME_" in s.series_description:
             info[bold].append(s.series_id)
     return info

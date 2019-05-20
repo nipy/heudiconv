@@ -1,4 +1,4 @@
-#! /usr/bin/env python 
+#! /usr/bin/env python
 
 import sys
 import re
@@ -15,5 +15,5 @@ def main():
     return bids_id_(sid)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
