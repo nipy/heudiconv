@@ -3,7 +3,7 @@ import sys
 import os
 import logging
 
-from .utils import which
+from nipype.utils.filemanip import which
 
 lgr = logging.getLogger(__name__)
 
