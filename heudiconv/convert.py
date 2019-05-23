@@ -420,7 +420,7 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids_options, tmpdir, dcmconf
     convertnode = Node(Dcm2niix(from_file=fromfile), name='convert')
     convertnode.base_dir = tmpdir
     convertnode.inputs.source_names = item_dicoms
-    convertnode.inputs.out_filename = op.basename(op.dirname(prefix))
+    convertnode.inputs.out_filename = prefix
 
     if nipype.__version__.split('.')[0] == '0':
         # deprecated since 1.0, might be needed(?) before
