@@ -41,6 +41,10 @@ def add_to_datalad(topdir, studydir, msg, bids):
     assert external_versions['datalad'] >= MIN_VERSION, (
       "Need datalad >= {}".format(MIN_VERSION))  # add to reqs
 
+    create_kwargs = {}
+    if external_versions['datalad'] >= '0.10':
+        create_kwargs['fake_dates'] = True  # fake dates by default
+
     studyrelpath = op.relpath(studydir, topdir)
     assert not studyrelpath.startswith(op.pardir)  # so we are under
     # now we need to test and initiate a DataLad dataset all along the path
@@ -58,7 +62,9 @@ def add_to_datalad(topdir, studydir, msg, bids):
                          force=True,
                          no_annex=True,
                          # shared_access='all',
-                         annex_version=6)
+                         annex_version=6,
+                         **create_kwargs
+                         )
             assert ds == ds_
         assert ds.is_installed()
         superds = ds
@@ -113,7 +119,8 @@ def add_to_datalad(topdir, studydir, msg, bids):
                             "yet provided", ds)
             else:
                 dsh = ds.create(path='.heudiconv',
-                                force=True
+                                force=True,
+                                **create_kwargs
                                 # shared_access='all'
                                 )
         # Since .heudiconv could contain sensitive information
