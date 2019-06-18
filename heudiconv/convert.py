@@ -122,7 +122,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
     # detected
     # ref: https://github.com/nipy/heudiconv/issues/84#issuecomment-330048609
     # for more automagical wishes
-    target_heuristic_filename = op.join(idir, op.basename(heuristic.filename))
+    target_heuristic_filename = op.join(idir, 'heuristic.py')
     # TODO:
     #  1. add a test
     #  2. possibly extract into a dedicated function for easier logic flow here
@@ -151,7 +151,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
         # TODO -- might have been done outside already!
         # MG -- will have to try with both dicom template, files
         assure_no_file_exists(target_heuristic_filename)
-        safe_copyfile(heuristic.filename, idir)
+        safe_copyfile(heuristic.filename, target_heuristic_filename)
         if dicoms:
             seqinfo = group_dicoms_into_seqinfos(
                 dicoms,
