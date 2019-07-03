@@ -551,7 +551,10 @@ def infotodict(seqinfo):
             if not dcm_image_iod_spec:
                 raise ValueError("Do not know image data type yet to make decision")
             seqtype_label = {
-                'M': 'magnitude',  # might want explicit {file_index}  ?
+                # might want explicit {file_index}  ?
+                # _epi for pipolar fieldmaps, see
+                # https://bids-specification.readthedocs.io/en/stable/04-modality-specific-files/01-magnetic-resonance-imaging-data.html#case-4-multiple-phase-encoded-directions-pepolar
+                'M': 'epi' if 'dir' in series_info else 'magnitude',
                 'P': 'phasediff',
                 'DIFFUSION': 'epi', # according to KODI those DWI are the EPIs we need
             }[dcm_image_iod_spec]
@@ -610,12 +613,23 @@ def infotodict(seqinfo):
         if s.is_motion_corrected and 'rec-' in series_info.get('bids', ''):
             raise NotImplementedError("want to add _acq-moco but there is _acq- already")
 
+        def from_series_info(name):
+            """A little helper to provide _name-value if series_info knows it
+
+            Returns None otherwise
+            """
+            if series_info.get(name):
+                return "%s-%s" % (name, series_info[name])
+            else:
+                return None
+
         suffix_parts = [
-            None if not series_info.get('task') else "task-%s" % series_info['task'],
-            None if not series_info.get('acq') else "acq-%s" % series_info['acq'],
+            from_series_info('task'),
+            from_series_info('acq'),
             # But we want to add an indicator in case it was motion corrected
             # in the magnet. ref sample  /2017/01/03/qa
             None if not s.is_motion_corrected else 'rec-moco',
+            from_series_info('dir'),
             series_info.get('bids'),
             run_label,
             seqtype_label,
@@ -903,7 +917,7 @@ def parse_series_spec(series_spec):
             .replace('_', 'X').replace('-', 'X') \
             .replace('(', '{').replace(')', '}')  # for Philips
 
-        if key in ['ses', 'run', 'task', 'acq']:
+        if key in ['ses', 'run', 'task', 'acq', 'dir']:
             # those we care about explicitly
             regd[{'ses': 'session'}.get(key, key)] = sanitize_str(value)
         else:
