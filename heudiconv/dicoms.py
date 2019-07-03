@@ -218,6 +218,7 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
     # be sortable in a way that preserves the series order
     for series_id, mwidx in sorted(group_map.items()):
         mw = mwgroup[mwidx]
+        series_files = [files[i] for i, s in enumerate(groups[0]) if s == series_id]
         if per_studyUID:
             studyUID = series_id[2]
             series_id = series_id[:2]
@@ -226,7 +227,6 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
             # this whole thing has no image data (maybe just PSg DICOMs)
             # nothing to see here, just move on
             continue
-        series_files = [files[i] for i, s in enumerate(groups[0]) if s == series_id]
         seqinfo = create_seqinfo(mw, series_files, series_id)
 
         if per_studyUID:
