@@ -28,10 +28,11 @@ per each session.
 Sequence names on the scanner must follow this specification to avoid manual
 conversion/handling:
 
-  [PREFIX:]<seqtype[-label]>[_ses-<SESID>][_task-<TASKID>][_acq-<ACQLABEL>][_run-<RUNID>][_dir-<DIR>][<more BIDS>][__<custom>]
+  [PREFIX:][WIP ]<seqtype[-label]>[_ses-<SESID>][_task-<TASKID>][_acq-<ACQLABEL>][_run-<RUNID>][_dir-<DIR>][<more BIDS>][__<custom>]
 
 where
  [PREFIX:] - leading capital letters followed by : are stripped/ignored
+ [WIP ] - prefix is stripped/ignored (added by Philips for patch sequences)
  <...> - value to be entered
  [...] - optional -- might be nearly mandatory for some modalities (e.g.,
          run for functional) and very optional for others
@@ -104,6 +105,16 @@ __<custom> (optional)
 
 Although we still support "-" and "+" used within SESID and TASKID, their use is
 not recommended, thus not listed here
+
+## Scanner specifics
+
+We perform following actions regardless of the type of scanner, but applied
+generally to accommodate limitations imposed by different manufacturers/models:
+
+### Philips
+
+- We replace all ( with { and ) with } to be able e.g. to specify session {date}
+- "WIP " prefix unconditionally added by the scanner is stripped
 """
 
 import os
@@ -426,16 +437,15 @@ def ls(study_session, seqinfo):
 # So we just need subdir and file_suffix!
 def infotodict(seqinfo):
     """Heuristic evaluator for determining which runs belong where
-    
-    allowed template fields - follow python string module: 
-    
+
+    allowed template fields - follow python string module:
+
     item: index within category 
     subject: participant id 
     seqitem: run number during scanning
     subindex: sub index within group
     session: scan index for longitudinal acq
     """
-
     seqinfo = fix_seqinfo(seqinfo)
     lgr.info("Processing %d seqinfo entries", len(seqinfo))
     and_dicom = ('dicom', 'nii.gz')
@@ -841,6 +851,7 @@ def parse_series_spec(series_spec):
     # https://github.com/ReproNim/reproin/issues/14
     # where PU: prefix is added by the scanner
     series_spec = re.sub("^[A-Z]*:", "", series_spec)
+    series_spec = re.sub("^WIP ", "", series_spec) # remove Philips WIP prefix
 
     # Remove possible suffix we don't care about after __
     series_spec = series_spec.split('__', 1)[0]
@@ -888,7 +899,9 @@ def parse_series_spec(series_spec):
 
         # sanitize values, which must not have _ and - is undesirable ATM as well
         # TODO: BIDSv2.0 -- allows "-" so replace with it instead
-        value = str(value).replace('_', 'X').replace('-', 'X')
+        value = str(value) \
+            .replace('_', 'X').replace('-', 'X') \
+            .replace('(', '{').replace(')', '}')  # for Philips
 
         if key in ['ses', 'run', 'task', 'acq']:
             # those we care about explicitly

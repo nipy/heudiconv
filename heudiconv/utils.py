@@ -21,12 +21,10 @@ lgr = logging.getLogger(__name__)
 
 
 seqinfo_fields = [
-    'total_files_till_now',  # 0
+    'series_files',  # 0
     'example_dcm_file',      # 1
     'series_id',             # 2
     'dcm_dir_name',          # 3
-    'unspecified2',          # 4
-    'unspecified3',          # 5
     'dim1', 'dim2', 'dim3', 'dim4', # 6, 7, 8, 9
     'TR', 'TE',              # 10, 11
     'protocol_name',         # 12
@@ -251,7 +249,17 @@ def treat_infofile(filename):
         j = json.load(f)
 
     j_slim = slim_down_info(j)
-    j_pretty = json_dumps_pretty(j_slim, indent=2, sort_keys=True)
+    dumps_kw = dict(indent=2, sort_keys=True)
+    try:
+        j_pretty = json_dumps_pretty(j_slim, **dumps_kw)
+    except AssertionError as exc:
+        lgr.warning(
+            "Prettyfication of .json failed (%s).  "
+            "Original .json will be kept as is.  Please share (if you could) "
+            "that file (%s) with HeuDiConv developers"
+            % (str(exc), filename)
+        )
+        j_pretty = json.dumps(j_slim, **dumps_kw)
 
     set_readonly(filename, False)
     with open(filename, 'wt') as fp:
@@ -475,3 +483,22 @@ def create_tree(path, tree, archives_leading_dir=True):
                 f.write(load)
         if executable:
             os.chmod(full_name, os.stat(full_name).st_mode | stat.S_IEXEC)
+
+
+def get_typed_attr(obj, attr, _type, default=None):
+    """
+    Typecasts an object's named attribute. If the attribute cannot be
+    converted, the default value is returned instead.
+
+    Parameters
+    ----------
+    obj: Object
+    attr: Attribute
+    _type: Type
+    default: value, optional
+    """
+    try:
+        val = _type(getattr(obj, attr, default))
+    except (TypeError, ValueError):
+        return default
+    return val
