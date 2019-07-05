@@ -237,7 +237,7 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
         lgr.debug("%30s %30s %27s %27s %5s nref=%-2d nsrc=%-2d %s" % (
             key,
             seqinfo.series_id,
-            seqinfo.series_desc,
+            seqinfo.series_description,
             mw.dcm_data.ProtocolName,
             seqinfo.is_derived,
             len(mw.dcm_data.get('ReferencedImageSequence', '')),
