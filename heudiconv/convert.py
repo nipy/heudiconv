@@ -159,7 +159,6 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
 
 
         seqinfo_list = list(seqinfo.keys())
-        import pdb; pdb.set_trace()
         filegroup = {si.series_id: x for si, x in seqinfo.items()}
         dicominfo_file = op.join(idir, 'dicominfo%s.tsv' % ses_suffix)
         # allow to overwrite even if was present under git-annex already
