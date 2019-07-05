@@ -94,6 +94,11 @@ def validate_dicom(fl, dcmfilter):
             del mw.series_signature[sig]
         except Exception:
             pass
+    # Workaround for protocol name in private siemens csa header
+    if not getattr(mw.dcm_data, 'ProtocolName', '').strip():
+        mw.dcm_data.ProtocolName = parse_private_csa_header(
+            mw.dcm_data, 'ProtocolName', 'tProtocolName'
+        ) if mw.is_csa else ''
     try:
         series_id = (
             int(mw.dcm_data.SeriesNumber), mw.dcm_data.ProtocolName
@@ -165,7 +170,6 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
     for filename in files:
         # TODO after getting a regression test check if the same behavior
         #      with stop_before_pixels=True
-
         mwinfo = validate_dicom(filename, dcmfilter)
         if mwinfo is None:
             continue
@@ -182,11 +186,6 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
                     "Conflicting study identifiers found [{}, {}].".format(
                         studyUID, file_studyUID)
                 )
-        # Workaround for protocol name in private siemens csa header
-        if not getattr(mw.dcm_data, 'ProtocolName', '').strip():
-            mw.dcm_data.ProtocolName = parse_private_csa_header(
-                mw.dcm_data, 'ProtocolName', 'tProtocolName'
-            ) if mw.is_csa else ''
 
         ingrp = False
         # check if same series was already converted
