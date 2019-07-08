@@ -123,12 +123,20 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
     # ref: https://github.com/nipy/heudiconv/issues/84#issuecomment-330048609
     # for more automagical wishes
     target_heuristic_filename = op.join(idir, 'heuristic.py')
+    # faciliates change - TODO: remove in 1.0
+    old_heuristic_filename = op.join(idir, op.basename(heuristic.filename))
+    if op.exists(old_heuristic_filename):
+        assure_no_file_exists(target_heuristic_filename)
+        safe_copyfile(old_heuristic_filename, target_heuristic_filename)
+        assure_no_file_exists(old_heuristic_filename)
     # TODO:
     #  1. add a test
     #  2. possibly extract into a dedicated function for easier logic flow here
     #     and a dedicated unittest
-    if (op.exists(target_heuristic_filename) and
-        file_md5sum(target_heuristic_filename) != file_md5sum(heuristic.filename)):
+    if (
+        op.exists(target_heuristic_filename) and
+        file_md5sum(target_heuristic_filename) != file_md5sum(heuristic.filename)
+    ):
         # remake conversion table
         reuse_conversion_table = False
         lgr.info(
