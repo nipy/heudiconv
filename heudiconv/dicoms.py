@@ -39,7 +39,7 @@ def create_seqinfo(mw, series_files, series_id):
     TR = get_typed_attr(dcminfo, "RepetitionTime", float, -1000) / 1000
     TE = get_typed_attr(dcminfo, "EchoTime", float, -1)
     refphys = get_typed_attr(dcminfo, "ReferringPhysicianName", str, "")
-    image_type = get_typed_attr(dcminfo, "ImageType", tuple, "")
+    image_type = get_typed_attr(dcminfo, "ImageType", tuple, ())
     is_moco = 'MOCO' in image_type
     series_desc = get_typed_attr(dcminfo, "SeriesDescription", str, "")
 
@@ -58,27 +58,31 @@ def create_seqinfo(mw, series_files, series_id):
     # len(dcminfo.SourceImageSequence)
     # FOR demographics
     seqinfo = SeqInfo(
-        fls,
-        op.basename(series_files[0]),
-        series_id,
-        op.basename(op.dirname(series_files[0])),
-        size[0], size[1], size[2], size[3],
-        TR, TE,
-        dcminfo.ProtocolName,
-        is_moco,
-        'derived' in [x.lower() for x in dcminfo.get('ImageType', [])],
-        dcminfo.get('PatientID'),
-        dcminfo.get('StudyDescription'),
-        refphys,
-        series_desc,
-        sequence_name,
-        image_type,
-        accession_number,
+        series_files=fls,
+        example_dcm_file=op.basename(series_files[0]),
+        series_id=series_id,
+        dcm_dir_name=op.basename(op.dirname(series_files[0])),
+        dim1=size[0],
+        dim2=size[1],
+        dim3=size[2],
+        dim4=size[3],
+        TR=TR,
+        TE=TE,
+        protocol_name=dcminfo.ProtocolName,
+        is_motion_corrected=is_moco,
+        is_derived='derived' in [x.lower() for x in image_type],
+        patient_id=dcminfo.get('PatientID'),
+        study_description=dcminfo.get('StudyDescription'),
+        referring_physician_name=refphys,
+        series_description=series_desc,
+        sequence_name=sequence_name,
+        image_type=image_type,
+        accession_number=accession_number,
         # For demographics to populate BIDS participants.tsv
-        dcminfo.get('PatientAge'),
-        dcminfo.get('PatientSex'),
-        dcminfo.get('AcquisitionDate'),
-        dcminfo.get('SeriesInstanceUID')
+        patient_age=dcminfo.get('PatientAge'),
+        patient_sex=dcminfo.get('PatientSex'),
+        date=dcminfo.get('AcquisitionDate'),
+        series_uid=dcminfo.get('SeriesInstanceUID')
     )
     return seqinfo
 
