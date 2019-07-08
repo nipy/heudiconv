@@ -128,7 +128,7 @@ def validate_dicom(fl, dcmfilter):
     return mw, series_id, file_studyUID
 
 
-def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
+def group_dicoms_into_seqinfos(files, grouping, file_filter=None, dcmfilter=None, flatten=False):
     """Process list of dicoms and return seqinfo and file group
     `seqinfo` contains per-sequence extract of fields from DICOMs which
     will be later provided into heuristics to decide on filenames
@@ -136,13 +136,14 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
     ----------
     files : list of str
       List of files to consider
+    grouping : str
+      Possible groupings: studyUID, accession_number, all, file, custom
     file_filter : callable, optional
       Applied to each item of filenames. Should return True if file needs to be
       kept, False otherwise.
     dcmfilter : callable, optional
       If called on dcm_data and returns True, it is used to set series_id
-    grouping : str
-      Possible groupings: studyUID, accession_number, all, file, custom
+    flatten : bool, optional
 
 
     Returns
@@ -153,7 +154,7 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
     filegrp : dict
       `filegrp` is a dictionary with files groupped per each sequence
     """
-    allowed_groupings = ['studyUID', 'accession_number', 'all', 'file', 'custom']
+    allowed_groupings = ['studyUID', 'accession_number', 'all']
     if grouping not in allowed_groupings:
         raise ValueError('I do not know how to group by {0}'.format(grouping))
     per_studyUID = grouping == 'studyUID'
@@ -172,8 +173,6 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
             nfl_before-nfl_after))
 
     for filename in files:
-        # TODO after getting a regression test check if the same behavior
-        #      with stop_before_pixels=True
         mwinfo = validate_dicom(filename, dcmfilter)
         if mwinfo is None:
             continue
@@ -185,11 +184,11 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
             # verify that we are working with a single study
             if studyUID is None:
                 studyUID = file_studyUID
-            elif grouping not in ['accession_number', 'all']:
+            if grouping not in ['all', 'accession_number']:
                 assert studyUID == file_studyUID, (
-                    "Conflicting study identifiers found [{}, {}].".format(
-                        studyUID, file_studyUID)
-                )
+                        "Conflicting study identifiers found [{}, {}].".format(
+                            studyUID, file_studyUID)
+                    )
 
         ingrp = False
         # check if same series was already converted
@@ -249,18 +248,19 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
             seqinfo.image_type
         ))
 
-        if per_studyUID:
-            if studyUID not in seqinfos:
-                seqinfos[studyUID] = OrderedDict()
-            seqinfos[studyUID][seqinfo] = series_files
-        elif grouping == 'accession_number':
-            if accession_number not in seqinfos:
-                seqinfos[accession_number] = OrderedDict()
-            seqinfos[accession_number][seqinfo] = series_files
-        elif grouping == 'all':
-            if not seqinfos.get('all'):
-                seqinfos['all'] = OrderedDict()
-            seqinfos['all'][seqinfo] = series_files
+        if not flatten:
+            if per_studyUID:
+                if studyUID not in seqinfos:
+                    seqinfos[studyUID] = OrderedDict()
+                seqinfos[studyUID][seqinfo] = series_files
+            elif grouping == 'accession_number':
+                if accession_number not in seqinfos:
+                    seqinfos[accession_number] = OrderedDict()
+                seqinfos[accession_number][seqinfo] = series_files
+            elif grouping == 'all':
+                if 'all' not in seqinfos:
+                    seqinfos['all'] = OrderedDict()
+                seqinfos['all'][seqinfo] = series_files
         else:
             seqinfos[seqinfo] = series_files
 

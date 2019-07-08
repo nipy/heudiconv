@@ -153,10 +153,10 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
         if dicoms:
             seqinfo = group_dicoms_into_seqinfos(
                 dicoms,
+                grouping,
                 file_filter=getattr(heuristic, 'filter_files', None),
                 dcmfilter=getattr(heuristic, 'filter_dicom', None),
-                grouping=grouping)
-
+                flatten=True)
 
         seqinfo_list = list(seqinfo.keys())
         filegroup = {si.series_id: x for si, x in seqinfo.items()}
