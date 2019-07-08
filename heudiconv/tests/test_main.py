@@ -250,3 +250,22 @@ def test_make_readonly(tmpdir):
         # and it should go back if we set it back to non-read_only
         assert set_readonly(pathname, read_only=False) == rw
         assert not is_readonly(pathname)
+
+
+def test_cache(tmpdir):
+    tmppath = tmpdir.strpath
+    args = (
+        "-f convertall --files %s/axasc35.dcm -s S01"
+        % (TESTS_DATA_PATH)
+    ).split(' ') + ['-o', tmppath]
+    runner(args)
+
+    cachedir = (tmpdir / '.heudiconv' / 'S01' / 'info')
+    assert cachedir.exists()
+
+    # check individual files
+    assert (cachedir / 'heuristic.py').exists()
+    assert (cachedir / 'filegroup.json').exists()
+    assert (cachedir / 'dicominfo.tsv').exists()
+    assert (cachedir / 'S01.auto.txt').exists()
+    assert (cachedir / 'S01.edit.txt').exists()
