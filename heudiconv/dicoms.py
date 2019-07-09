@@ -52,11 +52,6 @@ def create_seqinfo(mw, series_files, series_id):
     else:
         sequence_name = ""
 
-    # TO CONSIDER:
-    # dcminfo.AccessionNumber
-    # len(dcminfo.ReferencedImageSequence)
-    # len(dcminfo.SourceImageSequence)
-    # FOR demographics
     seqinfo = SeqInfo(
         series_files=fls,
         example_dcm_file=op.basename(series_files[0]),
@@ -128,7 +123,9 @@ def validate_dicom(fl, dcmfilter):
     return mw, series_id, file_studyUID
 
 
-def group_dicoms_into_seqinfos(files, grouping, file_filter=None, dcmfilter=None, flatten=False):
+def group_dicoms_into_seqinfos(files, grouping, file_filter=None,
+                               dcmfilter=None, flatten=False,
+                               custom_grouping=None):
     """Process list of dicoms and return seqinfo and file group
     `seqinfo` contains per-sequence extract of fields from DICOMs which
     will be later provided into heuristics to decide on filenames
@@ -137,13 +134,18 @@ def group_dicoms_into_seqinfos(files, grouping, file_filter=None, dcmfilter=None
     files : list of str
       List of files to consider
     grouping : str
-      Possible groupings: studyUID, accession_number, all, file, custom
+      Possible groupings: studyUID, accession_number, all, custom
     file_filter : callable, optional
       Applied to each item of filenames. Should return True if file needs to be
       kept, False otherwise.
     dcmfilter : callable, optional
       If called on dcm_data and returns True, it is used to set series_id
     flatten : bool, optional
+      Creates a flattened `seqinfo` with corresponding DICOM files. True when
+      invoked with `dicom_dir_template`.
+    custom_grouping: variable or method, optional
+     `grouping` variable defined within heuristic. Can be a string of a
+     DICOM attribute, or a method that handles more complex groupings.
 
 
     Returns
@@ -154,7 +156,7 @@ def group_dicoms_into_seqinfos(files, grouping, file_filter=None, dcmfilter=None
     filegrp : dict
       `filegrp` is a dictionary with files groupped per each sequence
     """
-    allowed_groupings = ['studyUID', 'accession_number', 'all']
+    allowed_groupings = ['studyUID', 'accession_number', 'all', 'custom']
     if grouping not in allowed_groupings:
         raise ValueError('I do not know how to group by {0}'.format(grouping))
     per_studyUID = grouping == 'studyUID'
@@ -172,6 +174,12 @@ def group_dicoms_into_seqinfos(files, grouping, file_filter=None, dcmfilter=None
         lgr.info('Filtering out {0} dicoms based on their filename'.format(
             nfl_before-nfl_after))
 
+    if grouping == 'custom':
+        if callable(custom_grouping):
+            return custom_grouping(files, dcmfilter, SeqInfo)
+        grouping = custom_grouping
+        study_customgroup = None
+
     for filename in files:
         mwinfo = validate_dicom(filename, dcmfilter)
         if mwinfo is None:
@@ -180,14 +188,24 @@ def group_dicoms_into_seqinfos(files, grouping, file_filter=None, dcmfilter=None
         if per_studyUID:
             series_id = series_id + (file_studyUID,)
 
-        if not per_studyUID:
-            # verify that we are working with a single study
-            if studyUID is None:
-                studyUID = file_studyUID
-            if grouping not in ['all', 'accession_number']:
-                assert studyUID == file_studyUID, (
-                        "Conflicting study identifiers found [{}, {}].".format(
-                            studyUID, file_studyUID)
+        if flatten:
+            if custom_grouping:
+                file_customgroup = mw.dcm_data.get(grouping)
+                if study_customgroup is None:
+                    study_customgroup = file_customgroup
+                else:
+                    assert study_customgroup == file_customgroup, (
+                        "Conflicting {0} found: {1}, {2}".format(
+                            grouping, study_customgroup, file_customgroup)
+                    )
+            elif not per_studyUID:
+                # verify that we are working with a single study
+                if studyUID is None:
+                    studyUID = file_studyUID
+                if (grouping not in ['all', 'accession_number']):
+                    assert studyUID == file_studyUID, (
+                            "Conflicting study identifiers found [{}, {}].".format(
+                                studyUID, file_studyUID)
                     )
 
         ingrp = False
@@ -235,6 +253,10 @@ def group_dicoms_into_seqinfos(files, grouping, file_filter=None, dcmfilter=None
             key = studyUID.split('.')[-1]
         elif grouping == 'accession_number':
             key = accession_number = mw.dcm_data.get("AccessionNumber")
+        elif grouping == 'all':
+            key = 'all'
+        elif custom_grouping:
+            key = custom = mw.dcm_data.get(custom_grouping)
         else:
             key = ''
         lgr.debug("%30s %30s %27s %27s %5s nref=%-2d nsrc=%-2d %s" % (
@@ -261,6 +283,10 @@ def group_dicoms_into_seqinfos(files, grouping, file_filter=None, dcmfilter=None
                 if 'all' not in seqinfos:
                     seqinfos['all'] = OrderedDict()
                 seqinfos['all'][seqinfo] = series_files
+            elif custom_grouping:
+                if custom not in seqinfos:
+                    seqinfos[custom] = OrderedDict()
+                seqinfos[custom][seqinfo] = series_files
         else:
             seqinfos[seqinfo] = series_files
 
