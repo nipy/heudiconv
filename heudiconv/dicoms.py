@@ -31,7 +31,6 @@ def create_seqinfo(mw, series_files, series_id):
 
     # TODO: do not group echoes by default
     size = list(mw.image_shape) + [len(series_files)]
-    fls = size[-1]
     if len(size) < 4:
         size.append(1)
 
@@ -52,11 +51,17 @@ def create_seqinfo(mw, series_files, series_id):
     else:
         sequence_name = ""
 
+    # initialized in `group_dicoms_to_seqinfos`
+    global total_files
+    total_files += len(series_files)
+
     seqinfo = SeqInfo(
-        series_files=fls,
+        total_files_till_now=total_files,
         example_dcm_file=op.basename(series_files[0]),
         series_id=series_id,
         dcm_dir_name=op.basename(op.dirname(series_files[0])),
+        series_files=len(series_files),
+        unspecified="",
         dim1=size[0],
         dim2=size[1],
         dim3=size[2],
