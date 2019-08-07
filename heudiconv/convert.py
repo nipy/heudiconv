@@ -580,7 +580,6 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
                 else:
                     echo_number = echo_times.index(fileinfo['EchoTime']) + 1
 
-
                 supported_multiecho = ['_bold', '_epi', '_sbref', '_T1w', '_PDT2']
                 # Now, decide where to insert it.
                 # Insert it **before** the following string(s), whichever appears first.
