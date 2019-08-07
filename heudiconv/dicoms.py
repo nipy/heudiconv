@@ -15,6 +15,7 @@ with warnings.catch_warnings():
     import nibabel.nicom.dicomwrappers as dw
 
 lgr = logging.getLogger(__name__)
+total_files = 0
 
 
 def create_seqinfo(mw, series_files, series_id):
