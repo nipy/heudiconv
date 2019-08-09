@@ -195,24 +195,21 @@ def group_dicoms_into_seqinfos(files, grouping, file_filter=None,
             series_id = series_id + (file_studyUID,)
 
         if flatten:
-            if custom_grouping:
+            if per_studyUID:
+                if studyUID is None:
+                    studyUID = file_studyUID
+                assert studyUID == file_studyUID, (
+                    "Conflicting study identifiers found [{}, {}]."
+                    .format(studyUID, file_studyUID)
+                )
+            elif custom_grouping:
                 file_customgroup = mw.dcm_data.get(grouping)
                 if study_customgroup is None:
                     study_customgroup = file_customgroup
-                else:
-                    assert study_customgroup == file_customgroup, (
-                        "Conflicting {0} found: {1}, {2}".format(
-                            grouping, study_customgroup, file_customgroup)
-                    )
-            elif not per_studyUID:
-                # verify that we are working with a single study
-                if studyUID is None:
-                    studyUID = file_studyUID
-                if (grouping not in ['all', 'accession_number']):
-                    assert studyUID == file_studyUID, (
-                            "Conflicting study identifiers found [{}, {}].".format(
-                                studyUID, file_studyUID)
-                    )
+                assert study_customgroup == file_customgroup, (
+                    "Conflicting {0} found: [{1}, {2}]"
+                    .format(grouping, study_customgroup, file_customgroup)
+                )
 
         ingrp = False
         # check if same series was already converted
