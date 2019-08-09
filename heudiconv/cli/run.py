@@ -129,7 +129,7 @@ def main(argv=None):
 
 def get_parser():
     docstr = ("""Example:
-             heudiconv -d rawdata/{subject} -o . -f heuristic.py -s s1 s2 s3""")
+             heudiconv -d 'rawdata/{subject}' -o . -f heuristic.py -s s1 s2 s3""")
     parser = ArgumentParser(description=docstr)
     parser.add_argument('--version', action='version', version=__version__)
     group = parser.add_mutually_exclusive_group()
@@ -138,7 +138,9 @@ def get_parser():
                        'subject id {subject} and session {session}. Tarballs '
                        '(can be compressed) are supported in addition to '
                        'directory. All matching tarballs for a subject are '
-                       'extracted and their content processed in a single pass')
+                       'extracted and their content processed in a single '
+                       'pass. Note that you might need to surround the value '
+                       'with quotes to avoid {...} being considered by shell')
     group.add_argument('--files', nargs='*',
                        help='Files (tarballs, dicoms) or directories '
                        'containing files to process. Cannot be provided if '

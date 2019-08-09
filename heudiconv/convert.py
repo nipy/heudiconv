@@ -504,9 +504,9 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
 
         # Also copy BIDS files although they might need to
         # be merged/postprocessed later
-        bids_files = sorted(res.outputs.bids
-                     if len(res.outputs.bids) == len(res_files)
-                     else [None] * len(res_files))
+        bids_files = (sorted(res.outputs.bids)
+                      if len(res.outputs.bids) == len(res_files)
+                      else [None] * len(res_files))
 
         ###   Do we have a multi-echo series?   ###
         #   Some Siemens sequences (e.g. CMRR's MB-EPI) set the label 'TE1',

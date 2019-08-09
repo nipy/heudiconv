@@ -209,3 +209,6 @@ def test_parse_series_spec():
     assert pdpn("func_ses-{date}") == \
            pdpn("func_ses-(date)") == \
            {'seqtype': 'func', 'session': '{date}'}
+
+    assert pdpn("fmap_dir-AP_ses-01") == \
+           {'seqtype': 'fmap', 'session': '01', 'dir': 'AP'}
