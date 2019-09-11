@@ -99,6 +99,16 @@ def process_extra_commands(outdir, args):
 
 
 def main(argv=None):
+    import etelemetry
+    try:
+        latest = etelemetry.get_project("nipy/heudiconv")
+    except RuntimeError as e:
+        print("Could not check for version updates: ", e)
+    else:
+        if latest and 'version' in latest:
+            print("Your version: {0} Latest version: {1}".format(__version__,
+                                                                 latest["version"]))
+
     parser = get_parser()
     args = parser.parse_args(argv)
     # exit if nothing to be done
