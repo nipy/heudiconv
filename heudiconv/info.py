@@ -11,7 +11,7 @@ tarballs into collections of NIfTI files following pre-defined heuristic(s)."""
 REQUIRES = [
     'nibabel',
     'pydicom',
-    'nipype @ git+https://github.com/nipy/nipype.git@23379ebd997b0cca3a1feb2c2d7085d4ee9cf717',
+    'nipype @ git+https://github.com/effigies/nipype.git@0196beac33d0c8c992bcc07b83c0b368810be02d',
     'pathlib',
     'dcmstack>=0.7',
 ]
