@@ -332,7 +332,8 @@ def save_scans_key(item, bids_files):
 
 def add_rows_to_scans_keys_file(fn, newrows):
     """
-    Add new rows to file fn for scans key filename
+    Add new rows to file fn for scans key filename and generate accompanying json
+    descriptor to make BIDS validator happy.
 
     Parameters
     ----------
@@ -355,6 +356,25 @@ def add_rows_to_scans_keys_file(fn, newrows):
         os.unlink(fn)
     else:
         fnames2info = newrows
+        # Populate _scans.json (an optional file to describe column names in
+        # _scans.tsv). This auto generation will make BIDS-validator happy.
+        scans_json = '.'.join(fn.split('.')[:-1] + ['json'])
+        if not op.lexists(scans_json):
+            save_json(scans_json,
+                OrderedDict([
+                    ("filename", OrderedDict([
+                        ("Description", "Name of the nifti file")])),
+                    ("acq_time", OrderedDict([
+                        ("LongName", "Acquisition time"),
+                        ("Description", "Acquisition time of the particular scan")])),
+                    ("operator", OrderedDict([
+                        ("Description", "Name of the operator")])),
+                    ("randstr", OrderedDict([
+                        ("LongName", "Random string"),
+                        ("Description", "md5 hash of UIDs")])),
+                ]),
+                sort_keys=False,
+                indent=2)
 
     header = ['filename', 'acq_time', 'operator', 'randstr']
     # prepare all the data rows
