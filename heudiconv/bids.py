@@ -240,6 +240,27 @@ def add_participant_record(studydir, subject, age, sex):
             known_subjects = {l.split('\t')[0] for l in f.readlines()}
         if participant_id in known_subjects:
             return
+    else:
+        # Populate particpants.json (an optional file to describe column names in
+        # participant.tsv). This auto generation will make BIDS-validator happy.
+        participants_json = op.join(studydir, 'participants.json')
+        if not op.lexists(participants_json):
+            save_json(participants_json,
+                OrderedDict([
+                    ("participant_id", OrderedDict([
+                        ("Description", "Participant identifier")])),
+                    ("age", OrderedDict([
+                        ("Description", "Age in years (TODO - verify) as in the initial"
+                            " session, might not be correct for other sessions")])),
+                    ("sex", OrderedDict([
+                        ("Description", "self-rated by participant, M for male/F for "
+                            "female (TODO: verify)")])),
+                    ("group", OrderedDict([
+                        ("Description", "(TODO: adjust - by default everyone is in "
+                            "control group)")])),
+                ]),
+                sort_keys=False,
+                indent=2)
     # Add a new participant
     with open(participants_tsv, 'a') as f:
         f.write(
