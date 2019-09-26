@@ -135,12 +135,14 @@ def group_dicoms_into_seqinfos(files, grouping, file_filter=None,
     """Process list of dicoms and return seqinfo and file group
     `seqinfo` contains per-sequence extract of fields from DICOMs which
     will be later provided into heuristics to decide on filenames
+
     Parameters
     ----------
     files : list of str
       List of files to consider
-    grouping : str
-      Possible groupings: studyUID, accession_number, all, custom
+    grouping : {'studyUID', 'accession_number', 'all', 'custom'}
+      How to group DICOMs for conversion. If 'custom', see `custom_grouping`
+      parameter.
     file_filter : callable, optional
       Applied to each item of filenames. Should return True if file needs to be
       kept, False otherwise.

@@ -170,7 +170,7 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
         )
 
         if sids:
-            if not len(sids) == 1:
+            if len(sids) != 1:
                 raise RuntimeError(
                     "We were provided some subjects (%s) but "
                     "we can deal only "
