@@ -15,6 +15,7 @@ REQUIRES = [
     'nipype >=1.0.0,!=1.2.1,!=1.2.2; python_version == "2.7"',
     'pathlib',
     'dcmstack>=0.7',
+    'etelemetry',
 ]
 
 TESTS_REQUIRES = [
