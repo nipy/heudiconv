@@ -172,9 +172,13 @@ def load_json(filename):
     -------
     data : dict
     """
-    with open(filename, 'r') as fp:
-        data = json.load(fp)
-    return data
+    try:
+        with open(filename, 'r') as fp:
+            data = json.load(fp)
+    except json.JSONDecodeError:
+        print("{fname} is not a valid json file".format(fname=filename))
+        raise
+    
 
 
 def assure_no_file_exists(path):
