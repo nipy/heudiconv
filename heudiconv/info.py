@@ -8,6 +8,19 @@ __longdesc__ = """Convert DICOM dirs based on heuristic info - HeuDiConv
 uses the dcmstack package and dcm2niix tool to convert DICOM directories or
 tarballs into collections of NIfTI files following pre-defined heuristic(s)."""
 
+CLASSIFIERS = [
+    'Environment :: Console',
+    'Intended Audience :: Science/Research',
+    'License :: OSI Approved :: Apache Software License',
+    'Programming Language :: Python :: 2.7',
+    'Programming Language :: Python :: 3.5',
+    'Programming Language :: Python :: 3.6',
+    'Programming Language :: Python :: 3.7',
+    'Topic :: Scientific/Engineering'
+]
+
+PYTHON_REQUIRES = ">=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*"
+
 REQUIRES = [
     'nibabel',
     'pydicom',
