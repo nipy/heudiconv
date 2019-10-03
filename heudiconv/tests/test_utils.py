@@ -2,10 +2,7 @@ import json
 import os
 import os.path as op
 
-try:
-    from json.decoder import JSONDecodeError
-except ImportError:
-    JSONDecodeError = ValueError
+from ..utils import JSONDecodeError, create_tree, save_json
 
 from heudiconv.utils import (
     get_known_heuristics_with_descriptions,
@@ -69,24 +66,21 @@ def test_json_dumps_pretty():
     assert pretty({'WipMemBlock': tstr}) == '{\n  "WipMemBlock": "%s"\n}' % tstr
 
 
-def test_load_json(tmp_path, capsys):
+def test_load_json(tmp_path, caplog):
     # test invalid json
-    icontent = u"I'm Jason Bourne"
-    ifname = "invalid.json"
-    invalid_json_file = tmp_path / ifname
-    invalid_json_file.write_text(icontent)
+    ifname = 'invalid.json'
+    invalid_json_file = str(tmp_path / ifname)
+    create_tree(str(tmp_path), {ifname: u"I'm Jason Bourne"})
 
     with pytest.raises(JSONDecodeError):
         load_json(str(invalid_json_file))
-        captured = capsys.readouterr()
-        assert ifname in captured.out
+
+    assert ifname in caplog.text
 
     # test valid json
     vcontent = {"secret": "spy"}
     vfname = "valid.json"
-    valid_json_file = tmp_path / vfname
-
-    with open(str(valid_json_file), "w") as vj:
-        json.dump(vcontent, vj)
+    valid_json_file = str(tmp_path / vfname)
+    save_json(valid_json_file, vcontent)
     
-    assert load_json(str(valid_json_file)) == vcontent
+    assert load_json(valid_json_file) == vcontent

@@ -14,15 +14,15 @@ from collections import namedtuple
 from glob import glob
 from subprocess import check_output
 
-try:
-    from json.decoder import JSONDecodeError
-except ImportError:
-    JSONDecodeError = ValueError
-
 from nipype.utils.filemanip import which
 
 import logging
 lgr = logging.getLogger(__name__)
+
+if sys.version_info[0] > 2:
+    from json.decoder import JSONDecodeError
+else:
+    JSONDecodeError = ValueError
 
 
 seqinfo_fields = [
@@ -181,7 +181,7 @@ def load_json(filename):
         with open(filename, 'r') as fp:
             data = json.load(fp)
     except JSONDecodeError:
-        print("{fname} is not a valid json file".format(fname=filename))
+        lgr.error("{fname} is not a valid json file".format(fname=filename))
         raise
 
     return data
