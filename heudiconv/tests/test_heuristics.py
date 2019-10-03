@@ -165,7 +165,13 @@ def test_notop(tmpdir, bidsoptions):
     runner(args)
 
     assert op.exists(pjoin(tmppath, 'Halchenko/Yarik/950_bids_test4'))
-    for fname in ['CHANGES', 'dataset_description.json', 'participants.tsv', 'README']:
+    for fname in [
+        'CHANGES',
+        'dataset_description.json',
+        'participants.tsv',
+        'README',
+        'participants.json'
+    ]:
         if 'notop' in bidsoptions:
             assert not op.exists(pjoin(tmppath, 'Halchenko/Yarik/950_bids_test4', fname))
         else:
