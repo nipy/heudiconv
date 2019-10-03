@@ -1,10 +1,12 @@
+import json
 import os
 import os.path as op
 from heudiconv.utils import (
     get_known_heuristics_with_descriptions,
     get_heuristic_description,
     load_heuristic,
-    json_dumps_pretty)
+    json_dumps_pretty,
+    load_json)
 
 import pytest
 from .utils import HEURISTICS_PATH
@@ -59,3 +61,16 @@ def test_json_dumps_pretty():
     # just the date which reveals the issue
     # tstr = 'Mar  3 2017 10:46:13 by eja'
     assert pretty({'WipMemBlock': tstr}) == '{\n  "WipMemBlock": "%s"\n}' % tstr
+
+
+def test_load_json(tmp_path, capsys):
+    # test invalid json
+    content = "I'm Jason Bourne"
+    fname = "invalid.json"
+    json_file = tmp_path / fname
+    json_file.write_text(content)
+
+    with pytest.raises(json.JSONDecodeError):
+        load_json(json_file)
+        captured = capsys.readouterr()
+        assert fname in captured.out
