@@ -16,7 +16,7 @@ import inspect
 import logging
 lgr = logging.getLogger(__name__)
 
-INIT_MSG = "Running {packname} version {version}".format
+INIT_MSG = "Running {packname} version {version} latest {latest}".format
 
 
 def is_interactive():
@@ -245,8 +245,16 @@ def process_args(args):
 
     outdir = op.abspath(args.outdir)
 
+    import etelemetry
+    try:
+        latest = etelemetry.get_project("nipy/heudiconv")
+    except Exception as e:
+        lgr.warning("Could not check for version updates: ", e)
+        latest = {"version": 'Unknown'}
+
     lgr.info(INIT_MSG(packname=__packagename__,
-                      version=__version__))
+                      version=__version__,
+                      latest=latest["version"]))
 
     if args.command:
         process_extra_commands(outdir, args)

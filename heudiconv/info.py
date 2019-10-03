@@ -11,9 +11,11 @@ tarballs into collections of NIfTI files following pre-defined heuristic(s)."""
 REQUIRES = [
     'nibabel',
     'pydicom',
-    'nipype>=1.0.0',
+    'nipype >=1.0.0; python_version > "3.0"',
+    'nipype >=1.0.0,!=1.2.1,!=1.2.2; python_version == "2.7"',
     'pathlib',
     'dcmstack>=0.7',
+    'etelemetry',
 ]
 
 TESTS_REQUIRES = [
