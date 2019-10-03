@@ -77,7 +77,7 @@ def test_load_json(tmp_path, capsys):
     invalid_json_file.write_text(icontent)
 
     with pytest.raises(JSONDecodeError):
-        load_json(invalid_json_file)
+        load_json(str(invalid_json_file))
         captured = capsys.readouterr()
         assert ifname in captured.out
 
@@ -86,7 +86,7 @@ def test_load_json(tmp_path, capsys):
     vfname = "valid.json"
     valid_json_file = tmp_path / vfname
 
-    with open(valid_json_file, "w") as vj:
+    with open(str(valid_json_file), "w") as vj:
         json.dump(vcontent, vj)
     
-    assert load_json(valid_json_file) == vcontent
+    assert load_json(str(valid_json_file)) == vcontent
