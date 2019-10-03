@@ -2,14 +2,15 @@ import json
 import os
 import os.path as op
 
-from ..utils import JSONDecodeError, create_tree, save_json
-
 from heudiconv.utils import (
     get_known_heuristics_with_descriptions,
     get_heuristic_description,
     load_heuristic,
     json_dumps_pretty,
-    load_json)
+    load_json,
+    create_tree,
+    save_json,
+    JSONDecodeError)
 
 import pytest
 from .utils import HEURISTICS_PATH
