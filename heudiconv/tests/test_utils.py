@@ -1,6 +1,12 @@
 import json
 import os
 import os.path as op
+
+try:
+    from json.decoder import JSONDecodeError
+except ImportError:
+    JSONDecodeError = ValueError
+
 from heudiconv.utils import (
     get_known_heuristics_with_descriptions,
     get_heuristic_description,
@@ -65,12 +71,22 @@ def test_json_dumps_pretty():
 
 def test_load_json(tmp_path, capsys):
     # test invalid json
-    content = u"I'm Jason Bourne"
-    fname = "invalid.json"
-    json_file = tmp_path / fname
-    json_file.write_text(content)
+    icontent = u"I'm Jason Bourne"
+    ifname = "invalid.json"
+    invalid_json_file = tmp_path / ifname
+    invalid_json_file.write_text(icontent)
 
-    with pytest.raises(json.JSONDecodeError):
-        load_json(json_file)
+    with pytest.raises(JSONDecodeError):
+        load_json(invalid_json_file)
         captured = capsys.readouterr()
-        assert fname in captured.out
+        assert ifname in captured.out
+
+    # test valid json
+    vcontent = {"secret": "spy"}
+    vfname = "valid.json"
+    valid_json_file = tmp_path / vfname
+
+    with open(valid_json_file, "w") as vj:
+        json.dump(vcontent, vj)
+    
+    assert load_json(valid_json_file) == vcontent
