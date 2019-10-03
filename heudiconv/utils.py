@@ -14,6 +14,11 @@ from collections import namedtuple
 from glob import glob
 from subprocess import check_output
 
+try:
+    from json.decoder import JSONDecodeError
+except ImportError:
+    JSONDecodeError = ValueError
+
 from nipype.utils.filemanip import which
 
 import logging
@@ -175,11 +180,12 @@ def load_json(filename):
     try:
         with open(filename, 'r') as fp:
             data = json.load(fp)
-    except json.JSONDecodeError:
+    except JSONDecodeError:
         print("{fname} is not a valid json file".format(fname=filename))
         raise
-    
 
+    return data
+    
 
 def assure_no_file_exists(path):
     """Check if file or symlink (git-annex?) exists, and if so -- remove"""
