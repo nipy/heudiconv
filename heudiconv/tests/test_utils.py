@@ -65,7 +65,7 @@ def test_json_dumps_pretty():
 
 def test_load_json(tmp_path, capsys):
     # test invalid json
-    content = "I'm Jason Bourne"
+    content = u"I'm Jason Bourne"
     fname = "invalid.json"
     json_file = tmp_path / fname
     json_file.write_text(content)
