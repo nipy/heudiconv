@@ -19,6 +19,11 @@ from nipype.utils.filemanip import which
 import logging
 lgr = logging.getLogger(__name__)
 
+if sys.version_info[0] > 2:
+    from json.decoder import JSONDecodeError
+else:
+    JSONDecodeError = ValueError
+
 
 seqinfo_fields = [
     'total_files_till_now',  # 0
@@ -172,10 +177,15 @@ def load_json(filename):
     -------
     data : dict
     """
-    with open(filename, 'r') as fp:
-        data = json.load(fp)
-    return data
+    try:
+        with open(filename, 'r') as fp:
+            data = json.load(fp)
+    except JSONDecodeError:
+        lgr.error("{fname} is not a valid json file".format(fname=filename))
+        raise
 
+    return data
+    
 
 def assure_no_file_exists(path):
     """Check if file or symlink (git-annex?) exists, and if so -- remove"""
