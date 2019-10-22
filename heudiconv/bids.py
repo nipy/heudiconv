@@ -411,7 +411,7 @@ def get_formatted_scans_key_row(dcm_fn):
         time = dcm_data.ContentTime.split('.')[0]
         td = time + date
         acq_time = datetime.strptime(td, '%H%M%S%Y%m%d').isoformat()
-    except AttributeError as exc:
+    except (AttributeError, ValueError) as exc:
         lgr.warning("Failed to get date/time for the content: %s", str(exc))
         acq_time = None
     # add random string
