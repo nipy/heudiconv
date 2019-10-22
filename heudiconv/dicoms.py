@@ -151,8 +151,8 @@ def group_dicoms_into_seqinfos(files, grouping, file_filter=None,
     flatten : bool, optional
       Creates a flattened `seqinfo` with corresponding DICOM files. True when
       invoked with `dicom_dir_template`.
-    custom_grouping: variable or method, optional
-     `grouping` variable defined within heuristic. Can be a string of a
+    custom_grouping: str or callable, optional
+     grouping key defined within heuristic. Can be a string of a
      DICOM attribute, or a method that handles more complex groupings.
 
 
@@ -183,6 +183,8 @@ def group_dicoms_into_seqinfos(files, grouping, file_filter=None,
             nfl_before-nfl_after))
 
     if grouping == 'custom':
+        if custom_grouping is None:
+            raise RuntimeError("Custom grouping is not defined in heuristic")
         if callable(custom_grouping):
             return custom_grouping(files, dcmfilter, SeqInfo)
         grouping = custom_grouping
@@ -255,13 +257,13 @@ def group_dicoms_into_seqinfos(files, grouping, file_filter=None,
         seqinfo = create_seqinfo(mw, series_files, series_id)
 
         if per_studyUID:
-            key = studyUID.split('.')[-1]
+            key = studyUID
         elif grouping == 'accession_number':
-            key = accession_number = mw.dcm_data.get("AccessionNumber")
+            key = mw.dcm_data.get("AccessionNumber")
         elif grouping == 'all':
             key = 'all'
         elif custom_grouping:
-            key = custom = mw.dcm_data.get(custom_grouping)
+            key = mw.dcm_data.get(custom_grouping)
         else:
             key = ''
         lgr.debug("%30s %30s %27s %27s %5s nref=%-2d nsrc=%-2d %s" % (
@@ -276,22 +278,9 @@ def group_dicoms_into_seqinfos(files, grouping, file_filter=None,
         ))
 
         if not flatten:
-            if per_studyUID:
-                if studyUID not in seqinfos:
-                    seqinfos[studyUID] = OrderedDict()
-                seqinfos[studyUID][seqinfo] = series_files
-            elif grouping == 'accession_number':
-                if accession_number not in seqinfos:
-                    seqinfos[accession_number] = OrderedDict()
-                seqinfos[accession_number][seqinfo] = series_files
-            elif grouping == 'all':
-                if 'all' not in seqinfos:
-                    seqinfos['all'] = OrderedDict()
-                seqinfos['all'][seqinfo] = series_files
-            elif custom_grouping:
-                if custom not in seqinfos:
-                    seqinfos[custom] = OrderedDict()
-                seqinfos[custom][seqinfo] = series_files
+            if key not in seqinfos:
+                seqinfos[key] = OrderedDict()
+            seqinfos[key][seqinfo] = series_files
         else:
             seqinfos[seqinfo] = series_files
 
