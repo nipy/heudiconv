@@ -547,10 +547,10 @@ def infotodict(seqinfo):
             elif 'P' in s.image_type:
                 seqtype_label = 'phase'
             elif 'M' in s.image_type:
-                # assume bold by default
                 seqtype_label = 'bold'
             else:
-                seqtype_label = 'UNK'
+                # assume bold by default
+                seqtype_label = 'bold'
 
         if seqtype == 'fmap' and not seqtype_label:
             if not dcm_image_iod_spec:
