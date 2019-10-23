@@ -126,7 +126,7 @@ from glob import glob
 import logging
 lgr = logging.getLogger('heudiconv')
 
-# Terminology to hamornise and use to name variables etc
+# Terminology to harmonise and use to name variables etc
 # experiment
 #  subject
 #   [session]
@@ -262,7 +262,7 @@ protocols2fix = {
     # fix per accession yet
     #    '23763823d2b9b4b09dafcadc8e8edf21':
     #        [
-    #            ('anat-T1w_acq-MPRAGE', 'anat-T1w_acq-MPRAGE_run-06'), 
+    #            ('anat-T1w_acq-MPRAGE', 'anat-T1w_acq-MPRAGE_run-06'),
     #            ('anat_T2w', 'anat_T2w_run-06'),
     #            ('fmap_acq-3mm', 'fmap_acq-3mm_run-06'),
     #        ],
@@ -440,8 +440,8 @@ def infotodict(seqinfo):
 
     allowed template fields - follow python string module:
 
-    item: index within category 
-    subject: participant id 
+    item: index within category
+    subject: participant id
     seqitem: run number during scanning
     subindex: sub index within group
     session: scan index for longitudinal acq
@@ -483,7 +483,6 @@ def infotodict(seqinfo):
             # 3 - Image IOD specific specialization (optional)
             dcm_image_iod_spec = s.image_type[2]
             image_type_seqtype = {
-                'P': 'fmap',   # phase
                 'FMRI': 'func',
                 'MPR': 'anat',
                 # 'M': 'func',  "magnitude"  -- can be for scout, anat, bold, fmap
@@ -541,18 +540,24 @@ def infotodict(seqinfo):
 
         # analyze s.protocol_name (series_id is based on it) for full name mapping etc
         if seqtype == 'func' and not seqtype_label:
-            if '_pace_' in series_spec:
+            if s.series_description.endswith('_SBRef'):
+                seqtype_label = 'sbref'
+            elif '_pace_' in series_spec:
                 seqtype_label = 'pace'  # or should it be part of seq-
-            else:
+            elif 'P' in s.image_type:
+                seqtype_label = 'phase'
+            elif 'M' in s.image_type:
                 # assume bold by default
                 seqtype_label = 'bold'
+            else:
+                seqtype_label = 'UNK'
 
         if seqtype == 'fmap' and not seqtype_label:
             if not dcm_image_iod_spec:
                 raise ValueError("Do not know image data type yet to make decision")
             seqtype_label = {
                 # might want explicit {file_index}  ?
-                # _epi for pipolar fieldmaps, see
+                # _epi for pepolar fieldmaps, see
                 # https://bids-specification.readthedocs.io/en/stable/04-modality-specific-files/01-magnetic-resonance-imaging-data.html#case-4-multiple-phase-encoded-directions-pepolar
                 'M': 'epi' if 'dir' in series_info else 'magnitude',
                 'P': 'phasediff',
