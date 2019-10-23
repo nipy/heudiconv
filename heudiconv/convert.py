@@ -519,11 +519,11 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
         #   echo times for all bids_files and see if they are all the same or not.
 
         # Check for varying echo times
-        echo_times = set(
+        echo_times = sorted(list(set(
             load_json(b).get('EchoTime', None)
             for b in bids_files
             if b
-        )
+        )))
 
         is_multiecho = len(echo_times) > 1
 
@@ -575,11 +575,13 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
             # For multi-echo sequences, we have to specify the echo number in
             # the file name:
             if bids_file and is_multiecho:
-                # Get the EchoNumber from json file info.  If not present, it's echo-1
-                echo_number = fileinfo.get('EchoNumber', 1)
+                # Get the EchoNumber from json file info.  If not present, use EchoTime
+                if 'EchoNumber' in fileinfo.keys():
+                    echo_number = fileinfo['EchoNumber']
+                else:
+                    echo_number = echo_times.index(fileinfo['EchoTime']) + 1
 
-
-                supported_multiecho = ['_bold', '_epi', '_sbref', '_T1w', '_PDT2']
+                supported_multiecho = ['_bold', '_phase', '_epi', '_sbref', '_T1w', '_PDT2']
                 # Now, decide where to insert it.
                 # Insert it **before** the following string(s), whichever appears first.
                 for imgtype in supported_multiecho:

@@ -16,7 +16,7 @@ import inspect
 import logging
 lgr = logging.getLogger(__name__)
 
-INIT_MSG = "Running {packname} version {version}".format
+INIT_MSG = "Running {packname} version {version} latest {latest}".format
 
 
 def is_interactive():
@@ -139,8 +139,11 @@ def get_parser():
                        '(can be compressed) are supported in addition to '
                        'directory. All matching tarballs for a subject are '
                        'extracted and their content processed in a single '
-                       'pass. Note that you might need to surround the value '
-                       'with quotes to avoid {...} being considered by shell')
+                       'pass. If multiple tarballs are found, each is '
+                       'assumed to be a separate session and the --ses '
+                       'argument is ignored. Note that you might need to '
+                       'surround the value with quotes to avoid {...} being '
+                       'considered by shell')
     group.add_argument('--files', nargs='*',
                        help='Files (tarballs, dicoms) or directories '
                        'containing files to process. Cannot be provided if '
@@ -243,8 +246,16 @@ def process_args(args):
 
     outdir = op.abspath(args.outdir)
 
+    import etelemetry
+    try:
+        latest = etelemetry.get_project("nipy/heudiconv")
+    except Exception as e:
+        lgr.warning("Could not check for version updates: ", e)
+        latest = {"version": 'Unknown'}
+
     lgr.info(INIT_MSG(packname=__packagename__,
-                      version=__version__))
+                      version=__version__,
+                      latest=latest["version"]))
 
     if args.command:
         process_extra_commands(outdir, args)

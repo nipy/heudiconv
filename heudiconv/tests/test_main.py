@@ -22,6 +22,7 @@ from mock import patch
 from os.path import join as opj
 from six.moves import StringIO
 import stat
+import os.path as op
 
 
 @patch('sys.stdout', new_callable=StringIO)
@@ -205,6 +206,7 @@ def test_add_rows_to_scans_keys_file(tmpdir):
         assert dates == sorted(dates)
 
     _check_rows(fn, rows)
+    assert op.exists(opj(tmpdir.strpath, 'file.json'))
     # add a new one
     extra_rows = {
         'a_new_file.nii.gz': ['2016adsfasd23', '', 'fasadfasdf'],
