@@ -140,8 +140,11 @@ def get_parser():
                        '(can be compressed) are supported in addition to '
                        'directory. All matching tarballs for a subject are '
                        'extracted and their content processed in a single '
-                       'pass. Note that you might need to surround the value '
-                       'with quotes to avoid {...} being considered by shell')
+                       'pass. If multiple tarballs are found, each is '
+                       'assumed to be a separate session and the --ses '
+                       'argument is ignored. Note that you might need to '
+                       'surround the value with quotes to avoid {...} being '
+                       'considered by shell')
     group.add_argument('--files', nargs='*',
                        help='Files (tarballs, dicoms) or directories '
                        'containing files to process. Cannot be provided if '
