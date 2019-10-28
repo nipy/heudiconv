@@ -413,7 +413,7 @@ def get_formatted_scans_key_row(dcm_fn):
         acq_time = datetime.strptime(td, '%H%M%S%Y%m%d').isoformat()
     except (AttributeError, ValueError) as exc:
         lgr.warning("Failed to get date/time for the content: %s", str(exc))
-        acq_time = None
+        acq_time = ''
     # add random string
     # But let's make it reproducible by using all UIDs
     # (might change across versions?)
@@ -425,11 +425,11 @@ def get_formatted_scans_key_row(dcm_fn):
     try:
         perfphys = dcm_data.PerformingPhysicianName
     except AttributeError:
-        perfphys = None
+        perfphys = ''
     row = [acq_time, perfphys, randstr]
     # empty entries should be 'n/a'
     # https://github.com/dartmouth-pbs/heudiconv/issues/32
-    row = ['n/a' if e is None else e for e in row]
+    row = ['n/a' if not e else e for e in row]
     return row
 
 
