@@ -429,7 +429,7 @@ def get_formatted_scans_key_row(dcm_fn):
     row = [acq_time, perfphys, randstr]
     # empty entries should be 'n/a'
     # https://github.com/dartmouth-pbs/heudiconv/issues/32
-    row = ['n/a' if not e else e for e in row]
+    row = ['n/a' if not str(e) else e for e in row]
     return row
 
 
