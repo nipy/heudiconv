@@ -1,4 +1,4 @@
-from filelock import SoftFileLock
+import filelock
 import os
 import os.path as op
 import logging
@@ -34,7 +34,6 @@ from .dicoms import (
 )
 
 LOCKFILE = 'heudiconv.lock'
-LOCKFILE_TIMEOUT = 10
 lgr = logging.getLogger(__name__)
 
 
@@ -205,8 +204,15 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
         clear_temp_dicoms(item_dicoms)
 
     if bids:
-        with SoftFileLock(op.join(anon_outdir, LOCKFILE),
-                          timeout=LOCKFILE_TIMEOUT):
+        lockfile = op.join(anon_outdir, LOCKFILE)
+        if op.exists(lockfile):
+            lgr.warning("Existing lockfile found in {0} - waiting for the "
+                        "lock to be released. To set a timeout limit, set "
+                        "the HEUDICONV_FILELOCK_TIMEOUT environmental variable "
+                        "to a value in seconds. If this process hangs, it may "
+                        "require a manual deletion of the {0}.".format(lockfile))
+        timeout = os.environ.get("HEUDICONV_LOCKFILE_TIMEOUT", -1)
+        with filelock.SoftFileLock(lockfile, timeout=timeout):
             if seqinfo:
                 keys = list(seqinfo)
                 add_participant_record(anon_outdir,
