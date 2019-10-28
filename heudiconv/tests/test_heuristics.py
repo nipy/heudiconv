@@ -150,3 +150,29 @@ def test_scout_conversion(tmpdir):
         'ses-localizer/anat/sub-phantom1sid1_ses-localizer_scout.dicom.tgz'
     )
     )
+
+
+@pytest.mark.parametrize(
+    'bidsoptions', [
+        ['notop'], [],
+    ])
+def test_notop(tmpdir, bidsoptions):
+    tmppath = tmpdir.strpath
+    args = (
+        "-f reproin --files %s"
+        % (TESTS_DATA_PATH)
+    ).split(' ') + ['-o', tmppath] + ['-b'] + bidsoptions
+    runner(args)
+
+    assert op.exists(pjoin(tmppath, 'Halchenko/Yarik/950_bids_test4'))
+    for fname in [
+        'CHANGES',
+        'dataset_description.json',
+        'participants.tsv',
+        'README',
+        'participants.json'
+    ]:
+        if 'notop' in bidsoptions:
+            assert not op.exists(pjoin(tmppath, 'Halchenko/Yarik/950_bids_test4', fname))
+        else:
+            assert op.exists(pjoin(tmppath, 'Halchenko/Yarik/950_bids_test4', fname))

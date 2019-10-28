@@ -19,6 +19,11 @@ from nipype.utils.filemanip import which
 import logging
 lgr = logging.getLogger(__name__)
 
+if sys.version_info[0] > 2:
+    from json.decoder import JSONDecodeError
+else:
+    JSONDecodeError = ValueError
+
 
 seqinfo_fields = [
     'total_files_till_now',  # 0
@@ -172,10 +177,15 @@ def load_json(filename):
     -------
     data : dict
     """
-    with open(filename, 'r') as fp:
-        data = json.load(fp)
-    return data
+    try:
+        with open(filename, 'r') as fp:
+            data = json.load(fp)
+    except JSONDecodeError:
+        lgr.error("{fname} is not a valid json file".format(fname=filename))
+        raise
 
+    return data
+    
 
 def assure_no_file_exists(path):
     """Check if file or symlink (git-annex?) exists, and if so -- remove"""
@@ -251,7 +261,17 @@ def treat_infofile(filename):
         j = json.load(f)
 
     j_slim = slim_down_info(j)
-    j_pretty = json_dumps_pretty(j_slim, indent=2, sort_keys=True)
+    dumps_kw = dict(indent=2, sort_keys=True)
+    try:
+        j_pretty = json_dumps_pretty(j_slim, **dumps_kw)
+    except AssertionError as exc:
+        lgr.warning(
+            "Prettyfication of .json failed (%s).  "
+            "Original .json will be kept as is.  Please share (if you could) "
+            "that file (%s) with HeuDiConv developers"
+            % (str(exc), filename)
+        )
+        j_pretty = json.dumps(j_slim, **dumps_kw)
 
     set_readonly(filename, False)
     with open(filename, 'wt') as fp:

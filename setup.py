@@ -47,11 +47,13 @@ def main():
         description=ldict['__description__'],
         long_description=ldict['__longdesc__'],
         license=ldict['__license__'],
+        classifiers=ldict['CLASSIFIERS'],
         packages=heudiconv_pkgs,
         entry_points={'console_scripts': [
             'heudiconv=heudiconv.cli.run:main',
             'heudiconv_monitor=heudiconv.cli.monitor:main',
         ]},
+        python_requires=ldict['PYTHON_REQUIRES'],
         install_requires=ldict['REQUIRES'],
         extras_require=ldict['EXTRA_REQUIRES'],
         package_data={
