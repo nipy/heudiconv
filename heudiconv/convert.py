@@ -219,7 +219,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                         "the HEUDICONV_FILELOCK_TIMEOUT environmental variable "
                         "to a value in seconds. If this process hangs, it may "
                         "require a manual deletion of the {0}.".format(lockfile))
-        timeout = os.environ.get("HEUDICONV_LOCKFILE_TIMEOUT", -1)
+        timeout = os.getenv("HEUDICONV_LOCKFILE_TIMEOUT", -1)
         with filelock.SoftFileLock(lockfile, timeout=timeout):
             if seqinfo:
                 keys = list(seqinfo)
