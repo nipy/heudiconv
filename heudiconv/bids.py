@@ -413,7 +413,7 @@ def get_formatted_scans_key_row(dcm_fn):
         acq_time = datetime.strptime(td, '%H%M%S%Y%m%d').isoformat()
     except (AttributeError, ValueError) as exc:
         lgr.warning("Failed to get date/time for the content: %s", str(exc))
-        acq_time = None
+        acq_time = ''
     # add random string
     # But let's make it reproducible by using all UIDs
     # (might change across versions?)
