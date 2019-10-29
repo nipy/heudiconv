@@ -29,6 +29,7 @@ REQUIRES = [
     'pathlib',
     'dcmstack>=0.7',
     'etelemetry',
+    'filelock>=3.0.12',
 ]
 
 TESTS_REQUIRES = [
