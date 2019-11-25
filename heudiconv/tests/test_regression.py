@@ -103,26 +103,22 @@ def test_grouping(tmpdir, subject):
 
     template = op.join("{subject}/*.dcm")
     hargs = gen_heudiconv_args(
-        tmpdir.strpath, outdir.strpath, subject, 'convertall.py',
+        tmpdir.strpath,
+        outdir.strpath,
+        subject,
+        'convertall.py',
         template=template
     )
 
     with pytest.raises(AssertionError):
-        """
-    test_regression.py:110: in test_grouping
-    runner(hargs)
-../cli/run.py:128: in main
-    process_args(args)
-../cli/run.py:333: in process_args
-    dcmconfig=args.dcmconfig,)
-../convert.py:168: in prep_conversion
-    grouping=None)
-../dicoms.py:96: in group_dicoms_into_seqinfos
-    studyUID, file_studyUID
-E   AssertionError: Conflicting study identifiers found [1.3.12.2.1107.5.2.32.35131.30000014022817282751500000052, 1.3.12.2.1107.5.2.43.66112.30000016081515591223100000010].
-"""
         runner(hargs)
 
     # group all found DICOMs under subject, despite conflicts
     hargs += ["-g", "all"]
     runner(hargs)
+    assert len([fl for fl in outdir.visit(fil='run0*')]) == 4
+    tsv = (outdir / 'participants.tsv')
+    assert tsv.check()
+    lines = tsv.open().readlines()
+    assert len(lines) == 2
+    assert lines[1].split('\t')[0] == 'sub-{}'.format(subject)
