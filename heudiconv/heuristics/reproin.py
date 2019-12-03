@@ -126,7 +126,7 @@ from glob import glob
 import logging
 lgr = logging.getLogger('heudiconv')
 
-# Terminology to harmonise and use to name variables etc
+# Terminology to hamornise and use to name variables etc
 # experiment
 #  subject
 #   [session]
@@ -557,7 +557,7 @@ def infotodict(seqinfo):
                 raise ValueError("Do not know image data type yet to make decision")
             seqtype_label = {
                 # might want explicit {file_index}  ?
-                # _epi for pepolar fieldmaps, see
+                # _epi for pipolar fieldmaps, see
                 # https://bids-specification.readthedocs.io/en/stable/04-modality-specific-files/01-magnetic-resonance-imaging-data.html#case-4-multiple-phase-encoded-directions-pepolar
                 'M': 'epi' if 'dir' in series_info else 'magnitude',
                 'P': 'phasediff',
