@@ -3,6 +3,8 @@ heudiconv (0.6.0-1) unstable; urgency=medium
   * Fresh upstream release, upload to unstable
   * debian/rules
     - cleanup artifacts from running tests at build time
+  * debian/control
+    - python-filelock into (B)Depends
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 05 Dec 2019 21:18:16 -0500
 
