@@ -18,3 +18,15 @@ Last-Update: 2019-12-05
      'filelock>=3.0.12',
  ]
  
+--- a/heudiconv/cli/run.py
++++ b/heudiconv/cli/run.py
+@@ -248,8 +248,8 @@ def process_args(args):
+ 
+     outdir = op.abspath(args.outdir)
+ 
+-    import etelemetry
+     try:
++        import etelemetry
+         latest = etelemetry.get_project("nipy/heudiconv")
+     except Exception as e:
+         lgr.warning("Could not check for version updates: ", e)
