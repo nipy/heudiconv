@@ -1,0 +1,20 @@
+From: Yaroslav Halchenko <debian@onerussian.com>
+Subject: do not strictly depend on etelemetry
+
+  It will be at most a recommended dependency anyways.
+  Code should allow to run without it
+
+Last-Update: 2019-12-05
+
+--- a/heudiconv/info.py
++++ b/heudiconv/info.py
+@@ -28,7 +28,8 @@ REQUIRES = [
+     'nipype >=1.0.0,!=1.2.1,!=1.2.2; python_version == "2.7"',
+     'pathlib',
+     'dcmstack>=0.7',
+-    'etelemetry',
++    # Do not strictly demand on debian yet, not packaged
++    #'etelemetry',
+     'filelock>=3.0.12',
+ ]
+ 
