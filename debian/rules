@@ -33,6 +33,10 @@ override_dh_auto_install:
 		-N --no-discard-stderr \
         ./debian/heudiconv/usr/bin/heudiconv >| build/heudiconv.1
 	find debian -iname *.pyc -delete
+	# https://github.com/nipy/heudiconv/issues/399
+	rm -rf debian/heudiconv/usr/lib/python*/*-packages/Research
+	find debian -name __pycache__ | xargs rm -rf
+
 
 clean::
 	dh_clean
