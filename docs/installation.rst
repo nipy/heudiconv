@@ -26,7 +26,7 @@ If `Docker <https://docs.docker.com/install/>`_ is available on your system, you
 can visit `our page on Docker Hub <https://hub.docker.com/r/nipy/heudiconv/tags>`_ 
 to view available releases. To pull the latest release, run::
 
-    $ docker pull nipy/heudiconv:0.5.4
+    $ docker pull nipy/heudiconv:0.6.0
 
 
 Singularity
@@ -35,4 +35,4 @@ If `Singularity <https://www.sylabs.io/singularity/>`_ is available on your syst
 you can use it to pull and convert our Docker images! For example, to pull and 
 build the latest release, you can run::
 
-    $ singularity pull docker://nipy/heudiconv:0.5.4
+    $ singularity pull docker://nipy/heudiconv:0.6.0
