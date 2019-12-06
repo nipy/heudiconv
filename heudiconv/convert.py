@@ -1,3 +1,4 @@
+import filelock
 import os
 import os.path as op
 import logging
@@ -32,6 +33,7 @@ from .dicoms import (
     compress_dicoms
 )
 
+LOCKFILE = 'heudiconv.lock'
 lgr = logging.getLogger(__name__)
 
 
@@ -79,7 +81,7 @@ def conversion_info(subject, outdir, info, filegroup, ses):
 
 
 def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
-                   anon_outdir, with_prov, ses, bids, seqinfo, min_meta,
+                   anon_outdir, with_prov, ses, bids_options, seqinfo, min_meta,
                    overwrite, dcmconfig):
     if dicoms:
         lgr.info("Processing %d dicoms", len(dicoms))
@@ -88,7 +90,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
     else:
         raise ValueError("neither dicoms nor seqinfo dict was provided")
 
-    if bids:
+    if bids_options is not None:
         if not sid:
             raise ValueError(
                 "BIDS requires alphanumeric subject ID. Got an empty value")
@@ -102,7 +104,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
 
     # Generate heudiconv info folder
     idir = op.join(outdir, '.heudiconv', anon_sid)
-    if bids and ses:
+    if bids_options is not None and ses:
         idir = op.join(idir, 'ses-%s' % str(ses))
     if anon_outdir == outdir:
         idir = op.join(idir, 'info')
@@ -122,13 +124,21 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
     # detected
     # ref: https://github.com/nipy/heudiconv/issues/84#issuecomment-330048609
     # for more automagical wishes
-    target_heuristic_filename = op.join(idir, op.basename(heuristic.filename))
+    target_heuristic_filename = op.join(idir, 'heuristic.py')
+    # faciliates change - TODO: remove in 1.0
+    old_heuristic_filename = op.join(idir, op.basename(heuristic.filename))
+    if op.exists(old_heuristic_filename):
+        assure_no_file_exists(target_heuristic_filename)
+        safe_copyfile(old_heuristic_filename, target_heuristic_filename)
+        assure_no_file_exists(old_heuristic_filename)
     # TODO:
     #  1. add a test
     #  2. possibly extract into a dedicated function for easier logic flow here
     #     and a dedicated unittest
-    if (op.exists(target_heuristic_filename) and
-        file_md5sum(target_heuristic_filename) != file_md5sum(heuristic.filename)):
+    if (
+        op.exists(target_heuristic_filename) and
+        file_md5sum(target_heuristic_filename) != file_md5sum(heuristic.filename)
+    ):
         # remake conversion table
         reuse_conversion_table = False
         lgr.info(
@@ -151,7 +161,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
         # TODO -- might have been done outside already!
         # MG -- will have to try with both dicom template, files
         assure_no_file_exists(target_heuristic_filename)
-        safe_copyfile(heuristic.filename, idir)
+        safe_copyfile(heuristic.filename, target_heuristic_filename)
         if dicoms:
             seqinfo = group_dicoms_into_seqinfos(
                 dicoms,
@@ -177,7 +187,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
         write_config(edit_file, info)
         save_json(filegroup_file, filegroup)
 
-    if bids:
+    if bids_options is not None:
         # the other portion of the path would mimic BIDS layout
         # so we don't need to worry here about sub, ses at all
         tdir = anon_outdir
@@ -192,7 +202,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                 scaninfo_suffix=getattr(heuristic, 'scaninfo_suffix', '.json'),
                 custom_callable=getattr(heuristic, 'custom_callable', None),
                 with_prov=with_prov,
-                bids=bids,
+                bids_options=bids_options,
                 outdir=tdir,
                 min_meta=min_meta,
                 overwrite=overwrite,
@@ -201,19 +211,28 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
     for item_dicoms in filegroup.values():
         clear_temp_dicoms(item_dicoms)
 
-    if bids:
-        if seqinfo:
-            keys = list(seqinfo)
-            add_participant_record(anon_outdir,
-                                   anon_sid,
-                                   keys[0].patient_age,
-                                   keys[0].patient_sex)
-        populate_bids_templates(anon_outdir,
-                                getattr(heuristic, 'DEFAULT_FIELDS', {}))
+    if bids_options is not None and 'notop' not in bids_options:
+        lockfile = op.join(anon_outdir, LOCKFILE)
+        if op.exists(lockfile):
+            lgr.warning("Existing lockfile found in {0} - waiting for the "
+                        "lock to be released. To set a timeout limit, set "
+                        "the HEUDICONV_FILELOCK_TIMEOUT environmental variable "
+                        "to a value in seconds. If this process hangs, it may "
+                        "require a manual deletion of the {0}.".format(lockfile))
+        timeout = os.getenv("HEUDICONV_LOCKFILE_TIMEOUT", -1)
+        with filelock.SoftFileLock(lockfile, timeout=timeout):
+            if seqinfo:
+                keys = list(seqinfo)
+                add_participant_record(anon_outdir,
+                                       anon_sid,
+                                       keys[0].patient_age,
+                                       keys[0].patient_sex)
+            populate_bids_templates(anon_outdir,
+                                    getattr(heuristic, 'DEFAULT_FIELDS', {}))
 
 
 def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
-            bids, outdir, min_meta, overwrite, symlink=True, prov_file=None,
+            bids_options, outdir, min_meta, overwrite, symlink=True, prov_file=None,
             dcmconfig=None):
     """Perform actual conversion (calls to converter etc) given info from
     heuristic's `infotodict`
@@ -256,7 +275,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
         # We want to create this dir only if we are converting it to nifti,
         # or if we're using BIDS
         dicom_only = outtypes == ('dicom',)
-        if not(dicom_only and bids) and not op.exists(prefix_dirname):
+        if not(dicom_only and (bids_options is not None)) and not op.exists(prefix_dirname):
             os.makedirs(prefix_dirname)
 
         for outtype in outtypes:
@@ -265,7 +284,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
             lgr.debug("Includes the following dicoms: %s", item_dicoms)
 
             if outtype == 'dicom':
-                convert_dicom(item_dicoms, bids, prefix,
+                convert_dicom(item_dicoms, bids_options, prefix,
                               outdir, tempdirs, symlink, overwrite)
             elif outtype in ['nii', 'nii.gz']:
                 assert converter == 'dcm2niix', ('Invalid converter '
@@ -279,16 +298,16 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
 
                     # run conversion through nipype
                     res, prov_file = nipype_convert(item_dicoms, prefix, with_prov,
-                                                    bids, tmpdir, dcmconfig)
+                                                    bids_options, tmpdir, dcmconfig)
 
-                    bids_outfiles = save_converted_files(res, item_dicoms, bids,
+                    bids_outfiles = save_converted_files(res, item_dicoms, bids_options,
                                                          outtype, prefix,
                                                          outname_bids,
                                                          overwrite=overwrite)
 
                     # save acquisition time information if it's BIDS
                     # at this point we still have acquisition date
-                    if bids:
+                    if bids_options is not None:
                         save_scans_key(item, bids_outfiles)
                     # Fix up and unify BIDS files
                     tuneup_bids_json_files(bids_outfiles)
@@ -310,7 +329,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
         elif not bids_outfiles:
             lgr.debug("No BIDS files were produced, nothing to embed to then")
         elif outname:
-            embed_metadata_from_dicoms(bids, item_dicoms, outname, outname_bids,
+            embed_metadata_from_dicoms(bids_options, item_dicoms, outname, outname_bids,
                                        prov_file, scaninfo, tempdirs, with_prov,
                                        min_meta)
         if scaninfo and op.exists(scaninfo):
@@ -326,7 +345,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
             custom_callable(*item)
 
 
-def convert_dicom(item_dicoms, bids, prefix,
+def convert_dicom(item_dicoms, bids_options, prefix,
                   outdir, tempdirs, symlink, overwrite):
     """Save DICOMs as output (default is by symbolic link)
 
@@ -334,8 +353,9 @@ def convert_dicom(item_dicoms, bids, prefix,
     ----------
     item_dicoms : list of filenames
         DICOMs to save
-    bids : bool
-        Save to BIDS format
+    bids_options : list or None
+        If not None then save to BIDS format. List may be empty
+        or contain bids specific options
     prefix : string
         Conversion outname
     outdir : string
@@ -352,7 +372,7 @@ def convert_dicom(item_dicoms, bids, prefix,
     -------
     None
     """
-    if bids:
+    if bids_options is not None:
         # mimic the same hierarchy location as the prefix
         # although it could all have been done probably
         # within heuristic really
@@ -383,7 +403,7 @@ def convert_dicom(item_dicoms, bids, prefix,
                 shutil.copyfile(filename, outfile)
 
 
-def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir, dcmconfig=None):
+def nipype_convert(item_dicoms, prefix, with_prov, bids_options, tmpdir, dcmconfig=None):
     """
     Converts DICOMs grouped from heuristic using Nipype's Dcm2niix interface.
 
@@ -395,8 +415,9 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir, dcmconfig=None)
         Heuristic output path
     with_prov : Bool
         Store provenance information
-    bids : Bool
-        Output BIDS sidecar JSONs
+    bids_options : List or None
+        If not None then output BIDS sidecar JSONs
+        List may contain bids specific options
     tmpdir : Directory
         Conversion working directory
     dcmconfig : File (optional)
@@ -418,14 +439,14 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir, dcmconfig=None)
     convertnode = Node(Dcm2niix(from_file=fromfile), name='convert')
     convertnode.base_dir = tmpdir
     convertnode.inputs.source_names = item_dicoms
-    convertnode.inputs.out_filename = op.basename(op.dirname(prefix))
+    convertnode.inputs.out_filename = prefix
 
     if nipype.__version__.split('.')[0] == '0':
         # deprecated since 1.0, might be needed(?) before
         convertnode.inputs.terminal_output = 'allatonce'
     else:
         convertnode.terminal_output = 'allatonce'
-    convertnode.inputs.bids_format = bids
+    convertnode.inputs.bids_format = bids_options is not None
     eg = convertnode.run()
 
     # prov information
@@ -439,7 +460,7 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids, tmpdir, dcmconfig=None)
     return eg, prov_file
 
 
-def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids, overwrite):
+def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outname_bids, overwrite):
     """Copy converted files from tempdir to output directory.
     Will rename files if necessary.
 
@@ -449,8 +470,9 @@ def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids, 
         Nipype conversion Node with results
     item_dicoms: list of filenames
         DICOMs converted
-    bids : bool
-        Option to save to BIDS
+    bids : list or None
+        If not list save to BIDS
+        List may contain bids specific options
     prefix : string
 
     Returns
@@ -481,7 +503,7 @@ def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids, 
         # dwi etc which might spit out multiple files
 
         suffixes = ([str(i+1) for i in range(len(res_files))]
-                     if bids else None)
+                     if (bids_options is not None) else None)
 
         if not suffixes:
             lgr.warning("Following series files likely have "
@@ -492,9 +514,9 @@ def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids, 
 
         # Also copy BIDS files although they might need to
         # be merged/postprocessed later
-        bids_files = sorted(res.outputs.bids
-                     if len(res.outputs.bids) == len(res_files)
-                     else [None] * len(res_files))
+        bids_files = (sorted(res.outputs.bids)
+                      if len(res.outputs.bids) == len(res_files)
+                      else [None] * len(res_files))
 
         ###   Do we have a multi-echo series?   ###
         #   Some Siemens sequences (e.g. CMRR's MB-EPI) set the label 'TE1',
@@ -506,19 +528,14 @@ def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids, 
         #   series. To do that, the most straightforward way is to read the
         #   echo times for all bids_files and see if they are all the same or not.
 
-        # Check for echotime information
-        echo_times = set()
+        # Check for varying echo times
+        echo_times = sorted(list(set(
+            load_json(b).get('EchoTime', None)
+            for b in bids_files
+            if b
+        )))
 
-        for bids_file in bids_files:
-            if bids_file:
-                # check for varying EchoTimes
-                echot = load_json(bids_file).get('EchoTime', None)
-                if echot is not None:
-                    echo_times.add(echot)
-
-        # To see if the echo times are the same, convert it to a set and see if
-        # only one remains:
-        is_multiecho = len(echo_times) >= 1 if echo_times else False
+        is_multiecho = len(echo_times) > 1
 
         ### Loop through the bids_files, set the output name and save files
         for fl, suffix, bids_file in zip(res_files, suffixes, bids_files):
@@ -568,11 +585,13 @@ def save_converted_files(res, item_dicoms, bids, outtype, prefix, outname_bids, 
             # For multi-echo sequences, we have to specify the echo number in
             # the file name:
             if bids_file and is_multiecho:
-                # Get the EchoNumber from json file info.  If not present, it's echo-1
-                echo_number = fileinfo.get('EchoNumber', 1)
+                # Get the EchoNumber from json file info.  If not present, use EchoTime
+                if 'EchoNumber' in fileinfo.keys():
+                    echo_number = fileinfo['EchoNumber']
+                else:
+                    echo_number = echo_times.index(fileinfo['EchoTime']) + 1
 
-
-                supported_multiecho = ['_bold', '_epi', '_sbref', '_T1w']
+                supported_multiecho = ['_bold', '_phase', '_epi', '_sbref', '_T1w', '_PDT2']
                 # Now, decide where to insert it.
                 # Insert it **before** the following string(s), whichever appears first.
                 for imgtype in supported_multiecho:

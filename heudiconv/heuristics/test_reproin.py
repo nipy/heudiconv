@@ -166,6 +166,7 @@ def test_parse_series_spec():
     assert \
         pdpn(" PREFIX:bids_func_ses+_task-boo_run+  ") == \
         pdpn("PREFIX:bids_func_ses+_task-boo_run+") == \
+        pdpn("WIP func_ses+_task-boo_run+") == \
         pdpn("bids_func_ses+_run+_task-boo") == \
            {
                'seqtype': 'func',
@@ -202,3 +203,12 @@ def test_parse_series_spec():
                 'acq': 'MPRAGE',
                 'seqtype_label': 'T1w'
            }
+
+    # Check for currently used {date}, which should also should get adjusted
+    # from (date) since Philips does not allow for {}
+    assert pdpn("func_ses-{date}") == \
+           pdpn("func_ses-(date)") == \
+           {'seqtype': 'func', 'session': '{date}'}
+
+    assert pdpn("fmap_dir-AP_ses-01") == \
+           {'seqtype': 'fmap', 'session': '01', 'dir': 'AP'}

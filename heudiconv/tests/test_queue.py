@@ -7,7 +7,7 @@ from heudiconv.queue import clean_args, which
 from .utils import TESTS_DATA_PATH
 import pytest
 
-@pytest.mark.skipif(which("sbatch"), reason="skip a real slurm call")
+@pytest.mark.skipif(bool(which("sbatch")), reason="skip a real slurm call")
 @pytest.mark.parametrize(
     'invocation', [
         "--files %s/01-fmap_acq-3mm" % TESTS_DATA_PATH,    # our new way with automated groupping

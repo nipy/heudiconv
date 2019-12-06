@@ -43,6 +43,13 @@ DICOMs as an independent ``heudiconv`` execution.
 The first script aggregates the DICOM directories and submits them to
 ``run_heudiconv.sh`` with SLURM as a job array.
 
+If using bids, the ``notop`` bids option suppresses creation of
+top-level files in the bids directory (e.g.,
+``dataset_description.json``) to avoid possible race conditions.
+These files may be generated later with ``populate_templates.sh``
+below (except for ``participants.tsv``, which must be create
+manually).
+
 .. code:: shell
 
     #!/bin/bash
@@ -75,8 +82,23 @@ The second script processes a DICOM directory with ``heudiconv`` using the built
     DCMDIR=${DCMDIRS[${SLURM_ARRAY_TASK_ID}]}
     echo Submitted directory: ${DCMDIR}
 
-    IMG="/singularity-images/heudiconv-0.5.4-dev.sif"
-    CMD="singularity run -B ${DCMDIR}:/dicoms:ro -B ${OUTDIR}:/output -e ${IMG} --files /dicoms/ -o /output -f reproin -c dcm2niix -b --minmeta -l ."
+    IMG="/singularity-images/heudiconv-0.6.0-dev.sif"
+    CMD="singularity run -B ${DCMDIR}:/dicoms:ro -B ${OUTDIR}:/output -e ${IMG} --files /dicoms/ -o /output -f reproin -c dcm2niix -b notop --minmeta -l ."
+
+    printf "Command:\n${CMD}\n"
+    ${CMD}
+    echo "Successful process"
+
+This script creates the top-level bids files (e.g.,
+``dataset_description.json``)
+
+..code:: shell
+    #!/bin/bash
+    set -eu
+
+    OUTDIR=${1}
+    IMG="/singularity-images/heudiconv-0.6.0-dev.sif"
+    CMD="singularity run -B ${OUTDIR}:/output -e ${IMG} --files /output -f reproin --command populate-templates"
 
     printf "Command:\n${CMD}\n"
     ${CMD}

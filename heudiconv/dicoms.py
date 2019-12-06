@@ -429,7 +429,7 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info, min_meta):
     return niftifile, infofile
 
 
-def embed_metadata_from_dicoms(bids, item_dicoms, outname, outname_bids,
+def embed_metadata_from_dicoms(bids_options, item_dicoms, outname, outname_bids,
                                prov_file, scaninfo, tempdirs, with_prov,
                                min_meta):
     """
@@ -437,7 +437,7 @@ def embed_metadata_from_dicoms(bids, item_dicoms, outname, outname_bids,
 
     Parameters
     ----------
-    bids
+    bids_options
     item_dicoms
     outname
     outname_bids
@@ -466,7 +466,7 @@ def embed_metadata_from_dicoms(bids, item_dicoms, outname, outname_bids,
     embedfunc.inputs.niftifile = op.abspath(outname)
     embedfunc.inputs.infofile = op.abspath(scaninfo)
     embedfunc.inputs.min_meta = min_meta
-    embedfunc.inputs.bids_info = load_json(op.abspath(outname_bids)) if bids else None
+    embedfunc.inputs.bids_info = load_json(op.abspath(outname_bids)) if (bids_options is not None) else None
     embedfunc.base_dir = tmpdir
     cwd = os.getcwd()
 

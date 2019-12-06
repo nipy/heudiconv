@@ -16,7 +16,7 @@ import inspect
 import logging
 lgr = logging.getLogger(__name__)
 
-INIT_MSG = "Running {packname} version {version}".format
+INIT_MSG = "Running {packname} version {version} latest {latest}".format
 
 
 def is_interactive():
@@ -112,6 +112,7 @@ def main(argv=None):
         random.seed(args.random_seed)
         import numpy
         numpy.random.seed(args.random_seed)
+    # Ensure only supported bids options are passed
     if args.debug:
         lgr.setLevel(logging.DEBUG)
     # Should be possible but only with a single subject -- will be used to
@@ -129,7 +130,7 @@ def main(argv=None):
 
 def get_parser():
     docstr = ("""Example:
-             heudiconv -d rawdata/{subject} -o . -f heuristic.py -s s1 s2 s3""")
+             heudiconv -d 'rawdata/{subject}' -o . -f heuristic.py -s s1 s2 s3""")
     parser = ArgumentParser(description=docstr)
     parser.add_argument('--version', action='version', version=__version__)
     group = parser.add_mutually_exclusive_group()
@@ -138,7 +139,12 @@ def get_parser():
                        'subject id {subject} and session {session}. Tarballs '
                        '(can be compressed) are supported in addition to '
                        'directory. All matching tarballs for a subject are '
-                       'extracted and their content processed in a single pass')
+                       'extracted and their content processed in a single '
+                       'pass. If multiple tarballs are found, each is '
+                       'assumed to be a separate session and the --ses '
+                       'argument is ignored. Note that you might need to '
+                       'surround the value with quotes to avoid {...} being '
+                       'considered by shell')
     group.add_argument('--files', nargs='*',
                        help='Files (tarballs, dicoms) or directories '
                        'containing files to process. Cannot be provided if '
@@ -181,8 +187,16 @@ def get_parser():
     parser.add_argument('-ss', '--ses', dest='session', default=None,
                         help='session for longitudinal study_sessions, default '
                         'is none')
-    parser.add_argument('-b', '--bids', action='store_true',
-                        help='flag for output into BIDS structure')
+    parser.add_argument('-b', '--bids', nargs='*',
+                        metavar=('BIDSOPTION1', 'BIDSOPTION2'),
+                        choices=['notop'],
+                        dest='bids_options',
+                        help='flag for output into BIDS structure. Can also '
+                        'take bids specific options, e.g., --bids notop.'
+                        'The only currently supported options is'
+                        '"notop", which skips creation of top-level bids '
+                        'files. This is useful when running in batch mode to '
+                        'prevent possible race conditions.')
     parser.add_argument('--overwrite', action='store_true', default=False,
                         help='flag to allow overwriting existing converted files')
     parser.add_argument('--datalad', action='store_true',
@@ -234,8 +248,16 @@ def process_args(args):
 
     outdir = op.abspath(args.outdir)
 
+    import etelemetry
+    try:
+        latest = etelemetry.get_project("nipy/heudiconv")
+    except Exception as e:
+        lgr.warning("Could not check for version updates: ", e)
+        latest = {"version": 'Unknown'}
+
     lgr.info(INIT_MSG(packname=__packagename__,
-                      version=__version__))
+                      version=__version__,
+                      latest=latest["version"]))
 
     if args.command:
         process_extra_commands(outdir, args)
@@ -302,7 +324,8 @@ def process_args(args):
             from ..external.dlad import prepare_datalad
             dlad_sid = sid if not anon_sid else anon_sid
             dl_msg = prepare_datalad(anon_study_outdir, anon_outdir, dlad_sid,
-                                     session, seqinfo, dicoms, args.bids)
+                                     session, seqinfo, dicoms,
+                                     args.bids_options)
 
         lgr.info("PROCESSING STARTS: {0}".format(
             str(dict(subject=sid, outdir=study_outdir, session=session))))
@@ -316,7 +339,7 @@ def process_args(args):
                         anon_outdir=anon_study_outdir,
                         with_prov=args.with_prov,
                         ses=session,
-                        bids=args.bids,
+                        bids_options=args.bids_options,
                         seqinfo=seqinfo,
                         min_meta=args.minmeta,
                         overwrite=args.overwrite,
@@ -333,7 +356,7 @@ def process_args(args):
             #  also in batch mode might fail since we have no locking ATM
             #  and theoretically no need actually to save entire study
             #  we just need that
-            add_to_datalad(outdir, study_outdir, msg, args.bids)
+            add_to_datalad(outdir, study_outdir, msg, args.bids_options)
 
     # if args.bids:
     #     # Let's populate BIDS templates for folks to take care about

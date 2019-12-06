@@ -240,6 +240,27 @@ def add_participant_record(studydir, subject, age, sex):
             known_subjects = {l.split('\t')[0] for l in f.readlines()}
         if participant_id in known_subjects:
             return
+    else:
+        # Populate particpants.json (an optional file to describe column names in
+        # participant.tsv). This auto generation will make BIDS-validator happy.
+        participants_json = op.join(studydir, 'participants.json')
+        if not op.lexists(participants_json):
+            save_json(participants_json,
+                OrderedDict([
+                    ("participant_id", OrderedDict([
+                        ("Description", "Participant identifier")])),
+                    ("age", OrderedDict([
+                        ("Description", "Age in years (TODO - verify) as in the initial"
+                            " session, might not be correct for other sessions")])),
+                    ("sex", OrderedDict([
+                        ("Description", "self-rated by participant, M for male/F for "
+                            "female (TODO: verify)")])),
+                    ("group", OrderedDict([
+                        ("Description", "(TODO: adjust - by default everyone is in "
+                            "control group)")])),
+                ]),
+                sort_keys=False,
+                indent=2)
     # Add a new participant
     with open(participants_tsv, 'a') as f:
         f.write(
@@ -311,7 +332,8 @@ def save_scans_key(item, bids_files):
 
 def add_rows_to_scans_keys_file(fn, newrows):
     """
-    Add new rows to file fn for scans key filename
+    Add new rows to file fn for scans key filename and generate accompanying json
+    descriptor to make BIDS validator happy.
 
     Parameters
     ----------
@@ -334,12 +356,35 @@ def add_rows_to_scans_keys_file(fn, newrows):
         os.unlink(fn)
     else:
         fnames2info = newrows
+        # Populate _scans.json (an optional file to describe column names in
+        # _scans.tsv). This auto generation will make BIDS-validator happy.
+        scans_json = '.'.join(fn.split('.')[:-1] + ['json'])
+        if not op.lexists(scans_json):
+            save_json(scans_json,
+                OrderedDict([
+                    ("filename", OrderedDict([
+                        ("Description", "Name of the nifti file")])),
+                    ("acq_time", OrderedDict([
+                        ("LongName", "Acquisition time"),
+                        ("Description", "Acquisition time of the particular scan")])),
+                    ("operator", OrderedDict([
+                        ("Description", "Name of the operator")])),
+                    ("randstr", OrderedDict([
+                        ("LongName", "Random string"),
+                        ("Description", "md5 hash of UIDs")])),
+                ]),
+                sort_keys=False,
+                indent=2)
 
     header = ['filename', 'acq_time', 'operator', 'randstr']
     # prepare all the data rows
     data_rows = [[k] + v for k, v in fnames2info.items()]
     # sort by the date/filename
-    data_rows_sorted = sorted(data_rows, key=lambda x: (x[1], x[0]))
+    try:
+        data_rows_sorted = sorted(data_rows, key=lambda x: (x[1], x[0]))
+    except TypeError as exc:
+        lgr.warning("Sorting scans by date failed: %s", str(exc))
+        data_rows_sorted = sorted(data_rows)
     # save
     with open(fn, 'a') as csvfile:
         writer = csv.writer(csvfile, delimiter='\t')
@@ -366,9 +411,9 @@ def get_formatted_scans_key_row(dcm_fn):
         time = dcm_data.ContentTime.split('.')[0]
         td = time + date
         acq_time = datetime.strptime(td, '%H%M%S%Y%m%d').isoformat()
-    except AttributeError as exc:
+    except (AttributeError, ValueError) as exc:
         lgr.warning("Failed to get date/time for the content: %s", str(exc))
-        acq_time = None
+        acq_time = ''
     # add random string
     # But let's make it reproducible by using all UIDs
     # (might change across versions?)
