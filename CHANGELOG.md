@@ -50,7 +50,7 @@ version boost.
   - Do not crash and store original .json file is "JSON pretification" fails
     ([#342][])
 - ReproIn heuristic
-  - tollerate WIP prefix on Philips scanners ([#343][])
+  - tolerate WIP prefix on Philips scanners ([#343][])
   - allow for use of `(...)` instead of `{...}` since `{}` are not allowed
     ([#343][])
   - Support pipolar fieldmaps by providing them with `_epi` not `_magnitude`.
