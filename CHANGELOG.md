@@ -4,7 +4,7 @@ All notable changes to this project will be documented (for humans) in this file
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [0.6.0] - 2019-12-05
+## [0.6.0] - 2019-12-16
 
 This is largely a bug fix.  Metadata and order of `_key-value` fields in BIDS
 could change from the result of converting using previous versions, thus minor
@@ -50,7 +50,7 @@ version boost.
   - Do not crash and store original .json file is "JSON pretification" fails
     ([#342][])
 - ReproIn heuristic
-  - tollerate WIP prefix on Philips scanners ([#343][])
+  - tolerate WIP prefix on Philips scanners ([#343][])
   - allow for use of `(...)` instead of `{...}` since `{}` are not allowed
     ([#343][])
   - Support pipolar fieldmaps by providing them with `_epi` not `_magnitude`.
