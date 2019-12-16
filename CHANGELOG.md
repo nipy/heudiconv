@@ -4,7 +4,7 @@ All notable changes to this project will be documented (for humans) in this file
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [0.6.0] - 2019-12-05
+## [0.6.0] - 2019-12-16
 
 This is largely a bug fix.  Metadata and order of `_key-value` fields in BIDS
 could change from the result of converting using previous versions, thus minor
