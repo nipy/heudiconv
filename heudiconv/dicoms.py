@@ -58,7 +58,9 @@ def group_dicoms_into_seqinfos(files, file_filter, dcmfilter, grouping):
         import nibabel.nicom.dicomwrappers as dw
         # TODO after getting a regression test check if the same behavior
         #      with stop_before_pixels=True
-        mw = dw.wrapper_from_data(dcm.read_file(filename, force=True))
+        mw = dw.wrapper_from_data(
+            dcm.read_file(filename, stop_before_pixels=True, force=True)
+        )
 
         for sig in ('iop', 'ICE_Dims', 'SequenceName'):
             try:
