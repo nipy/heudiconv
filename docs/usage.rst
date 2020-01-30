@@ -82,7 +82,7 @@ The second script processes a DICOM directory with ``heudiconv`` using the built
     DCMDIR=${DCMDIRS[${SLURM_ARRAY_TASK_ID}]}
     echo Submitted directory: ${DCMDIR}
 
-    IMG="/singularity-images/heudiconv-0.5.4-dev.sif"
+    IMG="/singularity-images/heudiconv-0.6.0-dev.sif"
     CMD="singularity run -B ${DCMDIR}:/dicoms:ro -B ${OUTDIR}:/output -e ${IMG} --files /dicoms/ -o /output -f reproin -c dcm2niix -b notop --minmeta -l ."
 
     printf "Command:\n${CMD}\n"
@@ -97,7 +97,7 @@ This script creates the top-level bids files (e.g.,
     set -eu
 
     OUTDIR=${1}
-    IMG="/singularity-images/heudiconv-0.5.4-dev.sif"
+    IMG="/singularity-images/heudiconv-0.6.0-dev.sif"
     CMD="singularity run -B ${OUTDIR}:/output -e ${IMG} --files /output -f reproin --command populate-templates"
 
     printf "Command:\n${CMD}\n"

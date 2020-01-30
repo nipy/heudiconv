@@ -4,15 +4,72 @@ All notable changes to this project will be documented (for humans) in this file
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2019-12-16
+
+This is largely a bug fix.  Metadata and order of `_key-value` fields in BIDS
+could change from the result of converting using previous versions, thus minor
+version boost.
+14 people contributed to this release -- thanks
+[everyone](https://github.com/nipy/heudiconv/graphs/contributors)!
+
+### Enhancement
+
+- Use [etelemetry](https://pypi.org/project/etelemetry) to inform about most
+  recent available version of heudiconv. Please set `NO_ET` environment variable
+  if you want to disable it ([#369][])
+- BIDS:
+  - `--bids` flag became an option. It can (optionally) accept `notop` value
+    to avoid creation of top level files (`CHANGES`, `dataset_description.json`,
+    etc) as a workaround during parallel execution to avoid race conditions etc.
+    ([#344][])
+  - Generate basic `.json` files with descriptions of the fields for
+    `participants.tsv` and `_scans.tsv` files ([#376][])
+  - Use `filelock` while writing top level files. Use
+    `HEUDICONV_FILELOCK_TIMEOUT` environment to change the default timeout value
+    ([#348][])
+  - `_PDT2` was added as a suffix for multi-echo (really "multi-modal")
+    sequences ([#345][])
+- Calls to `dcm2niix` would include full output path to make it easier to
+  discern in the logs what file it is working on ([#351][])
+- With recent [datalad]() (>= 0.10), created DataLad dataset will use
+  `--fake-dates` functionality of DataLad to not leak data conversion dates,
+  which might be close to actual data acquisition/patient visit ([#352][])
+- Support multi-echo EPI `_phase` data ([#373][] fixes [#368][])
+- Log location of a bad .json file to ease troubleshooting ([#379][])
+- Add basic pypi classifiers for the package ([#380][])
+
+### Fixed
+- Sorting `_scans.tsv` files lacking valid dates field should not cause a crash
+  ([#337][])
+- Multi-echo files detection based number of echos ([#339][])
+- BIDS
+  - Use `EchoTimes` from the associated multi-echo files if `EchoNumber` tag is
+    missing ([#366][] fixes [#347][])
+  - Tolerate empty ContentTime and/or ContentDate in DICOMs ([#372][]) and place
+    "n/a" if value is missing ([#390][])
+  - Do not crash and store original .json file is "JSON pretification" fails
+    ([#342][])
+- ReproIn heuristic
+  - tolerate WIP prefix on Philips scanners ([#343][])
+  - allow for use of `(...)` instead of `{...}` since `{}` are not allowed
+    ([#343][])
+  - Support pipolar fieldmaps by providing them with `_epi` not `_magnitude`.
+    "Loose" BIDS `_key-value` pairs might come now after `_dir-` even if they
+    came first before ([#358][] fixes [#357][])
+- All heuristics saved under `.heudiconv/` under `heuristic.py` name, to avoid
+  discrepancy during reconversion ([#354][] fixes [#353][])
+- Do not crash (with TypeError) while trying to sort absent file list ([#360][])
+- heudiconv requires nipype >= 1.0.0 ([#364][]) and blacklists `1.2.[12]` ([#375][])
+
 ## [0.5.4] - 2019-04-29
 
 This release includes fixes to BIDS multi-echo conversions, the
- re-implementation of queuing support (currently just SLURM), as well as
- some bugfixes.
+re-implementation of queuing support (currently just SLURM), as well as
+some bugfixes.
 
- Starting today, we will (finally) push versioned releases to DockerHub.
- Finally, to more accurately reflect on-going development, the `latest`
- tag has been renamed to `unstable`.
+Starting today, we will (finally) push versioned releases to DockerHub.
+Finally, to more accurately reflect on-going development, the `latest`
+tag has been renamed to `unstable`.
 
 ### Added
 - Readthedocs documentation ([#327][])
@@ -189,8 +246,37 @@ TODO Summary
 [DBIC]: http://dbic.dartmouth.edu
 [datalad]: http://datalad.org
 [dcm2niix]: https://github.com/rordenlab/dcm2niix
-[#293]: https://github.com/nipy/heudiconv/issues/293
 [#301]: https://github.com/nipy/heudiconv/issues/301
+[#353]: https://github.com/nipy/heudiconv/issues/353
+[#354]: https://github.com/nipy/heudiconv/issues/354
+[#357]: https://github.com/nipy/heudiconv/issues/357
+[#358]: https://github.com/nipy/heudiconv/issues/358
+[#347]: https://github.com/nipy/heudiconv/issues/347
+[#366]: https://github.com/nipy/heudiconv/issues/366
+[#368]: https://github.com/nipy/heudiconv/issues/368
+[#373]: https://github.com/nipy/heudiconv/issues/373
+[#293]: https://github.com/nipy/heudiconv/issues/293
 [#304]: https://github.com/nipy/heudiconv/issues/304
 [#306]: https://github.com/nipy/heudiconv/issues/306
 [#310]: https://github.com/nipy/heudiconv/issues/310
+[#327]: https://github.com/nipy/heudiconv/issues/327
+[#328]: https://github.com/nipy/heudiconv/issues/328
+[#334]: https://github.com/nipy/heudiconv/issues/334
+[#337]: https://github.com/nipy/heudiconv/issues/337
+[#339]: https://github.com/nipy/heudiconv/issues/339
+[#342]: https://github.com/nipy/heudiconv/issues/342
+[#343]: https://github.com/nipy/heudiconv/issues/343
+[#344]: https://github.com/nipy/heudiconv/issues/344
+[#345]: https://github.com/nipy/heudiconv/issues/345
+[#348]: https://github.com/nipy/heudiconv/issues/348
+[#351]: https://github.com/nipy/heudiconv/issues/351
+[#352]: https://github.com/nipy/heudiconv/issues/352
+[#360]: https://github.com/nipy/heudiconv/issues/360
+[#364]: https://github.com/nipy/heudiconv/issues/364
+[#369]: https://github.com/nipy/heudiconv/issues/369
+[#372]: https://github.com/nipy/heudiconv/issues/372
+[#375]: https://github.com/nipy/heudiconv/issues/375
+[#376]: https://github.com/nipy/heudiconv/issues/376
+[#379]: https://github.com/nipy/heudiconv/issues/379
+[#380]: https://github.com/nipy/heudiconv/issues/380
+[#390]: https://github.com/nipy/heudiconv/issues/390
