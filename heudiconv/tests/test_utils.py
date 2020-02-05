@@ -67,11 +67,11 @@ def test_json_dumps_pretty():
     assert pretty({'WipMemBlock': tstr}) == '{\n  "WipMemBlock": "%s"\n}' % tstr
 
 
-def test_load_json(tmp_path, caplog):
+def test_load_json(tmpdir, caplog):
     # test invalid json
     ifname = 'invalid.json'
-    invalid_json_file = str(tmp_path / ifname)
-    create_tree(str(tmp_path), {ifname: u"I'm Jason Bourne"})
+    invalid_json_file = str(tmpdir / ifname)
+    create_tree(str(tmpdir), {ifname: u"I'm Jason Bourne"})
 
     with pytest.raises(JSONDecodeError):
         load_json(str(invalid_json_file))
@@ -81,7 +81,7 @@ def test_load_json(tmp_path, caplog):
     # test valid json
     vcontent = {"secret": "spy"}
     vfname = "valid.json"
-    valid_json_file = str(tmp_path / vfname)
+    valid_json_file = str(tmpdir / vfname)
     save_json(valid_json_file, vcontent)
     
     assert load_json(valid_json_file) == vcontent

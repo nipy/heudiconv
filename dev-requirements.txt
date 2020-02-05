@@ -1,4 +1,5 @@
 -r requirements.txt
-pytest
+# Fix version to older pytest to ease backward compatibility testing
+pytest==3.6.4
 tinydb
 inotify

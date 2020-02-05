@@ -1,4 +1,4 @@
-__version__ = "0.6.0.dev1"
+__version__ = "0.6.0"
 __author__ = "HeuDiConv team and contributors"
 __url__ = "https://github.com/nipy/heudiconv"
 __packagename__ = 'heudiconv'
@@ -29,6 +29,7 @@ REQUIRES = [
     'pathlib',
     'dcmstack>=0.7',
     'etelemetry',
+    'filelock>=3.0.12',
 ]
 
 TESTS_REQUIRES = [
