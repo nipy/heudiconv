@@ -97,7 +97,7 @@ def validate_dicom(fl, dcmfilter):
     for sig in ('iop', 'ICE_Dims', 'SequenceName'):
         try:
             del mw.series_signature[sig]
-        except Exception:
+        except KeyError:
             pass
     # Workaround for protocol name in private siemens csa header
     if not getattr(mw.dcm_data, 'ProtocolName', '').strip():
@@ -112,15 +112,15 @@ def validate_dicom(fl, dcmfilter):
         lgr.warning(
             'Ignoring %s since not quite a "normal" DICOM: %s', fl, e
         )
-        return None
+        return
     if dcmfilter is not None and dcmfilter(mw.dcm_data):
         lgr.warning("Ignoring %s because of DICOM filter", fl)
-        return None
+        return
     if mw.dcm_data[0x0008, 0x0016].repval in (
         'Raw Data Storage',
         'GrayscaleSoftcopyPresentationStateStorage'
     ):
-        return None
+        return
     try:
         file_studyUID = mw.dcm_data.StudyInstanceUID
     except AttributeError:
@@ -190,9 +190,11 @@ def group_dicoms_into_seqinfos(files, grouping, file_filter=None,
         grouping = custom_grouping
         study_customgroup = None
 
-    for filename in files:
+    removeidx = []
+    for idx, filename in enumerate(files):
         mwinfo = validate_dicom(filename, dcmfilter)
         if mwinfo is None:
+            removeidx.append(idx)
             continue
         mw, series_id, file_studyUID = mwinfo
         if per_studyUID:
@@ -239,6 +241,11 @@ def group_dicoms_into_seqinfos(files, grouping, file_filter=None,
             groups[1].append(len(mwgroup) - 1)
 
     group_map = dict(zip(groups[0], groups[1]))
+
+    if removeidx:
+        # remove non DICOMS from files
+        for idx in sorted(removeidx, reverse=True):
+            del files[idx]
 
     seqinfos = OrderedDict()
     # for the next line to make any sense the series_id needs to
@@ -405,7 +412,6 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info, min_meta):
     """
     # imports for nipype
     import nibabel as nb
-    import os
     import os.path as op
     import json
     import re
@@ -418,7 +424,7 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info, min_meta):
         # may be odict now - iter to be safe
         stack = next(iter(stack))
 
-        #Create the nifti image using the data array
+        # Create the nifti image using the data array
         if not op.exists(niftifile):
             nifti_image = stack.to_nifti(embed_meta=True)
             nifti_image.to_filename(niftifile)
@@ -443,9 +449,9 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info, min_meta):
             meta_info.update(bids_info)
             # meta_info = dict(meta_info.items() + bids_info.items())
         try:
-            meta_info['TaskName'] = (re.search('(?<=_task-)\w+',
-                                               op.basename(infofile))
-                                     .group(0).split('_')[0])
+            meta_info['TaskName'] = re.search(
+                r'(?<=_task-)\w+', op.basename(infofile)
+            ).group(0).split('_')[0]
         except AttributeError:
             pass
     # write to outfile
