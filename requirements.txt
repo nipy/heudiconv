@@ -1,1 +1,2 @@
 .[all]
+git+git://github.com/moloney/dcmstack@master
