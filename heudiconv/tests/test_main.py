@@ -35,8 +35,7 @@ def test_main_help(stdout):
     assert stdout.getvalue().startswith("usage: ")
 
 
-@patch('sys.stderr' if sys.version_info[:2] <= (3, 3) else
-       'sys.stdout', new_callable=StringIO)
+@patch('sys.stdout', new_callable=StringIO)
 def test_main_version(std):
     with pytest.raises(SystemExit):
         runner(['--version'])
