@@ -52,9 +52,9 @@ def fetch_data(tmpdir, dataset, getpath=None):
     """
     from datalad import api
     targetdir = op.join(tmpdir, op.basename(dataset))
-    api.install(path=targetdir,
+    ds = api.install(path=targetdir,
                 source='http://datasets-tests.datalad.org/{}'.format(dataset))
 
     getdir = targetdir + (op.sep + getpath if getpath is not None else '')
-    api.get(getdir)
+    ds.get(getdir)
     return targetdir
