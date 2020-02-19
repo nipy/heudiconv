@@ -72,8 +72,7 @@ def conversion_info(subject, outdir, info, filegroup, ses):
                 try:
                     files = filegroup[item]
                 except KeyError:
-                    PY3 = sys.version_info[0] >= 3
-                    files = filegroup[(str if PY3 else unicode)(item)]
+                    files = filegroup[str(item)]
                 outprefix = template.format(**parameters)
                 convert_info.append((op.join(outpath, outprefix),
                                     outtype, files))

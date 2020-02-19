@@ -19,10 +19,7 @@ from nipype.utils.filemanip import which
 import logging
 lgr = logging.getLogger(__name__)
 
-if sys.version_info[0] > 2:
-    from json.decoder import JSONDecodeError
-else:
-    JSONDecodeError = ValueError
+from json.decoder import JSONDecodeError
 
 
 seqinfo_fields = [
@@ -115,9 +112,7 @@ def anonymize_sid(sid, anon_sid_cmd):
     cmd = [anon_sid_cmd, sid]
     shell_return = check_output(cmd)
 
-    if all([sys.version_info[0] > 2,
-            isinstance(shell_return, bytes),
-            isinstance(sid, str)]):
+    if isinstance(shell_return, bytes) and isinstance(sid, str):
         anon_sid = shell_return.decode()
     else:
         anon_sid = shell_return
@@ -490,8 +485,6 @@ def create_tree(path, tree, archives_leading_dir=True):
             create_tree(full_name, load, archives_leading_dir=archives_leading_dir)
         else:
             with open(full_name, 'w') as f:
-                if sys.version_info[0] == 2 and not isinstance(load, str):
-                    load = load.encode('utf-8')
                 f.write(load)
         if executable:
             os.chmod(full_name, os.stat(full_name).st_mode | stat.S_IEXEC)

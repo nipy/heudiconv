@@ -10,7 +10,7 @@ from ..utils import create_file_if_missing
 
 lgr = logging.getLogger(__name__)
 
-MIN_VERSION = '0.7'
+MIN_VERSION = '0.12.2'
 
 
 def prepare_datalad(studydir, outdir, sid, session, seqinfo, dicoms, bids):
@@ -34,23 +34,20 @@ def prepare_datalad(studydir, outdir, sid, session, seqinfo, dicoms, bids):
 def add_to_datalad(topdir, studydir, msg, bids):
     """Do all necessary preparations (if were not done before) and save
     """
-    from datalad.api import create
+    import datalad.api as dl
     from datalad.api import Dataset
     from datalad.support.annexrepo import AnnexRepo
     from datalad.support.external_versions import external_versions
     assert external_versions['datalad'] >= MIN_VERSION, (
-      "Need datalad >= {}".format(MIN_VERSION))  # add to reqs
+        "Need datalad >= {}".format(MIN_VERSION))  # add to reqs
 
-    create_kwargs = {}
-    if external_versions['datalad'] >= '0.10':
-        create_kwargs['fake_dates'] = True  # fake dates by default
 
     studyrelpath = op.relpath(studydir, topdir)
     assert not studyrelpath.startswith(op.pardir)  # so we are under
     # now we need to test and initiate a DataLad dataset all along the path
     curdir_ = topdir
     superds = None
-    subdirs = [''] + studyrelpath.split(op.sep)
+    subdirs = [''] + [d for d in studyrelpath.split(op.sep) if d != os.curdir]
     for isubdir, subdir in enumerate(subdirs):
         curdir_ = op.join(curdir_, subdir)
         ds = Dataset(curdir_)
@@ -58,12 +55,12 @@ def add_to_datalad(topdir, studydir, msg, bids):
             lgr.info("Initiating %s", ds)
             # would require annex > 20161018 for correct operation on annex v6
             # need to add .gitattributes first anyways
-            ds_ = create(curdir_, dataset=superds,
+            ds_ = dl.create(curdir_, dataset=superds,
                          force=True,
-                         no_annex=True,
+                         # initiate annex only at the bottom repository
+                         no_annex=isubdir<(len(subdirs)-1),
+                         fake_dates=True,
                          # shared_access='all',
-                         annex_version=6,
-                         **create_kwargs
                          )
             assert ds == ds_
         assert ds.is_installed()
@@ -93,17 +90,13 @@ def add_to_datalad(topdir, studydir, msg, bids):
     with open(gitattributes_path, 'wb') as f:
         f.write('\n'.join(known_attrs).encode('utf-8'))
 
-    # so for mortals it just looks like a regular directory!
-    if not ds.config.get('annex.thin'):
-        ds.config.add('annex.thin', 'true', where='local')
-    # initialize annex there if not yet initialized
-    AnnexRepo(ds.path, init=True)
+
     # ds might have memories of having ds.repo GitRepo
-    superds = None
-    del ds
-    ds = Dataset(studydir)
+    superds = Dataset(topdir)
+    assert op.realpath(ds.path) == op.realpath(studydir)
+    assert isinstance(ds.repo, AnnexRepo)
     # Add doesn't have all the options of save such as msg and supers
-    ds.add('.gitattributes', to_git=True, save=False)
+    ds.save(path=['.gitattributes'], message="Custom .gitattributes", to_git=True)
     dsh = dsh_path = None
     if op.lexists(op.join(ds.path, '.heudiconv')):
         dsh_path = op.join(ds.path, '.heudiconv')
@@ -120,7 +113,6 @@ def add_to_datalad(topdir, studydir, msg, bids):
             else:
                 dsh = ds.create(path='.heudiconv',
                                 force=True,
-                                **create_kwargs
                                 # shared_access='all'
                                 )
         # Since .heudiconv could contain sensitive information
@@ -146,7 +138,7 @@ def add_to_datalad(topdir, studydir, msg, bids):
     mark_sensitive(ds, '*/*/anat')  # within ses/subj
     if dsh_path:
         mark_sensitive(ds, '.heudiconv')  # entire .heudiconv!
-    ds.save(message=msg, recursive=True, super_datasets=True)
+    superds.save(path=ds.path, message=msg, recursive=True)
 
     assert not ds.repo.dirty
     # TODO:  they are still appearing as native annex symlinked beasts
