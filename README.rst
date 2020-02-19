@@ -4,7 +4,7 @@
 
 `a heuristic-centric DICOM converter`
 
-.. image:: https://img.shields.io/badge/docker-nipy/heudiconv:0.5.4-brightgreen.svg?logo=docker&style=flat
+.. image:: https://img.shields.io/badge/docker-nipy/heudiconv:latest-brightgreen.svg?logo=docker&style=flat
   :target: https://hub.docker.com/r/nipy/heudiconv/tags/
   :alt: Our Docker image
 
