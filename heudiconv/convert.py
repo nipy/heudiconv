@@ -321,16 +321,21 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                         % (outname)
                     )
 
-        if len(bids_outfiles) > 1:
-            lgr.warning("For now not embedding BIDS and info generated "
-                        ".nii.gz itself since sequence produced "
-                        "multiple files")
-        elif not bids_outfiles:
-            lgr.debug("No BIDS files were produced, nothing to embed to then")
-        elif outname:
-            embed_metadata_from_dicoms(bids_options, item_dicoms, outname, outname_bids,
-                                       prov_file, scaninfo, tempdirs, with_prov,
-                                       min_meta)
+                if len(bids_outfiles) > 1:
+                    lgr.warning("Embedding BIDS and info generated "
+                                ".nii.gz itself even though sequence produced "
+                                "multiple files")
+                    for bids_outfile in bids_outfiles:
+                        this_outname = op.splitext(bids_outfile)[0] + '.' + outtype
+                        embed_metadata_from_dicoms(bids_options, item_dicoms, this_outname, bids_outfile,
+                                                   prov_file, bids_outfile, tempdirs, with_prov,
+                                                   min_meta)
+                elif not bids_outfiles:
+                    lgr.debug("No BIDS files were produced, nothing to embed to then")
+                elif outname:
+                    embed_metadata_from_dicoms(bids_options, item_dicoms, outname, outname_bids,
+                                               prov_file, scaninfo, tempdirs, with_prov,
+                                               min_meta)
         if scaninfo and op.exists(scaninfo):
             lgr.info("Post-treating %s file", scaninfo)
             treat_infofile(scaninfo)
