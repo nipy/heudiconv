@@ -322,9 +322,8 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                     )
 
         if len(bids_outfiles) > 1:
-            lgr.warning("For now not embedding BIDS and info generated "
-                        ".nii.gz itself since sequence produced "
-                        "multiple files")
+            for bids_outfile in bids_outfiles:
+                add_taskname_to_infofile( bids_outfile )
         elif not bids_outfiles:
             lgr.debug("No BIDS files were produced, nothing to embed to then")
         elif outname:
@@ -628,3 +627,29 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
             except TypeError as exc:  ##catch lists
                 raise TypeError("Multiple BIDS sidecars detected.")
     return bids_outfiles
+
+
+def  add_taskname_to_infofile(infofile):
+    """Add the "TaskName" field to json files corresponding to func images.
+
+    Parameters
+    ----------
+    infofile : filename of json file
+
+    Returns
+    -------
+    """
+
+    import re
+
+    meta_info = load_json(infofile)
+
+    try:
+        meta_info['TaskName'] = (re.search('(?<=_task-)\w+',
+                                           op.basename(infofile))
+                                 .group(0).split('_')[0])
+    except AttributeError:
+        pass
+
+    # write to outfile
+    save_json(infofile, meta_info)
