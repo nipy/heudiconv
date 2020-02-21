@@ -649,7 +649,8 @@ def  add_taskname_to_infofile(infofile):
                                            op.basename(infofile))
                                  .group(0).split('_')[0])
     except AttributeError:
-        pass
+        lgr.warning("Failed to find task field in {0}.".format(infofile))
+        return
 
     # write to outfile
     save_json(infofile, meta_info)
