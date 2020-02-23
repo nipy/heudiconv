@@ -230,6 +230,95 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                                     getattr(heuristic, 'DEFAULT_FIELDS', {}))
 
 
+def update_complex_name(fileinfo, this_prefix_basename, suffix):
+    """
+    Insert `_part-<mag|phase>` entity into filename if data are from a sequence
+    with magnitude/phase reconstruction.
+    """
+    unsupported_types = ['_bold', '_phase']
+    if suffix in unsupported_types:
+        return this_prefix_basename
+
+    # Check to see if it is magnitude or phase reconstruction:
+    if 'M' in fileinfo.get('ImageType'):
+        mag_or_phase = 'mag'
+    elif 'P' in fileinfo.get('ImageType'):
+        mag_or_phase = 'phase'
+    else:
+        mag_or_phase = suffix
+
+    # Insert reconstruction label
+    if not ('_part-%s' % mag_or_phase) in this_prefix_basename:
+
+        # If "_part-" is specified, prepend the 'mag_or_phase' value.
+        if '_part-' in this_prefix_basename:
+            raise BIDSError(
+                "Part label for images will be automatically set, remove "
+                "from heuristic"
+            )
+
+        # If not, insert "_part-" + 'mag_or_phase' into the prefix_basename
+        #   **before** "_run", "_echo" or "_sbref", whichever appears first:
+        for label in ['_run', '_echo', '_sbref']:
+            if (label in this_prefix_basename):
+                this_prefix_basename = this_prefix_basename.replace(
+                    label, "_part-%s%s" % (mag_or_phase, label)
+                )
+                break
+    return this_prefix_basename
+
+
+def update_multiecho_name(fileinfo, this_prefix_basename, echo_times, suffix):
+    """
+    Insert `_echo-<num>` entity into filename if data are from a multi-echo
+    sequence.
+    """
+    unsupported_types = ['_magnitude1', '_magnitude2', '_phasediff', '_phase1', '_phase2']
+    if suffix in unsupported_types:
+        return this_prefix_basename
+
+    # Get the EchoNumber from json file info.  If not present, use EchoTime
+    if 'EchoNumber' in fileinfo.keys():
+        echo_number = fileinfo['EchoNumber']
+    else:
+        echo_number = echo_times.index(fileinfo['EchoTime']) + 1
+
+    # Now, decide where to insert it.
+    # Insert it **before** the following string(s), whichever appears first.
+    for imgtype in supported_multiecho:
+        if (imgtype in this_prefix_basename):
+            this_prefix_basename = this_prefix_basename.replace(
+                imgtype, "_echo-%d%s" % (echo_number, imgtype)
+            )
+            break
+    return this_prefix_basename
+
+
+def update_uncombined_name(fileinfo, this_prefix_basename, coil_names, suffix):
+    """
+    Insert `_channel-<num>` entity into filename if data are from a sequence
+    with "save uncombined".
+    """
+    # Determine the channel number
+    channel_number = coil_names.index(fileinfo['CoilString']) + 1
+
+    # Insert it **before** the following string(s), whichever appears first.
+    for label in ['_run', '_echo', suffix]:
+        if label == suffix:
+            prefix_suffix = this_prefix_basename.split('_')[-1]
+            this_prefix_basename = this_prefix_basename.replace(
+                prefix_suffix, "_channel-%s_%s" % (channel_number, prefix_suffix)
+            )
+            break
+
+        if (label in this_prefix_basename):
+            this_prefix_basename = this_prefix_basename.replace(
+                label, "_channel-%s%s" % (coil_number, label)
+            )
+            break
+    return this_prefix_basename
+
+
 def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
             bids_options, outdir, min_meta, overwrite, symlink=True, prov_file=None,
             dcmconfig=None):
@@ -527,14 +616,29 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
         #   series. To do that, the most straightforward way is to read the
         #   echo times for all bids_files and see if they are all the same or not.
 
-        # Check for varying echo times
-        echo_times = sorted(list(set(
-            load_json(b).get('EchoTime', None)
-            for b in bids_files
-            if b
-        )))
+        # Collect some metadata across all images
+        echo_times, channel_names, image_types = [], [], []
+        for b in bids_files:
+            if not b:
+                continue
+            metadata = load_json(b)
+            echo_times.append(metadata.get('EchoTime', None))
+            channel_names.append(metadata.get('CoilString', None))
+            image_types.append(metadata.get('ImageType', None))
+        echo_times = [v for v in echo_times if v]
+        echo_times = sorted(list(set(echo_times)))
+        channel_names = [v for v in channel_names if v]
+        channel_names = sorted(list(set(channel_names)))
+        image_types = [v for v in image_types if v]
+        image_types = sorted(list(set(image_types)))
 
-        is_multiecho = len(echo_times) > 1
+        is_multiecho = len(echo_times) > 1  # Check for varying echo times
+        is_uncombined = len(coil_names) > 1  # Check for uncombined data
+
+        # Determine if data are complex (magnitude + phase)
+        magnitude_found = ['M' in it for it in image_types]
+        phase_found = ['P' in it for it in image_types]
+        is_complex = magnitude_found and phase_found
 
         ### Loop through the bids_files, set the output name and save files
         for fl, suffix, bids_file in zip(res_files, suffixes, bids_files):
@@ -542,63 +646,32 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
             # TODO: monitor conversion duration
             if bids_file:
                 fileinfo = load_json(bids_file)
+                print(suffix)
 
             # set the prefix basename for this specific file (we'll modify it,
             # and we don't want to modify it for all the bids_files):
             this_prefix_basename = prefix_basename
 
-            # _sbref sequences reconstructing magnitude and phase generate
-            # two NIfTI files IN THE SAME SERIES, so we cannot just add
-            # the suffix, if we want to be bids compliant:
-            if bids_file and this_prefix_basename.endswith('_sbref'):
-                # Check to see if it is magnitude or phase reconstruction:
-                if 'M' in fileinfo.get('ImageType'):
-                    mag_or_phase = 'magnitude'
-                elif 'P' in fileinfo.get('ImageType'):
-                    mag_or_phase = 'phase'
-                else:
-                    mag_or_phase = suffix
+            # Update name if complex data
+            if bids_file and is_complex:
+                this_prefix_basename = update_complex_name(
+                    fileinfo, this_prefix_basename, suffix
+                )
 
-                # Insert reconstruction label
-                if not ("_rec-%s" % mag_or_phase) in this_prefix_basename:
-
-                    # If "_rec-" is specified, prepend the 'mag_or_phase' value.
-                    if ('_rec-' in this_prefix_basename):
-                        raise BIDSError(
-                        "Reconstruction label for multi-echo single-band"
-                        " reference images will be automatically set, remove"
-                        " from heuristic"
-                        )
-
-                    # If not, insert "_rec-" + 'mag_or_phase' into the prefix_basename
-                    #   **before** "_run", "_echo" or "_sbref", whichever appears first:
-                    for label in ['_run', '_echo', '_sbref']:
-                        if (label in this_prefix_basename):
-                            this_prefix_basename = this_prefix_basename.replace(
-                                label, "_rec-%s%s" % (mag_or_phase, label)
-                            )
-                            break
-
-            # Now check if this run is multi-echo
+            # Update name if multi-echo
             # (Note: it can be _sbref and multiecho, so don't use "elif"):
             # For multi-echo sequences, we have to specify the echo number in
             # the file name:
             if bids_file and is_multiecho:
-                # Get the EchoNumber from json file info.  If not present, use EchoTime
-                if 'EchoNumber' in fileinfo.keys():
-                    echo_number = fileinfo['EchoNumber']
-                else:
-                    echo_number = echo_times.index(fileinfo['EchoTime']) + 1
+                this_prefix_basename = update_multiecho_name(
+                    fileinfo, this_prefix_basename, echo_times, suffix
+                )
 
-                supported_multiecho = ['_bold', '_phase', '_epi', '_sbref', '_T1w', '_PDT2']
-                # Now, decide where to insert it.
-                # Insert it **before** the following string(s), whichever appears first.
-                for imgtype in supported_multiecho:
-                    if (imgtype in this_prefix_basename):
-                        this_prefix_basename = this_prefix_basename.replace(
-                            imgtype, "_echo-%d%s" % (echo_number, imgtype)
-                        )
-                        break
+            # Update name if uncombined (channel-level) data
+            if bids_file and is_uncombined:
+                this_prefix_basename = update_uncombined_name(
+                    fileinfo, this_prefix_basename, channel_names
+                )
 
             # Fallback option:
             # If we have failed to modify this_prefix_basename, because it didn't fall
