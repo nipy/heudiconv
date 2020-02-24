@@ -232,47 +232,52 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
 
 def update_complex_name(fileinfo, this_prefix_basename, suffix):
     """
-    Insert `_part-<mag|phase>` entity into filename if data are from a sequence
+    Insert `_rec-<magnitude|phase>` entity into filename if data are from a sequence
     with magnitude/phase reconstruction.
     """
+    # Functional scans separate magnitude/phase differently
     unsupported_types = ['_bold', '_phase']
     if any(ut in this_prefix_basename for ut in unsupported_types):
         return this_prefix_basename
 
     # Check to see if it is magnitude or phase reconstruction:
     if 'M' in fileinfo.get('ImageType'):
-        mag_or_phase = 'mag'
+        mag_or_phase = 'magnitude'
     elif 'P' in fileinfo.get('ImageType'):
         mag_or_phase = 'phase'
     else:
         mag_or_phase = suffix
 
     # Insert reconstruction label
-    if not ('_part-%s' % mag_or_phase) in this_prefix_basename:
-        # If "_part-" is specified, prepend the 'mag_or_phase' value.
-        if '_part-' in this_prefix_basename:
+    if not ('_rec-%s' % mag_or_phase) in this_prefix_basename:
+        # If "_rec-" is specified, prepend the 'mag_or_phase' value.
+        if '_rec-' in this_prefix_basename:
             raise BIDSError(
-                "Part label for images will be automatically set, remove "
+                "Rec label for images will be automatically set, remove "
                 "from heuristic"
             )
 
-        # If not, insert "_part-" + 'mag_or_phase' into the prefix_basename
+        # If not, insert "_rec-" + 'mag_or_phase' into the prefix_basename
         # **before** "_run", "_echo" or "_sbref", whichever appears first:
         for label in ['_run', '_echo', '_sbref']:
             if (label in this_prefix_basename):
                 this_prefix_basename = this_prefix_basename.replace(
-                    label, "_part-%s%s" % (mag_or_phase, label)
+                    label, "_rec-%s%s" % (mag_or_phase, label)
                 )
                 break
     return this_prefix_basename
 
 
-def update_multiecho_name(fileinfo, this_prefix_basename, echo_times, suffix):
+def update_multiecho_name(fileinfo, this_prefix_basename, echo_times):
     """
     Insert `_echo-<num>` entity into filename if data are from a multi-echo
     sequence.
     """
-    unsupported_types = ['_magnitude1', '_magnitude2', '_phasediff', '_phase1', '_phase2']
+    # Field maps separate echoes differently
+    unsupported_types = [
+        '_magnitude', '_magnitude1', '_magnitude2',
+        '_phasediff', '_phase1', '_phase2', '_fieldmap'
+    ]
     if any(ut in this_prefix_basename for ut in unsupported_types):
         return this_prefix_basename
 
@@ -299,11 +304,16 @@ def update_multiecho_name(fileinfo, this_prefix_basename, echo_times, suffix):
     return this_prefix_basename
 
 
-def update_uncombined_name(fileinfo, this_prefix_basename, channel_names, suffix):
+def update_uncombined_name(fileinfo, this_prefix_basename, channel_names):
     """
     Insert `_channel-<num>` entity into filename if data are from a sequence
     with "save uncombined".
     """
+    # In case any scan types separate channels differently
+    unsupported_types = []
+    if any(ut in this_prefix_basename for ut in unsupported_types):
+        return this_prefix_basename
+
     # Determine the channel number
     channel_number = ''.join([c for c in fileinfo['CoilString'] if c.isdigit()])
     if not channel_number:
@@ -657,12 +667,9 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
             this_prefix_basename = prefix_basename
 
             # Update name if multi-echo
-            # (Note: it can be _sbref and multiecho, so don't use "elif"):
-            # For multi-echo sequences, we have to specify the echo number in
-            # the file name:
             if bids_file and is_multiecho:
                 this_prefix_basename = update_multiecho_name(
-                    fileinfo, this_prefix_basename, echo_times, suffix
+                    fileinfo, this_prefix_basename, echo_times
                 )
 
             # Update name if complex data
@@ -674,7 +681,7 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
             # Update name if uncombined (channel-level) data
             if bids_file and is_uncombined:
                 this_prefix_basename = update_uncombined_name(
-                    fileinfo, this_prefix_basename, channel_names, suffix
+                    fileinfo, this_prefix_basename, channel_names
                 )
 
             # Fallback option:
