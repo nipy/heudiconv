@@ -251,6 +251,9 @@ def update_complex_name(fileinfo, this_prefix_basename, suffix):
     else:
         mag_or_phase = suffix
 
+    # Determine scan suffix
+    filetype = '_' + this_prefix_basename.split('_')[-1]
+
     # Insert reconstruction label
     if not ('_rec-%s' % mag_or_phase) in this_prefix_basename:
         # If "_rec-" is specified, prepend the 'mag_or_phase' value.
@@ -262,12 +265,18 @@ def update_complex_name(fileinfo, this_prefix_basename, suffix):
 
         # If not, insert "_rec-" + 'mag_or_phase' into the prefix_basename
         # **before** "_run", "_echo" or "_sbref", whichever appears first:
-        for label in ['_run', '_echo', '_sbref']:
-            if (label in this_prefix_basename):
+        for label in ['_dir', '_run', '_mod', '_echo', '_recording', '_proc', '_space', filetype]:
+            if label == filetype:
+                this_prefix_basename = this_prefix_basename.replace(
+                    filetype, "_rec-%s%s" % (mag_or_phase, filetype)
+                )
+                break
+            elif (label in this_prefix_basename):
                 this_prefix_basename = this_prefix_basename.replace(
                     label, "_rec-%s%s" % (mag_or_phase, label)
                 )
                 break
+
     return this_prefix_basename
 
 
@@ -289,10 +298,12 @@ def update_multiecho_name(fileinfo, this_prefix_basename, echo_times):
         echo_number = fileinfo['EchoNumber']
     else:
         echo_number = echo_times.index(fileinfo['EchoTime']) + 1
+
+    # Determine scan suffix
     filetype = '_' + this_prefix_basename.split('_')[-1]
 
     # Insert it **before** the following string(s), whichever appears first.
-    for label in ['_run', filetype]:
+    for label in ['_recording', '_proc', '_space', filetype]:
         if label == filetype:
             this_prefix_basename = this_prefix_basename.replace(
                 filetype, "_echo-%s%s" % (echo_number, filetype)
@@ -321,10 +332,13 @@ def update_uncombined_name(fileinfo, this_prefix_basename, channel_names):
     channel_number = ''.join([c for c in fileinfo['CoilString'] if c.isdigit()])
     if not channel_number:
         channel_number = channel_names.index(fileinfo['CoilString']) + 1
+
+    # Determine scan suffix
     filetype = '_' + this_prefix_basename.split('_')[-1]
 
     # Insert it **before** the following string(s), whichever appears first.
-    for label in ['_run', '_echo', filetype]:
+    # Choosing to put channel near the end since it's not in the specification yet.
+    for label in ['_recording', '_proc', '_space', filetype]:
         if label == filetype:
             this_prefix_basename = this_prefix_basename.replace(
                 filetype, "_channel-%s%s" % (channel_number, filetype)
