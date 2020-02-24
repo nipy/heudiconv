@@ -248,11 +248,11 @@ def process_args(args):
 
     outdir = op.abspath(args.outdir)
 
-    import etelemetry
     try:
+        import etelemetry
         latest = etelemetry.get_project("nipy/heudiconv")
     except Exception as e:
-        lgr.warning("Could not check for version updates: ", e)
+        lgr.warning("Could not check for version updates: %s", str(e))
         latest = {"version": 'Unknown'}
 
     lgr.info(INIT_MSG(packname=__packagename__,

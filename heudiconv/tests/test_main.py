@@ -1,6 +1,9 @@
 # TODO: break this up by modules
 
-from heudiconv.cli.run import main as runner
+from heudiconv.cli.run import (
+    main as runner,
+    process_args,
+)
 from heudiconv import __version__
 from heudiconv.utils import (create_file_if_missing,
                              set_readonly,
@@ -32,8 +35,7 @@ def test_main_help(stdout):
     assert stdout.getvalue().startswith("usage: ")
 
 
-@patch('sys.stderr' if sys.version_info[:2] <= (3, 3) else
-       'sys.stdout', new_callable=StringIO)
+@patch('sys.stdout', new_callable=StringIO)
 def test_main_version(std):
     with pytest.raises(SystemExit):
         runner(['--version'])
@@ -271,3 +273,16 @@ def test_cache(tmpdir):
     assert (cachedir / 'dicominfo.tsv').exists()
     assert (cachedir / 'S01.auto.txt').exists()
     assert (cachedir / 'S01.edit.txt').exists()
+
+
+def test_no_etelemetry():
+    # smoke test at large - just verifying that no crash if no etelemetry
+    class args:
+        outdir = '/dev/null'
+        command = 'ls'
+        heuristic = 'reproin'
+        files = []  # Nothing to list
+
+    # must not fail if etelemetry no found
+    with patch.dict('sys.modules', {'etelemetry': None}):
+        process_args(args)

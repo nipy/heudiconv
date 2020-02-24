@@ -746,6 +746,16 @@ def get_unique(seqinfos, attr):
 # hits, or may be we could just somehow demarkate that it will be multisession
 # one and so then later value parsed (again) in infotodict would be used???
 def infotoids(seqinfos, outdir):
+    # In python 3.7.5 we would obtain odict_keys() object which would be
+    # immutable, and we would not be able to perform any substitutions if
+    # needed.  So let's make it into a regular list
+    if isinstance(seqinfos, dict) or hasattr(seqinfos, 'keys'):
+        # just some checks for a paranoid Yarik
+        raise TypeError(
+            "Expected list-like structure here, not associative array. Got %s"
+            % type(seqinfos)
+        )
+    seqinfos = list(seqinfos)
     # decide on subjid and session based on patient_id
     lgr.info("Processing sequence infos to deduce study/session")
     study_description = get_study_description(seqinfos)
