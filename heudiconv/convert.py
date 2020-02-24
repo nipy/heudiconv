@@ -236,7 +236,7 @@ def update_complex_name(fileinfo, this_prefix_basename, suffix):
     with magnitude/phase reconstruction.
     """
     unsupported_types = ['_bold', '_phase']
-    if suffix in unsupported_types:
+    if any(ut in this_prefix_basename for ut in unsupported_types):
         return this_prefix_basename
 
     # Check to see if it is magnitude or phase reconstruction:
@@ -249,7 +249,6 @@ def update_complex_name(fileinfo, this_prefix_basename, suffix):
 
     # Insert reconstruction label
     if not ('_part-%s' % mag_or_phase) in this_prefix_basename:
-
         # If "_part-" is specified, prepend the 'mag_or_phase' value.
         if '_part-' in this_prefix_basename:
             raise BIDSError(
@@ -258,7 +257,7 @@ def update_complex_name(fileinfo, this_prefix_basename, suffix):
             )
 
         # If not, insert "_part-" + 'mag_or_phase' into the prefix_basename
-        #   **before** "_run", "_echo" or "_sbref", whichever appears first:
+        # **before** "_run", "_echo" or "_sbref", whichever appears first:
         for label in ['_run', '_echo', '_sbref']:
             if (label in this_prefix_basename):
                 this_prefix_basename = this_prefix_basename.replace(
@@ -274,7 +273,7 @@ def update_multiecho_name(fileinfo, this_prefix_basename, echo_times, suffix):
     sequence.
     """
     unsupported_types = ['_magnitude1', '_magnitude2', '_phasediff', '_phase1', '_phase2']
-    if suffix in unsupported_types:
+    if any(ut in this_prefix_basename for ut in unsupported_types):
         return this_prefix_basename
 
     # Get the EchoNumber from json file info.  If not present, use EchoTime
@@ -282,38 +281,45 @@ def update_multiecho_name(fileinfo, this_prefix_basename, echo_times, suffix):
         echo_number = fileinfo['EchoNumber']
     else:
         echo_number = echo_times.index(fileinfo['EchoTime']) + 1
+    filetype = '_' + this_prefix_basename.split('_')[-1]
 
-    # Now, decide where to insert it.
     # Insert it **before** the following string(s), whichever appears first.
-    for imgtype in supported_multiecho:
-        if (imgtype in this_prefix_basename):
+    for label in ['_run', filetype]:
+        if label == filetype:
             this_prefix_basename = this_prefix_basename.replace(
-                imgtype, "_echo-%d%s" % (echo_number, imgtype)
+                filetype, "_echo-%s%s" % (echo_number, filetype)
             )
             break
+        elif (label in this_prefix_basename):
+            this_prefix_basename = this_prefix_basename.replace(
+                label, "_echo-%s%s" % (echo_number, label)
+            )
+            break
+
     return this_prefix_basename
 
 
-def update_uncombined_name(fileinfo, this_prefix_basename, coil_names, suffix):
+def update_uncombined_name(fileinfo, this_prefix_basename, channel_names, suffix):
     """
     Insert `_channel-<num>` entity into filename if data are from a sequence
     with "save uncombined".
     """
     # Determine the channel number
-    channel_number = coil_names.index(fileinfo['CoilString']) + 1
+    channel_number = ''.join([c for c in fileinfo['CoilString'] if c.isdigit()])
+    if not channel_number:
+        channel_number = channel_names.index(fileinfo['CoilString']) + 1
+    filetype = '_' + this_prefix_basename.split('_')[-1]
 
     # Insert it **before** the following string(s), whichever appears first.
-    for label in ['_run', '_echo', suffix]:
-        if label == suffix:
-            prefix_suffix = this_prefix_basename.split('_')[-1]
+    for label in ['_run', '_echo', filetype]:
+        if label == filetype:
             this_prefix_basename = this_prefix_basename.replace(
-                prefix_suffix, "_channel-%s_%s" % (channel_number, prefix_suffix)
+                filetype, "_channel-%s%s" % (channel_number, filetype)
             )
             break
-
-        if (label in this_prefix_basename):
+        elif (label in this_prefix_basename):
             this_prefix_basename = this_prefix_basename.replace(
-                label, "_channel-%s%s" % (coil_number, label)
+                label, "_channel-%s%s" % (channel_number, label)
             )
             break
     return this_prefix_basename
@@ -630,14 +636,13 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
         channel_names = [v for v in channel_names if v]
         channel_names = sorted(list(set(channel_names)))
         image_types = [v for v in image_types if v]
-        image_types = sorted(list(set(image_types)))
 
         is_multiecho = len(echo_times) > 1  # Check for varying echo times
-        is_uncombined = len(coil_names) > 1  # Check for uncombined data
+        is_uncombined = len(channel_names) > 1  # Check for uncombined data
 
         # Determine if data are complex (magnitude + phase)
-        magnitude_found = ['M' in it for it in image_types]
-        phase_found = ['P' in it for it in image_types]
+        magnitude_found = any(['M' in it for it in image_types])
+        phase_found = any(['P' in it for it in image_types])
         is_complex = magnitude_found and phase_found
 
         ### Loop through the bids_files, set the output name and save files
@@ -646,17 +651,10 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
             # TODO: monitor conversion duration
             if bids_file:
                 fileinfo = load_json(bids_file)
-                print(suffix)
 
             # set the prefix basename for this specific file (we'll modify it,
             # and we don't want to modify it for all the bids_files):
             this_prefix_basename = prefix_basename
-
-            # Update name if complex data
-            if bids_file and is_complex:
-                this_prefix_basename = update_complex_name(
-                    fileinfo, this_prefix_basename, suffix
-                )
 
             # Update name if multi-echo
             # (Note: it can be _sbref and multiecho, so don't use "elif"):
@@ -667,10 +665,16 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
                     fileinfo, this_prefix_basename, echo_times, suffix
                 )
 
+            # Update name if complex data
+            if bids_file and is_complex:
+                this_prefix_basename = update_complex_name(
+                    fileinfo, this_prefix_basename, suffix
+                )
+
             # Update name if uncombined (channel-level) data
             if bids_file and is_uncombined:
                 this_prefix_basename = update_uncombined_name(
-                    fileinfo, this_prefix_basename, channel_names
+                    fileinfo, this_prefix_basename, channel_names, suffix
                 )
 
             # Fallback option:
