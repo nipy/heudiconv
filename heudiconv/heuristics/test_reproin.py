@@ -114,8 +114,10 @@ def test_fix_dbic_protocol():
     seqinfos = [seq1, seq2]
     protocols2fix = {
         md5sum('mystudy'):
-            [('scout_run\+', 'scout'),
+            [('scout_run\+', 'THESCOUT'),
              ('run-life[0-9]', 'run+_task-life')],
+        # rely on 'catch-all' to fix up above scout
+        '': [('THESCOUT', 'scout')]
     }
 
     with patch.object(reproin, 'protocols2fix', protocols2fix), \
