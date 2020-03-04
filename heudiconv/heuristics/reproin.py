@@ -412,10 +412,12 @@ def fix_dbic_protocol(seqinfo):
             fixed_kwargs = dict()
             # need to replace both protocol_name series_description
             for key in series_spec_fields:
-                value = getattr(s, key)
+                oldvalue = value = getattr(s, key)
                 # replace all I need to replace
                 for substring, replacement in substitutions:
                     value = re.sub(substring, replacement, value)
+                if oldvalue != value:
+                    lgr.info(" %s: %r -> %r", key, oldvalue, value)
                 fixed_kwargs[key] = value
             # namedtuples are immutable
             seqinfo[i] = s._replace(**fixed_kwargs)
