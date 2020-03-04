@@ -392,37 +392,56 @@ def fix_canceled_runs(seqinfo):
 
 
 def fix_dbic_protocol(seqinfo):
-    """Ad-hoc fixup for existing protocols
+    """Ad-hoc fixup for existing protocols.
+
+    It will operate in 3 stages on `protocols2fix` records.
+    1. consider a record which has md5sum of study_description
+    2. apply all substitutions, where key is a regular expression which
+       successfully searches (not necessarily matches, so anchor appropriately)
+       study_description
+    3. apply "catch all" substitutions in the key containing an empty string
+
+    3. is somewhat redundant since `re.compile('.*')` could match any, but is
+    kept for simplicity of its specification.
     """
 
     study_hash = get_study_hash(seqinfo)
+    study_description = get_study_description(seqinfo)
 
-    # We will consider study specific (based on hash) and global (if key is "",
-    # ie empty string) and in that order substitutions
-    candidate_substitutions = (
-        ('study (%s) specific' % study_hash, study_hash),
-        ('global', ''),
-    )
-    for subs_scope, subs_key in candidate_substitutions:
-        if subs_key not in protocols2fix:
-            continue
-        substitutions = protocols2fix[subs_key]
-        lgr.info("Considering %s substitutions", subs_scope)
-        for i, s in enumerate(seqinfo):
-            fixed_kwargs = dict()
-            # need to replace both protocol_name series_description
-            for key in series_spec_fields:
-                oldvalue = value = getattr(s, key)
-                # replace all I need to replace
-                for substring, replacement in substitutions:
-                    value = re.sub(substring, replacement, value)
-                if oldvalue != value:
-                    lgr.info(" %s: %r -> %r", key, oldvalue, value)
-                fixed_kwargs[key] = value
-            # namedtuples are immutable
-            seqinfo[i] = s._replace(**fixed_kwargs)
+    # We will consider first study specific (based on hash)
+    if study_hash in protocols2fix:
+        _apply_substitutions(seqinfo,
+                             protocols2fix[study_hash],
+                             'study (%s) specific' % study_hash)
+    # Then go through all regexps returning regex "search" result
+    # on study_description
+    for sub, substitutions in protocols2fix.items():
+        if isinstance(sub, re.Pattern) and sub.search(study_description):
+            _apply_substitutions(seqinfo,
+                                 substitutions,
+                                 '%r regex matching' % sub.pattern)
+    # and at the end - global
+    if '' in protocols2fix:
+        _apply_substitutions(seqinfo, protocols2fix[''], 'global')
 
     return seqinfo
+
+
+def _apply_substitutions(seqinfo, substitutions, subs_scope):
+    lgr.info("Considering %s substitutions", subs_scope)
+    for i, s in enumerate(seqinfo):
+        fixed_kwargs = dict()
+        # need to replace both protocol_name series_description
+        for key in series_spec_fields:
+            oldvalue = value = getattr(s, key)
+            # replace all I need to replace
+            for substring, replacement in substitutions:
+                value = re.sub(substring, replacement, value)
+            if oldvalue != value:
+                lgr.info(" %s: %r -> %r", key, oldvalue, value)
+            fixed_kwargs[key] = value
+        # namedtuples are immutable
+        seqinfo[i] = s._replace(**fixed_kwargs)
 
 
 def fix_seqinfo(seqinfo):

@@ -3,6 +3,7 @@
 #
 from collections import OrderedDict
 from mock import patch
+import re
 
 from . import reproin
 from .reproin import (
@@ -110,12 +111,13 @@ def test_fix_dbic_protocol():
                        'nochangeplease',
                        'nochangeeither')
 
-
     seqinfos = [seq1, seq2]
     protocols2fix = {
         md5sum('mystudy'):
-            [('scout_run\+', 'THESCOUT'),
+            [('scout_run\+', 'THESCOUT-runX'),
              ('run-life[0-9]', 'run+_task-life')],
+        re.compile('^my.*'):
+            [('THESCOUT-runX', 'THESCOUT')],
         # rely on 'catch-all' to fix up above scout
         '': [('THESCOUT', 'scout')]
     }
