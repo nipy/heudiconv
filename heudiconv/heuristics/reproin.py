@@ -391,26 +391,38 @@ def fix_canceled_runs(seqinfo, accession2run=fix_accession2run):
     return seqinfo
 
 
-def fix_dbic_protocol(seqinfo, keys=series_spec_fields, subsdict=protocols2fix):
+def fix_dbic_protocol(seqinfo, keys=None, subsdict=None):
     """Ad-hoc fixup for existing protocols
     """
+    if subsdict is None:
+        subsdict = protocols2fix
+    if keys is None:
+        keys = series_spec_fields
+
     study_hash = get_study_hash(seqinfo)
 
-    if study_hash not in subsdict:
-        raise ValueError("I don't know how to fix {0}".format(study_hash))
-
-    # need to replace both protocol_name series_description
-    substitutions = subsdict[study_hash]
-    for i, s in enumerate(seqinfo):
-        fixed_kwargs = dict()
-        for key in keys:
-            value = getattr(s, key)
-            # replace all I need to replace
-            for substring, replacement in substitutions:
-                value = re.sub(substring, replacement, value)
-            fixed_kwargs[key] = value
-        # namedtuples are immutable
-        seqinfo[i] = s._replace(**fixed_kwargs)
+    # We will consider study specific (based on hash) and global (if key is "",
+    # ie empty string) and in that order substitutions
+    candidate_substitutions = (
+        ('study (%s) specific' % study_hash, study_hash),
+        ('global', ''),
+    )
+    for subs_scope, subs_key in candidate_substitutions:
+        if subs_key not in subsdict:
+            continue
+        substitutions = subsdict[subs_key]
+        lgr.info("Considering %s substitutions", subs_scope)
+        for i, s in enumerate(seqinfo):
+            fixed_kwargs = dict()
+            # need to replace both protocol_name series_description
+            for key in keys:
+                value = getattr(s, key)
+                # replace all I need to replace
+                for substring, replacement in substitutions:
+                    value = re.sub(substring, replacement, value)
+                fixed_kwargs[key] = value
+            # namedtuples are immutable
+            seqinfo[i] = s._replace(**fixed_kwargs)
 
     return seqinfo
 
@@ -420,10 +432,7 @@ def fix_seqinfo(seqinfo):
     """
     # add cancelme to known bad runs
     seqinfo = fix_canceled_runs(seqinfo)
-    study_hash = get_study_hash(seqinfo)
-    if study_hash in protocols2fix:
-        lgr.info("Fixing up protocol for {0}".format(study_hash))
-        seqinfo = fix_dbic_protocol(seqinfo)
+    seqinfo = fix_dbic_protocol(seqinfo)
     return seqinfo
 
 
