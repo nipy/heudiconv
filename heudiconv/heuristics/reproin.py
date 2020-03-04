@@ -372,14 +372,14 @@ def get_study_hash(seqinfo):
     return md5sum(get_study_description(seqinfo))
 
 
-def fix_canceled_runs(seqinfo, accession2run=fix_accession2run):
+def fix_canceled_runs(seqinfo):
     """Function that adds cancelme_ to known bad runs which were forgotten
     """
     accession_number = get_unique(seqinfo, 'accession_number')
-    if accession_number in accession2run:
+    if accession_number in fix_accession2run:
         lgr.info("Considering some runs possibly marked to be "
                  "canceled for accession %s", accession_number)
-        badruns = accession2run[accession_number]
+        badruns = fix_accession2run[accession_number]
         badruns_pattern = '|'.join(badruns)
         for i, s in enumerate(seqinfo):
             if re.match(badruns_pattern, s.series_id):
@@ -391,13 +391,9 @@ def fix_canceled_runs(seqinfo, accession2run=fix_accession2run):
     return seqinfo
 
 
-def fix_dbic_protocol(seqinfo, keys=None, subsdict=None):
+def fix_dbic_protocol(seqinfo):
     """Ad-hoc fixup for existing protocols
     """
-    if subsdict is None:
-        subsdict = protocols2fix
-    if keys is None:
-        keys = series_spec_fields
 
     study_hash = get_study_hash(seqinfo)
 
@@ -408,14 +404,14 @@ def fix_dbic_protocol(seqinfo, keys=None, subsdict=None):
         ('global', ''),
     )
     for subs_scope, subs_key in candidate_substitutions:
-        if subs_key not in subsdict:
+        if subs_key not in protocols2fix:
             continue
-        substitutions = subsdict[subs_key]
+        substitutions = protocols2fix[subs_key]
         lgr.info("Considering %s substitutions", subs_scope)
         for i, s in enumerate(seqinfo):
             fixed_kwargs = dict()
             # need to replace both protocol_name series_description
-            for key in keys:
+            for key in series_spec_fields:
                 value = getattr(s, key)
                 # replace all I need to replace
                 for substring, replacement in substitutions:
