@@ -126,6 +126,10 @@ from glob import glob
 import logging
 lgr = logging.getLogger('heudiconv')
 
+# pythons before 3.7 didn't have re.Pattern, it was some protected
+# _sre.SRE_Pattern, so let's just sample a class of the compiled regex
+re_Pattern = re.compile('.').__class__
+
 # Terminology to harmonise and use to name variables etc
 # experiment
 #  subject
@@ -416,7 +420,7 @@ def fix_dbic_protocol(seqinfo):
     # Then go through all regexps returning regex "search" result
     # on study_description
     for sub, substitutions in protocols2fix.items():
-        if isinstance(sub, re.Pattern) and sub.search(study_description):
+        if isinstance(sub, re_Pattern) and sub.search(study_description):
             _apply_substitutions(seqinfo,
                                  substitutions,
                                  '%r regex matching' % sub.pattern)
