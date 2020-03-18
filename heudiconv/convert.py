@@ -529,8 +529,9 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
         #   echo times for all bids_files and see if they are all the same or not.
 
         # Check for varying echo times
+        from numpy import nan
         echo_times = sorted(list(set(
-            load_json(b).get('EchoTime', None)
+            load_json(b).get('EchoTime', nan)
             for b in bids_files
             if b
         )))
