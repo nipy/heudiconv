@@ -2,6 +2,7 @@ import filelock
 import os
 import os.path as op
 import logging
+from math import nan
 import shutil
 import sys
 
@@ -530,7 +531,7 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
 
         # Check for varying echo times
         echo_times = sorted(list(set(
-            load_json(b).get('EchoTime', None)
+            load_json(b).get('EchoTime', nan)
             for b in bids_files
             if b
         )))
