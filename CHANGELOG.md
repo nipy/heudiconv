@@ -4,6 +4,36 @@ All notable changes to this project will be documented (for humans) in this file
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2020-03-20
+
+### Removed
+
+- Python 2 support/testing
+
+### Enhancement
+
+- `-g` option obtained two new modes: `all` and `custom`. In case of `all`,
+  all provided DICOMs will be treated as coming from a single scanning session.
+  `custom` instructs to use `.grouping` value (could be a DICOM attribute or
+  a callable)provided by the heuristic ([#359][]).
+- Stop before reading pixels data while gathering metadata from DICOMs ([#404][])
+- reproin heuristic:
+  - In addition to original "md5sum of the study_description" `protocols2fix`
+    could now have (and applied after md5sum matching ones)
+    1). a regular expression searched in study_description,
+    2). an empty string as "catch all".
+    This features could be used to easily provide remapping into reproin
+    naming (documentation is to come to http://github.com/ReproNim/reproin)
+    ([#425][])
+
+### Fixed
+
+- Use nan, not None for absent echo value in sorting
+- reproin heuristic: case seqinfos into a list to be able to modify from
+  overloaded heuristic ([#419][])
+- No spurious errors from the logger upon a warning about `etelemetry`
+  absence ([#407][])
+
 ## [0.6.0] - 2019-12-16
 
 This is largely a bug fix.  Metadata and order of `_key-value` fields in BIDS
@@ -271,6 +301,7 @@ TODO Summary
 [#348]: https://github.com/nipy/heudiconv/issues/348
 [#351]: https://github.com/nipy/heudiconv/issues/351
 [#352]: https://github.com/nipy/heudiconv/issues/352
+[#359]: https://github.com/nipy/heudiconv/issues/359
 [#360]: https://github.com/nipy/heudiconv/issues/360
 [#364]: https://github.com/nipy/heudiconv/issues/364
 [#369]: https://github.com/nipy/heudiconv/issues/369
@@ -280,3 +311,7 @@ TODO Summary
 [#379]: https://github.com/nipy/heudiconv/issues/379
 [#380]: https://github.com/nipy/heudiconv/issues/380
 [#390]: https://github.com/nipy/heudiconv/issues/390
+[#404]: https://github.com/nipy/heudiconv/issues/404
+[#407]: https://github.com/nipy/heudiconv/issues/407
+[#419]: https://github.com/nipy/heudiconv/issues/419
+[#425]: https://github.com/nipy/heudiconv/issues/425
