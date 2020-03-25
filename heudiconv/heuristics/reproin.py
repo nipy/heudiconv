@@ -541,9 +541,7 @@ def infotodict(seqinfo):
 
         # analyze s.protocol_name (series_id is based on it) for full name mapping etc
         if seqtype == 'func' and not seqtype_label:
-            if s.series_description.endswith('_SBRef'):
-                seqtype_label = 'sbref'
-            elif '_pace_' in series_spec:
+            if '_pace_' in series_spec:
                 seqtype_label = 'pace'  # or should it be part of seq-
             elif 'P' in s.image_type:
                 seqtype_label = 'phase'
@@ -568,6 +566,11 @@ def infotodict(seqinfo):
         # label for dwi as well
         if seqtype == 'dwi' and not seqtype_label:
             seqtype_label = 'dwi'
+
+        # Some generic overrides, regardless what seq name says, because those
+        # come "complementary"
+        if s.series_description.endswith('_SBRef'):
+            seqtype_label = 'sbref'
 
         run = series_info.get('run')
         if run is not None:
