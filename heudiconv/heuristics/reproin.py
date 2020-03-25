@@ -611,7 +611,14 @@ def infotodict(seqinfo):
             seqtype_label = 'sbref'
 
         if not seqtype_label:
-            lgr.warning("We ended up with an empty label/suffix for %r", series_spec)
+            # Might be provided by the bids ending within series_spec, we would
+            # just want to check if that the last element is not _key-value pair
+            bids_ending = series_info.get('bids', None)
+            if not bids_ending \
+                    or "-" in bids_ending.split('_')[-1]:
+                lgr.warning(
+                    "We ended up with an empty label/suffix for %r",
+                    series_spec)
 
         run = series_info.get('run')
         if run is not None:
