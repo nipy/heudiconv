@@ -1,10 +1,13 @@
 from ..dlad import mark_sensitive
-from datalad.api import Dataset
 from ...utils import create_tree
+
+import pytest
+
+dl = pytest.importorskip('datalad.api')
 
 
 def test_mark_sensitive(tmpdir):
-    ds = Dataset(str(tmpdir)).create(force=True)
+    ds = dl.Dataset(str(tmpdir)).create(force=True)
     create_tree(
         str(tmpdir),
         {
