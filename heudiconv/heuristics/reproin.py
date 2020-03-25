@@ -484,9 +484,10 @@ def infotodict(seqinfo):
             # 3 - Image IOD specific specialization (optional)
             dcm_image_iod_spec = s.image_type[2]
             image_type_seqtype = {
+                # Note: P and M are too generic to make a decision here, could be
+                #  for different seqtypes (bold, fmap, etc)
                 'FMRI': 'func',
                 'MPR': 'anat',
-                # 'M': 'func',  "magnitude"  -- can be for scout, anat, bold, fmap
                 'DIFFUSION': 'dwi',
                 'MIP_SAG': 'anat',  # angiography
                 'MIP_COR': 'anat',  # angiography
