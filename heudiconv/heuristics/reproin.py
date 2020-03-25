@@ -553,6 +553,7 @@ def infotodict(seqinfo):
                 seqtype_label = 'bold'
 
         if seqtype == 'fmap' and not seqtype_label:
+            # TODO: support phase1 phase2 like in "Case 2: Two phase images ..."
             if not dcm_image_iod_spec:
                 raise ValueError("Do not know image data type yet to make decision")
             seqtype_label = {
