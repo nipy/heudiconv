@@ -161,14 +161,16 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
             files_ += files_ex
 
         # sort all DICOMS using heuristic
-        # TODO:  this one is not grouping by StudyUID but may be we should!
-        seqinfo_dict = group_dicoms_into_seqinfos(files_,
+        seqinfo_dict = group_dicoms_into_seqinfos(
+            files_,
+            grouping,
             file_filter=getattr(heuristic, 'filter_files', None),
             dcmfilter=getattr(heuristic, 'filter_dicom', None),
-            grouping=grouping)
+            custom_grouping=getattr(heuristic, 'grouping', None)
+        )
 
         if sids:
-            if not (len(sids) == 1 and len(seqinfo_dict) == 1):
+            if len(sids) != 1:
                 raise RuntimeError(
                     "We were provided some subjects (%s) but "
                     "we can deal only "
@@ -208,17 +210,21 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
             # TODO:  probably infotoids is doomed to do more and possibly
             # split into multiple sessions!!!! but then it should be provided
             # full seqinfo with files which it would place into multiple groups
-            lgr.info("Study session for %s" % str(ids))
             study_session_info = StudySessionInfo(
                 ids.get('locator'),
                 ids.get('session', session) or session,
                 sid or ids.get('subject', None)
             )
+            lgr.info("Study session for %r", study_session_info)
+
             if study_session_info in study_sessions:
-                #raise ValueError(
-                lgr.warning(
-                    "We already have a study session with the same value %s"
-                    % repr(study_session_info))
-                continue # skip for now
+                if grouping != 'all':
+                    # MG - should this blow up to mimic -d invocation?
+                    lgr.warning(
+                        "Existing study session with the same values (%r)."
+                        " Skipping DICOMS %s",
+                        study_session_info, *seqinfo.values()
+                    )
+                    continue
             study_sessions[study_session_info] = seqinfo
     return study_sessions

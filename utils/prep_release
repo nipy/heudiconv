@@ -1,0 +1,14 @@
+#!/bin/bash
+
+set -eu
+
+read -r newver oldver <<<$(sed -ne 's,## \[\([0-9\.]*\)\] .*,\1,gp' CHANGELOG.md | head -n 2 | tr '\n' ' ')
+
+echo "Old: $oldver  New: $newver"
+curver=$(python -c 'import heudiconv; print(heudiconv.__version__)')
+# check
+test "$oldver" = "$curver"
+
+sed -i -e "s,${oldver//./\\.},$newver,g" \
+    docs/conf.py docs/installation.rst docs/usage.rst heudiconv/info.py
+

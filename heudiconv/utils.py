@@ -27,8 +27,8 @@ seqinfo_fields = [
     'example_dcm_file',      # 1
     'series_id',             # 2
     'dcm_dir_name',          # 3
-    'unspecified2',          # 4
-    'unspecified3',          # 5
+    'series_files',          # 4
+    'unspecified',           # 5
     'dim1', 'dim2', 'dim3', 'dim4', # 6, 7, 8, 9
     'TR', 'TE',              # 10, 11
     'protocol_name',         # 12
@@ -44,7 +44,7 @@ seqinfo_fields = [
     'patient_age',           # 22
     'patient_sex',           # 23
     'date',                  # 24
-    'series_uid'             # 25
+    'series_uid',            # 25
  ]
 
 SeqInfo = namedtuple('SeqInfo', seqinfo_fields)
@@ -488,3 +488,22 @@ def create_tree(path, tree, archives_leading_dir=True):
                 f.write(load)
         if executable:
             os.chmod(full_name, os.stat(full_name).st_mode | stat.S_IEXEC)
+
+
+def get_typed_attr(obj, attr, _type, default=None):
+    """
+    Typecasts an object's named attribute. If the attribute cannot be
+    converted, the default value is returned instead.
+
+    Parameters
+    ----------
+    obj: Object
+    attr: Attribute
+    _type: Type
+    default: value, optional
+    """
+    try:
+        val = _type(getattr(obj, attr, default))
+    except (TypeError, ValueError):
+        return default
+    return val

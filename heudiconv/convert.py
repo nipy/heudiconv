@@ -2,6 +2,7 @@ import filelock
 import os
 import os.path as op
 import logging
+from math import nan
 import shutil
 import sys
 
@@ -80,8 +81,8 @@ def conversion_info(subject, outdir, info, filegroup, ses):
 
 
 def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
-                   anon_outdir, with_prov, ses, bids_options, seqinfo, min_meta,
-                   overwrite, dcmconfig):
+                    anon_outdir, with_prov, ses, bids_options, seqinfo, 
+                    min_meta, overwrite, dcmconfig, grouping):
     if dicoms:
         lgr.info("Processing %d dicoms", len(dicoms))
     elif seqinfo:
@@ -157,16 +158,17 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
         # So either it would need to be brought back or reconsidered altogether
         # (since no sample data to test on etc)
     else:
-        # TODO -- might have been done outside already!
-        # MG -- will have to try with both dicom template, files
         assure_no_file_exists(target_heuristic_filename)
         safe_copyfile(heuristic.filename, target_heuristic_filename)
         if dicoms:
             seqinfo = group_dicoms_into_seqinfos(
                 dicoms,
+                grouping,
                 file_filter=getattr(heuristic, 'filter_files', None),
                 dcmfilter=getattr(heuristic, 'filter_dicom', None),
-                grouping=None)
+                flatten=True,
+                custom_grouping=getattr(heuristic, 'grouping', None))
+
         seqinfo_list = list(seqinfo.keys())
         filegroup = {si.series_id: x for si, x in seqinfo.items()}
         dicominfo_file = op.join(idir, 'dicominfo%s.tsv' % ses_suffix)
@@ -531,7 +533,7 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
 
         # Check for varying echo times
         echo_times = sorted(list(set(
-            b.get('EchoTime', None)
+            b.get('EchoTime', nan)
             for b in bids_metas
             if b
         )))

@@ -126,6 +126,10 @@ from glob import glob
 import logging
 lgr = logging.getLogger('heudiconv')
 
+# pythons before 3.7 didn't have re.Pattern, it was some protected
+# _sre.SRE_Pattern, so let's just sample a class of the compiled regex
+re_Pattern = re.compile('.').__class__
+
 # Terminology to harmonise and use to name variables etc
 # experiment
 #  subject
@@ -372,14 +376,14 @@ def get_study_hash(seqinfo):
     return md5sum(get_study_description(seqinfo))
 
 
-def fix_canceled_runs(seqinfo, accession2run=fix_accession2run):
+def fix_canceled_runs(seqinfo):
     """Function that adds cancelme_ to known bad runs which were forgotten
     """
     accession_number = get_unique(seqinfo, 'accession_number')
-    if accession_number in accession2run:
+    if accession_number in fix_accession2run:
         lgr.info("Considering some runs possibly marked to be "
                  "canceled for accession %s", accession_number)
-        badruns = accession2run[accession_number]
+        badruns = fix_accession2run[accession_number]
         badruns_pattern = '|'.join(badruns)
         for i, s in enumerate(seqinfo):
             if re.match(badruns_pattern, s.series_id):
@@ -391,28 +395,57 @@ def fix_canceled_runs(seqinfo, accession2run=fix_accession2run):
     return seqinfo
 
 
-def fix_dbic_protocol(seqinfo, keys=series_spec_fields, subsdict=protocols2fix):
-    """Ad-hoc fixup for existing protocols
+def fix_dbic_protocol(seqinfo):
+    """Ad-hoc fixup for existing protocols.
+
+    It will operate in 3 stages on `protocols2fix` records.
+    1. consider a record which has md5sum of study_description
+    2. apply all substitutions, where key is a regular expression which
+       successfully searches (not necessarily matches, so anchor appropriately)
+       study_description
+    3. apply "catch all" substitutions in the key containing an empty string
+
+    3. is somewhat redundant since `re.compile('.*')` could match any, but is
+    kept for simplicity of its specification.
     """
+
     study_hash = get_study_hash(seqinfo)
+    study_description = get_study_description(seqinfo)
 
-    if study_hash not in subsdict:
-        raise ValueError("I don't know how to fix {0}".format(study_hash))
+    # We will consider first study specific (based on hash)
+    if study_hash in protocols2fix:
+        _apply_substitutions(seqinfo,
+                             protocols2fix[study_hash],
+                             'study (%s) specific' % study_hash)
+    # Then go through all regexps returning regex "search" result
+    # on study_description
+    for sub, substitutions in protocols2fix.items():
+        if isinstance(sub, re_Pattern) and sub.search(study_description):
+            _apply_substitutions(seqinfo,
+                                 substitutions,
+                                 '%r regex matching' % sub.pattern)
+    # and at the end - global
+    if '' in protocols2fix:
+        _apply_substitutions(seqinfo, protocols2fix[''], 'global')
 
-    # need to replace both protocol_name series_description
-    substitutions = subsdict[study_hash]
+    return seqinfo
+
+
+def _apply_substitutions(seqinfo, substitutions, subs_scope):
+    lgr.info("Considering %s substitutions", subs_scope)
     for i, s in enumerate(seqinfo):
         fixed_kwargs = dict()
-        for key in keys:
-            value = getattr(s, key)
+        # need to replace both protocol_name series_description
+        for key in series_spec_fields:
+            oldvalue = value = getattr(s, key)
             # replace all I need to replace
             for substring, replacement in substitutions:
                 value = re.sub(substring, replacement, value)
+            if oldvalue != value:
+                lgr.info(" %s: %r -> %r", key, oldvalue, value)
             fixed_kwargs[key] = value
         # namedtuples are immutable
         seqinfo[i] = s._replace(**fixed_kwargs)
-
-    return seqinfo
 
 
 def fix_seqinfo(seqinfo):
@@ -420,10 +453,7 @@ def fix_seqinfo(seqinfo):
     """
     # add cancelme to known bad runs
     seqinfo = fix_canceled_runs(seqinfo)
-    study_hash = get_study_hash(seqinfo)
-    if study_hash in protocols2fix:
-        lgr.info("Fixing up protocol for {0}".format(study_hash))
-        seqinfo = fix_dbic_protocol(seqinfo)
+    seqinfo = fix_dbic_protocol(seqinfo)
     return seqinfo
 
 

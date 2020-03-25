@@ -68,3 +68,20 @@ DICOMs where this function returns ``True`` will be filtered out.
 Further processing on ``seqinfos`` to deduce/customize subject, session, and locator.
 
 A dictionary of {"locator": locator, "session": session, "subject": subject} is returned.
+
+---------------------------------------------------------------
+``grouping`` string or ``grouping(files, dcmfilter, seqinfo)``
+---------------------------------------------------------------
+
+Whenever ``--grouping custom`` (``-g custom``) is used, this attribute or callable
+will be used to inform how to group the DICOMs into separate groups. From
+`original PR#359 <https://github.com/nipy/heudiconv/pull/359>`_::
+
+    grouping = 'AcquisitionDate'
+
+or::
+
+    def grouping(files, dcmfilter, seqinfo):
+        seqinfos = collections.OrderedDict()
+        ...
+        return seqinfos  # ordered dict containing seqinfo objects: list of DICOMs

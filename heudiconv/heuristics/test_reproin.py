@@ -2,6 +2,10 @@
 # Tests for reproin.py
 #
 from collections import OrderedDict
+from mock import patch
+import re
+
+from . import reproin
 from .reproin import (
     filter_files,
     fix_canceled_runs,
@@ -78,7 +82,8 @@ def test_fix_canceled_runs():
         'accession1': ['^01-', '^03-']
     }
 
-    seqinfo_ = fix_canceled_runs(seqinfo, fake_accession2run)
+    with patch.object(reproin, 'fix_accession2run', fake_accession2run):
+        seqinfo_ = fix_canceled_runs(seqinfo)
 
     for i, s in enumerate(seqinfo_, 1):
         output = runname
@@ -106,16 +111,20 @@ def test_fix_dbic_protocol():
                        'nochangeplease',
                        'nochangeeither')
 
-
     seqinfos = [seq1, seq2]
-    keys = ['field1']
-    subsdict = {
+    protocols2fix = {
         md5sum('mystudy'):
-            [('scout_run\+', 'scout'),
+            [('scout_run\+', 'THESCOUT-runX'),
              ('run-life[0-9]', 'run+_task-life')],
+        re.compile('^my.*'):
+            [('THESCOUT-runX', 'THESCOUT')],
+        # rely on 'catch-all' to fix up above scout
+        '': [('THESCOUT', 'scout')]
     }
 
-    seqinfos_ = fix_dbic_protocol(seqinfos, keys=keys, subsdict=subsdict)
+    with patch.object(reproin, 'protocols2fix', protocols2fix), \
+            patch.object(reproin, 'series_spec_fields', ['field1']):
+        seqinfos_ = fix_dbic_protocol(seqinfos)
     assert(seqinfos[1] == seqinfos_[1])
     # field2 shouldn't have changed since I didn't pass it
     assert(seqinfos_[0] == FakeSeqInfo(accession_number,
@@ -124,8 +133,9 @@ def test_fix_dbic_protocol():
                                        seq1.field2))
 
     # change also field2 please
-    keys = ['field1', 'field2']
-    seqinfos_ = fix_dbic_protocol(seqinfos, keys=keys, subsdict=subsdict)
+    with patch.object(reproin, 'protocols2fix', protocols2fix), \
+            patch.object(reproin, 'series_spec_fields', ['field1', 'field2']):
+        seqinfos_ = fix_dbic_protocol(seqinfos)
     assert(seqinfos[1] == seqinfos_[1])
     # now everything should have changed
     assert(seqinfos_[0] == FakeSeqInfo(accession_number,
