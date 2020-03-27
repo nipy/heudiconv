@@ -386,7 +386,7 @@ def compress_dicoms(dicom_list, out_prefix, tempdirs, overwrite):
     return outtar
 
 
-def embed_nifti(dcmfiles, niftifile, infofile, bids_info, min_meta):
+def embed_nifti(dcmfiles, niftifile, infofile, bids_info):
     """
 
     If `niftifile` doesn't exist, it gets created out of the `dcmfiles` stack,
@@ -403,7 +403,6 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info, min_meta):
     niftifile
     infofile
     bids_info
-    min_meta
 
     Returns
     -------
@@ -416,44 +415,31 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info, min_meta):
     import json
     import re
 
-    if not min_meta:
-        from heudiconv.external.dcmstack import ds
-        stack = ds.parse_and_stack(dcmfiles, force=True).values()
-        if len(stack) > 1:
-            raise ValueError('Found multiple series')
-        # may be odict now - iter to be safe
-        stack = next(iter(stack))
+    from heudiconv.external.dcmstack import ds
+    stack = ds.parse_and_stack(dcmfiles, force=True).values()
+    if len(stack) > 1:
+        raise ValueError('Found multiple series')
+    # may be odict now - iter to be safe
+    stack = next(iter(stack))
 
-        # Create the nifti image using the data array
-        if not op.exists(niftifile):
-            nifti_image = stack.to_nifti(embed_meta=True)
-            nifti_image.to_filename(niftifile)
-            return ds.NiftiWrapper(nifti_image).meta_ext.to_json()
+    # Create the nifti image using the data array
+    if not op.exists(niftifile):
+        nifti_image = stack.to_nifti(embed_meta=True)
+        nifti_image.to_filename(niftifile)
+        return ds.NiftiWrapper(nifti_image).meta_ext.to_json()
 
-        orig_nii = nb.load(niftifile)
-        aff = orig_nii.affine
-        ornt = nb.orientations.io_orientation(aff)
-        axcodes = nb.orientations.ornt2axcodes(ornt)
-        new_nii = stack.to_nifti(voxel_order=''.join(axcodes), embed_meta=True)
-        meta = ds.NiftiWrapper(new_nii).meta_ext.to_json()
-
-    meta_info = None if min_meta else json.loads(meta)
+    orig_nii = nb.load(niftifile)
+    aff = orig_nii.affine
+    ornt = nb.orientations.io_orientation(aff)
+    axcodes = nb.orientations.ornt2axcodes(ornt)
+    new_nii = stack.to_nifti(voxel_order=''.join(axcodes), embed_meta=True)
+    meta_info = ds.NiftiWrapper(new_nii).meta_ext.to_json()
 
     if bids_info:
+        # make nice with python 3 - same behavior?
+        meta_info = meta_info.copy()
+        meta_info.update(bids_info)
 
-        if min_meta:
-            meta_info = bids_info
-        else:
-            # make nice with python 3 - same behavior?
-            meta_info = meta_info.copy()
-            meta_info.update(bids_info)
-            # meta_info = dict(meta_info.items() + bids_info.items())
-        try:
-            meta_info['TaskName'] = re.search(
-                r'(?<=_task-)\w+', op.basename(infofile)
-            ).group(0).split('_')[0]
-        except AttributeError:
-            pass
     # write to outfile
     with open(infofile, 'wt') as fp:
         json.dump(meta_info, fp, indent=3, sort_keys=True)
@@ -462,8 +448,7 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info, min_meta):
 
 
 def embed_metadata_from_dicoms(bids_options, item_dicoms, outname, outname_bids,
-                               prov_file, scaninfo, tempdirs, with_prov,
-                               min_meta):
+                               prov_file, scaninfo, tempdirs, with_prov):
     """
     Enhance sidecar information file with more information from DICOMs
 
@@ -477,7 +462,6 @@ def embed_metadata_from_dicoms(bids_options, item_dicoms, outname, outname_bids,
     scaninfo
     tempdirs
     with_prov
-    min_meta
 
     Returns
     -------
@@ -490,14 +474,13 @@ def embed_metadata_from_dicoms(bids_options, item_dicoms, outname, outname_bids,
     item_dicoms = list(map(op.abspath, item_dicoms))
 
     embedfunc = Node(Function(input_names=['dcmfiles', 'niftifile', 'infofile',
-                                           'bids_info', 'min_meta'],
+                                           'bids_info',],
                               output_names=['outfile', 'meta'],
                               function=embed_nifti),
                      name='embedder')
     embedfunc.inputs.dcmfiles = item_dicoms
     embedfunc.inputs.niftifile = op.abspath(outname)
     embedfunc.inputs.infofile = op.abspath(scaninfo)
-    embedfunc.inputs.min_meta = min_meta
     embedfunc.inputs.bids_info = load_json(op.abspath(outname_bids)) if (bids_options is not None) else None
     embedfunc.base_dir = tmpdir
     cwd = os.getcwd()

@@ -333,10 +333,9 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                         "multiple files")
         elif not bids_outfiles:
             lgr.debug("No BIDS files were produced, nothing to embed to then")
-        elif outname:
+        elif outname and not min_meta:
             embed_metadata_from_dicoms(bids_options, item_dicoms, outname, outname_bids,
-                                       prov_file, scaninfo, tempdirs, with_prov,
-                                       min_meta)
+                                       prov_file, scaninfo, tempdirs, with_prov)
         if scaninfo and op.exists(scaninfo):
             lgr.info("Post-treating %s file", scaninfo)
             treat_infofile(scaninfo)
