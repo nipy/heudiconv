@@ -6,7 +6,13 @@ from collections import OrderedDict
 import tarfile
 
 from .external.pydicom import dcm
-from .utils import load_json, get_typed_attr, set_readonly, SeqInfo
+from .utils import (
+    get_typed_attr,
+    load_json,
+    save_json,
+    SeqInfo,
+    set_readonly,
+)
 
 import warnings
 with warnings.catch_warnings():
@@ -410,6 +416,7 @@ def embed_dicom_and_nifti_metadata(dcmfiles, niftifile, infofile, bids_info):
     import os.path as op
     import json
     import re
+    from heudiconv.utils import save_json
 
     from heudiconv.external.dcmstack import ds
     stack = ds.parse_and_stack(dcmfiles, force=True).values()
@@ -440,8 +447,7 @@ def embed_dicom_and_nifti_metadata(dcmfiles, niftifile, infofile, bids_info):
         meta_info.update(bids_info)
 
     # write to outfile
-    with open(infofile, 'wt') as fp:
-        json.dump(meta_info, fp, indent=3, sort_keys=True)
+    save_json(infofile, meta_info)
 
 
 def embed_metadata_from_dicoms(bids_options, item_dicoms, outname, outname_bids,
