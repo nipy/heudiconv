@@ -5,6 +5,7 @@ import logging
 from math import nan
 import shutil
 import sys
+import re
 
 from .utils import (
     read_config,
@@ -323,6 +324,9 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                         % (outname)
                     )
 
+        # add the taskname field to the json file(s):
+        add_taskname_to_infofile( bids_outfiles )
+
         if len(bids_outfiles) > 1:
             lgr.warning("For now not embedding BIDS and info generated "
                         ".nii.gz itself since sequence produced "
@@ -637,3 +641,32 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
             except TypeError as exc:  ##catch lists
                 raise TypeError("Multiple BIDS sidecars detected.")
     return bids_outfiles
+
+
+def  add_taskname_to_infofile(infofiles):
+    """Add the "TaskName" field to json files corresponding to func images.
+
+    Parameters
+    ----------
+    infofiles : list with json filenames or single filename
+
+    Returns
+    -------
+    """
+
+    # in case they pass a string with a path:
+    if not isinstance(infofiles, list):
+        infofiles = [infofiles]
+
+    for infofile in infofiles:
+        meta_info = load_json(infofile)
+        try:
+            meta_info['TaskName'] = (re.search('(?<=_task-)\w+',
+                                               op.basename(infofile))
+                                     .group(0).split('_')[0])
+        except AttributeError:
+            lgr.warning("Failed to find task field in {0}.".format(infofile))
+            continue
+
+        # write to outfile
+        save_json(infofile, meta_info)
