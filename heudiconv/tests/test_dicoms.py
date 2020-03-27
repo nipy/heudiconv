@@ -7,7 +7,10 @@ from heudiconv.external.pydicom import dcm
 from heudiconv.cli.run import main as runner
 from heudiconv.convert import nipype_convert
 from heudiconv.dicoms import parse_private_csa_header, embed_dicom_and_nifti_metadata
-from .utils import TESTS_DATA_PATH
+from .utils import (
+    assert_cwd_unchanged,
+    TESTS_DATA_PATH,
+)
 
 # Public: Private DICOM tags
 DICOM_FIELDS_TO_TEST = {
@@ -27,6 +30,7 @@ def test_private_csa_header(tmpdir):
         runner(['--files', dcm_file, '-c' 'none', '-f', 'reproin'])
 
 
+@assert_cwd_unchanged(ok_to_chdir=True)  # so we cd back after tmpdir.chdir
 def test_embed_dicom_and_nifti_metadata(tmpdir):
     """Test dcmstack's additional fields"""
     tmpdir.chdir()
