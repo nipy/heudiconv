@@ -325,7 +325,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                     )
 
         # add the taskname field to the json file(s):
-        add_taskname_to_infofile( bids_outfiles )
+        add_taskname_to_infofile(bids_outfiles)
 
         if len(bids_outfiles) > 1:
             lgr.warning("For now not embedding BIDS and info generated "
