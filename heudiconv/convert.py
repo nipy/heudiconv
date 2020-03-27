@@ -518,6 +518,8 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
         bids_files = (sorted(res.outputs.bids)
                       if len(res.outputs.bids) == len(res_files)
                       else [None] * len(res_files))
+        # preload since will be used in multiple spots
+        bids_metas = [load_json(b) for b in bids_files if b]
 
         ###   Do we have a multi-echo series?   ###
         #   Some Siemens sequences (e.g. CMRR's MB-EPI) set the label 'TE1',
@@ -531,19 +533,17 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
 
         # Check for varying echo times
         echo_times = sorted(list(set(
-            load_json(b).get('EchoTime', nan)
-            for b in bids_files
+            b.get('EchoTime', nan)
+            for b in bids_metas
             if b
         )))
 
         is_multiecho = len(echo_times) > 1
 
         ### Loop through the bids_files, set the output name and save files
-        for fl, suffix, bids_file in zip(res_files, suffixes, bids_files):
+        for fl, suffix, bids_file, bids_meta in zip(res_files, suffixes, bids_files, bids_metas):
 
             # TODO: monitor conversion duration
-            if bids_file:
-                fileinfo = load_json(bids_file)
 
             # set the prefix basename for this specific file (we'll modify it,
             # and we don't want to modify it for all the bids_files):
@@ -552,11 +552,18 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
             # _sbref sequences reconstructing magnitude and phase generate
             # two NIfTI files IN THE SAME SERIES, so we cannot just add
             # the suffix, if we want to be bids compliant:
-            if bids_file and this_prefix_basename.endswith('_sbref'):
+            if bids_meta and this_prefix_basename.endswith('_sbref') \
+                    and len(suffixes) > len(echo_times):
+                if len(suffixes) != len(echo_times)*2:
+                    lgr.warning(
+                        "Got %d suffixes for %d echo times, which isn't "
+                        "multiple of two as if it was magnitude + phase pairs",
+                        len(suffixes), len(echo_times)
+                    )
                 # Check to see if it is magnitude or phase reconstruction:
-                if 'M' in fileinfo.get('ImageType'):
+                if 'M' in bids_meta.get('ImageType'):
                     mag_or_phase = 'magnitude'
-                elif 'P' in fileinfo.get('ImageType'):
+                elif 'P' in bids_meta.get('ImageType'):
                     mag_or_phase = 'phase'
                 else:
                     mag_or_phase = suffix
@@ -585,12 +592,12 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
             # (Note: it can be _sbref and multiecho, so don't use "elif"):
             # For multi-echo sequences, we have to specify the echo number in
             # the file name:
-            if bids_file and is_multiecho:
+            if bids_meta and is_multiecho:
                 # Get the EchoNumber from json file info.  If not present, use EchoTime
-                if 'EchoNumber' in fileinfo.keys():
-                    echo_number = fileinfo['EchoNumber']
+                if 'EchoNumber' in bids_meta:
+                    echo_number = bids_meta['EchoNumber']
                 else:
-                    echo_number = echo_times.index(fileinfo['EchoTime']) + 1
+                    echo_number = echo_times.index(bids_meta['EchoTime']) + 1
 
                 supported_multiecho = ['_bold', '_phase', '_epi', '_sbref', '_T1w', '_PDT2']
                 # Now, decide where to insert it.

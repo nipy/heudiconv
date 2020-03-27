@@ -514,10 +514,10 @@ def infotodict(seqinfo):
             # 3 - Image IOD specific specialization (optional)
             dcm_image_iod_spec = s.image_type[2]
             image_type_seqtype = {
-                'P': 'fmap',   # phase
+                # Note: P and M are too generic to make a decision here, could be
+                #  for different seqtypes (bold, fmap, etc)
                 'FMRI': 'func',
                 'MPR': 'anat',
-                # 'M': 'func',  "magnitude"  -- can be for scout, anat, bold, fmap
                 'DIFFUSION': 'dwi',
                 'MIP_SAG': 'anat',  # angiography
                 'MIP_COR': 'anat',  # angiography
@@ -570,29 +570,55 @@ def infotodict(seqinfo):
         #     prefix = ''
         prefix = ''
 
+        #
+        # Figure out the seqtype_label (BIDS _suffix)
+        #
+        # If none was provided -- let's deduce it from the information we find:
         # analyze s.protocol_name (series_id is based on it) for full name mapping etc
-        if seqtype == 'func' and not seqtype_label:
-            if '_pace_' in series_spec:
-                seqtype_label = 'pace'  # or should it be part of seq-
-            else:
-                # assume bold by default
-                seqtype_label = 'bold'
+        if not seqtype_label:
+            if seqtype == 'func':
+                if '_pace_' in series_spec:
+                    seqtype_label = 'pace'  # or should it be part of seq-
+                elif 'P' in s.image_type:
+                    seqtype_label = 'phase'
+                elif 'M' in s.image_type:
+                    seqtype_label = 'bold'
+                else:
+                    # assume bold by default
+                    seqtype_label = 'bold'
+            elif seqtype == 'fmap':
+                # TODO: support phase1 phase2 like in "Case 2: Two phase images ..."
+                if not dcm_image_iod_spec:
+                    raise ValueError("Do not know image data type yet to make decision")
+                seqtype_label = {
+                    # might want explicit {file_index}  ?
+                    # _epi for pepolar fieldmaps, see
+                    # https://bids-specification.readthedocs.io/en/stable/04-modality-specific-files/01-magnetic-resonance-imaging-data.html#case-4-multiple-phase-encoded-directions-pepolar
+                    'M': 'epi' if 'dir' in series_info else 'magnitude',
+                    'P': 'phasediff',
+                    'DIFFUSION': 'epi',  # according to KODI those DWI are the EPIs we need
+                }[dcm_image_iod_spec]
+            elif seqtype == 'dwi':
+                # label for dwi as well
+                seqtype_label = 'dwi'
 
-        if seqtype == 'fmap' and not seqtype_label:
-            if not dcm_image_iod_spec:
-                raise ValueError("Do not know image data type yet to make decision")
-            seqtype_label = {
-                # might want explicit {file_index}  ?
-                # _epi for pepolar fieldmaps, see
-                # https://bids-specification.readthedocs.io/en/stable/04-modality-specific-files/01-magnetic-resonance-imaging-data.html#case-4-multiple-phase-encoded-directions-pepolar
-                'M': 'epi' if 'dir' in series_info else 'magnitude',
-                'P': 'phasediff',
-                'DIFFUSION': 'epi',  # according to KODI those DWI are the EPIs we need
-            }[dcm_image_iod_spec]
+        #
+        # Even if seqtype_label was provided, for some data we might need to override,
+        # since they are complementary files produced along-side with original
+        # ones.
+        #
+        if s.series_description.endswith('_SBRef'):
+            seqtype_label = 'sbref'
 
-        # label for dwi as well
-        if seqtype == 'dwi' and not seqtype_label:
-            seqtype_label = 'dwi'
+        if not seqtype_label:
+            # Might be provided by the bids ending within series_spec, we would
+            # just want to check if that the last element is not _key-value pair
+            bids_ending = series_info.get('bids', None)
+            if not bids_ending \
+                    or "-" in bids_ending.split('_')[-1]:
+                lgr.warning(
+                    "We ended up with an empty label/suffix for %r",
+                    series_spec)
 
         run = series_info.get('run')
         if run is not None:
