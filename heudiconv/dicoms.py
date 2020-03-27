@@ -386,14 +386,10 @@ def compress_dicoms(dicom_list, out_prefix, tempdirs, overwrite):
     return outtar
 
 
-def embed_nifti(dcmfiles, niftifile, infofile, bids_info):
-    """
+def embed_dicom_and_nifti_metadata(dcmfiles, niftifile, infofile, bids_info):
+    """Embed metadata from nifti (affine etc) and dicoms into infofile (json)
 
-    If `niftifile` doesn't exist, it gets created out of the `dcmfiles` stack,
-    and json representation of its meta_ext is returned (bug since should return
-    both niftifile and infofile?)
-
-    if `niftifile` exists, its affine's orientation information is used while
+    `niftifile` should exist. Its affine's orientation information is used while
     establishing new `NiftiImage` out of dicom stack and together with `bids_info`
     (if provided) is dumped into json `infofile`
 
@@ -402,11 +398,11 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info):
     dcmfiles
     niftifile
     infofile
-    bids_info
-
-    Returns
-    -------
-    niftifile, infofile
+    bids_info: dict
+      Additional metadata to be embedded. `infofile` is overwritten if exists,
+      so here you could pass some metadata which would overload (at the first
+      level of the dict structure, no recursive fancy updates) what is obtained
+      from nifti and dicoms
 
     """
     # imports for nipype
@@ -422,11 +418,13 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info):
     # may be odict now - iter to be safe
     stack = next(iter(stack))
 
-    # Create the nifti image using the data array
     if not op.exists(niftifile):
-        nifti_image = stack.to_nifti(embed_meta=True)
-        nifti_image.to_filename(niftifile)
-        return ds.NiftiWrapper(nifti_image).meta_ext.to_json()
+        raise NotImplementedError(
+            "%s does not exist. "
+            "We are not producing new nifti files here any longer. "
+            "Use dcm2niix directly or .convert.nipype_convert helper ."
+            % niftifile
+        )
 
     orig_nii = nb.load(niftifile)
     aff = orig_nii.affine
@@ -434,6 +432,7 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info):
     axcodes = nb.orientations.ornt2axcodes(ornt)
     new_nii = stack.to_nifti(voxel_order=''.join(axcodes), embed_meta=True)
     meta_info = ds.NiftiWrapper(new_nii).meta_ext.to_json()
+    meta_info = json.loads(meta_info)
 
     if bids_info:
         # make nice with python 3 - same behavior?
@@ -443,8 +442,6 @@ def embed_nifti(dcmfiles, niftifile, infofile, bids_info):
     # write to outfile
     with open(infofile, 'wt') as fp:
         json.dump(meta_info, fp, indent=3, sort_keys=True)
-
-    return niftifile, infofile
 
 
 def embed_metadata_from_dicoms(bids_options, item_dicoms, outname, outname_bids,
@@ -476,7 +473,7 @@ def embed_metadata_from_dicoms(bids_options, item_dicoms, outname, outname_bids,
     embedfunc = Node(Function(input_names=['dcmfiles', 'niftifile', 'infofile',
                                            'bids_info',],
                               output_names=['outfile', 'meta'],
-                              function=embed_nifti),
+                              function=embed_dicom_and_nifti_metadata),
                      name='embedder')
     embedfunc.inputs.dcmfiles = item_dicoms
     embedfunc.inputs.niftifile = op.abspath(outname)
