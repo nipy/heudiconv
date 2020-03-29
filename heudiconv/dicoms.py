@@ -442,8 +442,6 @@ def embed_dicom_and_nifti_metadata(dcmfiles, niftifile, infofile, bids_info):
     meta_info = json.loads(meta_info)
 
     if bids_info:
-        # make nice with python 3 - same behavior?
-        meta_info = meta_info.copy()
         meta_info.update(bids_info)
 
     # write to outfile
