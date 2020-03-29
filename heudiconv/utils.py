@@ -319,7 +319,7 @@ def load_heuristic(heuristic):
         path, fname = op.split(heuristic_file)
         try:
             old_syspath = sys.path[:]
-            sys.path.append(path)
+            sys.path.append(0, path)
             mod = __import__(fname.split('.')[0])
             mod.filename = heuristic_file
         finally:
