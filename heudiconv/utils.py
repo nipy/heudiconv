@@ -188,7 +188,7 @@ def assure_no_file_exists(path):
         os.unlink(path)
 
 
-def save_json(filename, data, indent=4, sort_keys=True, pretty=False):
+def save_json(filename, data, indent=2, sort_keys=True, pretty=False):
     """Save data to a json file
 
     Parameters
