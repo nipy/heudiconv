@@ -38,9 +38,12 @@ def test_embed_dicom_and_nifti_metadata(tmpdir):
     dcmfiles = [op.join(TESTS_DATA_PATH, 'axasc35.dcm')]
     infofile = 'infofile.json'
 
-    # 1) nifti does not exist -- no longer supported
-    # we should produce nifti using our "standard" ways
     out_prefix = str(tmpdir / "nifti")
+    # 1) nifti does not exist -- no longer supported
+    with pytest.raises(NotImplementedError):
+        embed_dicom_and_nifti_metadata(dcmfiles, out_prefix + '.nii.gz', infofile, None)
+
+    # we should produce nifti using our "standard" ways
     nipype_out, prov_file = nipype_convert(
         dcmfiles, prefix=out_prefix, with_prov=False,
         bids_options=None, tmpdir=str(tmpdir))
