@@ -188,7 +188,7 @@ def assure_no_file_exists(path):
         os.unlink(path)
 
 
-def save_json(filename, data, indent=4, sort_keys=True, pretty=False):
+def save_json(filename, data, indent=2, sort_keys=True, pretty=False):
     """Save data to a json file
 
     Parameters
@@ -203,11 +203,25 @@ def save_json(filename, data, indent=4, sort_keys=True, pretty=False):
 
     """
     assure_no_file_exists(filename)
+    dumps_kw = dict(sort_keys=sort_keys, indent=indent)
+    j = None
+    if pretty:
+        try:
+            j = json_dumps_pretty(data, **dumps_kw)
+        except AssertionError as exc:
+            pretty = False
+            lgr.warning(
+                "Prettyfication of .json failed (%s).  "
+                "Original .json will be kept as is.  Please share (if you "
+                "could) "
+                "that file (%s) with HeuDiConv developers"
+                % (str(exc), filename)
+            )
+    if not pretty:
+        j = _canonical_dumps(data, **dumps_kw)
+    assert j is not None  # one way or another it should have been set to a str
     with open(filename, 'w') as fp:
-        fp.write(
-            (json_dumps_pretty if pretty else _canonical_dumps)(
-                data, sort_keys=sort_keys, indent=indent)
-        )
+        fp.write(j)
 
 
 def json_dumps_pretty(j, indent=2, sort_keys=True):
@@ -252,25 +266,9 @@ def json_dumps_pretty(j, indent=2, sort_keys=True):
 def treat_infofile(filename):
     """Tune up generated .json file (slim down, pretty-print for humans).
     """
-    with open(filename) as f:
-        j = json.load(f)
-
+    j = load_json(filename)
     j_slim = slim_down_info(j)
-    dumps_kw = dict(indent=2, sort_keys=True)
-    try:
-        j_pretty = json_dumps_pretty(j_slim, **dumps_kw)
-    except AssertionError as exc:
-        lgr.warning(
-            "Prettyfication of .json failed (%s).  "
-            "Original .json will be kept as is.  Please share (if you could) "
-            "that file (%s) with HeuDiConv developers"
-            % (str(exc), filename)
-        )
-        j_pretty = json.dumps(j_slim, **dumps_kw)
-
-    set_readonly(filename, False)
-    with open(filename, 'wt') as fp:
-        fp.write(j_pretty)
+    save_json(filename, j_slim, sort_keys=True, pretty=True)
     set_readonly(filename)
 
 
