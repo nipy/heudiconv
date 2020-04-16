@@ -116,7 +116,7 @@ def main(argv=None):
         sys.exit(1)
 
     kwargs = vars(args)
-    process_args(**kwargs)
+    heudiconv_workflow(**kwargs)
 
 
 def get_parser():
@@ -229,12 +229,14 @@ def get_parser():
     return parser
 
 
-def process_args(outdir, command=None, heuristic=None, queue=None, files=None,
-                 subjs=None, queue_args=None, dicom_dir_template=None,
-                 session=None, grouping=None, locator=None, anon_cmd=None,
-                 conv_outdir=None, converter=None, with_prov=None,
-                 bids_options=None, minmeta=None, overwrite=False,
-                 dcmconfig=None, datalad=False, random_seed=None, debug=False):
+def heudiconv_workflow(dicom_dir_template=None, files=None,
+                       subjs=None, converter='dcm2niix', outdir='.',
+                       locator=None, conv_outdir=None, anon_cmd=None,
+                       heuristic=None, with_prov=False, session=None,
+                       bids_options=None, overwrite=False, datalad=False,
+                       debug=False, command=None, grouping='studyUID',
+                       minmeta=False, random_seed=None, dcmconfig=None,
+                       queue=None, queue_args=None):
     """Given a structure of arguments from the parser perform computation"""
 
     # To be done asap so anything random is deterministic
