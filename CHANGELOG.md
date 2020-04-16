@@ -4,6 +4,44 @@ All notable changes to this project will be documented (for humans) in this file
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - Date
+
+TODO Summary
+
+### Added
+### Changed
+### Deprecated
+### Fixed
+### Removed
+### Security
+
+
+## [0.8.0] - 2020-04-15
+
+### Enhancements
+
+- Centralized saving of .json files.  Indentation of some files could
+  change now from previous versions where it could have used `3`
+  spaces. Now indentation should be consistently `2` for .json files
+  we produce/modify ([#436][]) (note: dcm2niix uses tabs for indentation)
+- ReproIn heuristic: support SBRef and phase data ([#387][])
+- Set the "TaskName" field in .json sidecar files for multi-echo data
+  ([#420][])
+- Provide an informative exception if command needs heuristic to be
+  specified ([#437][])
+
+### Refactored
+
+- `embed_nifti` was refactored into `embed_dicom_and_nifti_metadata`
+  which would no longer create `.nii` file if it does not exist
+  already ([#432][])
+
+### Fixed
+
+- Skip datalad-based tests if no datalad available ([#430][])
+- Search heuristic file path first so we do not pick up a python
+  module if name conflicts ([#434][])
+
 ## [0.7.0] - 2020-03-20
 
 ### Removed
@@ -310,8 +348,15 @@ TODO Summary
 [#376]: https://github.com/nipy/heudiconv/issues/376
 [#379]: https://github.com/nipy/heudiconv/issues/379
 [#380]: https://github.com/nipy/heudiconv/issues/380
+[#387]: https://github.com/nipy/heudiconv/issues/387
 [#390]: https://github.com/nipy/heudiconv/issues/390
 [#404]: https://github.com/nipy/heudiconv/issues/404
 [#407]: https://github.com/nipy/heudiconv/issues/407
 [#419]: https://github.com/nipy/heudiconv/issues/419
+[#420]: https://github.com/nipy/heudiconv/issues/420
 [#425]: https://github.com/nipy/heudiconv/issues/425
+[#430]: https://github.com/nipy/heudiconv/issues/430
+[#432]: https://github.com/nipy/heudiconv/issues/432
+[#434]: https://github.com/nipy/heudiconv/issues/434
+[#436]: https://github.com/nipy/heudiconv/issues/436
+[#437]: https://github.com/nipy/heudiconv/issues/437
