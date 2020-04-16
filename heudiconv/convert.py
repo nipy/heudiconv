@@ -821,6 +821,14 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
         echo_times = sorted(echo_times)  # also converts to list
         channel_names = sorted(channel_names)  # also converts to list
 
+        iops = sorted(list(set(
+            b.get('ImageOrientationPatient', nan)
+            for b in bids_metas
+            if b
+        )))
+
+        is_multiorient = len(iops) > 1
+
         ### Loop through the bids_files, set the output name and save files
         for fl, suffix, bids_file, bids_meta in zip(res_files, suffixes, bids_files, bids_metas):
 
