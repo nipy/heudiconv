@@ -46,7 +46,8 @@ def setup_exceptionhook():
     sys.excepthook = _pdb_excepthook
 
 
-def process_extra_commands(outdir, args):
+def process_extra_commands(outdir, command, files, dicom_dir_template,
+                           heuristic, session, subjs, grouping):
     """
     Perform custom command instead of regular operations. Supported commands:
     ['treat-json', 'ls', 'populate-templates']
@@ -58,17 +59,17 @@ def process_extra_commands(outdir, args):
     args : Namespace
         arguments
     """
-    if args.command == 'treat-jsons':
-        for f in args.files:
+    if command == 'treat-jsons':
+        for f in files:
             treat_infofile(f)
-    elif args.command == 'ls':
-        ensure_heuristic_arg(args)
-        heuristic = load_heuristic(args.heuristic)
+    elif command == 'ls':
+        ensure_heuristic_arg(heuristic)
+        heuristic = load_heuristic(heuristic)
         heuristic_ls = getattr(heuristic, 'ls', None)
-        for f in args.files:
+        for f in files:
             study_sessions = get_study_sessions(
-                args.dicom_dir_template, [f], heuristic, outdir,
-                args.session, args.subjs, grouping=args.grouping)
+                dicom_dir_template, [f], heuristic, outdir,
+                session, subjs, grouping=grouping)
             print(f)
             for study_session, sequences in study_sessions.items():
                 suf = ''
@@ -78,29 +79,29 @@ def process_extra_commands(outdir, args):
                     "\t%s %d sequences%s"
                     % (str(study_session), len(sequences), suf)
                 )
-    elif args.command == 'populate-templates':
-        ensure_heuristic_arg(args)
-        heuristic = load_heuristic(args.heuristic)
-        for f in args.files:
+    elif command == 'populate-templates':
+        ensure_heuristic_arg(heuristic)
+        heuristic = load_heuristic(heuristic)
+        for f in files:
             populate_bids_templates(f, getattr(heuristic, 'DEFAULT_FIELDS', {}))
-    elif args.command == 'sanitize-jsons':
-        tuneup_bids_json_files(args.files)
-    elif args.command == 'heuristics':
+    elif command == 'sanitize-jsons':
+        tuneup_bids_json_files(files)
+    elif command == 'heuristics':
         from ..utils import get_known_heuristics_with_descriptions
         for name_desc in get_known_heuristics_with_descriptions().items():
             print("- %s: %s" % name_desc)
-    elif args.command == 'heuristic-info':
-        ensure_heuristic_arg(args)
+    elif command == 'heuristic-info':
+        ensure_heuristic_arg(heuristic)
         from ..utils import get_heuristic_description
-        print(get_heuristic_description(args.heuristic, full=True))
+        print(get_heuristic_description(heuristic, full=True))
     else:
-        raise ValueError("Unknown command %s", args.command)
+        raise ValueError("Unknown command %s", command)
     return
 
 
-def ensure_heuristic_arg(args):
+def ensure_heuristic_arg(heuristic=None):
     from ..utils import get_known_heuristic_names
-    if not args.heuristic:
+    if not heuristic:
         raise ValueError("Specify heuristic using -f. Known are: %s"
                          % ', '.join(get_known_heuristic_names()))
 
@@ -113,25 +114,9 @@ def main(argv=None):
         lgr.warning("Nothing to be done - displaying usage help")
         parser.print_help()
         sys.exit(1)
-    # To be done asap so anything random is deterministic
-    if args.random_seed is not None:
-        import random
-        random.seed(args.random_seed)
-        import numpy
-        numpy.random.seed(args.random_seed)
-    # Ensure only supported bids options are passed
-    if args.debug:
-        lgr.setLevel(logging.DEBUG)
-    # Should be possible but only with a single subject -- will be used to
-    # override subject deduced from the DICOMs
-    if args.files and args.subjs and len(args.subjs) > 1:
-        raise ValueError(
-            "Unable to processes multiple `--subjects` with files"
-        )
 
-    if args.debug:
-        setup_exceptionhook()
-    process_args(args)
+    kwargs = vars(args)
+    process_args(**kwargs)
 
 
 def get_parser():
@@ -244,14 +229,38 @@ def get_parser():
     return parser
 
 
-def process_args(args):
+def process_args(outdir, command=None, heuristic=None, queue=None, files=None,
+                 subjs=None, queue_args=None, dicom_dir_template=None,
+                 session=None, grouping=None, locator=None, anon_cmd=None,
+                 conv_outdir=None, converter=None, with_prov=None,
+                 bids_options=None, minmeta=None, overwrite=False,
+                 dcmconfig=None, datalad=False, random_seed=None, debug=False):
     """Given a structure of arguments from the parser perform computation"""
+
+    # To be done asap so anything random is deterministic
+    if random_seed is not None:
+        import random
+        random.seed(random_seed)
+        import numpy
+        numpy.random.seed(random_seed)
+    # Ensure only supported bids options are passed
+    if debug:
+        lgr.setLevel(logging.DEBUG)
+    # Should be possible but only with a single subject -- will be used to
+    # override subject deduced from the DICOMs
+    if files and subjs and len(subjs) > 1:
+        raise ValueError(
+            "Unable to processes multiple `--subjects` with files"
+        )
+
+    if debug:
+        setup_exceptionhook()
 
     # Deal with provided files or templates
     # pre-process provided list of files and possibly sort into groups/sessions
     # Group files per each study/sid/session
 
-    outdir = op.abspath(args.outdir)
+    outdir = op.abspath(outdir)
 
     try:
         import etelemetry
@@ -264,27 +273,28 @@ def process_args(args):
                       version=__version__,
                       latest=latest["version"]))
 
-    if args.command:
-        process_extra_commands(outdir, args)
+    if command:
+        process_extra_commands(outdir, command, files, dicom_dir_template,
+                               heuristic, session, subjs, grouping)
         return
     #
     # Load heuristic -- better do it asap to make sure it loads correctly
     #
-    if not args.heuristic:
+    if not heuristic:
         raise RuntimeError("No heuristic specified - add to arguments and rerun")
 
-    if args.queue:
-        lgr.info("Queuing %s conversion", args.queue)
-        iterarg, iterables = ("files", len(args.files)) if args.files else \
-                             ("subjects", len(args.subjs))
-        queue_conversion(args.queue, iterarg, iterables, args.queue_args)
+    if queue:
+        lgr.info("Queuing %s conversion", queue)
+        iterarg, iterables = ("files", len(files)) if files else \
+                             ("subjects", len(subjs))
+        queue_conversion(queue, iterarg, iterables, queue_args)
         sys.exit(0)
 
-    heuristic = load_heuristic(args.heuristic)
+    heuristic = load_heuristic(heuristic)
 
-    study_sessions = get_study_sessions(args.dicom_dir_template, args.files,
-                                        heuristic, outdir, args.session,
-                                        args.subjs, grouping=args.grouping)
+    study_sessions = get_study_sessions(dicom_dir_template, files,
+                                        heuristic, outdir, session,
+                                        subjs, grouping=grouping)
 
     # extract tarballs, and replace their entries with expanded lists of files
     # TODO: we might need to sort so sessions are ordered???
@@ -295,10 +305,10 @@ def process_args(args):
     for (locator, session, sid), files_or_seqinfo in study_sessions.items():
 
         # Allow for session to be overloaded from command line
-        if args.session is not None:
-            session = args.session
-        if args.locator is not None:
-            locator = args.locator
+        if session is not None:
+            session = session
+        if locator is not None:
+            locator = locator
         if not len(files_or_seqinfo):
             raise ValueError("nothing to process?")
         # that is how life is ATM :-/ since we don't do sorting if subj
@@ -315,22 +325,22 @@ def process_args(args):
             lgr.warning("Skipping unknown locator dataset")
             continue
 
-        anon_sid = anonymize_sid(sid, args.anon_cmd) if args.anon_cmd else None
-        if args.anon_cmd:
+        anon_sid = anonymize_sid(sid, anon_cmd) if anon_cmd else None
+        if anon_cmd:
             lgr.info('Anonymized {} to {}'.format(sid, anon_sid))
 
         study_outdir = op.join(outdir, locator or '')
-        anon_outdir = args.conv_outdir or outdir
+        anon_outdir = conv_outdir or outdir
         anon_study_outdir = op.join(anon_outdir, locator or '')
 
         # TODO: --datalad  cmdline option, which would take care about initiating
         # the outdir -> study_outdir datasets if not yet there
-        if args.datalad:
+        if datalad:
             from ..external.dlad import prepare_datalad
             dlad_sid = sid if not anon_sid else anon_sid
             dl_msg = prepare_datalad(anon_study_outdir, anon_outdir, dlad_sid,
                                      session, seqinfo, dicoms,
-                                     args.bids_options)
+                                     bids_options)
 
         lgr.info("PROCESSING STARTS: {0}".format(
             str(dict(subject=sid, outdir=study_outdir, session=session))))
@@ -339,22 +349,22 @@ def process_args(args):
                         dicoms,
                         study_outdir,
                         heuristic,
-                        converter=args.converter,
+                        converter=converter,
                         anon_sid=anon_sid,
                         anon_outdir=anon_study_outdir,
-                        with_prov=args.with_prov,
+                        with_prov=with_prov,
                         ses=session,
-                        bids_options=args.bids_options,
+                        bids_options=bids_options,
                         seqinfo=seqinfo,
-                        min_meta=args.minmeta,
-                        overwrite=args.overwrite,
-                        dcmconfig=args.dcmconfig,
-                        grouping=args.grouping,)
+                        min_meta=minmeta,
+                        overwrite=overwrite,
+                        dcmconfig=dcmconfig,
+                        grouping=grouping,)
 
         lgr.info("PROCESSING DONE: {0}".format(
             str(dict(subject=sid, outdir=study_outdir, session=session))))
 
-        if args.datalad:
+        if datalad:
             from ..external.dlad import add_to_datalad
             msg = "Converted subject %s" % dl_msg
             # TODO:  whenever propagate to supers work -- do just
@@ -362,9 +372,9 @@ def process_args(args):
             #  also in batch mode might fail since we have no locking ATM
             #  and theoretically no need actually to save entire study
             #  we just need that
-            add_to_datalad(outdir, study_outdir, msg, args.bids_options)
+            add_to_datalad(outdir, study_outdir, msg, bids_options)
 
-    # if args.bids:
+    # if bids:
     #     # Let's populate BIDS templates for folks to take care about
     #     for study_outdir in processed_studydirs:
     #         populate_bids_templates(study_outdir)
