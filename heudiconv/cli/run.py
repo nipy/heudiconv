@@ -237,7 +237,91 @@ def heudiconv_workflow(dicom_dir_template=None, files=None,
                        debug=False, command=None, grouping='studyUID',
                        minmeta=False, random_seed=None, dcmconfig=None,
                        queue=None, queue_args=None):
-    """Given a structure of arguments from the parser perform computation"""
+    """Run the HeuDiConv conversion workflow.
+
+    Parameters
+    ----------
+    dicom_dir_template : str or None, optional
+        Location of dicomdir that can be indexed with subject id
+        {subject} and session {session}. Tarballs (can be compressed)
+        are supported in addition to directory. All matching tarballs
+        for a subject are extracted and their content processed in a
+        single pass. If multiple tarballs are found, each is assumed to
+        be a separate session and the 'session' argument is ignored.
+        Mutually exclusive with 'files'. Default is None.
+    files : list or None, optional
+        Files (tarballs, dicoms) or directories containing files to
+        process. Mutually exclusive with 'dicom_dir_template'. Default is None.
+    subjs : list or None, optional
+        List of subjects - required for dicom template. If not
+        provided, DICOMS would first be "sorted" and subject IDs
+        deduced by the heuristic. Default is None.
+    converter : {'dcm2niix', None}, optional
+        Tool to use for DICOM conversion. Setting to None disables
+        the actual conversion step -- useful for testing heuristics.
+        Default is None.
+    outdir : str, optional
+        Output directory for conversion setup (for further
+        customization and future reference. This directory will refer
+        to non-anonymized subject IDs.
+        Default is '.' (current working directory).
+    locator : str or 'unknown' or None, optional
+        Study path under outdir. If provided, it overloads the value
+        provided by the heuristic. If 'datalad=True', every
+        directory within locator becomes a super-dataset thus
+        establishing a hierarchy. Setting to "unknown" will skip that
+        dataset. Default is None.
+    conv_outdir : str or None, optional
+        Output directory for converted files. By default this is
+        identical to --outdir. This option is most useful in
+        combination with 'anon_cmd'. Default is None.
+    anon_cmd : str or None, optional
+        Command to run to convert subject IDs used for DICOMs to
+        anonymized IDs. Such command must take a single argument and
+        return a single anonymized ID. Also see 'conv_outdir'. Default is None.
+    heuristic : str or None, optional
+        Name of a known heuristic or path to the Python script containing
+        heuristic. Default is None.
+    with_prov : bool, optional
+        Store additional provenance information. Requires python-rdflib.
+        Default is False.
+    session : str or None, optional
+        Session for longitudinal study_sessions. Default is None.
+    bids_options : str or None, optional
+        Flag for output into BIDS structure. Can also take BIDS-
+        specific options, e.g., --bids notop. The only currently
+        supported options is "notop", which skips creation of
+        top-level BIDS files. This is useful when running in batch
+        mode to prevent possible race conditions. Default is None.
+    overwrite : bool, optional
+        Overwrite existing converted files. Default is False.
+    datalad : bool, optional
+        Store the entire collection as DataLad dataset(s). Small files
+        will be committed directly to git, while large to annex. New
+        version (6) of annex repositories will be used in a "thin"
+        mode so it would look to mortals as just any other regular
+        directory (i.e. no symlinks to under .git/annex). For now just
+        for BIDS mode. Default is False.
+    debug : bool, optional
+        Do not catch exceptions and show exception traceback. Default is False.
+    command : {'heuristics', 'heuristic-info', 'ls', 'populate-templates',
+               'sanitize-jsons', 'treat-jsons', None}, optional
+        Custom action to be performed on provided files instead of regular
+        operation. Default is None.
+    grouping : {'studyUID', 'accession_number', 'all', 'custom'}, optional
+        How to group dicoms. Default is 'studyUID'.
+    minmeta : bool, optional
+        Exclude dcmstack meta information in sidecar jsons. Default is False.
+    random_seed : int or None, optional
+        Random seed to initialize RNG. Default is None.
+    dcmconfig : str or None, optional
+        JSON file for additional dcm2niix configuration. Default is None.
+    queue : {'SLURM', None}, optional
+        Batch system to submit jobs in parallel. Default is None.
+    queue_args : str or None, optional
+        Additional queue arguments passed as single string of space-separated
+        Argument=Value pairs. Default is None.
+    """
 
     # To be done asap so anything random is deterministic
     if random_seed is not None:
