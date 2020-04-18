@@ -1,9 +1,7 @@
 # TODO: break this up by modules
 
-from heudiconv.cli.run import (
-    main as runner,
-    process_args,
-)
+from heudiconv.cli.run import main as runner
+from heudiconv.workflows.run import process_args
 from heudiconv import __version__
 from heudiconv.utils import (create_file_if_missing,
                              set_readonly,
