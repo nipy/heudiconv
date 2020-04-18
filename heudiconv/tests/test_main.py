@@ -286,12 +286,7 @@ def test_cache(tmpdir):
 
 def test_no_etelemetry():
     # smoke test at large - just verifying that no crash if no etelemetry
-    class args:
-        outdir = '/dev/null'
-        command = 'ls'
-        heuristic = 'reproin'
-        files = []  # Nothing to list
-
     # must not fail if etelemetry no found
     with patch.dict('sys.modules', {'etelemetry': None}):
-        heudiconv_workflow(**vars(args))
+        heudiconv_workflow(outdir='/dev/null', command='ls',
+                           heuristic='reproin', files=[])
