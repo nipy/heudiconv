@@ -448,6 +448,26 @@ def update_uncombined_name(metadata, filename, channel_names):
     return filename
 
 
+def update_mutliorient_name(bids_meta, this_prefix_basename):
+    if 'acq-' in this_prefix_basename:
+        lgr.warning('Not embedding multi-orientation information as prefix already uses acq- parameter.')
+        return this_prefix_basename
+    iop = bids_meta.get('ImageOrientationPatientDICOM')
+    iop = [round(x) for x in iop]
+    cross_prod = [
+        iop[1]*iop[5]-iop[2]*iop[4],
+        iop[2]*iop[3]-iop[0]*iop[5],
+        iop[0]*iop[4]-iop[1]*iop[3]]
+    cross_prod = [abs(x) for x in cross_prod]
+    slice_orient = ['sagittal', 'coronal', 'axial'][cross_prod.index(1)]
+    bids_pairs = this_prefix_basename.split('_')
+    # acq needs to be inserted right after sub- or ses-
+    ses_or_sub_idx = sum([bids_pair.split('-')[0] in ['sub', 'ses'] for bids_pair in bids_pairs])
+    bids_pairs.insert(ses_or_sub_idx, 'acq-%s'%slice_orient)
+    this_prefix_basename = '_'.join(bids_pairs)
+    return this_prefix_basename
+
+
 def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
             bids_options, outdir, min_meta, overwrite, symlink=True, prov_file=None,
             dcmconfig=None, populate_intended_for_opts={}):
