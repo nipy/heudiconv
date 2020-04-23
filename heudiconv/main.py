@@ -102,14 +102,12 @@ def ensure_heuristic_arg(heuristic=None):
                          % ', '.join(get_known_heuristic_names()))
 
 
-def heudiconv_workflow(dicom_dir_template=None, files=None,
-                       subjs=None, converter='dcm2niix', outdir='.',
-                       locator=None, conv_outdir=None, anon_cmd=None,
-                       heuristic=None, with_prov=False, session=None,
-                       bids_options=None, overwrite=False, datalad=False,
-                       debug=False, command=None, grouping='studyUID',
-                       minmeta=False, random_seed=None, dcmconfig=None,
-                       queue=None, queue_args=None):
+def workflow(dicom_dir_template=None, files=None, subjs=None,
+             converter='dcm2niix', outdir='.', locator=None, conv_outdir=None,
+             anon_cmd=None, heuristic=None, with_prov=False, session=None,
+             bids_options=None, overwrite=False, datalad=False, debug=False,
+             command=None, grouping='studyUID', minmeta=False,
+             random_seed=None, dcmconfig=None, queue=None, queue_args=None):
     """Run the HeuDiConv conversion workflow.
 
     Parameters

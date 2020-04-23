@@ -6,7 +6,7 @@ import sys
 from argparse import ArgumentParser
 
 from .. import __version__
-from ..workflows import heudiconv_workflow
+from ..main import workflow
 
 lgr = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ def main(argv=None):
         sys.exit(1)
 
     kwargs = vars(args)
-    heudiconv_workflow(**kwargs)
+    workflow(**kwargs)
 
 
 def get_parser():
