@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
-import os
-from argparse import ArgumentParser
-import sys
 import logging
+import os
+import sys
+from argparse import ArgumentParser
 
 from .. import __version__
 from ..workflows import heudiconv_workflow
