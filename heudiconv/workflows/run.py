@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 import os.path as op
 import sys
 import logging
