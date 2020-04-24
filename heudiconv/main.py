@@ -83,12 +83,12 @@ def process_extra_commands(outdir, command, files, dicom_dir_template,
     elif command == 'sanitize-jsons':
         tuneup_bids_json_files(files)
     elif command == 'heuristics':
-        from ..utils import get_known_heuristics_with_descriptions
+        from .utils import get_known_heuristics_with_descriptions
         for name_desc in get_known_heuristics_with_descriptions().items():
             print("- %s: %s" % name_desc)
     elif command == 'heuristic-info':
         ensure_heuristic_arg(heuristic)
-        from ..utils import get_heuristic_description
+        from .utils import get_heuristic_description
         print(get_heuristic_description(heuristic, full=True))
     else:
         raise ValueError("Unknown command %s", command)
@@ -96,7 +96,7 @@ def process_extra_commands(outdir, command, files, dicom_dir_template,
 
 
 def ensure_heuristic_arg(heuristic=None):
-    from ..utils import get_known_heuristic_names
+    from .utils import get_known_heuristic_names
     if not heuristic:
         raise ValueError("Specify heuristic using -f. Known are: %s"
                          % ', '.join(get_known_heuristic_names()))
@@ -293,7 +293,7 @@ def workflow(dicom_dir_template=None, files=None, subjs=None,
         # TODO: --datalad  cmdline option, which would take care about initiating
         # the outdir -> study_outdir datasets if not yet there
         if datalad:
-            from ..external.dlad import prepare_datalad
+            from .external.dlad import prepare_datalad
             dlad_sid = sid if not anon_sid else anon_sid
             dl_msg = prepare_datalad(anon_study_outdir, anon_outdir, dlad_sid,
                                      session, seqinfo, dicoms,
@@ -322,7 +322,7 @@ def workflow(dicom_dir_template=None, files=None, subjs=None,
             str(dict(subject=sid, outdir=study_outdir, session=session))))
 
         if datalad:
-            from ..external.dlad import add_to_datalad
+            from .external.dlad import add_to_datalad
             msg = "Converted subject %s" % dl_msg
             # TODO:  whenever propagate to supers work -- do just
             # ds.save(msg=msg)
