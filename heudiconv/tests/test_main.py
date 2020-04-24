@@ -1,7 +1,7 @@
 # TODO: break this up by modules
 
 from heudiconv.cli.run import main as runner
-from heudiconv.workflows.run import heudiconv_workflow
+from heudiconv.main import workflow
 from heudiconv import __version__
 from heudiconv.utils import (create_file_if_missing,
                              set_readonly,
@@ -288,5 +288,5 @@ def test_no_etelemetry():
     # smoke test at large - just verifying that no crash if no etelemetry
     # must not fail if etelemetry no found
     with patch.dict('sys.modules', {'etelemetry': None}):
-        heudiconv_workflow(outdir='/dev/null', command='ls',
-                           heuristic='reproin', files=[])
+        workflow(outdir='/dev/null', command='ls',
+                 heuristic='reproin', files=[])

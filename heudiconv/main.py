@@ -2,12 +2,12 @@ import logging
 import os.path as op
 import sys
 
-from .. import __version__, __packagename__
-from ..bids import populate_bids_templates, tuneup_bids_json_files
-from ..convert import prep_conversion
-from ..parser import get_study_sessions
-from ..queue import queue_conversion
-from ..utils import anonymize_sid, load_heuristic, treat_infofile, SeqInfo
+from . import __version__, __packagename__
+from .bids import populate_bids_templates, tuneup_bids_json_files
+from .convert import prep_conversion
+from .parser import get_study_sessions
+from .queue import queue_conversion
+from .utils import anonymize_sid, load_heuristic, treat_infofile, SeqInfo
 
 lgr = logging.getLogger(__name__)
 
