@@ -62,6 +62,12 @@ RUN apt-get update -qq \
     && make install \
     && rm -rf /tmp/dcm2niix
 
+# Download bidsphysio (we'll install later):
+RUN mkdir -p /src/bidsphysio \
+    && curl -sSL https://github.com/cbinyu/bidsphysio/archive/v3.0.tar.gz \
+        | tar -vxz -C /src/bidsphysio --exclude='bidsphysio/tests'\    
+ --strip-components=1
+
 RUN apt-get update -qq \
     && apt-get install -y -q --no-install-recommends \
            git \
@@ -99,7 +105,8 @@ RUN export PATH="/opt/miniconda-latest/bin:$PATH" \
     && sync && conda clean -tipsy && sync \
     && bash -c "source activate base \
     &&   pip install --no-cache-dir --editable \
-             '/src/heudiconv[all]'" \
+             '/src/heudiconv[all]' \
+	     '/src/bidsphysio'" \
     && rm -rf ~/.cache/pip/* \
     && sync
 
