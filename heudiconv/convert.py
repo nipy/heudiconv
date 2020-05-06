@@ -435,7 +435,7 @@ def convert_physio(item_dicoms, bids_options, prefix):
             return
 
         item_dicoms = list(map(op.abspath, item_dicoms)) # absolute paths
-        if len(item_dicoms)>1:
+        if len(item_dicoms) > 1:
             lgr.warning(
                 "More than one PHYSIO file has been found for this series. "
                 "If each file corresponds to a different signal, all is OK. "
