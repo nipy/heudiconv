@@ -411,6 +411,7 @@ def convert_dicom(item_dicoms, bids_options, prefix,
 
 def convert_physio(item_dicoms, bids_options, prefix):
     """Save DICOM physiology as BIDS physio files
+
     Parameters
     ----------
     item_dicoms : list of filenames
