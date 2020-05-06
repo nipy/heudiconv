@@ -444,7 +444,7 @@ def convert_physio(item_dicoms, bids_options, prefix):
                 "from the last file will be saved."
             )
         for dicom_file in item_dicoms:
-            dcm2bidsphysio.dcm2bids( dicom_file, prefix )
+            dcm2bidsphysio.dcm2bids(dicom_file, prefix)
 
 
 def nipype_convert(item_dicoms, prefix, with_prov, bids_options, tmpdir, dcmconfig=None):
