@@ -268,7 +268,7 @@ def group_dicoms_into_seqinfos(files, grouping, file_filter=None,
             # If this is a Siemens PhysioLog, keep it:
             if mw.dcm_data.SeriesDescription.endswith('_PhysioLog'):
                 # just give it a dummy shape, so that we can continue:
-                mw.image_shape=(0,0,0)
+                mw.image_shape = (0, 0, 0)
             else:
                 # nothing to see here, just move on
                 continue
