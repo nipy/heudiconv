@@ -9,7 +9,12 @@ from heudiconv.cli.run import main as runner
 from heudiconv.external.pydicom import dcm
 from heudiconv.utils import load_json
 # testing utilities
-from .utils import fetch_data, gen_heudiconv_args, TESTS_DATA_PATH
+from .utils import (
+    fetch_data,
+    gen_heudiconv_args,
+    assert_cwd_unchanged,
+    TESTS_DATA_PATH
+)
 
 have_datalad = True
 try:
@@ -90,11 +95,12 @@ def test_multiecho(tmpdir, subject='MEEPI', heuristic='bids_ME.py'):
         assert 'echo-' not in event
 
 
+@assert_cwd_unchanged(ok_to_chdir=True)  # so we cd back after tmpdir.chdir
 @pytest.mark.skipif(not have_bidsphysio, reason="no bidsphysio")
 def test_physio(tmpdir, subject='samplePhysio', heuristic='bids_physio.py'):
     tmpdir.chdir()
     outdir = tmpdir.mkdir('out').strpath
-    template = op.join("{subject}/*/*.dcm")
+    template = "{subject}/*/*.dcm"
     args = gen_heudiconv_args(
         TESTS_DATA_PATH, outdir, subject, heuristic,template=template
     )
