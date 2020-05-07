@@ -232,17 +232,17 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
 
 def update_complex_name(fileinfo, this_prefix_basename, suffix):
     """
-    Insert `_rec-<magnitude|phase>` entity into filename if data are from a sequence
-    with magnitude/phase reconstruction.
+    Insert `_part-<magnitude|phase>` entity into filename if data are from a sequence
+    with magnitude/phase part.
     """
     # Functional scans separate magnitude/phase differently
     unsupported_types = ['_bold', '_phase']
     if any(ut in this_prefix_basename for ut in unsupported_types):
         return this_prefix_basename
 
-    # Check to see if it is magnitude or phase reconstruction:
+    # Check to see if it is magnitude or phase part:
     if 'M' in fileinfo.get('ImageType'):
-        mag_or_phase = 'magnitude'
+        mag_or_phase = 'mag'
     elif 'P' in fileinfo.get('ImageType'):
         mag_or_phase = 'phase'
     else:
@@ -251,26 +251,26 @@ def update_complex_name(fileinfo, this_prefix_basename, suffix):
     # Determine scan suffix
     filetype = '_' + this_prefix_basename.split('_')[-1]
 
-    # Insert reconstruction label
-    if not ('_rec-%s' % mag_or_phase) in this_prefix_basename:
-        # If "_rec-" is specified, prepend the 'mag_or_phase' value.
-        if '_rec-' in this_prefix_basename:
+    # Insert part label
+    if not ('_part-%s' % mag_or_phase) in this_prefix_basename:
+        # If "_part-" is specified, prepend the 'mag_or_phase' value.
+        if '_part-' in this_prefix_basename:
             raise BIDSError(
-                "Rec label for images will be automatically set, remove "
+                "Part label for images will be automatically set, remove "
                 "from heuristic"
             )
 
-        # If not, insert "_rec-" + 'mag_or_phase' into the prefix_basename
+        # If not, insert "_part-" + 'mag_or_phase' into the prefix_basename
         # **before** "_run", "_echo" or "_sbref", whichever appears first:
         for label in ['_dir', '_run', '_mod', '_echo', '_recording', '_proc', '_space', filetype]:
             if label == filetype:
                 this_prefix_basename = this_prefix_basename.replace(
-                    filetype, "_rec-%s%s" % (mag_or_phase, filetype)
+                    filetype, "_part-%s%s" % (mag_or_phase, filetype)
                 )
                 break
             elif (label in this_prefix_basename):
                 this_prefix_basename = this_prefix_basename.replace(
-                    label, "_rec-%s%s" % (mag_or_phase, label)
+                    label, "_part-%s%s" % (mag_or_phase, label)
                 )
                 break
 
@@ -317,7 +317,7 @@ def update_multiecho_name(fileinfo, this_prefix_basename, echo_times):
 
 def update_uncombined_name(fileinfo, this_prefix_basename, channel_names):
     """
-    Insert `_channel-<num>` entity into filename if data are from a sequence
+    Insert `_ch-<num>` entity into filename if data are from a sequence
     with "save uncombined".
     """
     # In case any scan types separate channels differently
@@ -329,6 +329,7 @@ def update_uncombined_name(fileinfo, this_prefix_basename, channel_names):
     channel_number = ''.join([c for c in fileinfo['CoilString'] if c.isdigit()])
     if not channel_number:
         channel_number = channel_names.index(fileinfo['CoilString']) + 1
+    channel_number = channel_number.zfill(2)
 
     # Determine scan suffix
     filetype = '_' + this_prefix_basename.split('_')[-1]
@@ -338,12 +339,12 @@ def update_uncombined_name(fileinfo, this_prefix_basename, channel_names):
     for label in ['_recording', '_proc', '_space', filetype]:
         if label == filetype:
             this_prefix_basename = this_prefix_basename.replace(
-                filetype, "_channel-%s%s" % (channel_number, filetype)
+                filetype, "_ch-%s%s" % (channel_number, filetype)
             )
             break
         elif (label in this_prefix_basename):
             this_prefix_basename = this_prefix_basename.replace(
-                label, "_channel-%s%s" % (channel_number, label)
+                label, "_ch-%s%s" % (channel_number, label)
             )
             break
     return this_prefix_basename
