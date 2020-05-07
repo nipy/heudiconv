@@ -171,7 +171,7 @@ def populate_aggregated_jsons(path):
             act = "Generating"
         lgr.debug("%s %s", act, task_file)
         fields.update(placeholders)
-        save_json(task_file, fields, indent=2, sort_keys=True, pretty=True)
+        save_json(task_file, fields, sort_keys=True, pretty=True)
 
 
 def tuneup_bids_json_files(json_files):
@@ -193,7 +193,7 @@ def tuneup_bids_json_files(json_files):
             # Let's hope no word 'Date' comes within a study name or smth like
             # that
             raise ValueError("There must be no dates in .json sidecar")
-        save_json(jsonfile, json_, indent=2)
+        save_json(jsonfile, json_)
 
     # Load the beast
     seqtype = op.basename(op.dirname(jsonfile))
@@ -223,7 +223,7 @@ def tuneup_bids_json_files(json_files):
             was_readonly = is_readonly(json_phasediffname)
             if was_readonly:
                 set_readonly(json_phasediffname, False)
-            save_json(json_phasediffname, json_, indent=2)
+            save_json(json_phasediffname, json_)
             if was_readonly:
                 set_readonly(json_phasediffname)
 
@@ -259,8 +259,7 @@ def add_participant_record(studydir, subject, age, sex):
                         ("Description", "(TODO: adjust - by default everyone is in "
                             "control group)")])),
                 ]),
-                sort_keys=False,
-                indent=2)
+                sort_keys=False)
     # Add a new participant
     with open(participants_tsv, 'a') as f:
         f.write(
@@ -373,8 +372,7 @@ def add_rows_to_scans_keys_file(fn, newrows):
                         ("LongName", "Random string"),
                         ("Description", "md5 hash of UIDs")])),
                 ]),
-                sort_keys=False,
-                indent=2)
+                sort_keys=False)
 
     header = ['filename', 'acq_time', 'operator', 'randstr']
     # prepare all the data rows

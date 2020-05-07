@@ -65,6 +65,17 @@ def test_populate_bids_templates(tmpdir):
 
     # it should also be available as a command
     os.unlink(str(description_file))
+
+    # it must fail if no heuristic was provided
+    with pytest.raises(ValueError) as cme:
+        runner([
+            '--command', 'populate-templates',
+            '--files', str(tmpdir)
+        ])
+    assert str(cme.value).startswith("Specify heuristic using -f. Known are:")
+    assert "convertall," in str(cme.value)
+    assert not description_file.exists()
+
     runner([
         '--command', 'populate-templates', '-f', 'convertall',
         '--files', str(tmpdir)

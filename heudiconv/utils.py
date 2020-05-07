@@ -27,8 +27,8 @@ seqinfo_fields = [
     'example_dcm_file',      # 1
     'series_id',             # 2
     'dcm_dir_name',          # 3
-    'unspecified2',          # 4
-    'unspecified3',          # 5
+    'series_files',          # 4
+    'unspecified',           # 5
     'dim1', 'dim2', 'dim3', 'dim4', # 6, 7, 8, 9
     'TR', 'TE',              # 10, 11
     'protocol_name',         # 12
@@ -44,7 +44,7 @@ seqinfo_fields = [
     'patient_age',           # 22
     'patient_sex',           # 23
     'date',                  # 24
-    'series_uid'             # 25
+    'series_uid',            # 25
  ]
 
 SeqInfo = namedtuple('SeqInfo', seqinfo_fields)
@@ -188,7 +188,7 @@ def assure_no_file_exists(path):
         os.unlink(path)
 
 
-def save_json(filename, data, indent=4, sort_keys=True, pretty=False):
+def save_json(filename, data, indent=2, sort_keys=True, pretty=False):
     """Save data to a json file
 
     Parameters
@@ -203,11 +203,25 @@ def save_json(filename, data, indent=4, sort_keys=True, pretty=False):
 
     """
     assure_no_file_exists(filename)
+    dumps_kw = dict(sort_keys=sort_keys, indent=indent)
+    j = None
+    if pretty:
+        try:
+            j = json_dumps_pretty(data, **dumps_kw)
+        except AssertionError as exc:
+            pretty = False
+            lgr.warning(
+                "Prettyfication of .json failed (%s).  "
+                "Original .json will be kept as is.  Please share (if you "
+                "could) "
+                "that file (%s) with HeuDiConv developers"
+                % (str(exc), filename)
+            )
+    if not pretty:
+        j = _canonical_dumps(data, **dumps_kw)
+    assert j is not None  # one way or another it should have been set to a str
     with open(filename, 'w') as fp:
-        fp.write(
-            (json_dumps_pretty if pretty else _canonical_dumps)(
-                data, sort_keys=sort_keys, indent=indent)
-        )
+        fp.write(j)
 
 
 def json_dumps_pretty(j, indent=2, sort_keys=True):
@@ -252,25 +266,9 @@ def json_dumps_pretty(j, indent=2, sort_keys=True):
 def treat_infofile(filename):
     """Tune up generated .json file (slim down, pretty-print for humans).
     """
-    with open(filename) as f:
-        j = json.load(f)
-
+    j = load_json(filename)
     j_slim = slim_down_info(j)
-    dumps_kw = dict(indent=2, sort_keys=True)
-    try:
-        j_pretty = json_dumps_pretty(j_slim, **dumps_kw)
-    except AssertionError as exc:
-        lgr.warning(
-            "Prettyfication of .json failed (%s).  "
-            "Original .json will be kept as is.  Please share (if you could) "
-            "that file (%s) with HeuDiConv developers"
-            % (str(exc), filename)
-        )
-        j_pretty = json.dumps(j_slim, **dumps_kw)
-
-    set_readonly(filename, False)
-    with open(filename, 'wt') as fp:
-        fp.write(j_pretty)
+    save_json(filename, j_slim, sort_keys=True, pretty=True)
     set_readonly(filename)
 
 
@@ -319,7 +317,7 @@ def load_heuristic(heuristic):
         path, fname = op.split(heuristic_file)
         try:
             old_syspath = sys.path[:]
-            sys.path.append(path)
+            sys.path.insert(0, path)
             mod = __import__(fname.split('.')[0])
             mod.filename = heuristic_file
         finally:
@@ -488,3 +486,22 @@ def create_tree(path, tree, archives_leading_dir=True):
                 f.write(load)
         if executable:
             os.chmod(full_name, os.stat(full_name).st_mode | stat.S_IEXEC)
+
+
+def get_typed_attr(obj, attr, _type, default=None):
+    """
+    Typecasts an object's named attribute. If the attribute cannot be
+    converted, the default value is returned instead.
+
+    Parameters
+    ----------
+    obj: Object
+    attr: Attribute
+    _type: Type
+    default: value, optional
+    """
+    try:
+        val = _type(getattr(obj, attr, default))
+    except (TypeError, ValueError):
+        return default
+    return val

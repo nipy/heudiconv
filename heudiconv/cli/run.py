@@ -62,6 +62,7 @@ def process_extra_commands(outdir, args):
         for f in args.files:
             treat_infofile(f)
     elif args.command == 'ls':
+        ensure_heuristic_arg(args)
         heuristic = load_heuristic(args.heuristic)
         heuristic_ls = getattr(heuristic, 'ls', None)
         for f in args.files:
@@ -78,6 +79,7 @@ def process_extra_commands(outdir, args):
                     % (str(study_session), len(sequences), suf)
                 )
     elif args.command == 'populate-templates':
+        ensure_heuristic_arg(args)
         heuristic = load_heuristic(args.heuristic)
         for f in args.files:
             populate_bids_templates(f, getattr(heuristic, 'DEFAULT_FIELDS', {}))
@@ -88,14 +90,19 @@ def process_extra_commands(outdir, args):
         for name_desc in get_known_heuristics_with_descriptions().items():
             print("- %s: %s" % name_desc)
     elif args.command == 'heuristic-info':
-        from ..utils import get_heuristic_description, get_known_heuristic_names
-        if not args.heuristic:
-            raise ValueError("Specify heuristic using -f. Known are: %s"
-                             % ', '.join(get_known_heuristic_names()))
+        ensure_heuristic_arg(args)
+        from ..utils import get_heuristic_description
         print(get_heuristic_description(args.heuristic, full=True))
     else:
         raise ValueError("Unknown command %s", args.command)
     return
+
+
+def ensure_heuristic_arg(args):
+    from ..utils import get_known_heuristic_names
+    if not args.heuristic:
+        raise ValueError("Specify heuristic using -f. Known are: %s"
+                         % ', '.join(get_known_heuristic_names()))
 
 
 def main(argv=None):
@@ -124,7 +131,6 @@ def main(argv=None):
 
     if args.debug:
         setup_exceptionhook()
-
     process_args(args)
 
 
@@ -154,8 +160,7 @@ def get_parser():
                         'If not provided, DICOMS would first be "sorted" and '
                         'subject IDs deduced by the heuristic')
     parser.add_argument('-c', '--converter',
-                        default='dcm2niix',
-                        choices=('dcm2niix', 'none'),
+                        choices=('dcm2niix', 'none'), default='dcm2niix',
                         help='tool to use for DICOM conversion. Setting to '
                         '"none" disables the actual conversion step -- useful'
                         'for testing heuristics.')
@@ -219,7 +224,7 @@ def get_parser():
                         help='custom actions to be performed on provided '
                         'files instead of regular operation.')
     parser.add_argument('-g', '--grouping', default='studyUID',
-                        choices=('studyUID', 'accession_number'),
+                        choices=('studyUID', 'accession_number', 'all', 'custom'),
                         help='How to group dicoms (default: by studyUID)')
     parser.add_argument('--minmeta', action='store_true',
                         help='Exclude dcmstack meta information in sidecar '
@@ -343,7 +348,8 @@ def process_args(args):
                         seqinfo=seqinfo,
                         min_meta=args.minmeta,
                         overwrite=args.overwrite,
-                        dcmconfig=args.dcmconfig,)
+                        dcmconfig=args.dcmconfig,
+                        grouping=args.grouping,)
 
         lgr.info("PROCESSING DONE: {0}".format(
             str(dict(subject=sid, outdir=study_outdir, session=session))))
