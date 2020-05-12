@@ -406,9 +406,9 @@ def get_formatted_scans_key_row(dcm_fn):
     # parse date and time and get it into isoformat
     try:
         date = dcm_data.ContentDate
-        time = dcm_data.ContentTime.split('.')[0]
-        td = time + date
-        acq_time = datetime.strptime(td, '%H%M%S%Y%m%d').isoformat()
+        time = dcm_data.ContentTime
+        td = time + ':' + date
+        acq_time = datetime.strptime(td, '%H%M%S.%f:%Y%m%d').isoformat()
     except (AttributeError, ValueError) as exc:
         lgr.warning("Failed to get date/time for the content: %s", str(exc))
         acq_time = ''
