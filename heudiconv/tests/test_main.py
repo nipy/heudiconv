@@ -173,7 +173,7 @@ def test_get_formatted_scans_key_row():
 
     row1 = get_formatted_scans_key_row(dcm_fn)
     assert len(row1) == 3
-    assert row1[0] == '2016-10-14T09:26:36'
+    assert row1[0] == '2016-10-14T09:26:36.693000'
     assert row1[1] == 'n/a'
     prandstr1 = row1[2]
 
