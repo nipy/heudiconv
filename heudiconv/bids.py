@@ -21,6 +21,7 @@ from .utils import (
     json_dumps_pretty,
     set_readonly,
     is_readonly,
+    get_datetime,
 )
 
 lgr = logging.getLogger(__name__)
@@ -407,8 +408,7 @@ def get_formatted_scans_key_row(dcm_fn):
     try:
         date = dcm_data.ContentDate
         time = dcm_data.ContentTime
-        td = time + ':' + date
-        acq_time = datetime.strptime(td, '%H%M%S.%f:%Y%m%d').isoformat()
+        acq_time = get_datetime(date, time)
     except (AttributeError, ValueError) as exc:
         lgr.warning("Failed to get date/time for the content: %s", str(exc))
         acq_time = ''
