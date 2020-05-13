@@ -510,7 +510,7 @@ def get_typed_attr(obj, attr, _type, default=None):
 
 def get_datetime(date, time):
     """
-    Convert date and time from dicom to isoformat.
+    Combine date and time from dicom to isoformat.
 
     Parameters
     ----------
@@ -522,11 +522,12 @@ def get_datetime(date, time):
     Returns
     -------
     datetime_str : str
-        Combined date and time in ISO format, with milliseconds.
+        Combined date and time in ISO format (with microseconds if
+        they were available in provided time).
     """
     if '.' not in time:
-        # add milliseconds if not available
-        time += '.000'
+        # add dummy microseconds if not available for strptime to parse
+        time += '.000000'
     td = time + ':' + date
     datetime_str = datetime.strptime(td, '%H%M%S.%f:%Y%m%d').isoformat()
     return datetime_str
