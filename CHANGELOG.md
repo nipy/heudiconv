@@ -360,3 +360,11 @@ TODO Summary
 [#434]: https://github.com/nipy/heudiconv/issues/434
 [#436]: https://github.com/nipy/heudiconv/issues/436
 [#437]: https://github.com/nipy/heudiconv/issues/437
+[#425]: https://github.com/nipy/heudiconv/issues/425
+[#420]: https://github.com/nipy/heudiconv/issues/420
+[#425]: https://github.com/nipy/heudiconv/issues/425
+[#430]: https://github.com/nipy/heudiconv/issues/430
+[#432]: https://github.com/nipy/heudiconv/issues/432
+[#434]: https://github.com/nipy/heudiconv/issues/434
+[#436]: https://github.com/nipy/heudiconv/issues/436
+[#437]: https://github.com/nipy/heudiconv/issues/437
