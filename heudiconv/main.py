@@ -102,7 +102,7 @@ def ensure_heuristic_arg(heuristic=None):
                          % ', '.join(get_known_heuristic_names()))
 
 
-def workflow(dicom_dir_template=None, files=None, subjs=None,
+def workflow(*, dicom_dir_template=None, files=None, subjs=None,
              converter='dcm2niix', outdir='.', locator=None, conv_outdir=None,
              anon_cmd=None, heuristic=None, with_prov=False, session=None,
              bids_options=None, overwrite=False, datalad=False, debug=False,
@@ -192,6 +192,10 @@ def workflow(dicom_dir_template=None, files=None, subjs=None,
     queue_args : str or None, optional
         Additional queue arguments passed as single string of space-separated
         Argument=Value pairs. Default is None.
+
+    Notes
+    -----
+    All parameters in this function must be called as keyword arguments.
     """
 
     # To be done asap so anything random is deterministic
