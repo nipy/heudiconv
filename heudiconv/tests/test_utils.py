@@ -94,3 +94,4 @@ def test_get_datetime():
     """
     assert get_datetime('20200512', '162130') == '2020-05-12T16:21:30'
     assert get_datetime('20200512', '162130.5') == '2020-05-12T16:21:30.500000'
+    assert get_datetime('20200512', '162130.5', microseconds=False) == '2020-05-12T16:21:30'

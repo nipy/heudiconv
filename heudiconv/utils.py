@@ -508,7 +508,7 @@ def get_typed_attr(obj, attr, _type, default=None):
     return val
 
 
-def get_datetime(date, time):
+def get_datetime(date, time, *, microseconds=True):
     """
     Combine date and time from dicom to isoformat.
 
@@ -518,16 +518,21 @@ def get_datetime(date, time):
         Date in YYYYMMDD format.
     time : str
         Time in either HHMMSS.ffffff format or HHMMSS format.
+    microseconds: bool, optional
+        Either to include microseconds in the output
 
     Returns
     -------
     datetime_str : str
-        Combined date and time in ISO format (with microseconds if
-        they were available in provided time).
+        Combined date and time in ISO format, with microseconds as
+        if fraction was provided in 'time', and 'microseconds' was
+        True.
     """
     if '.' not in time:
         # add dummy microseconds if not available for strptime to parse
         time += '.000000'
     td = time + ':' + date
     datetime_str = datetime.strptime(td, '%H%M%S.%f:%Y%m%d').isoformat()
+    if not microseconds:
+        datetime_str = datetime_str.split('.', 1)[0]
     return datetime_str
