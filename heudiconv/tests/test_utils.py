@@ -92,11 +92,5 @@ def test_get_datetime():
     """
     Test utils.get_datetime()
     """
-    date = '20200512'
-    time = '162130'
-    datetime_str = get_datetime(date, time)
-    assert datetime_str == '2020-05-12T16:21:30'
-    date = '20200512'
-    time = '162130.5'
-    datetime_str = get_datetime(date, time)
-    assert datetime_str == '2020-05-12T16:21:30.500000'
+    assert get_datetime('20200512', '162130') == '2020-05-12T16:21:30'
+    assert get_datetime('20200512', '162130.5') == '2020-05-12T16:21:30.500000'
