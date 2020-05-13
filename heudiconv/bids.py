@@ -26,6 +26,19 @@ from .utils import (
 
 lgr = logging.getLogger(__name__)
 
+# Fields to be populated in _scans files. Order matters
+SCANS_FILE_FIELDS = OrderedDict([
+    ("filename", OrderedDict([
+        ("Description", "Name of the nifti file")])),
+    ("acq_time", OrderedDict([
+        ("LongName", "Acquisition time"),
+        ("Description", "Acquisition time of the particular scan")])),
+    ("operator", OrderedDict([
+        ("Description", "Name of the operator")])),
+    ("randstr", OrderedDict([
+        ("LongName", "Random string"),
+        ("Description", "md5 hash of UIDs")])),
+])
 
 class BIDSError(Exception):
     pass
@@ -360,22 +373,9 @@ def add_rows_to_scans_keys_file(fn, newrows):
         # _scans.tsv). This auto generation will make BIDS-validator happy.
         scans_json = '.'.join(fn.split('.')[:-1] + ['json'])
         if not op.lexists(scans_json):
-            save_json(scans_json,
-                OrderedDict([
-                    ("filename", OrderedDict([
-                        ("Description", "Name of the nifti file")])),
-                    ("acq_time", OrderedDict([
-                        ("LongName", "Acquisition time"),
-                        ("Description", "Acquisition time of the particular scan")])),
-                    ("operator", OrderedDict([
-                        ("Description", "Name of the operator")])),
-                    ("randstr", OrderedDict([
-                        ("LongName", "Random string"),
-                        ("Description", "md5 hash of UIDs")])),
-                ]),
-                sort_keys=False)
+            save_json(scans_json, SCANS_FILE_FIELDS, sort_keys=False)
 
-    header = ['filename', 'acq_time', 'operator', 'randstr']
+    header = SCANS_FILE_FIELDS
     # prepare all the data rows
     data_rows = [[k] + v for k, v in fnames2info.items()]
     # sort by the date/filename
