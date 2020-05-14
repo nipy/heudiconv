@@ -50,10 +50,27 @@ def process_extra_commands(outdir, command, files, dicom_dir_template,
 
     Parameters
     ----------
-    outdir : String
+    outdir : str
         Output directory
-    args : Namespace
-        arguments
+    command : {'treat-json', 'ls', 'populate-templates'}
+        Heudiconv command to run
+    files : list of str
+        List of files
+    dicom_dir_template : str
+        Location of dicomdir that can be indexed with subject id
+        {subject} and session {session}. Tarballs (can be compressed)
+        are supported in addition to directory. All matching tarballs
+        for a subject are extracted and their content processed in a
+        single pass. If multiple tarballs are found, each is assumed to
+        be a separate session and the 'session' argument is ignored.
+    heuristic : str
+        Path to heuristic file or name of builtin heuristic.
+    session : str
+        Session identifier
+    subjs : list of str
+        List of subject identifiers
+    grouping : {'studyUID', 'accession_number', 'all', 'custom'}
+        How to group dicoms.
     """
     if command == 'treat-jsons':
         for f in files:
@@ -96,6 +113,9 @@ def process_extra_commands(outdir, command, files, dicom_dir_template,
 
 
 def ensure_heuristic_arg(heuristic=None):
+    """
+    Check that the heuristic argument was provided.
+    """
     from .utils import get_known_heuristic_names
     if not heuristic:
         raise ValueError("Specify heuristic using -f. Known are: %s"
