@@ -283,13 +283,14 @@ def workflow(*, dicom_dir_template=None, files=None, subjs=None,
 
     # processed_studydirs = set()
 
+    locator_manual, session_manual = locator, session
     for (locator, session, sid), files_or_seqinfo in study_sessions.items():
 
         # Allow for session to be overloaded from command line
-        if session is not None:
-            session = session
-        if locator is not None:
-            locator = locator
+        if session_manual is not None:
+            session = session_manual
+        if locator_manual is not None:
+            locator = locator_manual
         if not len(files_or_seqinfo):
             raise ValueError("nothing to process?")
         # that is how life is ATM :-/ since we don't do sorting if subj
