@@ -122,7 +122,7 @@ def ensure_heuristic_arg(heuristic=None):
                          % ', '.join(get_known_heuristic_names()))
 
 
-def workflow(*, dicom_dir_template=None, files=None, subjs=None,
+def workflow(dicom_dir_template=None, files=None, subjs=None,
              converter='dcm2niix', outdir='.', locator=None, conv_outdir=None,
              anon_cmd=None, heuristic=None, with_prov=False, session=None,
              bids_options=None, overwrite=False, datalad=False, debug=False,
