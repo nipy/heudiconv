@@ -315,8 +315,6 @@ def workflow(*, dicom_dir_template=None, files=None, subjs=None,
         anon_outdir = conv_outdir or outdir
         anon_study_outdir = op.join(anon_outdir, locator or '')
 
-        # TODO: --datalad  cmdline option, which would take care about initiating
-        # the outdir -> study_outdir datasets if not yet there
         if datalad:
             from .external.dlad import prepare_datalad
             dlad_sid = sid if not anon_sid else anon_sid
