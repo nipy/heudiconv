@@ -37,3 +37,10 @@ into structured directory layouts.
 - it can track the provenance of the conversion from DICOM to NIfTI in W3C PROV format
 - it provides assistance in converting to `BIDS <http://bids.neuroimaging.io/>`_.
 - it integrates with `DataLad <https://www.datalad.org/>`_ to place converted and original data under git/git-annex version control, while automatically annotating files with sensitive information (e.g., non-defaced anatomicals, etc)
+
+How to cite
+-----------
+
+Please use `Zenodo record <https://doi.org/10.5281/zenodo.1012598>`_ for
+your specific version of HeuDiConv.  We also support gathering
+all relevant citations via `DueCredit <http://duecredit.org>`_.
