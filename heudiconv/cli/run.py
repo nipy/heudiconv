@@ -11,6 +11,7 @@ from ..utils import load_heuristic, anonymize_sid, treat_infofile, SeqInfo
 from ..convert import prep_conversion
 from ..bids import populate_bids_templates, tuneup_bids_json_files
 from ..queue import queue_conversion
+from ..due import due, Doi
 
 import inspect
 import logging
@@ -244,6 +245,12 @@ def get_parser():
     return parser
 
 
+@due.dcite(
+    Doi('10.5281/zenodo.1012598'),
+    path='heudiconv',
+    description='Flexible DICOM converter for organizing brain imaging data',
+    version=__version__,
+    cite_module=True)
 def process_args(args):
     """Given a structure of arguments from the parser perform computation"""
 

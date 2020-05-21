@@ -39,7 +39,9 @@ TESTS_REQUIRES = [
 
 EXTRA_REQUIRES = {
     'tests': TESTS_REQUIRES,
-    'extras': [],  # Requires patched version ATM ['dcmstack'],
+    'extras': [
+        'duecredit',  # optional dependency
+    ],  # Requires patched version ATM ['dcmstack'],
     'datalad': ['datalad >=0.12.3']
 }
 
