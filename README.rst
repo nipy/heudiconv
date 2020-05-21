@@ -20,6 +20,10 @@
   :target: http://heudiconv.readthedocs.io/en/latest/?badge=latest
   :alt: Readthedocs
 
+.. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.1012598.svg
+  :target: https://doi.org/10.5281/zenodo.1012598
+  :alt: Zenodo (latest)
+
 About
 -----
 
