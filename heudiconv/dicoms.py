@@ -476,7 +476,6 @@ def embed_metadata_from_dicoms(bids_options, item_dicoms, outname, outname_bids,
 
     embedfunc = Node(Function(input_names=['dcmfiles', 'niftifile', 'infofile',
                                            'bids_info',],
-                              output_names=['outfile', 'meta'],
                               function=embed_dicom_and_nifti_metadata),
                      name='embedder')
     embedfunc.inputs.dcmfiles = item_dicoms
