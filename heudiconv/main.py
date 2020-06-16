@@ -209,6 +209,8 @@ def workflow(*, dicom_dir_template=None, files=None, subjs=None,
         JSON file for additional dcm2niix configuration. Default is None.
     queue : {'SLURM', None}, optional
         Batch system to submit jobs in parallel. Default is None.
+        If set, will cause scheduling of conversion and return without performing
+        any further action.
     queue_args : str or None, optional
         Additional queue arguments passed as single string of space-separated
         Argument=Value pairs. Default is None.
@@ -269,7 +271,7 @@ def workflow(*, dicom_dir_template=None, files=None, subjs=None,
         iterarg, iterables = ("files", len(files)) if files else \
                              ("subjects", len(subjs))
         queue_conversion(queue, iterarg, iterables, queue_args)
-        sys.exit(0)
+        return
 
     heuristic = load_heuristic(heuristic)
 
