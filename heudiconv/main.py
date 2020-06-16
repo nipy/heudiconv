@@ -108,7 +108,7 @@ def process_extra_commands(outdir, command, files, dicom_dir_template,
         from .utils import get_heuristic_description
         print(get_heuristic_description(heuristic, full=True))
     else:
-        raise ValueError("Unknown command %s", command)
+        raise ValueError("Unknown command %s" % command)
     return
 
 
