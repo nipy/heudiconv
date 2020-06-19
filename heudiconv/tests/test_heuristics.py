@@ -116,7 +116,7 @@ def test_scans_keys_reproin(tmpdir, invocation):
             if i != 0:
                 assert(os.path.exists(pjoin(dirname(scans_keys[0]), row[0])))
                 assert(re.match(
-                    '^[\d]{4}-[\d]{2}-[\d]{2}T[\d]{2}:[\d]{2}:[\d]{2}$',
+                    '^[\d]{4}-[\d]{2}-[\d]{2}T[\d]{2}:[\d]{2}:[\d]{2}.[\d]{6}$',
                     row[1]))
 
 

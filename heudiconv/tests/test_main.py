@@ -1,9 +1,7 @@
 # TODO: break this up by modules
 
-from heudiconv.cli.run import (
-    main as runner,
-    process_args,
-)
+from heudiconv.cli.run import main as runner
+from heudiconv.main import workflow
 from heudiconv import __version__
 from heudiconv.utils import (create_file_if_missing,
                              set_readonly,
@@ -173,7 +171,7 @@ def test_get_formatted_scans_key_row():
 
     row1 = get_formatted_scans_key_row(dcm_fn)
     assert len(row1) == 3
-    assert row1[0] == '2016-10-14T09:26:36'
+    assert row1[0] == '2016-10-14T09:26:36.693000'
     assert row1[1] == 'n/a'
     prandstr1 = row1[2]
 
@@ -288,12 +286,7 @@ def test_cache(tmpdir):
 
 def test_no_etelemetry():
     # smoke test at large - just verifying that no crash if no etelemetry
-    class args:
-        outdir = '/dev/null'
-        command = 'ls'
-        heuristic = 'reproin'
-        files = []  # Nothing to list
-
     # must not fail if etelemetry no found
     with patch.dict('sys.modules', {'etelemetry': None}):
-        process_args(args)
+        workflow(outdir='/dev/null', command='ls',
+                 heuristic='reproin', files=[])
