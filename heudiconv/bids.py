@@ -406,7 +406,7 @@ def get_formatted_scans_key_row(dcm_fn):
     # parse date and time and get it into isoformat
     try:
         date = dcm_data.ContentDate
-        time = dcm_data.ContentTime.split('.')[0]
+        time = dcm_data.AcquisitionTime.split('.')[0]
         td = time + date
         acq_time = datetime.strptime(td, '%H%M%S%Y%m%d').isoformat()
     except (AttributeError, ValueError) as exc:
