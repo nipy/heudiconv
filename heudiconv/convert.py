@@ -694,9 +694,9 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
         for metadata in bids_metas:
             if not metadata:
                 continue
-            echo_times.add(metadata.get('EchoTime', nan))
-            channel_names.add(metadata.get('CoilString', nan))
-            image_types.update(metadata.get('ImageType', [nan]))
+            echo_times.add(metadata.get('EchoTime', False))
+            channel_names.add(metadata.get('CoilString', False))
+            image_types.update(metadata.get('ImageType', [False]))
         is_multiecho = len(set(filter(bool, echo_times))) > 1  # Check for varying echo times
         is_uncombined = len(set(filter(bool, channel_names))) > 1  # Check for uncombined data
         is_complex = 'M' in image_types and 'P' in image_types  # Determine if data are complex (magnitude + phase)
