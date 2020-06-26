@@ -319,6 +319,8 @@ def update_multiecho_name(metadata, filename, echo_times):
     if any(ut in filename for ut in unsupported_types):
         return filename
 
+    assert isinstance(echo_times, list), 'Argument "echo_times" must be a list.'
+
     # Get the EchoNumber from json file info.  If not present, use EchoTime
     if 'EchoNumber' in metadata.keys():
         echo_number = metadata['EchoNumber']
@@ -363,6 +365,8 @@ def update_uncombined_name(metadata, filename, channel_names):
     unsupported_types = []
     if any(ut in filename for ut in unsupported_types):
         return filename
+
+    assert isinstance(channel_names, list), 'Argument "channel_names" must be a list.'
 
     # Determine the channel number
     channel_number = ''.join([c for c in metadata['CoilString'] if c.isdigit()])
@@ -696,6 +700,8 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
         is_multiecho = len(set(filter(bool, echo_times))) > 1  # Check for varying echo times
         is_uncombined = len(set(filter(bool, channel_names))) > 1  # Check for uncombined data
         is_complex = 'M' in image_types and 'P' in image_types  # Determine if data are complex (magnitude + phase)
+        echo_times = sorted(echo_times)  # also converts to list
+        channel_names = sorted(channel_names)  # also converts to list
 
         ### Loop through the bids_files, set the output name and save files
         for fl, suffix, bids_file, bids_meta in zip(res_files, suffixes, bids_files, bids_metas):
