@@ -10,7 +10,7 @@ from ..utils import create_file_if_missing
 
 lgr = logging.getLogger(__name__)
 
-MIN_VERSION = '0.12.4'
+from ..info import MIN_DATALAD_VERSION as MIN_VERSION
 
 
 def prepare_datalad(studydir, outdir, sid, session, seqinfo, dicoms, bids):
