@@ -17,7 +17,7 @@ def test_mark_sensitive(tmpdir):
             'g2': 'd1',
          }
     )
-    ds.add('.')
+    ds.save('.')
     mark_sensitive(ds, 'f*')
     all_meta = dict(ds.repo.get_metadata('.'))
     target_rec = {'distribution-restrictions': ['sensitive']}
