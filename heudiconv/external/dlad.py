@@ -10,7 +10,7 @@ from ..utils import create_file_if_missing
 
 lgr = logging.getLogger(__name__)
 
-MIN_VERSION = '0.12.4'
+from ..info import MIN_DATALAD_VERSION as MIN_VERSION
 
 
 def prepare_datalad(studydir, outdir, sid, session, seqinfo, dicoms, bids):
@@ -105,8 +105,7 @@ def add_to_datalad(topdir, studydir, msg, bids):
             # Previously we did not have it as a submodule, and since no
             # automagic migration is implemented, we just need to check first
             # if any path under .heudiconv is already under git control
-            if any(x[0].startswith('.heudiconv/') for x in
-                   ds.repo.repo.index.entries.keys()):
+            if any(x.startswith('.heudiconv/') for x in ds.repo.get_files()):
                 lgr.warning("%s has .heudiconv not as a submodule from previous"
                             " versions of heudiconv. No automagic migration is "
                             "yet provided", ds)
@@ -119,11 +118,11 @@ def add_to_datalad(topdir, studydir, msg, bids):
         # we place all files under annex and then add
         if create_file_if_missing(op.join(dsh_path, '.gitattributes'),
                                   """* annex.largefiles=anything"""):
-            ds.add('.heudiconv/.gitattributes',
+            ds.save('.heudiconv/.gitattributes',
                    to_git=True,
                    message="Added gitattributes to place all .heudiconv content"
                            " under annex")
-    ds.add('.', recursive=True, save=False,
+    ds.save('.', recursive=True
            # not in effect! ?
            #annex_add_opts=['--include-dotfiles']
            )

@@ -37,10 +37,11 @@ TESTS_REQUIRES = [
     'inotify',
 ]
 
+MIN_DATALAD_VERSION = '0.12.4'
 EXTRA_REQUIRES = {
     'tests': TESTS_REQUIRES,
     'extras': [],  # Requires patched version ATM ['dcmstack'],
-    'datalad': ['datalad >=0.12.3']
+    'datalad': ['datalad >=%s' % MIN_DATALAD_VERSION]
 }
 
 # Flatten the lists

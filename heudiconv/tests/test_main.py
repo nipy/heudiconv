@@ -147,7 +147,7 @@ def test_prepare_for_datalad(tmpdir):
     dummy_path = os.path.join(dsh_path, 'dummy.nii.gz')
 
     create_file_if_missing(dummy_path, '')
-    ds.add(dummy_path, message="added a dummy file")
+    ds.save(dummy_path, message="added a dummy file")
     # next call must not fail, should just issue a warning
     add_to_datalad(str(tmpdir), studydir_, None, False)
     ds.repo.is_under_annex(dummy_path)
