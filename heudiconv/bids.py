@@ -404,10 +404,10 @@ def get_formatted_scans_key_row(dcm_fn):
     """
     dcm_data = dcm.read_file(dcm_fn, stop_before_pixels=True, force=True)
     # we need to store filenames and acquisition times
-    # parse date and time and get it into isoformat
+    # parse date and time of start of run acquisition and get it into isoformat
     try:
-        date = dcm_data.ContentDate
-        time = dcm_data.ContentTime
+        date = dcm_data.AcquisitionDate
+        time = dcm_data.AcquisitionTime
         acq_time = get_datetime(date, time)
     except (AttributeError, ValueError) as exc:
         lgr.warning("Failed to get date/time for the content: %s", str(exc))
