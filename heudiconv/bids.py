@@ -406,7 +406,7 @@ def get_formatted_scans_key_row(dcm_fn):
     # we need to store filenames and acquisition times
     # parse date and time of start of run acquisition and get it into isoformat
     try:
-        date = dcm_data.ContentDate
+        date = dcm_data.AcquisitionDate
         time = dcm_data.AcquisitionTime
         acq_time = get_datetime(date, time)
     except (AttributeError, ValueError) as exc:
