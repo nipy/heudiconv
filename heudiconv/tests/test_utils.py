@@ -84,7 +84,7 @@ def test_load_json(tmpdir, caplog):
     vfname = "valid.json"
     valid_json_file = str(tmpdir / vfname)
     save_json(valid_json_file, vcontent)
-    
+
     assert load_json(valid_json_file) == vcontent
 
 

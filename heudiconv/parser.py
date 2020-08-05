@@ -7,8 +7,9 @@ import re
 from collections import defaultdict
 
 import tarfile
-from tempfile import mkdtemp
+from tempfile import TemporaryDirectory
 
+from . import config
 from .dicoms import group_dicoms_into_seqinfos
 from .utils import (
     docstring_parameter,
@@ -65,8 +66,13 @@ def get_extracted_dicoms(fl):
     # strategy: extract everything in a temp dir and assemble a list
     # of all files in all tarballs
 
-    # cannot use TempDirs since will trigger cleanup with __del__
-    tmpdir = mkdtemp(prefix='heudiconvDCM')
+    # To ensure proper conversion for tarballed files, these
+    # temporary directories must persist until the conversion
+    # step. To address this, the configuration module tracks
+    # temporary directories in memory, and automically cleans
+    # up upon program exit.
+    tmpdir = TemporaryDirectory(prefix='heudiconvDCM')
+    config.add_tmpdir(tmpdir)
 
     sessions = defaultdict(list)
     session = 0

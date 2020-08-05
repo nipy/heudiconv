@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 import logging
 import os
 import sys
@@ -13,15 +12,14 @@ lgr = logging.getLogger(__name__)
 
 def main(argv=None):
     parser = get_parser()
-    args = parser.parse_args(argv)
+    opts = parser.parse_args(argv)
     # exit if nothing to be done
-    if not args.files and not args.dicom_dir_template and not args.command:
+    if not any((opts.files, opts.dicom_dir_template, opts.command)):
         lgr.warning("Nothing to be done - displaying usage help")
         parser.print_help()
         sys.exit(1)
 
-    kwargs = vars(args)
-    workflow(**kwargs)
+    return workflow(**vars(opts))
 
 
 def get_parser():
@@ -44,6 +42,7 @@ def get_parser():
     group.add_argument(
         '--files',
         nargs='*',
+        type=os.path.abspath,
         help='Files (tarballs, dicoms) or directories containing files to '
              'process. Cannot be provided if using --dicom_dir_template.')
     parser.add_argument(

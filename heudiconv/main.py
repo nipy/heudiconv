@@ -2,7 +2,7 @@ import logging
 import os.path as op
 import sys
 
-from . import __version__, __packagename__
+from . import __version__, __packagename__, config
 from .bids import populate_bids_templates, tuneup_bids_json_files
 from .convert import prep_conversion
 from .parser import get_study_sessions
@@ -219,16 +219,15 @@ def workflow(*, dicom_dir_template=None, files=None, subjs=None,
     -----
     All parameters in this function must be called as keyword arguments.
     """
+    # Initialized configuration if we haven't already
+    print(locals())
 
-    # To be done asap so anything random is deterministic
-    if random_seed is not None:
-        import random
-        random.seed(random_seed)
-        import numpy
-        numpy.random.seed(random_seed)
-    # Ensure only supported bids options are passed
-    if debug:
-        lgr.setLevel(logging.DEBUG)
+    if not config._initialized:
+        config.from_dict(locals())
+        # recurse with updated params
+        print("Running with updated args")
+        return workflow(**config.get()['workflow'])
+
     # Should be possible but only with a single subject -- will be used to
     # override subject deduced from the DICOMs
     if files and subjs and len(subjs) > 1:
@@ -237,32 +236,29 @@ def workflow(*, dicom_dir_template=None, files=None, subjs=None,
         )
 
     if debug:
+        lgr.setLevel(logging.DEBUG)
         setup_exceptionhook()
 
     # Deal with provided files or templates
     # pre-process provided list of files and possibly sort into groups/sessions
     # Group files per each study/sid/session
-
-    outdir = op.abspath(outdir)
-
-    try:
-        import etelemetry
-        latest = etelemetry.get_project("nipy/heudiconv")
-    except Exception as e:
-        lgr.warning("Could not check for version updates: %s", str(e))
-        latest = {"version": 'Unknown'}
-
     lgr.info(INIT_MSG(packname=__packagename__,
                       version=__version__,
-                      latest=latest["version"]))
+                      latest=config._latest_version))
 
     if command:
-        process_extra_commands(outdir, command, files, dicom_dir_template,
-                               heuristic, session, subjs, grouping)
+        process_extra_commands(
+            outdir,
+            command,
+            files,
+            dicom_dir_template,
+            heuristic,
+            session,
+            subjs,
+            grouping,
+        )
         return
-    #
-    # Load heuristic -- better do it asap to make sure it loads correctly
-    #
+
     if not heuristic:
         raise RuntimeError("No heuristic specified - add to arguments and rerun")
 
@@ -273,11 +269,15 @@ def workflow(*, dicom_dir_template=None, files=None, subjs=None,
         queue_conversion(queue, iterarg, iterables, queue_args)
         return
 
-    heuristic = load_heuristic(heuristic)
-
-    study_sessions = get_study_sessions(dicom_dir_template, files,
-                                        heuristic, outdir, session,
-                                        subjs, grouping=grouping)
+    study_sessions = get_study_sessions(
+        dicom_dir_template,
+        files,
+        heuristic,
+        outdir,
+        session,
+        subjs,
+        grouping=grouping,
+    )
 
     # extract tarballs, and replace their entries with expanded lists of files
     # TODO: we might need to sort so sessions are ordered???
@@ -363,3 +363,6 @@ def workflow(*, dicom_dir_template=None, files=None, subjs=None,
     #
     # TODO: record_collection of the sid/session although that information
     # is pretty much present in .heudiconv/SUBJECT/info so we could just poke there
+
+    # reset config
+    config._initialized = False

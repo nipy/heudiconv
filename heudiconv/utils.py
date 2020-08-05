@@ -66,40 +66,6 @@ StudySessionInfo = namedtuple(
 )
 
 
-class TempDirs(object):
-    """A helper to centralize handling and cleanup of dirs"""
-
-    def __init__(self):
-        self.dirs = []
-        self.exists = op.exists
-        self.lgr = logging.getLogger('tempdirs')
-
-    def __call__(self, prefix=None):
-        tmpdir = tempfile.mkdtemp(prefix=prefix)
-        self.dirs.append(tmpdir)
-        return tmpdir
-
-    def __del__(self):
-        try:
-            self.cleanup()
-        except AttributeError:
-            pass
-
-    def cleanup(self):
-        self.lgr.debug("Removing %d temporary directories", len(self.dirs))
-        for t in self.dirs[:]:
-            self.lgr.debug("Removing %s", t)
-            if self:
-                self.rmtree(t)
-        self.dirs = []
-
-    def rmtree(self, tmpdir):
-        if self.exists(tmpdir):
-            shutil.rmtree(tmpdir)
-        if tmpdir in self.dirs:
-            self.dirs.remove(tmpdir)
-
-
 def docstring_parameter(*sub):
     """ Borrowed from https://stackoverflow.com/a/10308363/6145776 """
     def dec(obj):
@@ -181,7 +147,7 @@ def load_json(filename):
         raise
 
     return data
-    
+
 
 def assure_no_file_exists(path):
     """Check if file or symlink (git-annex?) exists, and if so -- remove"""
@@ -413,19 +379,6 @@ def is_readonly(path):
     return not bool(perms & ALL_CAN_WRITE)
 
 
-def clear_temp_dicoms(item_dicoms):
-    """Ensures DICOM temporary directories are safely cleared"""
-    try:
-        tmp = Path(op.commonprefix(item_dicoms)).parents[1]
-    except IndexError:
-        return
-    if (str(tmp.parent) == tempfile.gettempdir()
-        and str(tmp.stem).startswith('heudiconvDCM')
-        and op.exists(str(tmp))):
-        # clean up directory holding dicoms
-        shutil.rmtree(str(tmp))
-
-
 def file_md5sum(filename):
     with open(filename, 'rb') as f:
         return hashlib.md5(f.read()).hexdigest()
@@ -536,3 +489,5 @@ def get_datetime(date, time, *, microseconds=True):
     if not microseconds:
         datetime_str = datetime_str.split('.', 1)[0]
     return datetime_str
+
+
