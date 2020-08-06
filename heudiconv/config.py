@@ -7,7 +7,6 @@ import os
 from pathlib import Path
 
 
-_initialized = False
 # avoid telemetry check if user desires
 _disable_et = bool(
     os.getenv("NO_ET") is not None
@@ -144,9 +143,6 @@ class workflow(_Config):
 def from_dict(settings):
     """Read and load settings from a flat dictionary."""
     workflow.load(settings)
-    # mark as initialized
-    global _initialized
-    _initialized = True
 
 
 def get(flat=False):

@@ -127,7 +127,8 @@ def workflow(*, dicom_dir_template=None, files=None, subjs=None,
              anon_cmd=None, heuristic=None, with_prov=False, session=None,
              bids_options=None, overwrite=False, datalad=False, debug=False,
              command=None, grouping='studyUID', minmeta=False,
-             random_seed=None, dcmconfig=None, queue=None, queue_args=None):
+             random_seed=None, dcmconfig=None, queue=None, queue_args=None,
+             init_config=True):
     """Run the HeuDiConv conversion workflow.
 
     Parameters
@@ -214,6 +215,8 @@ def workflow(*, dicom_dir_template=None, files=None, subjs=None,
     queue_args : str or None, optional
         Additional queue arguments passed as single string of space-separated
         Argument=Value pairs. Default is None.
+    init_config : bool, optional
+        Initializes ``heudiconv``'s configuration module based on parameters.
 
     Notes
     -----
@@ -222,11 +225,11 @@ def workflow(*, dicom_dir_template=None, files=None, subjs=None,
     # Initialized configuration if we haven't already
     print(locals())
 
-    if not config._initialized:
+    if init_config:
         config.from_dict(locals())
         # recurse with updated params
         print("Running with updated args")
-        return workflow(**config.get()['workflow'])
+        return workflow(init_config=False, **config.get()['workflow'])
 
     # Should be possible but only with a single subject -- will be used to
     # override subject deduced from the DICOMs
@@ -363,6 +366,3 @@ def workflow(*, dicom_dir_template=None, files=None, subjs=None,
     #
     # TODO: record_collection of the sid/session although that information
     # is pretty much present in .heudiconv/SUBJECT/info so we could just poke there
-
-    # reset config
-    config._initialized = False
