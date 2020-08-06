@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 from argparse import ArgumentParser
+from importlib import reload
 
 from .. import __version__, config
 from ..main import workflow
@@ -12,7 +13,6 @@ lgr = logging.getLogger(__name__)
 
 def main(argv=None):
     # ensure config is reset before starting anew
-    from importlib import reload
     reload(config)
 
     parser = get_parser()

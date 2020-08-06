@@ -469,11 +469,11 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                         tuneup_bids_json_files(bids_outfiles)
                         if prov_file:
                             prov_files.append(prov_file)
-                        else:
-                            raise RuntimeError(
-                                "was asked to convert into %s but destination already exists"
-                                % (outname)
-                            )
+                else:
+                    raise RuntimeError(
+                        "was asked to convert into %s but destination already exists"
+                        % (outname)
+                    )
 
         # add the taskname field to the json file(s):
         add_taskname_to_infofile(bids_outfiles)

@@ -223,12 +223,10 @@ def workflow(*, dicom_dir_template=None, files=None, subjs=None,
     All parameters in this function must be called as keyword arguments.
     """
     # Initialized configuration if we haven't already
-    print(locals())
 
     if init_config:
         config.from_dict(locals())
         # recurse with updated params
-        print("Running with updated args")
         return workflow(init_config=False, **config.get()['workflow'])
 
     # Should be possible but only with a single subject -- will be used to
