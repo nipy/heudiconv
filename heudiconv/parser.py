@@ -7,7 +7,7 @@ import re
 from collections import defaultdict
 
 import tarfile
-from tempfile import TemporaryDirectory
+from tempfile import mkdtemp
 
 from . import config
 from .dicoms import group_dicoms_into_seqinfos
@@ -71,7 +71,7 @@ def get_extracted_dicoms(fl):
     # step. To address this, the configuration module tracks
     # temporary directories in memory, and automically cleans
     # up upon program exit.
-    tmpdir = TemporaryDirectory(prefix='heudiconvDCM')
+    tmpdir = mkdtemp(prefix='heudiconvDCM')
     config.add_tmpdir(tmpdir)
 
     sessions = defaultdict(list)
@@ -96,10 +96,10 @@ def get_extracted_dicoms(fl):
         tf_content = [m.name for m in tmembers if m.isfile()]
         # store full paths to each file, so we don't need to drag along
         # tmpdir as some basedir
-        sessions[session] = [op.join(tmpdir, f) for f in tf_content]
+        sessions[session] = [op.join(str(tmpdir), f) for f in tf_content]
         session += 1
         # extract into tmp dir
-        tf.extractall(path=tmpdir, members=tmembers)
+        tf.extractall(path=str(tmpdir), members=tmembers)
 
     if session == 1:
         # we had only 1 session, so no really multiple sessions according

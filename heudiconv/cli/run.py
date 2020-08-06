@@ -3,7 +3,6 @@ import logging
 import os
 import sys
 from argparse import ArgumentParser
-from importlib import reload
 
 from .. import __version__, config
 from ..main import workflow
@@ -11,10 +10,20 @@ from ..main import workflow
 lgr = logging.getLogger(__name__)
 
 
-def main(argv=None):
-    # ensure config is reset before starting anew
-    reload(config)
+def reset_config(func):
+    """Decorator to reset configuration"""
+    from importlib import reload
 
+    def _reset(argv=None):
+        reload(config)
+        func(argv)
+        config._cleanup()
+        reload(config)
+    return _reset
+
+
+@reset_config
+def main(argv=None):
     parser = get_parser()
     opts = parser.parse_args(argv)
     # exit if nothing to be done
@@ -23,7 +32,7 @@ def main(argv=None):
         parser.print_help()
         sys.exit(1)
 
-    return workflow(**vars(opts))
+    workflow(**vars(opts))
 
 
 def get_parser():

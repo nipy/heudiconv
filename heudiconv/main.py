@@ -7,7 +7,7 @@ from .bids import populate_bids_templates, tuneup_bids_json_files
 from .convert import prep_conversion
 from .parser import get_study_sessions
 from .queue import queue_conversion
-from .utils import anonymize_sid, load_heuristic, treat_infofile, SeqInfo
+from .utils import anonymize_sid, treat_infofile, SeqInfo
 
 lgr = logging.getLogger(__name__)
 
@@ -77,7 +77,6 @@ def process_extra_commands(outdir, command, files, dicom_dir_template,
             treat_infofile(f)
     elif command == 'ls':
         ensure_heuristic_arg(heuristic)
-        heuristic = load_heuristic(heuristic)
         heuristic_ls = getattr(heuristic, 'ls', None)
         for f in files:
             study_sessions = get_study_sessions(
@@ -94,7 +93,6 @@ def process_extra_commands(outdir, command, files, dicom_dir_template,
                 )
     elif command == 'populate-templates':
         ensure_heuristic_arg(heuristic)
-        heuristic = load_heuristic(heuristic)
         for f in files:
             populate_bids_templates(f, getattr(heuristic, 'DEFAULT_FIELDS', {}))
     elif command == 'sanitize-jsons':
@@ -222,8 +220,8 @@ def workflow(*, dicom_dir_template=None, files=None, subjs=None,
     -----
     All parameters in this function must be called as keyword arguments.
     """
-    # Initialized configuration if we haven't already
 
+    # Ensure configuration is initialized
     if init_config:
         config.from_dict(locals())
         # recurse with updated params

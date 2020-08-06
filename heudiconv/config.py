@@ -92,7 +92,7 @@ class workflow(_Config):
     "Files (tarballs, DICOMs) or directories containing files to process."
     subjs = None
     "List of target subject IDs."
-    converter = None
+    converter = 'dcm2niix'
     "Tool to use for DICOM conversion."
     outdir = Path('.').absolute()
     "Output directory for conversion."
@@ -108,13 +108,13 @@ class workflow(_Config):
     "Store additional provenance information."
     session = None
     "Session for longitudinal studies."
-    bids = None
+    bids_options = None
     "Generate relevant BIDS files."
     overwrite = False
     "Overwrite existing converted files."
-    datalad = False
+    datalad = None
     "Store the entire collection as DataLad datasets."
-    debug = False
+    debug = None
     "Do not catch exceptions and show traceback."
     grouping = None
     "DICOM grouping method."
@@ -128,13 +128,15 @@ class workflow(_Config):
     "Batch system to submit jobs in parallel."
     queue_args = None
     "Additional queue arguments."
+    command = None
+    "Custom action to be performed on provided files"
 
     @classmethod
     def init(cls):
         """Initialize heudiconv execution"""
         from .utils import load_heuristic
 
-        if cls.heuristic is not None:
+        if cls.heuristic:
             cls.heuristic = load_heuristic(cls.heuristic)
         if cls.random_seed is not None:
             _init_seed(cls.random_seed)
@@ -172,8 +174,13 @@ def add_tmpdir(tmpdir):
 
 def _cleanup():
     """Cleanup tracked temporary directories"""
+    import shutil
+
     for tmpdir in _tmpdirs:
-        tmpdir.cleanup()
+        try:
+            shutil.rmtree(tmpdir)
+        except FileNotFoundError:
+            pass
 
 
 _tmpdirs = set()
