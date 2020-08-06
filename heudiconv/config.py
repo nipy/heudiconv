@@ -21,7 +21,7 @@ if not _disable_et:
     from contextlib import suppress
     from requests import get, ConnectionError, ReadTimeout
     with suppress((ConnectionError, ReadTimeout)):
-        res = get("https://rig.mit.edu/et/projects/nipy/heudiconv", timeout=0.1)
+        res = get("https://rig.mit.edu/et/projects/nipy/heudiconv", timeout=0.5)
     try:
         _latest_version = res.json()['version']
     except Exception:

@@ -4,13 +4,17 @@ import os
 import sys
 from argparse import ArgumentParser
 
-from .. import __version__
+from .. import __version__, config
 from ..main import workflow
 
 lgr = logging.getLogger(__name__)
 
 
 def main(argv=None):
+    # ensure config is reset before starting anew
+    from importlib import reload
+    reload(config)
+
     parser = get_parser()
     opts = parser.parse_args(argv)
     # exit if nothing to be done
