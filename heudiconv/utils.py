@@ -489,5 +489,3 @@ def get_datetime(date, time, *, microseconds=True):
     if not microseconds:
         datetime_str = datetime_str.split('.', 1)[0]
     return datetime_str
-
-
