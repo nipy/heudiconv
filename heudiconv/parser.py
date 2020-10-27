@@ -7,6 +7,7 @@ import re
 from collections import defaultdict
 
 import tarfile
+import zipfile
 from tempfile import mkdtemp
 
 from .dicoms import group_dicoms_into_seqinfos
@@ -76,24 +77,44 @@ def get_extracted_dicoms(fl):
     # needs sorting to keep the generated "session" label deterministic
     for i, t in enumerate(sorted(fl)):
         # "classical" heudiconv has that heuristic to handle multiple
-        # tarballs as providing different sessions per each tarball
-        if not tarfile.is_tarfile(t):
-            sessions[None].append(t)
-            continue
+        # tarballs as providing different sessions per each tarball or zipfile
 
-        tf = tarfile.open(t)
-        # check content and sanitize permission bits
-        tmembers = tf.getmembers()
-        for tm in tmembers:
-            tm.mode = 0o700
-        # get all files, assemble full path in tmp dir
-        tf_content = [m.name for m in tmembers if m.isfile()]
-        # store full paths to each file, so we don't need to drag along
-        # tmpdir as some basedir
-        sessions[session] = [op.join(tmpdir, f) for f in tf_content]
-        session += 1
-        # extract into tmp dir
-        tf.extractall(path=tmpdir, members=tmembers)
+        if tarfile.is_tarfile(t):
+            # cannot use TempDirs since will trigger cleanup with __del__
+            tmpdir = mkdtemp(prefix='heudiconvDCM')
+            # load file
+            tf = tarfile.open(t)
+            # check content and sanitize permission bits
+            tmembers = tf.getmembers()
+            for tm in tmembers:
+                tm.mode = 0o700
+            # get all files, assemble full path in tmp dir
+            tf_content = [m.name for m in tmembers if m.isfile()]
+            # store full paths to each file, so we don't need to drag along
+            # tmpdir as some basedir
+            sessions[session] = [op.join(tmpdir, f) for f in tf_content]
+            session += 1
+            # extract into tmp dir
+            tf.extractall(path=tmpdir, members=tmembers)
+
+        elif zipfile.is_zipfile(t):
+            # cannot use TempDirs since will trigger cleanup with __del__
+            tmpdir = mkdtemp(prefix='heudiconvDCM')
+            # load file
+            zf = zipfile.ZipFile(t)
+            # check content
+            zmembers = zf.infolist()
+            # get all files, assemble full path in tmp dir
+            zf_content = [m.filename for m in zmembers if not m.is_dir()]
+            # store full paths to each file, so we don't need to drag along
+            # tmpdir as some basedir
+            sessions[session] = [op.join(tmpdir, f) for f in zf_content]
+            session += 1
+            # extract into tmp dir
+            zf.extractall(path=tmpdir)
+
+        else:
+            sessions[None].append(t)
 
     if session == 1:
         # we had only 1 session, so no really multiple sessions according
