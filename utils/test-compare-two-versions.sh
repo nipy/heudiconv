@@ -26,6 +26,10 @@ function run() {
    shift
    source $heudiconvdir/venvs/dev3/bin/activate
    whichheudiconv=$(which heudiconv)
+   # to get "reproducible" dataset UUIDs (might be detremental if we had multiple datalad calls
+   # but since we use python API for datalad, should be Ok)
+   export DATALAD_SEED=1
+
 
    if [ ! -e "$out" ]; then
 	  # just do full conversion
