@@ -16,7 +16,7 @@ def test_update_complex_name():
     fn = 'sub-X_ses-Y_task-Z_run-01_sbref'
     metadata = {'ImageType': ['ORIGINAL', 'PRIMARY', 'P', 'MB', 'TE3', 'ND', 'MOSAIC']}
     suffix = 3
-    out_fn_true = 'sub-X_ses-Y_task-Z_rec-phase_run-01_sbref'
+    out_fn_true = 'sub-X_ses-Y_task-Z_run-01_part-phase_sbref'
     out_fn_test = update_complex_name(metadata, fn, suffix)
     assert out_fn_test == out_fn_true
     # Catch an unsupported type and *do not* update
@@ -26,12 +26,12 @@ def test_update_complex_name():
     # Data type is missing from metadata so use suffix
     fn = 'sub-X_ses-Y_task-Z_run-01_sbref'
     metadata = {'ImageType': ['ORIGINAL', 'PRIMARY', 'MB', 'TE3', 'ND', 'MOSAIC']}
-    out_fn_true = 'sub-X_ses-Y_task-Z_rec-3_run-01_sbref'
+    out_fn_true = 'sub-X_ses-Y_task-Z_run-01_rec-3_sbref'
     out_fn_test = update_complex_name(metadata, fn, suffix)
     assert out_fn_test == out_fn_true
     # Catch existing field with value that *does not match* metadata
     # and raise Exception
-    fn = 'sub-X_ses-Y_task-Z_rec-magnitude_run-01_sbref'
+    fn = 'sub-X_ses-Y_task-Z_run-01_rec-mag_sbref'
     metadata = {'ImageType': ['ORIGINAL', 'PRIMARY', 'P', 'MB', 'TE3', 'ND', 'MOSAIC']}
     suffix = 3
     with pytest.raises(BIDSError):
