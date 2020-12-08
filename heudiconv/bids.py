@@ -44,6 +44,9 @@ class BIDSError(Exception):
     pass
 
 
+BIDS_VERSION = "1.4.1"
+
+
 def populate_bids_templates(path, defaults={}):
     """Premake BIDS text files with templates"""
 
@@ -53,7 +56,7 @@ def populate_bids_templates(path, defaults={}):
         save_json(descriptor,
               OrderedDict([
                   ('Name', "TODO: name of the dataset"),
-                  ('BIDSVersion', "1.0.1"),
+                  ('BIDSVersion', BIDS_VERSION),
                   ('License', defaults.get('License',
                         "TODO: choose a license, e.g. PDDL "
                         "(http://opendatacommons.org/licenses/pddl/)")),

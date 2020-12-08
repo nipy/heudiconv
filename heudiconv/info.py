@@ -40,7 +40,9 @@ TESTS_REQUIRES = [
 MIN_DATALAD_VERSION = '0.12.4'
 EXTRA_REQUIRES = {
     'tests': TESTS_REQUIRES,
-    'extras': [],  # Requires patched version ATM ['dcmstack'],
+    'extras': [
+        'duecredit',  # optional dependency
+    ],  # Requires patched version ATM ['dcmstack'],
     'datalad': ['datalad >=%s' % MIN_DATALAD_VERSION]
 }
 
