@@ -238,7 +238,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
 
 def update_complex_name(metadata, filename, suffix):
     """
-    Insert `_rec-<magnitude|phase>` entity into filename if data are from a
+    Insert `_part-<mag|phase>` entity into filename if data are from a
     sequence with magnitude/phase part.
 
     Parameters
@@ -257,7 +257,10 @@ def update_complex_name(metadata, filename, suffix):
         Updated filename with rec entity added in appropriate position.
     """
     # Some scans separate magnitude/phase differently
-    unsupported_types = ['_bold', '_phase',
+    # A small note: _phase is deprecated, but this may add part-mag to
+    # magnitude data while leaving phase data with a separate suffix,
+    # depending on how one sets up their heuristic.
+    unsupported_types = ['_phase',
                          '_magnitude', '_magnitude1', '_magnitude2',
                          '_phasediff', '_phase1', '_phase2']
     if any(ut in filename for ut in unsupported_types):
@@ -265,7 +268,7 @@ def update_complex_name(metadata, filename, suffix):
 
     # Check to see if it is magnitude or phase part:
     if 'M' in metadata.get('ImageType'):
-        mag_or_phase = 'magnitude'
+        mag_or_phase = 'mag'
     elif 'P' in metadata.get('ImageType'):
         mag_or_phase = 'phase'
     else:
@@ -275,19 +278,19 @@ def update_complex_name(metadata, filename, suffix):
     filetype = '_' + filename.split('_')[-1]
 
     # Insert rec label
-    if not ('_rec-%s' % mag_or_phase) in filename:
-        # If "_rec-" is specified, prepend the 'mag_or_phase' value.
-        if '_rec-' in filename:
+    if not ('_part-%s' % mag_or_phase) in filename:
+        # If "_part-" is specified, prepend the 'mag_or_phase' value.
+        if '_part-' in filename:
             raise BIDSError(
-                "Reconstruction label for images will be automatically set, "
+                "Part label for images will be automatically set, "
                 "remove from heuristic"
             )
 
         # Insert it **before** the following string(s), whichever appears first.
-        for label in ['_dir', '_run', '_mod', '_echo', '_recording', '_proc', '_space', filetype]:
+        for label in ['_recording', '_proc', '_space', filetype]:
             if (label == filetype) or (label in filename):
                 filename = filename.replace(
-                    label, "_rec-%s%s" % (mag_or_phase, label)
+                    label, "_part-%s%s" % (mag_or_phase, label)
                 )
                 break
 
