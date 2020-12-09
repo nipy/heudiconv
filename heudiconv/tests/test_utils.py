@@ -10,6 +10,7 @@ from heudiconv.utils import (
     load_json,
     create_tree,
     save_json,
+    add_field_to_json,
     get_datetime,
     JSONDecodeError)
 
@@ -86,6 +87,32 @@ def test_load_json(tmpdir, caplog):
     save_json(valid_json_file, vcontent)
     
     assert load_json(valid_json_file) == vcontent
+
+
+def test_add_field_to_json(tmpdir):
+    """
+    Test utils.add_field_to_json()
+    """
+    dummy_json_file = str(tmpdir / 'dummy.json')
+    some_content = {"name": "Jason", "age": 30, "city": "New York"}
+    save_json(dummy_json_file, some_content, pretty=True)
+
+    added_content = {"LastName": "Bourne",
+                     "Movies": [
+                         "The Bourne Identity",
+                         "The Bourne Supremacy",
+                         "The Bourne Ultimatum",
+                         "The Bourne Legacy",
+                         "Jason Bourne"
+                     ]
+                     }
+    add_field_to_json(dummy_json_file, added_content)
+
+    # check that it was added:
+    with open(dummy_json_file) as f:
+        data = json.load(f)
+    some_content.update(added_content)
+    assert data == some_content
 
 
 def test_get_datetime():
