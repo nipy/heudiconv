@@ -19,6 +19,7 @@ from .utils import (
     save_json,
     create_file_if_missing,
     json_dumps_pretty,
+    add_field_to_json,
     set_readonly,
     is_readonly,
     get_datetime,
@@ -457,3 +458,125 @@ def convert_sid_bids(subject_id):
     lgr.warning('{0} contained nonalphanumeric character(s), subject '
                 'ID was cleaned to be {1}'.format(subject_id, sid))
     return sid, subject_id
+
+
+def populate_intended_for(path_to_bids_session):
+    """
+    Adds the 'IntendedFor' field to the fmap .json files in a session folder.
+    It goes through the session folders and checks what runs have the same
+    'ShimSetting' as the fmaps. If there is no 'ShimSetting' field in the json
+    file, we'll use the folder name ('func', 'dwi', 'anat') and see which fmap
+    with a matching '_acq' entity.
+
+    If several fmap runs have the same 'ShimSetting' (or '_acq'), it will use
+    the first one. Because fmaps come in groups (with reversed PE polarity,
+    or magnitude/phase), it adds the same runs to the 'IntendedFor' of the
+    corresponding fmaps by checking the '_acq' and '_run' entities.
+
+    Note: the logic behind the way we decide how to populate the "IntendedFor"
+    is: we want all images in the session (except for the fmap images
+    themselves) to have AT MOST one fmap.  (That is, a pair of SE EPI with
+    reversed polarities, or a magnitude a phase field map). If there are more
+    than one fmap (more than a fmap pair) with the same acquisition parameters
+    as, say, a functional run, we will just assign that run to the FIRST pair,
+    while leaving the other fmap pairs without any assigned images.  If the
+    user's intentions were different, he/she will have to manually edit the
+    fmap json files.
+
+    Parameters:
+    ----------
+    path_to_bids_session : str or os.path
+        path to the session folder (or to the subject folder, if there are no
+        sessions).
+    """
+    lgr.info('')
+    lgr.info('Adding "IntendedFor" to the fieldmaps in {}.'.format(path_to_bids_session))
+
+    shim_key = 'ShimSetting'
+    lgr.debug('shim_key: {}'.format(shim_key))
+
+    # Resolve path (eliminate '..')
+    path_to_bids_session = op.abspath(path_to_bids_session)
+
+    # get the BIDS folder (if "data_folder" includes the session, remove it):
+    if op.basename(path_to_bids_session).startswith('ses-'):
+        bids_folder = op.dirname(path_to_bids_session)
+    else:
+        bids_folder = path_to_bids_session
+
+    fmap_dir = op.join(path_to_bids_session, 'fmap')
+    if not op.exists(fmap_dir):
+        lgr.warning('Fmap folder not found in {}.'.format(path_to_bids_session))
+        lgr.warning('We cannot add the IntendedFor field')
+        return
+
+    # Get a list of all fmap json files in the session:
+    # (we will remove elements later on, so don't just iterate)
+    fmap_jsons = sorted([j for j in glob(op.join(path_to_bids_session, 'fmap/*.json'))])
+
+    # Get a set with all non-fmap json files in the session (set is easier):
+    # We also exclude the SBRef files.
+    session_jsons = set(
+        j for j in glob(op.join(path_to_bids_session, '*/*.json')) if not (
+            j in fmap_jsons
+            # j[:-5] removes the '.json' from the end
+            or j[-5].endswith('_sbref')
+        )
+    )
+
+    # Loop through all the fmap json files and, for each one, find which other
+    # non-fmap images in the session have the same shim settings. Those that
+    # match are added to the intended_for list and removed from the list of
+    # non-fmap json files in the session (since they have already assigned to
+    # a fmap).
+    # After finishing with all the non-fmap images in the session, we go back
+    # to the fmap json file list, and find any other fmap json files of the
+    # same acquisition type and run number (because fmaps have several files:
+    # normal- and reversed-polarity, or magnitude and phase, etc.) We add the
+    # same IntendedFor list to those other corresponding fmap json files, and
+    # remove them from the list of available fmap json files.
+    # Once we have gone through all the fmap json files, we are done.
+    jsons_accounted_for = set()
+    for fm_json in fmap_jsons:
+        lgr.debug('Looking for runs for {}'.format(fm_json))
+        data = load_json(fm_json)
+        if shim_key in data.keys():
+            fm_shims = data[shim_key]
+        else:
+            fm_shims = fm_json.name.split('_acq-')[1].split('_')[0]
+            if fm_shims.lower() == 'fmri':
+                fm_shims = 'func'
+
+        intended_for = []
+        for image_json in session_jsons:
+            data = load_json(image_json)
+            if shim_key in data.keys():
+                image_shims = data[shim_key]
+            else:
+                # we just use the acquisition type (the name of the folder:
+                # 'anat', 'func', ...)
+                image_shims = op.basename(op.dirname(image_json))
+            if image_shims == fm_shims:
+                # BIDS specifies that the intended for are:
+                # - **image** files
+                # - path relative to the **subject level**
+                image_json_relative_path = op.relpath(image_json, start=bids_folder)
+                # image_json_relative_path[:-5] removes the '.json' extension:
+                intended_for.append(
+                    image_json_relative_path[:-5] + '.nii.gz'
+                )
+                jsons_accounted_for.add(image_json)
+        if len(intended_for) > 0:
+            fm_json_name = op.basename(fm_json)
+            # get from "_acq-"/"_run-" to the next "_":
+            acq_str = '_acq-' + fm_json_name.split('_acq-')[1].split('_')[0]
+            run_str = '_run-' + fm_json_name.split('_run-')[1].split('_')[0]
+            # Loop through all the files that have the same "acq-" and "run-"
+            intended_for = sorted([str(f) for f in intended_for])
+            for other_fm_json in glob(op.join(path_to_bids_session, 'fmap/*' + acq_str + '*' + run_str + '*.json')):
+                # add the IntendedFor field to the json file:
+                add_field_to_json(other_fm_json, {"IntendedFor": intended_for})
+                fmap_jsons.remove(other_fm_json)
+        # Remove the runs accounted for from the session_jsons list, so that
+        # we don't assign another fmap to this image:
+        session_jsons -= jsons_accounted_for
