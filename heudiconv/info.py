@@ -23,7 +23,7 @@ PYTHON_REQUIRES = ">=3.5"
 REQUIRES = [
     'nibabel',
     'pydicom',
-    'nipype >=1.0.0',
+    'nipype >=1.2.3',
     'dcmstack>=0.8',
     'etelemetry',
     'filelock>=3.0.12',
