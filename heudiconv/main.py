@@ -3,7 +3,7 @@ import os.path as op
 import sys
 
 from . import __version__, __packagename__
-from .bids import populate_bids_templates, tuneup_bids_json_files
+from .bids import populate_bids_templates, tuneup_bids_json_files, populate_intended_for
 from .convert import prep_conversion
 from .due import due, Doi
 from .parser import get_study_sessions
@@ -47,13 +47,13 @@ def process_extra_commands(outdir, command, files, dicom_dir_template,
                            heuristic, session, subjs, grouping):
     """
     Perform custom command instead of regular operations. Supported commands:
-    ['treat-json', 'ls', 'populate-templates']
+    ['treat-json', 'ls', 'populate-templates', 'populate_intended_for']
 
     Parameters
     ----------
     outdir : str
         Output directory
-    command : {'treat-json', 'ls', 'populate-templates'}
+    command : {'treat-json', 'ls', 'populate-templates', 'populate_intended_for'}
         Heudiconv command to run
     files : list of str
         List of files
@@ -108,6 +108,12 @@ def process_extra_commands(outdir, command, files, dicom_dir_template,
         ensure_heuristic_arg(heuristic)
         from .utils import get_heuristic_description
         print(get_heuristic_description(heuristic, full=True))
+    elif command == 'populate_intended_for':
+        for subj in subjs:
+            session_path = op.join(outdir, 'sub-' + subj)
+            if session:
+                session_path = op.join(session_path, 'ses-' + session)
+            populate_intended_for(session_path)
     else:
         raise ValueError("Unknown command %s" % command)
     return

@@ -1,7 +1,8 @@
 # TODO: break this up by modules
 
 from heudiconv.cli.run import main as runner
-from heudiconv.main import workflow
+from heudiconv.main import (workflow,
+                            process_extra_commands)
 from heudiconv import __version__
 from heudiconv.utils import (create_file_if_missing,
                              set_readonly,
@@ -290,3 +291,33 @@ def test_no_etelemetry():
     with patch.dict('sys.modules', {'etelemetry': None}):
         workflow(outdir='/dev/null', command='ls',
                  heuristic='reproin', files=[])
+
+
+# Test two scenarios:
+# -study without sessions
+# -study with sessions
+# The "expected_folder" is the session folder without the tmpdir
+@pytest.mark.parametrize(
+    "session, expected_folder", [
+        ('', '/foo/sub-{sID}'),
+        ('pre', '/foo/sub-{sID}/ses-pre')
+    ]
+)
+def test_populate_intended_for(session, expected_folder, capfd):
+    """
+    Tests for "process_extra_commands" when the command is
+    'populate_intended_for'
+    """
+    # Because the function .utils.populate_intended_for already has its own
+    # tests, here we just test that "process_extra_commands", when 'command'
+    # is 'populate_intended_for' does what we expect (loop through the list of
+    # subjects and calls 'populate_intended_for'). We call it using folders
+    # that don't exist, and check that the output is the expected.
+    bids_folder = expected_folder.split('sub-')[0]
+    subjects = ['1', '2']
+    process_extra_commands(bids_folder, 'populate_intended_for', [], '',
+                           '', session, subjects, None)
+    captured_output = capfd.readouterr().err
+    for s in subjects:
+        expected_info = 'Adding "IntendedFor" to the fieldmaps in ' + expected_folder.format(sID=s)
+        assert expected_info in captured_output
