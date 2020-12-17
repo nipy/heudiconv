@@ -11,8 +11,8 @@ from heudiconv.bids import populate_intended_for
 
 import pytest
 
-
-def create_dummy_bids_session(session_path):
+# TODO: Do the same with a GRE fmap (magnitude/phase, etc.)
+def create_dummy_pepolar_bids_session(session_path):
     """
     Creates a dummy BIDS session, with slim json files and empty nii.gz
     Parameters:
@@ -114,7 +114,7 @@ def test_populate_intended_for(tmpdir, folder, expected_prefix):
     """
 
     session_folder = op.join(tmpdir, folder)
-    session_struct = create_dummy_bids_session(session_folder)
+    session_struct = create_dummy_pepolar_bids_session(session_folder)
     populate_intended_for(session_folder)
 
     run_prefix = 'sub-1' + ('_' + expected_prefix if expected_prefix else '')
