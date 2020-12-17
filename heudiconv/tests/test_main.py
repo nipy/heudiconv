@@ -315,7 +315,7 @@ def test_populate_intended_for(session, expected_folder, capfd):
     # that don't exist, and check that the output is the expected.
     bids_folder = expected_folder.split('sub-')[0]
     subjects = ['1', '2']
-    process_extra_commands(bids_folder, 'populate_intended_for', [], '',
+    process_extra_commands(bids_folder, 'populate-intended-for', [], '',
                            '', session, subjects, None)
     captured_output = capfd.readouterr().err
     for s in subjects:

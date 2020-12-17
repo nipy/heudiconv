@@ -108,7 +108,7 @@ def process_extra_commands(outdir, command, files, dicom_dir_template,
         ensure_heuristic_arg(heuristic)
         from .utils import get_heuristic_description
         print(get_heuristic_description(heuristic, full=True))
-    elif command == 'populate_intended_for':
+    elif command == 'populate-intended-for':
         for subj in subjs:
             session_path = op.join(outdir, 'sub-' + subj)
             if session:
