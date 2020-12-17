@@ -306,7 +306,7 @@ def test_no_etelemetry():
 def test_populate_intended_for(session, expected_folder, capfd):
     """
     Tests for "process_extra_commands" when the command is
-    'populate_intended_for'
+    'populate-intended-for'
     """
     # Because the function .utils.populate_intended_for already has its own
     # tests, here we just test that "process_extra_commands", when 'command'

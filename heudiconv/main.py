@@ -47,13 +47,13 @@ def process_extra_commands(outdir, command, files, dicom_dir_template,
                            heuristic, session, subjs, grouping):
     """
     Perform custom command instead of regular operations. Supported commands:
-    ['treat-json', 'ls', 'populate-templates', 'populate_intended_for']
+    ['treat-json', 'ls', 'populate-templates', 'populate-intended-for']
 
     Parameters
     ----------
     outdir : str
         Output directory
-    command : {'treat-json', 'ls', 'populate-templates', 'populate_intended_for'}
+    command : {'treat-json', 'ls', 'populate-templates', 'populate-intended-for'}
         Heudiconv command to run
     files : list of str
         List of files
