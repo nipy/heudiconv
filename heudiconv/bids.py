@@ -520,7 +520,7 @@ def populate_intended_for(path_to_bids_session):
         j for j in glob(op.join(path_to_bids_session, '*/*.json')) if not (
             j in fmap_jsons
             # j[:-5] removes the '.json' from the end
-            or j[-5].endswith('_sbref')
+            or j[:-5].endswith('_sbref')
         )
     )
 
@@ -568,9 +568,11 @@ def populate_intended_for(path_to_bids_session):
                 jsons_accounted_for.add(image_json)
         if len(intended_for) > 0:
             fm_json_name = op.basename(fm_json)
-            # get from "_acq-"/"_run-" to the next "_":
-            acq_str = '_acq-' + fm_json_name.split('_acq-')[1].split('_')[0]
-            run_str = '_run-' + fm_json_name.split('_run-')[1].split('_')[0]
+            # get <acq> and <run> labels:
+            acq_match = re.findall('([/_]acq-([a-zA-Z0-9]*))', fm_json_name)
+            acq_str = acq_match[0][0] if acq_match else ''
+            run_match = re.findall('([/_]run-([a-zA-Z0-9]*))', fm_json_name)
+            run_str = run_match[0][0] if run_match else ''
             # Loop through all the files that have the same "acq-" and "run-"
             intended_for = sorted([str(f) for f in intended_for])
             for other_fm_json in glob(op.join(path_to_bids_session, 'fmap/*' + acq_str + '*' + run_str + '*.json')):
