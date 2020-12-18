@@ -113,7 +113,7 @@ def test_populate_intended_for(tmpdir, folder, expected_prefix):
         expected start of the "IntendedFor" elements
     """
 
-    session_folder = op.join(tmpdir, folder)
+    session_folder = op.join(str(tmpdir), folder)
     session_struct = create_dummy_pepolar_bids_session(session_folder)
     populate_intended_for(session_folder)
 
