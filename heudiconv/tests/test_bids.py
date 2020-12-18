@@ -5,16 +5,53 @@ from random import random
 
 from heudiconv.utils import (
     load_json,
+    save_json,
     create_tree,
 )
-from heudiconv.bids import populate_intended_for
+from heudiconv.bids import (
+    populate_intended_for,
+    get_shim_setting,
+    SHIM_KEY,
+)
 
 import pytest
 
+SHIM_LENGTH = 6
+
+
+# Test scenarios:
+# -file with "ShimSetting" field
+# -file with no "ShimSetting", in "foo" dir, should return "foo"
+# -file with no "ShimSetting", in "fmap" dir, acq-CatchThis, should return
+#       "CatchThis"
+# -file with no "ShimSetting", in "fmap" dir, acq-fMRI, should return "func"
+A_SHIM = ['{0:.4f}'.format(random()) for i in range(SHIM_LENGTH)]
+@pytest.mark.parametrize(
+    "fname, content, expected_return", [
+        (op.join('foo', 'bar.json'), {SHIM_KEY: A_SHIM}, A_SHIM),
+        (op.join('dont_catch_this', 'foo', 'bar.json'), {}, 'foo'),
+        (op.join('dont_catch_this', 'fmap', 'bar_acq-CatchThis.json'), {}, 'CatchThis'),
+        (op.join('dont_catch_this', 'fmap', 'bar_acq-fMRI.json'), {}, 'func'),
+    ]
+)
+def test_get_shim_setting(tmpdir, fname, content, expected_return):
+    """ Tests for get_shim_setting """
+    json_name = op.join(str(tmpdir), fname)
+    json_dir = op.dirname(json_name)
+    if not op.exists(json_dir):
+        os.makedirs(json_dir)
+    save_json(json_name, content)
+    assert get_shim_setting(json_name) == expected_return
+
+
 # TODO: Do the same with a GRE fmap (magnitude/phase, etc.)
+# TODO: Add test for when there are no ShimSettings
 def create_dummy_pepolar_bids_session(session_path):
     """
     Creates a dummy BIDS session, with slim json files and empty nii.gz
+    The fmap files are pepolar
+    The json files have ShimSettings
+
     Parameters:
     ----------
     session_path : str or os.path
@@ -22,17 +59,14 @@ def create_dummy_pepolar_bids_session(session_path):
     """
     session_parent, session_basename = op.split(session_path)
     if session_basename.startswith('ses-'):
-        subj_folder = session_parent
         prefix = op.split(session_parent)[1] + '_' + session_basename
     else:
-        subj_folder = session_path
         prefix = session_basename
 
     # Generate some random ShimSettings:
-    shim_length = 6
-    dwi_shims = ['{0:.4f}'.format(random()) for i in range(shim_length)]
-    func_shims_A = ['{0:.4f}'.format(random()) for i in range(shim_length)]
-    func_shims_B = ['{0:.4f}'.format(random()) for i in range(shim_length)]
+    dwi_shims = ['{0:.4f}'.format(random()) for i in range(SHIM_LENGTH)]
+    func_shims_A = ['{0:.4f}'.format(random()) for i in range(SHIM_LENGTH)]
+    func_shims_B = ['{0:.4f}'.format(random()) for i in range(SHIM_LENGTH)]
 
     # Dict with the file structure for the session:
     # -anat:
@@ -58,7 +92,7 @@ def create_dummy_pepolar_bids_session(session_path):
         '{p}_acq-A_bold.json'.format(p=prefix): {'ShimSetting': func_shims_A},
         '{p}_acq-B_bold.json'.format(p=prefix): {'ShimSetting': func_shims_B},
         '{p}_acq-unmatched_bold.json'.format(p=prefix): {
-            'ShimSetting': ['{0:.4f}'.format(random()) for i in range(shim_length)]
+            'ShimSetting': ['{0:.4f}'.format(random()) for i in range(SHIM_LENGTH)]
         },
     })
     # -fmap:
@@ -140,7 +174,7 @@ def test_populate_intended_for(tmpdir, folder, expected_prefix):
             ]
             # runNo=1 goes with acq='A'; runNo=2 goes with acq='B'
             for runNo, acq in zip([1, 2], ['A', 'B'])
-            for d in['AP', 'PA']
+            for d in ['AP', 'PA']
         }
     )
 

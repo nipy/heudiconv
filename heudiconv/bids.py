@@ -47,6 +47,9 @@ class BIDSError(Exception):
 
 BIDS_VERSION = "1.4.1"
 
+SHIM_KEY = 'ShimSetting'
+lgr.debug('shim_key: {}'.format(SHIM_KEY))
+
 
 def populate_bids_templates(path, defaults={}):
     """Premake BIDS text files with templates"""
@@ -460,6 +463,36 @@ def convert_sid_bids(subject_id):
     return sid, subject_id
 
 
+def get_shim_setting(json_file):
+    """
+    Gets the "ShimSetting" field from a json_file.
+    If not present:
+    - for fmap files: use the <acq> entity from the file name
+    - for other files: use the folder name ('anat', 'func', 'dwi', ...)
+
+    Parameters:
+    ----------
+    json_file : str
+
+    Returns:
+    -------
+    str with "ShimSetting" value or <acq> entity
+    """
+    data = load_json(json_file)
+    if SHIM_KEY in data.keys():
+        shims = data[SHIM_KEY]
+    else:
+        modality = op.basename(op.dirname(json_file))
+        if modality == 'fmap':
+            # extract the <acq> entity:
+            shims = re.search('(?<=[/_]acq-)\w+',json_file).group(0).split('_')[0]
+            if shims.lower() in ['fmri', 'bold']:
+                shims = 'func'
+        else:
+            shims = modality
+    return shims
+
+
 def populate_intended_for(path_to_bids_session):
     """
     Adds the 'IntendedFor' field to the fmap .json files in a session folder.
@@ -491,9 +524,6 @@ def populate_intended_for(path_to_bids_session):
     """
     lgr.info('')
     lgr.info('Adding "IntendedFor" to the fieldmaps in {}.'.format(path_to_bids_session))
-
-    shim_key = 'ShimSetting'
-    lgr.debug('shim_key: {}'.format(shim_key))
 
     # Resolve path (eliminate '..')
     path_to_bids_session = op.abspath(path_to_bids_session)
@@ -539,23 +569,11 @@ def populate_intended_for(path_to_bids_session):
     jsons_accounted_for = set()
     for fm_json in fmap_jsons:
         lgr.debug('Looking for runs for {}'.format(fm_json))
-        data = load_json(fm_json)
-        if shim_key in data.keys():
-            fm_shims = data[shim_key]
-        else:
-            fm_shims = fm_json.name.split('_acq-')[1].split('_')[0]
-            if fm_shims.lower() == 'fmri':
-                fm_shims = 'func'
+        fm_shims = get_shim_setting(fm_json)
 
         intended_for = []
         for image_json in session_jsons:
-            data = load_json(image_json)
-            if shim_key in data.keys():
-                image_shims = data[shim_key]
-            else:
-                # we just use the acquisition type (the name of the folder:
-                # 'anat', 'func', ...)
-                image_shims = op.basename(op.dirname(image_json))
+            image_shims = get_shim_setting(image_json)
             if image_shims == fm_shims:
                 # BIDS specifies that the intended for are:
                 # - **image** files
