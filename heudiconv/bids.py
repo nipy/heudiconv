@@ -176,7 +176,7 @@ def populate_aggregated_jsons(path):
         placeholders = {
             "TaskName": ("TODO: full task name for %s" %
                          task_acq.split('_')[0].split('-')[1]),
-            "CogAtlasID": "TODO",
+            "CogAtlasID": "http://www.cognitiveatlas.org/task/id/TODO",
         }
         if op.lexists(task_file):
             j = load_json(task_file)
