@@ -71,12 +71,10 @@ def create_dummy_pepolar_bids_session(session_path):
     # Dict with the file structure for the session:
     # -anat:
     anat_struct = {
-        '{p}_{m}.nii.gz'.format(p=prefix, m=mod): '' for mod in ['T1w', 'T2w']
+        '{p}_{m}.{e}'.format(p=prefix, m=mod, e=ext): dummy_content
+        for ext, dummy_content in zip(['nii.gz', 'json'], ['', {}])
+        for mod in ['T1w', 'T2w']
     }
-    anat_struct.update({
-        # empty json:
-        '{p}_{m}.json'.format(p=prefix, m=mod): {} for mod in ['T1w', 'T2w']
-    })
     # -dwi:
     dwi_struct = {
         '{p}_acq-A_run-{r}_dwi.nii.gz'.format(p=prefix, r=runNo): '' for runNo in [1, 2]
