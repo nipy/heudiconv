@@ -3,20 +3,20 @@ Maintainer: NeuroDebian Team <team@neuro.debian.net>
 Uploaders: Michael Hanke <mih@debian.org>, Yaroslav Halchenko <debian@onerussian.com>
 Section: science
 Priority: optional
-Build-Depends: debhelper (>= 9),
+Build-Depends: debhelper (>= 10),
                dh-python,
-               python-all,
-               python-datalad,
-               python-filelock,
-               python-mock,
-               python-setuptools,
-               python-six,
-               python-pytest,
-               python-nipype, dcm2niix,
-               python-pathlib,
+               python3-all,
+               python3-datalad,
+               python3-filelock,
+               python3-mock,
+               python3-setuptools,
+               python3-six,
+               python3-pytest,
+               python3-nipype, dcm2niix,
+               python3-pathlib,
                help2man,
-               python-dcmstack,
-               python-dicom,
+               python3-dcmstack,
+               python3-dicom,
 Standards-Version: 4.3.0
 Homepage: https://github.com/nipy/heudiconv
 Vcs-Browser: https://github.com/nipy/heudiconv
@@ -27,15 +27,16 @@ Architecture: all
 Depends: ${misc:Depends},
          dcm2niix,
          python,
-         python-dcmstack,
-         python-dicom,
-         python-filelock,
-         python-nibabel,
-         python-pathlib,
-         python-numpy,
-         python-nipype,
-Recommends: python-pytest,
-            python-datalad,
+         python3-dcmstack,
+         python3-dicom,
+         python3-filelock,
+         python3-nibabel,
+         python3-pathlib,
+         python3-numpy,
+         python3-nipype,
+Recommends: python3-pytest,
+            python3-datalad,
+            python3-etelemetry,
 Description: DICOM converter with support for structure heuristics
  This is a flexible dicom converter for organizing brain imaging data into
  structured directory layouts. It allows for flexible directory layouts and
