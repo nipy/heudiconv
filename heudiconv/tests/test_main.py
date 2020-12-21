@@ -1,6 +1,7 @@
 # TODO: break this up by modules
 
 from heudiconv.cli.run import main as runner
+from heudiconv.main import workflow
 from heudiconv import __version__
 from heudiconv.utils import (create_file_if_missing,
                              set_readonly,
@@ -32,8 +33,7 @@ def test_main_help(stdout):
     assert stdout.getvalue().startswith("usage: ")
 
 
-@patch('sys.stderr' if sys.version_info[:2] <= (3, 3) else
-       'sys.stdout', new_callable=StringIO)
+@patch('sys.stdout', new_callable=StringIO)
 def test_main_version(std):
     with pytest.raises(SystemExit):
         runner(['--version'])
@@ -63,6 +63,17 @@ def test_populate_bids_templates(tmpdir):
 
     # it should also be available as a command
     os.unlink(str(description_file))
+
+    # it must fail if no heuristic was provided
+    with pytest.raises(ValueError) as cme:
+        runner([
+            '--command', 'populate-templates',
+            '--files', str(tmpdir)
+        ])
+    assert str(cme.value).startswith("Specify heuristic using -f. Known are:")
+    assert "convertall," in str(cme.value)
+    assert not description_file.exists()
+
     runner([
         '--command', 'populate-templates', '-f', 'convertall',
         '--files', str(tmpdir)
@@ -136,7 +147,7 @@ def test_prepare_for_datalad(tmpdir):
     dummy_path = os.path.join(dsh_path, 'dummy.nii.gz')
 
     create_file_if_missing(dummy_path, '')
-    ds.add(dummy_path, message="added a dummy file")
+    ds.save(dummy_path, message="added a dummy file")
     # next call must not fail, should just issue a warning
     add_to_datalad(str(tmpdir), studydir_, None, False)
     ds.repo.is_under_annex(dummy_path)
@@ -160,7 +171,7 @@ def test_get_formatted_scans_key_row():
 
     row1 = get_formatted_scans_key_row(dcm_fn)
     assert len(row1) == 3
-    assert row1[0] == '2016-10-14T09:26:36'
+    assert row1[0] == '2016-10-14T09:26:34.692500'
     assert row1[1] == 'n/a'
     prandstr1 = row1[2]
 
@@ -271,3 +282,11 @@ def test_cache(tmpdir):
     assert (cachedir / 'dicominfo.tsv').exists()
     assert (cachedir / 'S01.auto.txt').exists()
     assert (cachedir / 'S01.edit.txt').exists()
+
+
+def test_no_etelemetry():
+    # smoke test at large - just verifying that no crash if no etelemetry
+    # must not fail if etelemetry no found
+    with patch.dict('sys.modules', {'etelemetry': None}):
+        workflow(outdir='/dev/null', command='ls',
+                 heuristic='reproin', files=[])

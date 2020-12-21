@@ -2,8 +2,12 @@ import filelock
 import os
 import os.path as op
 import logging
+from math import nan
 import shutil
 import sys
+import re
+
+from .due import due, Doi
 
 from .utils import (
     read_config,
@@ -25,7 +29,8 @@ from .bids import (
     save_scans_key,
     tuneup_bids_json_files,
     add_participant_record,
-    BIDSError
+    BIDSError,
+    BIDS_VERSION,
 )
 from .dicoms import (
     group_dicoms_into_seqinfos,
@@ -72,8 +77,7 @@ def conversion_info(subject, outdir, info, filegroup, ses):
                 try:
                     files = filegroup[item]
                 except KeyError:
-                    PY3 = sys.version_info[0] >= 3
-                    files = filegroup[(str if PY3 else unicode)(item)]
+                    files = filegroup[str(item)]
                 outprefix = template.format(**parameters)
                 convert_info.append((op.join(outpath, outprefix),
                                     outtype, files))
@@ -81,8 +85,8 @@ def conversion_info(subject, outdir, info, filegroup, ses):
 
 
 def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
-                   anon_outdir, with_prov, ses, bids_options, seqinfo, min_meta,
-                   overwrite, dcmconfig):
+                    anon_outdir, with_prov, ses, bids_options, seqinfo,
+                    min_meta, overwrite, dcmconfig, grouping):
     if dicoms:
         lgr.info("Processing %d dicoms", len(dicoms))
     elif seqinfo:
@@ -158,16 +162,17 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
         # So either it would need to be brought back or reconsidered altogether
         # (since no sample data to test on etc)
     else:
-        # TODO -- might have been done outside already!
-        # MG -- will have to try with both dicom template, files
         assure_no_file_exists(target_heuristic_filename)
         safe_copyfile(heuristic.filename, target_heuristic_filename)
         if dicoms:
             seqinfo = group_dicoms_into_seqinfos(
                 dicoms,
+                grouping,
                 file_filter=getattr(heuristic, 'filter_files', None),
                 dcmfilter=getattr(heuristic, 'filter_dicom', None),
-                grouping=None)
+                flatten=True,
+                custom_grouping=getattr(heuristic, 'grouping', None))
+
         seqinfo_list = list(seqinfo.keys())
         filegroup = {si.series_id: x for si, x in seqinfo.items()}
         dicominfo_file = op.join(idir, 'dicominfo%s.tsv' % ses_suffix)
@@ -231,6 +236,160 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                                     getattr(heuristic, 'DEFAULT_FIELDS', {}))
 
 
+def update_complex_name(metadata, filename, suffix):
+    """
+    Insert `_part-<mag|phase>` entity into filename if data are from a
+    sequence with magnitude/phase part.
+
+    Parameters
+    ----------
+    metadata : dict
+        Scan metadata dictionary from BIDS sidecar file.
+    filename : str
+        Incoming filename
+    suffix : str
+        An index used for cases where a single scan produces multiple files,
+        but the differences between those files are unknown.
+
+    Returns
+    -------
+    filename : str
+        Updated filename with rec entity added in appropriate position.
+    """
+    # Some scans separate magnitude/phase differently
+    # A small note: _phase is deprecated, but this may add part-mag to
+    # magnitude data while leaving phase data with a separate suffix,
+    # depending on how one sets up their heuristic.
+    unsupported_types = ['_phase',
+                         '_magnitude', '_magnitude1', '_magnitude2',
+                         '_phasediff', '_phase1', '_phase2']
+    if any(ut in filename for ut in unsupported_types):
+        return filename
+
+    # Check to see if it is magnitude or phase part:
+    if 'M' in metadata.get('ImageType'):
+        mag_or_phase = 'mag'
+    elif 'P' in metadata.get('ImageType'):
+        mag_or_phase = 'phase'
+    else:
+        mag_or_phase = suffix
+
+    # Determine scan suffix
+    filetype = '_' + filename.split('_')[-1]
+
+    # Insert rec label
+    if not ('_part-%s' % mag_or_phase) in filename:
+        # If "_part-" is specified, prepend the 'mag_or_phase' value.
+        if '_part-' in filename:
+            raise BIDSError(
+                "Part label for images will be automatically set, "
+                "remove from heuristic"
+            )
+
+        # Insert it **before** the following string(s), whichever appears first.
+        for label in ['_recording', '_proc', '_space', filetype]:
+            if (label == filetype) or (label in filename):
+                filename = filename.replace(
+                    label, "_part-%s%s" % (mag_or_phase, label)
+                )
+                break
+
+    return filename
+
+
+def update_multiecho_name(metadata, filename, echo_times):
+    """
+    Insert `_echo-<num>` entity into filename if data are from a multi-echo
+    sequence.
+
+    Parameters
+    ----------
+    metadata : dict
+        Scan metadata dictionary from BIDS sidecar file.
+    filename : str
+        Incoming filename
+    echo_times : list
+        List of all echo times from scan. Used to determine the echo *number*
+        (i.e., index) if field is missing from metadata.
+
+    Returns
+    -------
+    filename : str
+        Updated filename with echo entity added, if appropriate.
+    """
+    # Field maps separate echoes differently
+    unsupported_types = [
+        '_magnitude', '_magnitude1', '_magnitude2',
+        '_phasediff', '_phase1', '_phase2', '_fieldmap'
+    ]
+    if any(ut in filename for ut in unsupported_types):
+        return filename
+
+    # Get the EchoNumber from json file info.  If not present, use EchoTime
+    if 'EchoNumber' in metadata.keys():
+        echo_number = metadata['EchoNumber']
+    else:
+        echo_number = echo_times.index(metadata['EchoTime']) + 1
+
+    # Determine scan suffix
+    filetype = '_' + filename.split('_')[-1]
+
+    # Insert it **before** the following string(s), whichever appears first.
+    for label in ['_recording', '_proc', '_space', filetype]:
+        if (label == filetype) or (label in filename):
+            filename = filename.replace(
+                label, "_echo-%s%s" % (echo_number, label)
+            )
+            break
+
+    return filename
+
+
+def update_uncombined_name(metadata, filename, channel_names):
+    """
+    Insert `_ch-<num>` entity into filename if data are from a sequence
+    with "save uncombined".
+
+    Parameters
+    ----------
+    metadata : dict
+        Scan metadata dictionary from BIDS sidecar file.
+    filename : str
+        Incoming filename
+    channel_names : list
+        List of all channel names from scan. Used to determine the channel
+        *number* (i.e., index) if field is missing from metadata.
+
+    Returns
+    -------
+    filename : str
+        Updated filename with ch entity added, if appropriate.
+    """
+    # In case any scan types separate channels differently
+    unsupported_types = []
+    if any(ut in filename for ut in unsupported_types):
+        return filename
+
+    # Determine the channel number
+    channel_number = ''.join([c for c in metadata['CoilString'] if c.isdigit()])
+    if not channel_number:
+        channel_number = channel_names.index(metadata['CoilString']) + 1
+    channel_number = str(channel_number).zfill(2)
+
+    # Determine scan suffix
+    filetype = '_' + filename.split('_')[-1]
+
+    # Insert it **before** the following string(s), whichever appears first.
+    # Choosing to put channel near the end since it's not in the specification yet.
+    for label in ['_recording', '_proc', '_space', filetype]:
+        if (label == filetype) or (label in filename):
+            filename = filename.replace(
+                label, "_ch-%s%s" % (channel_number, label)
+            )
+            break
+    return filename
+
+
 def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
             bids_options, outdir, min_meta, overwrite, symlink=True, prov_file=None,
             dcmconfig=None):
@@ -256,6 +415,20 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
     """
     prov_files = []
     tempdirs = TempDirs()
+
+    if bids_options is not None:
+        due.cite(
+            # doi matches the BIDS_VERSION
+            Doi("10.5281/zenodo.4085321"),
+            description="Brain Imaging Data Structure (BIDS) Specification",
+            path="bids",
+            version=BIDS_VERSION,
+            tags=["implementation"])
+        due.cite(
+            Doi("10.1038/sdata.2016.44"),
+            description="Brain Imaging Data Structure (BIDS), Original paper",
+            path="bids",
+            tags=["documentation"])
 
     for item_idx, item in enumerate(items):
 
@@ -322,16 +495,18 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                         % (outname)
                     )
 
+        # add the taskname field to the json file(s):
+        add_taskname_to_infofile(bids_outfiles)
+
         if len(bids_outfiles) > 1:
             lgr.warning("For now not embedding BIDS and info generated "
                         ".nii.gz itself since sequence produced "
                         "multiple files")
         elif not bids_outfiles:
             lgr.debug("No BIDS files were produced, nothing to embed to then")
-        elif outname:
+        elif outname and not min_meta:
             embed_metadata_from_dicoms(bids_options, item_dicoms, outname, outname_bids,
-                                       prov_file, scaninfo, tempdirs, with_prov,
-                                       min_meta)
+                                       prov_file, scaninfo, tempdirs, with_prov)
         if scaninfo and op.exists(scaninfo):
             lgr.info("Post-treating %s file", scaninfo)
             treat_infofile(scaninfo)
@@ -517,6 +692,8 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
         bids_files = (sorted(res.outputs.bids)
                       if len(res.outputs.bids) == len(res_files)
                       else [None] * len(res_files))
+        # preload since will be used in multiple spots
+        bids_metas = [load_json(b) for b in bids_files if b]
 
         ###   Do we have a multi-echo series?   ###
         #   Some Siemens sequences (e.g. CMRR's MB-EPI) set the label 'TE1',
@@ -528,78 +705,43 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
         #   series. To do that, the most straightforward way is to read the
         #   echo times for all bids_files and see if they are all the same or not.
 
-        # Check for varying echo times
-        echo_times = sorted(list(set(
-            load_json(b).get('EchoTime', None)
-            for b in bids_files
-            if b
-        )))
-
-        is_multiecho = len(echo_times) > 1
+        # Collect some metadata across all images
+        echo_times, channel_names, image_types = set(), set(), set()
+        for metadata in bids_metas:
+            if not metadata:
+                continue
+            echo_times.add(metadata.get('EchoTime', nan))
+            channel_names.add(metadata.get('CoilString', nan))
+            image_types.update(metadata.get('ImageType', [nan]))
+        is_multiecho = len(set(filter(bool, echo_times))) > 1  # Check for varying echo times
+        is_uncombined = len(set(filter(bool, channel_names))) > 1  # Check for uncombined data
+        is_complex = 'M' in image_types and 'P' in image_types  # Determine if data are complex (magnitude + phase)
 
         ### Loop through the bids_files, set the output name and save files
-        for fl, suffix, bids_file in zip(res_files, suffixes, bids_files):
+        for fl, suffix, bids_file, bids_meta in zip(res_files, suffixes, bids_files, bids_metas):
 
             # TODO: monitor conversion duration
-            if bids_file:
-                fileinfo = load_json(bids_file)
 
             # set the prefix basename for this specific file (we'll modify it,
             # and we don't want to modify it for all the bids_files):
             this_prefix_basename = prefix_basename
 
-            # _sbref sequences reconstructing magnitude and phase generate
-            # two NIfTI files IN THE SAME SERIES, so we cannot just add
-            # the suffix, if we want to be bids compliant:
-            if bids_file and this_prefix_basename.endswith('_sbref'):
-                # Check to see if it is magnitude or phase reconstruction:
-                if 'M' in fileinfo.get('ImageType'):
-                    mag_or_phase = 'magnitude'
-                elif 'P' in fileinfo.get('ImageType'):
-                    mag_or_phase = 'phase'
-                else:
-                    mag_or_phase = suffix
+            # Update name for certain criteria
+            if bids_file:
+                if is_multiecho:
+                    this_prefix_basename = update_multiecho_name(
+                        bids_meta, this_prefix_basename, echo_times
+                    )
 
-                # Insert reconstruction label
-                if not ("_rec-%s" % mag_or_phase) in this_prefix_basename:
+                if is_complex:
+                    this_prefix_basename = update_complex_name(
+                        bids_meta, this_prefix_basename, suffix
+                    )
 
-                    # If "_rec-" is specified, prepend the 'mag_or_phase' value.
-                    if ('_rec-' in this_prefix_basename):
-                        raise BIDSError(
-                        "Reconstruction label for multi-echo single-band"
-                        " reference images will be automatically set, remove"
-                        " from heuristic"
-                        )
-
-                    # If not, insert "_rec-" + 'mag_or_phase' into the prefix_basename
-                    #   **before** "_run", "_echo" or "_sbref", whichever appears first:
-                    for label in ['_run', '_echo', '_sbref']:
-                        if (label in this_prefix_basename):
-                            this_prefix_basename = this_prefix_basename.replace(
-                                label, "_rec-%s%s" % (mag_or_phase, label)
-                            )
-                            break
-
-            # Now check if this run is multi-echo
-            # (Note: it can be _sbref and multiecho, so don't use "elif"):
-            # For multi-echo sequences, we have to specify the echo number in
-            # the file name:
-            if bids_file and is_multiecho:
-                # Get the EchoNumber from json file info.  If not present, use EchoTime
-                if 'EchoNumber' in fileinfo.keys():
-                    echo_number = fileinfo['EchoNumber']
-                else:
-                    echo_number = echo_times.index(fileinfo['EchoTime']) + 1
-
-                supported_multiecho = ['_bold', '_phase', '_epi', '_sbref', '_T1w', '_PDT2']
-                # Now, decide where to insert it.
-                # Insert it **before** the following string(s), whichever appears first.
-                for imgtype in supported_multiecho:
-                    if (imgtype in this_prefix_basename):
-                        this_prefix_basename = this_prefix_basename.replace(
-                            imgtype, "_echo-%d%s" % (echo_number, imgtype)
-                        )
-                        break
+                if is_uncombined:
+                    this_prefix_basename = update_uncombined_name(
+                        bids_meta, this_prefix_basename, channel_names
+                    )
 
             # Fallback option:
             # If we have failed to modify this_prefix_basename, because it didn't fall
@@ -629,3 +771,32 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
             except TypeError as exc:  ##catch lists
                 raise TypeError("Multiple BIDS sidecars detected.")
     return bids_outfiles
+
+
+def  add_taskname_to_infofile(infofiles):
+    """Add the "TaskName" field to json files corresponding to func images.
+
+    Parameters
+    ----------
+    infofiles : list with json filenames or single filename
+
+    Returns
+    -------
+    """
+
+    # in case they pass a string with a path:
+    if not isinstance(infofiles, list):
+        infofiles = [infofiles]
+
+    for infofile in infofiles:
+        meta_info = load_json(infofile)
+        try:
+            meta_info['TaskName'] = (re.search('(?<=_task-)\w+',
+                                               op.basename(infofile))
+                                     .group(0).split('_')[0])
+        except AttributeError:
+            lgr.warning("Failed to find task field in {0}.".format(infofile))
+            continue
+
+        # write to outfile
+        save_json(infofile, meta_info)

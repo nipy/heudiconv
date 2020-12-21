@@ -10,6 +10,7 @@ from heudiconv.utils import (
     load_json,
     create_tree,
     save_json,
+    get_datetime,
     JSONDecodeError)
 
 import pytest
@@ -85,3 +86,12 @@ def test_load_json(tmpdir, caplog):
     save_json(valid_json_file, vcontent)
     
     assert load_json(valid_json_file) == vcontent
+
+
+def test_get_datetime():
+    """
+    Test utils.get_datetime()
+    """
+    assert get_datetime('20200512', '162130') == '2020-05-12T16:21:30'
+    assert get_datetime('20200512', '162130.5') == '2020-05-12T16:21:30.500000'
+    assert get_datetime('20200512', '162130.5', microseconds=False) == '2020-05-12T16:21:30'

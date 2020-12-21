@@ -123,8 +123,14 @@ from collections import OrderedDict
 import hashlib
 from glob import glob
 
+from heudiconv.due import due, Doi
+
 import logging
 lgr = logging.getLogger('heudiconv')
+
+# pythons before 3.7 didn't have re.Pattern, it was some protected
+# _sre.SRE_Pattern, so let's just sample a class of the compiled regex
+re_Pattern = re.compile('.').__class__
 
 # Terminology to harmonise and use to name variables etc
 # experiment
@@ -372,14 +378,14 @@ def get_study_hash(seqinfo):
     return md5sum(get_study_description(seqinfo))
 
 
-def fix_canceled_runs(seqinfo, accession2run=fix_accession2run):
+def fix_canceled_runs(seqinfo):
     """Function that adds cancelme_ to known bad runs which were forgotten
     """
     accession_number = get_unique(seqinfo, 'accession_number')
-    if accession_number in accession2run:
+    if accession_number in fix_accession2run:
         lgr.info("Considering some runs possibly marked to be "
                  "canceled for accession %s", accession_number)
-        badruns = accession2run[accession_number]
+        badruns = fix_accession2run[accession_number]
         badruns_pattern = '|'.join(badruns)
         for i, s in enumerate(seqinfo):
             if re.match(badruns_pattern, s.series_id):
@@ -391,28 +397,57 @@ def fix_canceled_runs(seqinfo, accession2run=fix_accession2run):
     return seqinfo
 
 
-def fix_dbic_protocol(seqinfo, keys=series_spec_fields, subsdict=protocols2fix):
-    """Ad-hoc fixup for existing protocols
+def fix_dbic_protocol(seqinfo):
+    """Ad-hoc fixup for existing protocols.
+
+    It will operate in 3 stages on `protocols2fix` records.
+    1. consider a record which has md5sum of study_description
+    2. apply all substitutions, where key is a regular expression which
+       successfully searches (not necessarily matches, so anchor appropriately)
+       study_description
+    3. apply "catch all" substitutions in the key containing an empty string
+
+    3. is somewhat redundant since `re.compile('.*')` could match any, but is
+    kept for simplicity of its specification.
     """
+
     study_hash = get_study_hash(seqinfo)
+    study_description = get_study_description(seqinfo)
 
-    if study_hash not in subsdict:
-        raise ValueError("I don't know how to fix {0}".format(study_hash))
+    # We will consider first study specific (based on hash)
+    if study_hash in protocols2fix:
+        _apply_substitutions(seqinfo,
+                             protocols2fix[study_hash],
+                             'study (%s) specific' % study_hash)
+    # Then go through all regexps returning regex "search" result
+    # on study_description
+    for sub, substitutions in protocols2fix.items():
+        if isinstance(sub, re_Pattern) and sub.search(study_description):
+            _apply_substitutions(seqinfo,
+                                 substitutions,
+                                 '%r regex matching' % sub.pattern)
+    # and at the end - global
+    if '' in protocols2fix:
+        _apply_substitutions(seqinfo, protocols2fix[''], 'global')
 
-    # need to replace both protocol_name series_description
-    substitutions = subsdict[study_hash]
+    return seqinfo
+
+
+def _apply_substitutions(seqinfo, substitutions, subs_scope):
+    lgr.info("Considering %s substitutions", subs_scope)
     for i, s in enumerate(seqinfo):
         fixed_kwargs = dict()
-        for key in keys:
-            value = getattr(s, key)
+        # need to replace both protocol_name series_description
+        for key in series_spec_fields:
+            oldvalue = value = getattr(s, key)
             # replace all I need to replace
             for substring, replacement in substitutions:
                 value = re.sub(substring, replacement, value)
+            if oldvalue != value:
+                lgr.info(" %s: %r -> %r", key, oldvalue, value)
             fixed_kwargs[key] = value
         # namedtuples are immutable
         seqinfo[i] = s._replace(**fixed_kwargs)
-
-    return seqinfo
 
 
 def fix_seqinfo(seqinfo):
@@ -420,10 +455,7 @@ def fix_seqinfo(seqinfo):
     """
     # add cancelme to known bad runs
     seqinfo = fix_canceled_runs(seqinfo)
-    study_hash = get_study_hash(seqinfo)
-    if study_hash in protocols2fix:
-        lgr.info("Fixing up protocol for {0}".format(study_hash))
-        seqinfo = fix_dbic_protocol(seqinfo)
+    seqinfo = fix_dbic_protocol(seqinfo)
     return seqinfo
 
 
@@ -437,6 +469,10 @@ def ls(study_session, seqinfo):
 # XXX we killed session indicator!  what should we do now?!!!
 # WE DON:T NEED IT -- it will be provided into conversion_info as `session`
 # So we just need subdir and file_suffix!
+@due.dcite(
+    Doi('10.5281/zenodo.1207117'),
+    path='heudiconv.heuristics.reproin',
+    description='ReproIn heudiconv heuristic for turnkey conversion into BIDS')
 def infotodict(seqinfo):
     """Heuristic evaluator for determining which runs belong where
 
@@ -484,10 +520,10 @@ def infotodict(seqinfo):
             # 3 - Image IOD specific specialization (optional)
             dcm_image_iod_spec = s.image_type[2]
             image_type_seqtype = {
-                'P': 'fmap',   # phase
+                # Note: P and M are too generic to make a decision here, could be
+                #  for different seqtypes (bold, fmap, etc)
                 'FMRI': 'func',
                 'MPR': 'anat',
-                # 'M': 'func',  "magnitude"  -- can be for scout, anat, bold, fmap
                 'DIFFUSION': 'dwi',
                 'MIP_SAG': 'anat',  # angiography
                 'MIP_COR': 'anat',  # angiography
@@ -540,29 +576,55 @@ def infotodict(seqinfo):
         #     prefix = ''
         prefix = ''
 
+        #
+        # Figure out the seqtype_label (BIDS _suffix)
+        #
+        # If none was provided -- let's deduce it from the information we find:
         # analyze s.protocol_name (series_id is based on it) for full name mapping etc
-        if seqtype == 'func' and not seqtype_label:
-            if '_pace_' in series_spec:
-                seqtype_label = 'pace'  # or should it be part of seq-
-            else:
-                # assume bold by default
-                seqtype_label = 'bold'
+        if not seqtype_label:
+            if seqtype == 'func':
+                if '_pace_' in series_spec:
+                    seqtype_label = 'pace'  # or should it be part of seq-
+                elif 'P' in s.image_type:
+                    seqtype_label = 'phase'
+                elif 'M' in s.image_type:
+                    seqtype_label = 'bold'
+                else:
+                    # assume bold by default
+                    seqtype_label = 'bold'
+            elif seqtype == 'fmap':
+                # TODO: support phase1 phase2 like in "Case 2: Two phase images ..."
+                if not dcm_image_iod_spec:
+                    raise ValueError("Do not know image data type yet to make decision")
+                seqtype_label = {
+                    # might want explicit {file_index}  ?
+                    # _epi for pepolar fieldmaps, see
+                    # https://bids-specification.readthedocs.io/en/stable/04-modality-specific-files/01-magnetic-resonance-imaging-data.html#case-4-multiple-phase-encoded-directions-pepolar
+                    'M': 'epi' if 'dir' in series_info else 'magnitude',
+                    'P': 'phasediff',
+                    'DIFFUSION': 'epi',  # according to KODI those DWI are the EPIs we need
+                }[dcm_image_iod_spec]
+            elif seqtype == 'dwi':
+                # label for dwi as well
+                seqtype_label = 'dwi'
 
-        if seqtype == 'fmap' and not seqtype_label:
-            if not dcm_image_iod_spec:
-                raise ValueError("Do not know image data type yet to make decision")
-            seqtype_label = {
-                # might want explicit {file_index}  ?
-                # _epi for pepolar fieldmaps, see
-                # https://bids-specification.readthedocs.io/en/stable/04-modality-specific-files/01-magnetic-resonance-imaging-data.html#case-4-multiple-phase-encoded-directions-pepolar
-                'M': 'epi' if 'dir' in series_info else 'magnitude',
-                'P': 'phasediff',
-                'DIFFUSION': 'epi',  # according to KODI those DWI are the EPIs we need
-            }[dcm_image_iod_spec]
+        #
+        # Even if seqtype_label was provided, for some data we might need to override,
+        # since they are complementary files produced along-side with original
+        # ones.
+        #
+        if s.series_description.endswith('_SBRef'):
+            seqtype_label = 'sbref'
 
-        # label for dwi as well
-        if seqtype == 'dwi' and not seqtype_label:
-            seqtype_label = 'dwi'
+        if not seqtype_label:
+            # Might be provided by the bids ending within series_spec, we would
+            # just want to check if that the last element is not _key-value pair
+            bids_ending = series_info.get('bids', None)
+            if not bids_ending \
+                    or "-" in bids_ending.split('_')[-1]:
+                lgr.warning(
+                    "We ended up with an empty label/suffix for %r",
+                    series_spec)
 
         run = series_info.get('run')
         if run is not None:
@@ -741,6 +803,16 @@ def get_unique(seqinfos, attr):
 # hits, or may be we could just somehow demarkate that it will be multisession
 # one and so then later value parsed (again) in infotodict would be used???
 def infotoids(seqinfos, outdir):
+    # In python 3.7.5 we would obtain odict_keys() object which would be
+    # immutable, and we would not be able to perform any substitutions if
+    # needed.  So let's make it into a regular list
+    if isinstance(seqinfos, dict) or hasattr(seqinfos, 'keys'):
+        # just some checks for a paranoid Yarik
+        raise TypeError(
+            "Expected list-like structure here, not associative array. Got %s"
+            % type(seqinfos)
+        )
+    seqinfos = list(seqinfos)
     # decide on subjid and session based on patient_id
     lgr.info("Processing sequence infos to deduce study/session")
     study_description = get_study_description(seqinfos)

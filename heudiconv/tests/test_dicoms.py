@@ -5,8 +5,12 @@ import pytest
 
 from heudiconv.external.pydicom import dcm
 from heudiconv.cli.run import main as runner
-from heudiconv.dicoms import parse_private_csa_header, embed_nifti
-from .utils import TESTS_DATA_PATH
+from heudiconv.convert import nipype_convert
+from heudiconv.dicoms import parse_private_csa_header, embed_dicom_and_nifti_metadata
+from .utils import (
+    assert_cwd_unchanged,
+    TESTS_DATA_PATH,
+)
 
 # Public: Private DICOM tags
 DICOM_FIELDS_TO_TEST = {
@@ -15,7 +19,7 @@ DICOM_FIELDS_TO_TEST = {
 
 def test_private_csa_header(tmpdir):
     dcm_file = op.join(TESTS_DATA_PATH, 'axasc35.dcm')
-    dcm_data = dcm.read_file(dcm_file)
+    dcm_data = dcm.read_file(dcm_file, stop_before_pixels=True)
     for pub, priv in DICOM_FIELDS_TO_TEST.items():
         # ensure missing public tag
         with pytest.raises(AttributeError):
@@ -26,35 +30,37 @@ def test_private_csa_header(tmpdir):
         runner(['--files', dcm_file, '-c' 'none', '-f', 'reproin'])
 
 
-def test_nifti_embed(tmpdir):
+@assert_cwd_unchanged(ok_to_chdir=True)  # so we cd back after tmpdir.chdir
+def test_embed_dicom_and_nifti_metadata(tmpdir):
     """Test dcmstack's additional fields"""
     tmpdir.chdir()
     # set up testing files
     dcmfiles = [op.join(TESTS_DATA_PATH, 'axasc35.dcm')]
     infofile = 'infofile.json'
 
-    # 1) nifti does not exist
-    out = embed_nifti(dcmfiles, 'nifti.nii', 'infofile.json', None, False)
-    # string -> json
-    out = json.loads(out)
-    # should have created nifti file
-    assert op.exists('nifti.nii')
+    out_prefix = str(tmpdir / "nifti")
+    # 1) nifti does not exist -- no longer supported
+    with pytest.raises(NotImplementedError):
+        embed_dicom_and_nifti_metadata(dcmfiles, out_prefix + '.nii.gz', infofile, None)
 
+    # we should produce nifti using our "standard" ways
+    nipype_out, prov_file = nipype_convert(
+        dcmfiles, prefix=out_prefix, with_prov=False,
+        bids_options=None, tmpdir=str(tmpdir))
+    niftifile = nipype_out.outputs.converted_files
+
+    assert op.exists(niftifile)
     # 2) nifti exists
-    nifti, info = embed_nifti(dcmfiles, 'nifti.nii', 'infofile.json', None, False)
-    assert op.exists(nifti)
-    assert op.exists(info)
-    with open(info) as fp:
+    embed_dicom_and_nifti_metadata(dcmfiles, niftifile, infofile, None)
+    assert op.exists(infofile)
+    with open(infofile) as fp:
         out2 = json.load(fp)
-
-    assert out == out2
 
     # 3) with existing metadata
     bids = {"existing": "data"}
-    nifti, info = embed_nifti(dcmfiles, 'nifti.nii', 'infofile.json', bids, False)
-    with open(info) as fp:
+    embed_dicom_and_nifti_metadata(dcmfiles, niftifile, infofile, bids)
+    with open(infofile) as fp:
         out3 = json.load(fp)
 
-    assert out3["existing"]
-    del out3["existing"]
-    assert out3 == out2 == out
+    assert out3.pop("existing") == "data"
+    assert out3 == out2
