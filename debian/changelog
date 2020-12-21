@@ -4,6 +4,7 @@ heudiconv (0.8.0+git84-gee5cebb-1) unstable; urgency=medium
     - boost to debcompat 10
     - switch to use python3- versions of packages
       (Closes #934687)
+    - require nipype >= 1.2.3 as the one fixing handling of DWI files
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 21 Dec 2020 13:27:11 -0500
 
