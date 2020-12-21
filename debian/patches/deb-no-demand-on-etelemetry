@@ -8,25 +8,12 @@ Last-Update: 2019-12-05
 
 --- a/heudiconv/info.py
 +++ b/heudiconv/info.py
-@@ -28,7 +28,8 @@ REQUIRES = [
-     'nipype >=1.0.0,!=1.2.1,!=1.2.2; python_version == "2.7"',
-     'pathlib',
-     'dcmstack>=0.7',
+@@ -25,7 +25,7 @@ REQUIRES = [
+     'pydicom',
+     'nipype >=1.2.3',
+     'dcmstack>=0.8',
 -    'etelemetry',
-+    # Do not strictly demand on debian yet, not packaged
-+    #'etelemetry',
++    # 'etelemetry',
      'filelock>=3.0.12',
  ]
  
---- a/heudiconv/cli/run.py
-+++ b/heudiconv/cli/run.py
-@@ -248,8 +248,8 @@ def process_args(args):
- 
-     outdir = op.abspath(args.outdir)
- 
--    import etelemetry
-     try:
-+        import etelemetry
-         latest = etelemetry.get_project("nipy/heudiconv")
-     except Exception as e:
-         lgr.warning("Could not check for version updates: ", e)
