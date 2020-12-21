@@ -1,4 +1,4 @@
-import json
+import re
 import os
 import os.path as op
 from random import random
@@ -56,12 +56,22 @@ def create_dummy_pepolar_bids_session(session_path):
     ----------
     session_path : str or os.path
         path to the session (or subject) level folder
+
+    Returns:
+    -------
+    session_struct : dict
+        Structure of the directory that was created
+    expected_result : dict
+        dictionary with fmap names as keys and the expected "IntendedFor" as
+        values.
     """
     session_parent, session_basename = op.split(session_path)
     if session_basename.startswith('ses-'):
         prefix = op.split(session_parent)[1] + '_' + session_basename
     else:
         prefix = session_basename
+
+    # 1) Simulate the file structure for a session:
 
     # Generate some random ShimSettings:
     dwi_shims = ['{0:.4f}'.format(random()) for i in range(SHIM_LENGTH)]
@@ -119,7 +129,40 @@ def create_dummy_pepolar_bids_session(session_path):
     }
 
     create_tree(session_path, session_struct)
-    return session_struct
+
+    # 2) Now, let's create a dict with what we expect for the "IntendedFor":
+
+    sub_match = re.findall('(sub-([a-zA-Z0-9]*))', session_path)
+    sub_str = sub_match[0][0]
+    expected_prefix = session_path.split(sub_str)[-1].split(op.sep)[-1]
+
+    # dict, with fmap names as keys and the expected "IntendedFor" as values.
+    expected_result = {
+        '{p}_acq-dwi_dir-{d}_run-{r}_epi.json'.format(p=prefix, d=d, r=runNo):
+        intended_for
+        # (runNo=1 goes with the long list, runNo=2 goes with None):
+        for runNo, intended_for in zip(
+            [1, 2],
+            [[op.join(expected_prefix, 'dwi', '{p}_acq-A_run-{r}_dwi.nii.gz'.format(p=prefix, r=r)) for r in [1,2]],
+             None]
+        )
+        for d in ['AP', 'PA']
+    }
+    expected_result.update(
+        {
+            '{p}_acq-fMRI_dir-{d}_run-{r}_epi.json'.format(p=prefix, d=d, r=runNo):
+            [
+                op.join(expected_prefix,
+                        'func',
+                        '{p}_acq-{a}_bold.nii.gz'.format(p=prefix, a=acq))
+            ]
+            # runNo=1 goes with acq='A'; runNo=2 goes with acq='B'
+            for runNo, acq in zip([1, 2], ['A', 'B'])
+            for d in ['AP', 'PA']
+        }
+    )
+    
+    return session_struct, expected_result
 
 
 # Test two scenarios:
@@ -146,35 +189,8 @@ def test_populate_intended_for(tmpdir, folder, expected_prefix):
     """
 
     session_folder = op.join(str(tmpdir), folder)
-    session_struct = create_dummy_pepolar_bids_session(session_folder)
+    session_struct, expected_result = create_dummy_pepolar_bids_session(session_folder)
     populate_intended_for(session_folder)
-
-    run_prefix = 'sub-1' + ('_' + expected_prefix if expected_prefix else '')
-    # dict, with fmap names as keys and the expected "IntendedFor" as values.
-    expected_result = {
-        '{p}_acq-dwi_dir-{d}_run-{r}_epi.json'.format(p=run_prefix, d=d, r=runNo):
-        intended_for
-        # (runNo=1 goes with the long list, runNo=2 goes with None):
-        for runNo, intended_for in zip(
-            [1, 2],
-            [[op.join(expected_prefix, 'dwi', '{p}_acq-A_run-{r}_dwi.nii.gz'.format(p=run_prefix, r=r)) for r in [1,2]],
-             None]
-        )
-        for d in ['AP', 'PA']
-    }
-    expected_result.update(
-        {
-            '{p}_acq-fMRI_dir-{d}_run-{r}_epi.json'.format(p=run_prefix, d=d, r=runNo):
-            [
-                op.join(expected_prefix,
-                        'func',
-                        '{p}_acq-{a}_bold.nii.gz'.format(p=run_prefix, a=acq))
-            ]
-            # runNo=1 goes with acq='A'; runNo=2 goes with acq='B'
-            for runNo, acq in zip([1, 2], ['A', 'B'])
-            for d in ['AP', 'PA']
-        }
-    )
 
     # Now, loop through the jsons in the fmap folder and make sure it matches
     # the expected result:
@@ -188,6 +204,7 @@ def test_populate_intended_for(tmpdir, folder, expected_prefix):
                 # Also, make sure the run with random shims is not here:
                 # (It is assured by the assert above, but let's make it
                 # explicit)
+                run_prefix = j.split('_acq')[0]
                 assert '{p}_acq-unmatched_bold.nii.gz'.format(p=run_prefix) not in data['IntendedFor']
             else:
                 assert 'IntendedFor' not in data.keys()
