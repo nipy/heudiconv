@@ -3,6 +3,7 @@ heudiconv (0.8.0+git84-gee5cebb-1) unstable; urgency=medium
   * debian/control
     - boost to debcompat 10
     - switch to use python3- versions of packages
+      (Closes #934687)
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 21 Dec 2020 13:27:11 -0500
 
