@@ -379,7 +379,7 @@ def _safe_op_file(src, dest, operation, overwrite=False):
         if not overwrite:
             raise RuntimeError(
                 "was asked to %s %s but destination already exists: %s"
-                % (src, operation, dest)
+                % (operation, src, dest)
             )
         os.unlink(dest)
     getattr(shutil, operation)(src, dest)
