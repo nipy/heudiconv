@@ -1,3 +1,4 @@
+import atexit
 import logging
 import os
 import os.path as op
@@ -13,9 +14,13 @@ from .dicoms import group_dicoms_into_seqinfos
 from .utils import (
     docstring_parameter,
     StudySessionInfo,
+    TempDirs,
 )
 
 lgr = logging.getLogger(__name__)
+tempdirs = TempDirs()
+# Ensure they are cleaned up upon exit
+atexit.register(tempdirs.cleanup)
 
 _VCS_REGEX = '%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (op.sep, op.sep)
 
@@ -66,7 +71,7 @@ def get_extracted_dicoms(fl):
     # of all files in all tarballs
 
     # cannot use TempDirs since will trigger cleanup with __del__
-    tmpdir = mkdtemp(prefix='heudiconvDCM')
+    tmpdir = tempdirs('heudiconvDCM')
 
     sessions = defaultdict(list)
     session = 0
