@@ -566,37 +566,40 @@ def populate_intended_for(path_to_bids_session):
     # same IntendedFor list to those other corresponding fmap json files, and
     # remove them from the list of available fmap json files.
     # Once we have gone through all the fmap json files, we are done.
-    jsons_accounted_for = set()
+    runs_accounted_for = set()
+    fmaps_accounted_for = set()
     for fm_json in fmap_jsons:
-        lgr.debug('Looking for runs for {}'.format(fm_json))
-        fm_shims = get_shim_setting(fm_json)
+        if fm_json not in fmaps_accounted_for:
+            lgr.debug('Looking for runs for {}'.format(fm_json))
+            fm_shims = get_shim_setting(fm_json)
 
-        intended_for = []
-        for image_json in session_jsons:
-            image_shims = get_shim_setting(image_json)
-            if image_shims == fm_shims:
-                # BIDS specifies that the intended for are:
-                # - **image** files
-                # - path relative to the **subject level**
-                image_json_relative_path = op.relpath(image_json, start=bids_folder)
-                # image_json_relative_path[:-5] removes the '.json' extension:
-                intended_for.append(
-                    image_json_relative_path[:-5] + '.nii.gz'
-                )
-                jsons_accounted_for.add(image_json)
-        if len(intended_for) > 0:
-            fm_json_name = op.basename(fm_json)
-            # get <acq> and <run> labels:
-            acq_match = re.findall('([/_]acq-([a-zA-Z0-9]*))', fm_json_name)
-            acq_str = acq_match[0][0] if acq_match else ''
-            run_match = re.findall('([/_]run-([a-zA-Z0-9]*))', fm_json_name)
-            run_str = run_match[0][0] if run_match else ''
-            # Loop through all the files that have the same "acq-" and "run-"
-            intended_for = sorted([str(f) for f in intended_for])
-            for other_fm_json in glob(op.join(path_to_bids_session, 'fmap/*' + acq_str + '*' + run_str + '*.json')):
-                # add the IntendedFor field to the json file:
-                add_field_to_json(other_fm_json, {"IntendedFor": intended_for})
-                fmap_jsons.remove(other_fm_json)
-        # Remove the runs accounted for from the session_jsons list, so that
-        # we don't assign another fmap to this image:
-        session_jsons -= jsons_accounted_for
+            intended_for = []
+            for image_json in session_jsons:
+                image_shims = get_shim_setting(image_json)
+                if image_shims == fm_shims:
+                    # BIDS specifies that the intended for are:
+                    # - **image** files
+                    # - path relative to the **subject level**
+                    image_json_relative_path = op.relpath(image_json, start=bids_folder)
+                    # image_json_relative_path[:-5] removes the '.json' extension:
+                    intended_for.append(
+                        image_json_relative_path[:-5] + '.nii.gz'
+                    )
+                    runs_accounted_for.add(image_json)
+            if len(intended_for) > 0:
+                intended_for = sorted([str(f) for f in intended_for])
+                # find all fmap json files with the same <acq> and <run> entities:
+                fm_json_name = op.basename(fm_json)
+                acq_match = re.findall('([/_]acq-([a-zA-Z0-9]*))', fm_json_name)
+                acq_str = acq_match[0][0] if acq_match else ''
+                run_match = re.findall('([/_]run-([a-zA-Z0-9]*))', fm_json_name)
+                run_str = run_match[0][0] if run_match else ''
+                # Loop through all the files that have the same "acq-" and "run-"
+                # Note: the following loop will also include 'fm_json'
+                for linked_fm_json in glob(op.join(path_to_bids_session, 'fmap/*' + acq_str + '*' + run_str + '*.json')):
+                    # add the IntendedFor field to the json file:
+                    add_field_to_json(linked_fm_json, {"IntendedFor": intended_for})
+                    fmaps_accounted_for.update({linked_fm_json})
+            # Remove the runs accounted for from the session_jsons list, so that
+            # we don't assign another fmap to this image:
+            session_jsons -= runs_accounted_for
