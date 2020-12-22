@@ -354,7 +354,21 @@ def get_known_heuristics_with_descriptions():
 
 
 def safe_copyfile(src, dest, overwrite=False):
-    """Copy file but blow if destination name already exists
+    """Copy file but blow if destination name already exists"""
+    return _safe_op_file(src, dest, "copyfile", overwrite=overwrite)
+
+
+def safe_movefile(src, dest, overwrite=False):
+    """Move file but blow if destination name already exists"""
+    return _safe_op_file(src, dest, "move", overwrite=overwrite)
+
+
+def _safe_op_file(src, dest, operation, overwrite=False):
+    """Copy or move file but blow if destination name already exists
+
+    Parameters
+    ----------
+    operation: str, {copyfile, move}
     """
     if op.isdir(dest):
         dest = op.join(dest, op.basename(src))
@@ -364,11 +378,11 @@ def safe_copyfile(src, dest, overwrite=False):
     if op.lexists(dest):
         if not overwrite:
             raise RuntimeError(
-                "was asked to copy %s but destination already exists: %s"
-                % (src, dest)
+                "was asked to %s %s but destination already exists: %s"
+                % (src, operation, dest)
             )
         os.unlink(dest)
-    shutil.copyfile(src, dest)
+    getattr(shutil, operation)(src, dest)
 
 
 # Globals to check filewriting permissions
