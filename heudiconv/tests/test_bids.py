@@ -229,6 +229,9 @@ def create_dummy_no_shim_settings_bids_session(session_path):
     create_tree(session_path, session_struct)
 
     # 2) Now, let's create a dict with what we expect for the "IntendedFor":
+    # NOTE: The "expected_prefix" (the beginning of the path to the
+    # "IntendedFor") should be relative to the subject level (see:
+    # https://bids-specification.readthedocs.io/en/stable/04-modality-specific-files/01-magnetic-resonance-imaging-data.html#fieldmap-data)
 
     sub_match = re.findall('(sub-([a-zA-Z0-9]*))', session_path)
     sub_str = sub_match[0][0]
@@ -263,20 +266,134 @@ def create_dummy_no_shim_settings_bids_session(session_path):
     return session_struct, expected_result
 
 
+def create_dummy_magnitude_phase_bids_session(session_path):
+    """
+    Creates a dummy BIDS session, with slim json files and empty nii.gz
+    The fmap files are a magnitude/phase pair
+    The json files have ShimSettings
+    We just need to test a very simple case to make sure the mag/phase have
+    the same "IntendedFor" field:
+
+    Parameters:
+    ----------
+    session_path : str or os.path
+        path to the session (or subject) level folder
+
+    Returns:
+    -------
+    session_struct : dict
+        Structure of the directory that was created
+    expected_result : dict
+        dictionary with fmap names as keys and the expected "IntendedFor" as
+        values.
+    """
+    session_parent, session_basename = op.split(session_path)
+    if session_basename.startswith('ses-'):
+        prefix = op.split(session_parent)[1] + '_' + session_basename
+    else:
+        prefix = session_basename
+
+    # 1) Simulate the file structure for a session:
+
+    # Generate some random ShimSettings:
+    dwi_shims = ['{0:.4f}'.format(random()) for i in range(SHIM_LENGTH)]
+    func_shims_A = ['{0:.4f}'.format(random()) for i in range(SHIM_LENGTH)]
+    func_shims_B = ['{0:.4f}'.format(random()) for i in range(SHIM_LENGTH)]
+
+    # Dict with the file structure for the session:
+    # -dwi:
+    dwi_struct = {
+        '{p}_acq-A_run-{r}_dwi.nii.gz'.format(p=prefix, r=runNo): '' for runNo in [1, 2]
+    }
+    dwi_struct.update({
+        '{p}_acq-A_run-{r}_dwi.json'.format(p=prefix, r=runNo): {'ShimSetting': dwi_shims} for runNo in [1, 2]
+    })
+    # -func:
+    func_struct = {
+        '{p}_acq-{a}_bold.nii.gz'.format(p=prefix, a=acq): '' for acq in ['A', 'B', 'unmatched']
+    }
+    func_struct.update({
+        '{p}_acq-A_bold.json'.format(p=prefix): {'ShimSetting': func_shims_A},
+        '{p}_acq-B_bold.json'.format(p=prefix): {'ShimSetting': func_shims_B},
+        '{p}_acq-unmatched_bold.json'.format(p=prefix): {
+            'ShimSetting': ['{0:.4f}'.format(random()) for i in range(SHIM_LENGTH)]
+        },
+    })
+    # -fmap:
+    #    * Case 1 in https://bids-specification.readthedocs.io/en/stable/04-modality-specific-files/01-magnetic-resonance-imaging-data.html#fieldmap-data
+    fmap_struct = {
+        '{p}_acq-case1_{s}.nii.gz'.format(p=prefix, s=suffix): ''
+        for suffix in ['phasediff', 'magnitude1', 'magnitude2']
+    }
+    fmap_struct.update({
+        '{p}_acq-case1_{s}.json'.format(p=prefix, s='phasediff'): {'ShimSetting': dwi_shims}
+    })
+    #    * Case 2:
+    fmap_struct.update({
+        '{p}_acq-case2_{s}.nii.gz'.format(p=prefix, s=suffix): ''
+        for suffix in ['magnitude1', 'magnitude2', 'phase1', 'phase2']
+    })
+    fmap_struct.update({
+        '{p}_acq-case2_phase{n}.json'.format(p=prefix, n=n): {'ShimSetting': func_shims_A}
+        for n in [1, 2]
+    })
+    #    * Case 3:
+    fmap_struct.update({
+        '{p}_acq-case3_{s}.nii.gz'.format(p=prefix, s=suffix): ''
+        for suffix in ['magnitude', 'fieldmap']
+    })
+    fmap_struct.update({
+        '{p}_acq-case3_fieldmap.json'.format(p=prefix): {'ShimSetting': func_shims_B}
+    })
+    # structure for the full session:
+    session_struct = {
+        'dwi': dwi_struct,
+        'func': func_struct,
+        'fmap': fmap_struct
+    }
+
+    create_tree(session_path, session_struct)
+
+    # 2) Now, let's create a dict with what we expect for the "IntendedFor":
+
+    sub_match = re.findall('(sub-([a-zA-Z0-9]*))', session_path)
+    sub_str = sub_match[0][0]
+    expected_prefix = session_path.split(sub_str)[-1].split(op.sep)[-1]
+
+    # dict, with fmap names as keys and the expected "IntendedFor" as values.
+    expected_result = {
+        '{p}_acq-case1_{s}.json'.format(p=prefix, s='phasediff'):
+            [op.join(expected_prefix, 'dwi', '{p}_acq-A_run-{r}_dwi.nii.gz'.format(p=prefix, r=r)) for r in [1, 2]]
+    }
+    expected_result.update({
+        '{p}_acq-case2_phase{n}.json'.format(p=prefix, n=n):
+            # populate_intended_for writes lists:
+            [op.join(expected_prefix, 'func', '{p}_acq-A_bold.nii.gz'.format(p=prefix))]
+        for n in [1, 2]
+    })
+    expected_result.update({
+        '{p}_acq-case3_fieldmap.json'.format(p=prefix):
+            # populate_intended_for writes lists:
+            [op.join(expected_prefix, 'func', '{p}_acq-B_bold.nii.gz'.format(p=prefix))]
+    })
+
+    return session_struct, expected_result
+
+
 # Test two scenarios for each case:
 # -study without sessions
 # -study with sessions
 # Cases:
 # A) pepolar fmaps with ShimSetting in json files
 # B) same, with no ShimSetting
-# TODO: Do the same with a GRE fmap (magnitude/phase, etc.)
-# The "expected_prefix" (the beginning of the path to the "IntendedFor")
-# should be relative to the subject level
+# C) magnitude/phase, with ShimSetting
 @pytest.mark.parametrize(
     "folder, expected_prefix, simulation_function", [
         (folder, expected_prefix, sim_func)
         for folder, expected_prefix in zip(['no_sessions/sub-1', 'sessions/sub-1/ses-pre'], ['', 'ses-pre'])
-        for sim_func in [create_dummy_pepolar_bids_session, create_dummy_no_shim_settings_bids_session]
+        for sim_func in [create_dummy_pepolar_bids_session,
+                         create_dummy_no_shim_settings_bids_session,
+                         create_dummy_magnitude_phase_bids_session]
     ]
 )
 def test_populate_intended_for(tmpdir, folder, expected_prefix, simulation_function):
