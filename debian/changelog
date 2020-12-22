@@ -1,4 +1,4 @@
-heudiconv (0.8.0+git84-gee5cebb-1) unstable; urgency=medium
+heudiconv (0.8.0+git89-gbfa2ae3-1) unstable; urgency=medium
 
   * debian/control
     - boost to debcompat 10
@@ -6,7 +6,7 @@ heudiconv (0.8.0+git84-gee5cebb-1) unstable; urgency=medium
       (Closes #934687)
     - require nipype >= 1.2.3 as the one fixing handling of DWI files
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 21 Dec 2020 13:27:11 -0500
+ -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 22 Dec 2020 11:31:03 -0500
 
 heudiconv (0.6.0-1) UNRELEASED; urgency=medium
 
