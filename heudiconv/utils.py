@@ -358,6 +358,9 @@ def safe_copyfile(src, dest, overwrite=False):
     """
     if op.isdir(dest):
         dest = op.join(dest, op.basename(src))
+    if op.realpath(src) == op.realpath(dest):
+        lgr.debug("Source %s = destination %s", src, dest)
+        return
     if op.lexists(dest):
         if not overwrite:
             raise RuntimeError(
