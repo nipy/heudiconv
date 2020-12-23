@@ -7,7 +7,7 @@ read -r newver oldver <<<$(sed -ne 's,## \[\([0-9\.]*\)\] .*,\1,gp' CHANGELOG.md
 echo "Old: $oldver  New: $newver"
 curver=$(python -c 'import heudiconv; print(heudiconv.__version__)')
 # check
-test "$oldver" = "$curver"
+#test "$oldver" = "$curver"
 
 utils/link_issues_CHANGELOG
 
