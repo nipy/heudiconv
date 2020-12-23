@@ -1,12 +1,14 @@
-heudiconv (0.8.0+git89-gbfa2ae3-1) unstable; urgency=medium
+heudiconv (0.9.0-1) unstable; urgency=medium
 
+  * Fresh upstream release, another attempt at unstable (needs python3-nipype,
+    in NEW queue)
   * debian/control
     - boost to debcompat 10
     - switch to use python3- versions of packages
       (Closes #934687)
     - require nipype >= 1.2.3 as the one fixing handling of DWI files
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 22 Dec 2020 11:31:03 -0500
+ -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 23 Dec 2020 10:27:58 -0500
 
 heudiconv (0.6.0-1) UNRELEASED; urgency=medium
 
