@@ -4,16 +4,42 @@ All notable changes to this project will be documented (for humans) in this file
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [0.8.1] - Date
+## [0.9.0] - 2020-12-23
 
-TODO Summary
+Various improvements and compatibility/support (dcm2niix, datalad,
+duecredit) changes.  Major change is placement of output files to the
+target output directory during conversion.
 
 ### Added
+
+- #454 zenodo referencing in README.rst and support for ducredit for
+  heudiconv and reproin heuristic
+- #445 more tutorial references in README.md
+
 ### Changed
-### Deprecated
+
+- [#485][] placed files during conversion right away into the target
+  directory (with a `_heudiconv???` suffix, renamed into ultimate target
+  name later on), which avoids hitting file size limits of /tmp ([#481][]) and
+  helped to avoid a regression in dcm2nixx 1.0.20201102
+- #477 replaced `rec-<magnitude|phase>` with `part-<mag|phase>` now
+  that BIDS supports the part entity
+- #473 made default for CogAtlasID to be a TODO URL
+- #459 made AcquisitionTime used for acq_time scans file field
+- #451 retained sub-second resolution in scans files
+- #442 refactored code so there is now heudiconv.main.workflow for
+  more convenient use as a Python module
+
 ### Fixed
+
+- minimal version of nipype set to 1.2.3 to guarantee correct handling
+  of DWI files ([#480][])
+- `heudiconvDCM*` temporary directories are removed now ([#462][])
+- compatibility with DataLad 0.13 ([#464][])
+
 ### Removed
-### Security
+
+- #443 pathlib as a dependency (we are Python3 only now)
 
 
 ## [0.8.0] - 2020-04-15
@@ -323,6 +349,7 @@ TODO Summary
 [#366]: https://github.com/nipy/heudiconv/issues/366
 [#368]: https://github.com/nipy/heudiconv/issues/368
 [#373]: https://github.com/nipy/heudiconv/issues/373
+[#485]: https://github.com/nipy/heudiconv/issues/485
 [#293]: https://github.com/nipy/heudiconv/issues/293
 [#304]: https://github.com/nipy/heudiconv/issues/304
 [#306]: https://github.com/nipy/heudiconv/issues/306
@@ -360,11 +387,7 @@ TODO Summary
 [#434]: https://github.com/nipy/heudiconv/issues/434
 [#436]: https://github.com/nipy/heudiconv/issues/436
 [#437]: https://github.com/nipy/heudiconv/issues/437
-[#425]: https://github.com/nipy/heudiconv/issues/425
-[#420]: https://github.com/nipy/heudiconv/issues/420
-[#425]: https://github.com/nipy/heudiconv/issues/425
-[#430]: https://github.com/nipy/heudiconv/issues/430
-[#432]: https://github.com/nipy/heudiconv/issues/432
-[#434]: https://github.com/nipy/heudiconv/issues/434
-[#436]: https://github.com/nipy/heudiconv/issues/436
-[#437]: https://github.com/nipy/heudiconv/issues/437
+[#462]: https://github.com/nipy/heudiconv/issues/462
+[#464]: https://github.com/nipy/heudiconv/issues/464
+[#480]: https://github.com/nipy/heudiconv/issues/480
+[#481]: https://github.com/nipy/heudiconv/issues/481
