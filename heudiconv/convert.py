@@ -5,6 +5,7 @@ import logging
 from math import nan
 import shutil
 import sys
+import random
 import re
 
 from .due import due, Doi
@@ -16,6 +17,7 @@ from .utils import (
     write_config,
     TempDirs,
     safe_copyfile,
+    safe_movefile,
     treat_infofile,
     set_readonly,
     clear_temp_dicoms,
@@ -614,7 +616,11 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids_options, tmpdir, dcmconf
     convertnode = Node(Dcm2niix(from_file=fromfile), name='convert')
     convertnode.base_dir = tmpdir
     convertnode.inputs.source_names = item_dicoms
-    convertnode.inputs.out_filename = prefix
+    convertnode.inputs.out_filename = op.basename(prefix) + "_heudiconv%03d" % random.randint(0, 999)
+    prefix_dir = op.dirname(prefix)
+    # if provided prefix had a path in it -- pass is as output_dir instead of default curdir
+    if prefix_dir:
+        convertnode.inputs.output_dir = prefix_dir
 
     if nipype.__version__.split('.')[0] == '0':
         # deprecated since 1.0, might be needed(?) before
@@ -627,7 +633,7 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids_options, tmpdir, dcmconf
     # prov information
     prov_file = prefix + '_prov.ttl' if with_prov else None
     if prov_file:
-        safe_copyfile(op.join(convertnode.base_dir,
+        safe_movefile(op.join(convertnode.base_dir,
                               convertnode.name,
                               'provenance.ttl'),
                       prov_file)
@@ -669,8 +675,8 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
 
     if isdefined(res.outputs.bvecs) and isdefined(res.outputs.bvals):
         outname_bvecs, outname_bvals = prefix + '.bvec', prefix + '.bval'
-        safe_copyfile(res.outputs.bvecs, outname_bvecs, overwrite)
-        safe_copyfile(res.outputs.bvals, outname_bvals, overwrite)
+        safe_movefile(res.outputs.bvecs, outname_bvecs, overwrite)
+        safe_movefile(res.outputs.bvals, outname_bvals, overwrite)
 
     if isinstance(res_files, list):
         res_files = sorted(res_files)
@@ -754,19 +760,19 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
             outfile = outname + '.' + outtype
 
             # Write the files needed:
-            safe_copyfile(fl, outfile, overwrite)
+            safe_movefile(fl, outfile, overwrite)
             if bids_file:
                 outname_bids_file = "%s.json" % (outname)
-                safe_copyfile(bids_file, outname_bids_file, overwrite)
+                safe_movefile(bids_file, outname_bids_file, overwrite)
                 bids_outfiles.append(outname_bids_file)
 
     # res_files is not a list
     else:
         outname = "{}.{}".format(prefix, outtype)
-        safe_copyfile(res_files, outname, overwrite)
+        safe_movefile(res_files, outname, overwrite)
         if isdefined(res.outputs.bids):
             try:
-                safe_copyfile(res.outputs.bids, outname_bids, overwrite)
+                safe_movefile(res.outputs.bids, outname_bids, overwrite)
                 bids_outfiles.append(outname_bids)
             except TypeError as exc:  ##catch lists
                 raise TypeError("Multiple BIDS sidecars detected.")
