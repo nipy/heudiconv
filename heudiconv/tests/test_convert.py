@@ -1,5 +1,6 @@
 """Test functions in heudiconv.convert module.
 """
+from os import path as op
 import pytest
 
 from heudiconv import convert
@@ -74,3 +75,54 @@ def test_update_uncombined_name():
     out_fn_true = 'sub-X_ses-Y_task-Z_run-01_ch-04_bold'
     out_fn_test = convert.update_uncombined_name(metadata, fn, channel_names)
     assert out_fn_test == out_fn_true
+
+
+# Test two scenarios for each case:
+# -study without sessions
+# -study with sessions
+@pytest.mark.parametrize(
+    "subjects, sesID, expected_session_folder", [
+        (['Jason', 'Bourne'], None, 'sub-{sID}'),
+        ('Bourne', 'Treadstone', 'sub-{{sID}}{sep}ses-{{ses}}'.format(sep=op.sep)),
+    ]
+)
+def test_convert(monkeypatch, capfd,
+                 subjects, sesID, expected_session_folder):
+    """
+    Test convert
+
+    For now, I'm just going to test that the call to populate_intended_for is
+    done with the correct argument.
+    More tests can be added here.
+    """
+
+    def mock_populate_intended_for(session):
+        """
+        Pretend we run populate_intended_for, but just print out the argument.
+        """
+        print('session: {}'.format(session))
+        return
+    monkeypatch.setattr(convert, "populate_intended_for", mock_populate_intended_for)
+
+    outdir = op.sep + 'foo'
+    outfolder = op.join(outdir, 'sub-{sID}', 'ses-{ses}' if sesID else '')
+    sub_ses = 'sub-{sID}' + ('_ses-{ses}' if sesID else '')
+
+    # items are a list of tuples, with each tuple having three elements:
+    #   prefix, outtypes, item_dicoms
+    items = [
+        (op.join(outfolder, 'anat', sub_ses + '_T1w').format(sID=s, ses=sesID), ('',), [])
+        for s in subjects
+    ]
+
+    convert.convert(items,
+                    converter='',
+                    scaninfo_suffix='.json',
+                    custom_callable=None,
+                    with_prov=None,
+                    bids_options=[],
+                    outdir=outdir,
+                    min_meta=True,
+                    overwrite=False)
+    output = capfd.readouterr()
+    assert ['session: sub-{}'.format(s) in output.out for s in subjects]

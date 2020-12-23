@@ -26,6 +26,7 @@ from .utils import (
 from .bids import (
     convert_sid_bids,
     populate_bids_templates,
+    populate_intended_for,
     save_scans_key,
     tuneup_bids_json_files,
     add_participant_record,
@@ -518,6 +519,22 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
 
         if custom_callable is not None:
             custom_callable(*item)
+
+    # Populate "IntendedFor" for fmap files.
+    # Because fmap files can only be used to correct for distortions in images
+    # collected within the same scanning session, find unique subject/session
+    # combinations from the outname in each item:
+    outnames = [item[0] for item in items]
+    # - grab "sub-<sID>[/ses-<ses>]", and keep only unique ones:
+    sessions = set(
+        re.search(
+            'sub-(?P<subj>[a-zA-Z0-9]*)([{0}_]ses-(?P<ses>[a-zA-Z0-9]*))?'.format(op.sep),
+            oname
+        ).group(0)
+        for oname in outnames
+    )
+    for ses in sessions:
+        populate_intended_for(ses)
 
 
 def convert_dicom(item_dicoms, bids_options, prefix,
