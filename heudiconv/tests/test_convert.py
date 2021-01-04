@@ -104,7 +104,7 @@ def test_convert(tmpdir, monkeypatch, capfd,
         return
     monkeypatch.setattr(convert, "populate_intended_for", mock_populate_intended_for)
 
-    outdir = op.join(tmpdir, 'foo')
+    outdir = op.join(str(tmpdir), 'foo')
     outfolder = op.join(outdir, 'sub-{sID}', 'ses-{ses}' if sesID else '')
     sub_ses = 'sub-{sID}' + ('_ses-{ses}' if sesID else '')
 
