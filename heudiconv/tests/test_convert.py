@@ -86,7 +86,7 @@ def test_update_uncombined_name():
         ('Bourne', 'Treadstone', 'sub-{{sID}}{sep}ses-{{ses}}'.format(sep=op.sep)),
     ]
 )
-def test_convert(monkeypatch, capfd,
+def test_convert(tmpdir, monkeypatch, capfd,
                  subjects, sesID, expected_session_folder):
     """
     Test convert
@@ -104,7 +104,7 @@ def test_convert(monkeypatch, capfd,
         return
     monkeypatch.setattr(convert, "populate_intended_for", mock_populate_intended_for)
 
-    outdir = op.sep + 'foo'
+    outdir = op.join(tmpdir, 'foo')
     outfolder = op.join(outdir, 'sub-{sID}', 'ses-{ses}' if sesID else '')
     sub_ses = 'sub-{sID}' + ('_ses-{ses}' if sesID else '')
 
