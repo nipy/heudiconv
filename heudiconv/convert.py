@@ -526,13 +526,19 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
     # combinations from the outname in each item:
     outnames = [item[0] for item in items]
     # - grab "sub-<sID>[/ses-<ses>]", and keep only unique ones:
-    sessions = set(
-        re.search(
-            'sub-(?P<subj>[a-zA-Z0-9]*)([{0}_]ses-(?P<ses>[a-zA-Z0-9]*))?'.format(op.sep),
-            oname
-        ).group(0)
-        for oname in outnames
-    )
+    try:
+        sessions = set(
+            re.search(
+                'sub-(?P<subj>[a-zA-Z0-9]*)([{0}_]ses-(?P<ses>[a-zA-Z0-9]*))?'.format(op.sep),
+                oname
+            ).group(0)
+            for oname in outnames
+        )
+    except AttributeError:
+        # "sub-<sID>[/ses-<ses>]" is not present, so this is not BIDS compliant
+        # and it doesn't make sense to add "IntendedFor":
+        sessions = set()
+
     for ses in sessions:
         populate_intended_for(ses)
 
