@@ -89,6 +89,7 @@ def create_seqinfo(mw, series_files, series_id):
         patient_age=dcminfo.get('PatientAge'),
         patient_sex=dcminfo.get('PatientSex'),
         date=dcminfo.get('AcquisitionDate'),
+        time=dcminfo.get('AcquisitionTime'),
         series_uid=dcminfo.get('SeriesInstanceUID')
     )
     return seqinfo
