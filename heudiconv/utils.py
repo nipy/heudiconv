@@ -13,6 +13,7 @@ from pathlib import Path
 from collections import namedtuple
 from glob import glob
 from subprocess import check_output
+from datetime import datetime
 
 from nipype.utils.filemanip import which
 
@@ -353,18 +354,35 @@ def get_known_heuristics_with_descriptions():
 
 
 def safe_copyfile(src, dest, overwrite=False):
-    """Copy file but blow if destination name already exists
+    """Copy file but blow if destination name already exists"""
+    return _safe_op_file(src, dest, "copyfile", overwrite=overwrite)
+
+
+def safe_movefile(src, dest, overwrite=False):
+    """Move file but blow if destination name already exists"""
+    return _safe_op_file(src, dest, "move", overwrite=overwrite)
+
+
+def _safe_op_file(src, dest, operation, overwrite=False):
+    """Copy or move file but blow if destination name already exists
+
+    Parameters
+    ----------
+    operation: str, {copyfile, move}
     """
     if op.isdir(dest):
         dest = op.join(dest, op.basename(src))
+    if op.realpath(src) == op.realpath(dest):
+        lgr.debug("Source %s = destination %s", src, dest)
+        return
     if op.lexists(dest):
         if not overwrite:
             raise RuntimeError(
-                "was asked to copy %s but destination already exists: %s"
-                % (src, dest)
+                "was asked to %s %s but destination already exists: %s"
+                % (operation, src, dest)
             )
         os.unlink(dest)
-    shutil.copyfile(src, dest)
+    getattr(shutil, operation)(src, dest)
 
 
 # Globals to check filewriting permissions
@@ -505,3 +523,33 @@ def get_typed_attr(obj, attr, _type, default=None):
     except (TypeError, ValueError):
         return default
     return val
+
+
+def get_datetime(date, time, *, microseconds=True):
+    """
+    Combine date and time from dicom to isoformat.
+
+    Parameters
+    ----------
+    date : str
+        Date in YYYYMMDD format.
+    time : str
+        Time in either HHMMSS.ffffff format or HHMMSS format.
+    microseconds: bool, optional
+        Either to include microseconds in the output
+
+    Returns
+    -------
+    datetime_str : str
+        Combined date and time in ISO format, with microseconds as
+        if fraction was provided in 'time', and 'microseconds' was
+        True.
+    """
+    if '.' not in time:
+        # add dummy microseconds if not available for strptime to parse
+        time += '.000000'
+    td = time + ':' + date
+    datetime_str = datetime.strptime(td, '%H%M%S.%f:%Y%m%d').isoformat()
+    if not microseconds:
+        datetime_str = datetime_str.split('.', 1)[0]
+    return datetime_str

@@ -123,6 +123,8 @@ from collections import OrderedDict
 import hashlib
 from glob import glob
 
+from heudiconv.due import due, Doi
+
 import logging
 lgr = logging.getLogger('heudiconv')
 
@@ -467,6 +469,10 @@ def ls(study_session, seqinfo):
 # XXX we killed session indicator!  what should we do now?!!!
 # WE DON:T NEED IT -- it will be provided into conversion_info as `session`
 # So we just need subdir and file_suffix!
+@due.dcite(
+    Doi('10.5281/zenodo.1207117'),
+    path='heudiconv.heuristics.reproin',
+    description='ReproIn heudiconv heuristic for turnkey conversion into BIDS')
 def infotodict(seqinfo):
     """Heuristic evaluator for determining which runs belong where
 

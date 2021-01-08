@@ -1,4 +1,4 @@
-__version__ = "0.8.0"
+__version__ = "0.9.0"
 __author__ = "HeuDiConv team and contributors"
 __url__ = "https://github.com/nipy/heudiconv"
 __packagename__ = 'heudiconv'
@@ -23,7 +23,7 @@ PYTHON_REQUIRES = ">=3.5"
 REQUIRES = [
     'nibabel',
     'pydicom',
-    'nipype >=1.0.0',
+    'nipype >=1.2.3',
     'dcmstack>=0.8',
     'etelemetry',
     'filelock>=3.0.12',
@@ -37,10 +37,14 @@ TESTS_REQUIRES = [
     'inotify',
 ]
 
+MIN_DATALAD_VERSION = '0.12.4'
 EXTRA_REQUIRES = {
     'tests': TESTS_REQUIRES,
-    'extras': ['bidsphysio.dcm2bids >=1.4.3'],
-    'datalad': ['datalad >=0.12.3']
+    'extras': [
+        'duecredit',  # optional dependency
+        'bidsphysio.dcm2bids >=1.4.3',   # optional, if dicoms with physio need to be converted
+    ],  # Requires patched version ATM ['dcmstack'],
+    'datalad': ['datalad >=%s' % MIN_DATALAD_VERSION]
 }
 
 # Flatten the lists
