@@ -24,7 +24,7 @@ except ImportError:
 
 have_bidsphysio = True
 try:
-    from bidsphysio import dcm2bidsphysio
+    from bidsphysio.dcm2bids.dcm2bidsphysio import dcm2bids
 except ImportError:
     have_bidsphysio = False
 

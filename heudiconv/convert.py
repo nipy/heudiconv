@@ -430,10 +430,10 @@ def convert_physio(item_dicoms, bids_options, prefix):
         return
 
     try:
-        from bidsphysio import dcm2bidsphysio
+        from bidsphysio.dcm2bids.dcm2bidsphysio import dcm2bids
     except ImportError:
         lgr.warning(
-            "Dcm2bidsphysio not found. "
+            "bidsphysio.dcm2bids not found. "
             "Not extracting physiological recordings."
         )
         return
@@ -447,7 +447,9 @@ def convert_physio(item_dicoms, bids_options, prefix):
             "from the last file will be saved."
         )
     for dicom_file in item_dicoms:
-        dcm2bidsphysio.dcm2bids(dicom_file, prefix)
+        physio_data = dcm2bids(dicom_file)
+        if physio_data.labels():
+            physio_data.save_to_bids_with_trigger(prefix)
 
 
 def nipype_convert(item_dicoms, prefix, with_prov, bids_options, tmpdir, dcmconfig=None):
