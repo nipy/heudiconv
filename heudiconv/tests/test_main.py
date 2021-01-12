@@ -284,7 +284,7 @@ def test_cache(tmpdir):
     assert (cachedir / 'S01.edit.txt').exists()
 
     # check dicominfo has "time" as last column:
-    with open(cachedir / 'dicominfo.tsv', 'r') as f:
+    with open(str(cachedir / 'dicominfo.tsv'), 'r') as f:
         cols = f.readline().split()
     assert cols[26] == "time"
 
