@@ -8,10 +8,10 @@ from heudiconv.external.pydicom import dcm
 from heudiconv.cli.run import main as runner
 from heudiconv.convert import nipype_convert
 from heudiconv.dicoms import (
-    parse_private_csa_header,
+    OrderedDict,
     embed_dicom_and_nifti_metadata,
     group_dicoms_into_seqinfos,
-    OrderedDict,
+    parse_private_csa_header,
 )
 from .utils import (
     assert_cwd_unchanged,
