@@ -46,7 +46,8 @@ seqinfo_fields = [
     'patient_sex',           # 23
     'date',                  # 24
     'series_uid',            # 25
- ]
+    'time',                  # 26
+]
 
 SeqInfo = namedtuple('SeqInfo', seqinfo_fields)
 
