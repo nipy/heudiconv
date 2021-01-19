@@ -283,6 +283,11 @@ def test_cache(tmpdir):
     assert (cachedir / 'S01.auto.txt').exists()
     assert (cachedir / 'S01.edit.txt').exists()
 
+    # check dicominfo has "time" as last column:
+    with open(str(cachedir / 'dicominfo.tsv'), 'r') as f:
+        cols = f.readline().split()
+    assert cols[26] == "time"
+
 
 def test_no_etelemetry():
     # smoke test at large - just verifying that no crash if no etelemetry

@@ -42,6 +42,7 @@ EXTRA_REQUIRES = {
     'tests': TESTS_REQUIRES,
     'extras': [
         'duecredit',  # optional dependency
+        'bidsphysio.dcm2bids >=1.4.3',   # optional, if dicoms with physio need to be converted
     ],  # Requires patched version ATM ['dcmstack'],
     'datalad': ['datalad >=%s' % MIN_DATALAD_VERSION]
 }
