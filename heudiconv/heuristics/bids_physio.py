@@ -53,35 +53,6 @@ def infotodict(seqinfo):
             info[bold] = [{'item': s.series_id}]
             next_series = idx+1    # used for physio log below
 
-            ###   is phase image present?   ###
-            # At least for Siemens systems, if magnitude/phase was
-            # selected, the phase images come as a separate series
-            # immediatelly following the magnitude series.
-            # (note: make sure you don't check beyond the number of
-            # elements in seqinfo...)
-            if (
-                idx+1 < len(seqinfo)
-                and 'P' in seqinfo[idx+1].image_type
-            ):
-                phase = create_key(
-                    'sub-{subject}/func/sub-{subject}_task-test_run-%02d_phase' % run_no
-                )
-                info[phase] = [{'item': seqinfo[idx+1].series_id}]
-                next_series = idx+2    # used for physio log below
-
-            ###   SBREF   ###
-            # here, within the functional run code, check to see if
-            # the previous run's series_description ended in _sbref,
-            # to assign the same run number.
-            if (
-                idx > 0
-                and seqinfo[idx-1].series_description.lower().endswith('_sbref')
-            ):
-                sbref = create_key(
-                    'sub-{subject}/func/sub-{subject}_task-test_run-%02d_sbref' % run_no
-                )
-                info[sbref] = [{'item': seqinfo[idx-1].series_id}]
-
             ###   PHYSIO LOG   ###
             # here, within the functional run code, check to see if
             # the next run image_type lists "PHYSIO", to assign the
