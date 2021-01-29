@@ -1,11 +1,16 @@
 """Test functions in heudiconv.convert module.
 """
+import os.path as op
+from glob import glob
+
 import pytest
+from .utils import TESTS_DATA_PATH
 
 from heudiconv.convert import (update_complex_name,
                                update_multiecho_name,
                                update_uncombined_name)
 from heudiconv.bids import BIDSError
+from heudiconv.cli.run import main as runner
 
 
 def test_update_complex_name():
@@ -76,3 +81,29 @@ def test_update_uncombined_name():
     out_fn_true = 'sub-X_ses-Y_task-Z_run-01_ch-04_bold'
     out_fn_test = update_uncombined_name(metadata, fn, channel_names)
     assert out_fn_test == out_fn_true
+
+
+def test_b0dwi_for_fmap(tmpdir):
+    """Make sure that we don't copy .bvec and .bval files
+    when the modality is not dwi.
+    We check it by extracting a b-value=0 dwi image as fmap and dwi
+    """
+    tmppath = tmpdir.strpath
+    subID = 'b0dwiForFmap'
+    args = (
+        "-c dcm2niix -o %s -b -f test_b0dwi_for_fmap --files %s -s %s"
+        % (tmpdir, op.join(TESTS_DATA_PATH, 'b0dwiForFmap'), subID)
+    ).split(' ')
+    runner(args)
+
+    # check that the fmap directory has been extracted and it doesn't contain
+    # any *.bvec or *.bval files
+    assert op.isdir(op.join(tmppath, 'sub-%s', 'fmap') % (subID))
+    for ext in ['bval', 'bvec']:
+        assert not glob(op.join(tmppath, 'sub-%s', 'fmap', 'sub-%s_*.%s') % (subID, subID, ext))
+
+    # check that the dwi directory has been extracted and it does contain a
+    # *.bvec and a *.bval files
+    assert op.isdir(op.join(tmppath, 'sub-%s', 'dwi') % (subID))
+    for ext in ['bval', 'bvec']:
+        assert glob(op.join(tmppath, 'sub-%s', 'dwi', 'sub-%s_*.%s') % (subID, subID, ext))

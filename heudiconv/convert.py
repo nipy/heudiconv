@@ -674,9 +674,14 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
         return
 
     if isdefined(res.outputs.bvecs) and isdefined(res.outputs.bvals):
-        outname_bvecs, outname_bvals = prefix + '.bvec', prefix + '.bval'
-        safe_movefile(res.outputs.bvecs, outname_bvecs, overwrite)
-        safe_movefile(res.outputs.bvals, outname_bvals, overwrite)
+        if prefix_dirname.endswith('dwi'):
+            outname_bvecs, outname_bvals = prefix + '.bvec', prefix + '.bval'
+            safe_movefile(res.outputs.bvecs, outname_bvecs, overwrite)
+            safe_movefile(res.outputs.bvals, outname_bvals, overwrite)
+        else:
+            os.remove(res.outputs.bvecs)
+            os.remove(res.outputs.bvals)
+            lgr.debug("%s and %s were removmed", res.outputs.bvecs, res.outputs.bvals)
 
     if isinstance(res_files, list):
         res_files = sorted(res_files)
