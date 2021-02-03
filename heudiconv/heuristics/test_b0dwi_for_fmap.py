@@ -27,7 +27,7 @@ def infotodict(seqinfo):
 
     info = {fmap: [], dwi: []}
     for s in seqinfo:
-        if 'DIFFUSION' in s.image_type and 'FieldMap' in s.series_description:
+        if 'DIFFUSION' in s.image_type:
             info[fmap].append(s.series_id)
             info[dwi].append(s.series_id)
     return info
