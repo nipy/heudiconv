@@ -176,3 +176,20 @@ def test_notop(tmpdir, bidsoptions):
             assert not op.exists(pjoin(tmppath, 'Halchenko/Yarik/950_bids_test4', fname))
         else:
             assert op.exists(pjoin(tmppath, 'Halchenko/Yarik/950_bids_test4', fname))
+
+
+def test_phoenix_doc_conversion(tmpdir):
+    tmppath = tmpdir.strpath
+    subID = 'Phoenix'
+    args = (
+        "-c dcm2niix -o %s -b -f bids_PhoenixReport --files %s -s %s"
+        % (tmpdir, pjoin(TESTS_DATA_PATH, 'Phoenix'), subID)
+    ).split(' ')
+    runner(args)
+
+    # check that the Phoenix document has been extracted (as gzipped dicom) in
+    # the sourcedata/misc folder:
+    assert op.exists(pjoin(tmppath, 'sourcedata', 'sub-%s', 'misc', 'sub-%s_phoenix.dicom.tgz') % (subID, subID))
+    # check that no "sub-<subID>/misc" folder has been created in the BIDS
+    # structure:
+    assert not op.exists(pjoin(tmppath, 'sub-%s', 'misc') % subID)
