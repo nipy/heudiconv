@@ -25,7 +25,7 @@ Package: heudiconv
 Architecture: all
 Depends: ${misc:Depends},
          dcm2niix,
-         python,
+         python3,
          python3-dcmstack,
          python3-dicom,
          python3-filelock,

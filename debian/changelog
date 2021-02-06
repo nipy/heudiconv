@@ -1,3 +1,9 @@
+heudiconv (0.9.0-2) UNRELEASED; urgency=medium
+
+  * Replace python with python3 as a Depends (Closes: #982120)
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Sat, 06 Feb 2021 12:21:33 -0500
+
 heudiconv (0.9.0-1) unstable; urgency=medium
 
   * Fresh upstream release, another attempt at unstable (needs python3-nipype,
