@@ -155,7 +155,7 @@ def test_prepare_for_datalad(tmpdir):
     assert '.heudiconv/dummy.nii.gz' in ds.repo.get_files()
 
     # Let's now roll back and make it a proper submodule
-    ds.repo._git_custom_command([], ['git', 'reset', '--hard', old_hexsha])
+    ds.repo.call_git(['reset', '--hard', old_hexsha])
     # now we do not add dummy to git
     create_file_if_missing(dummy_path, '')
     add_to_datalad(str(tmpdir), studydir_, None, False)
