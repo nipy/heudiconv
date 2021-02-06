@@ -28,10 +28,10 @@ export GIT_COMMITTER_NAME=$(GIT_AUTHOR_NAME)
 override_dh_auto_install:
 	dh_auto_install
 	mkdir -p build 
-	PYTHONPATH=./debian/heudiconv/usr/lib/python2.7/dist-packages \
+	PYTHONPATH=$$(/bin/ls -d ./debian/heudiconv/usr/lib/python*/*-packages | head -n 1)
 	help2man -n 'DICOM converter for organizing brain imaging data into structured directory layouts' \
 		-N --no-discard-stderr \
-        ./debian/heudiconv/usr/bin/heudiconv >| build/heudiconv.1
+        "python3 -W ignore ./debian/heudiconv/usr/bin/heudiconv" >| build/heudiconv.1
 	find debian -iname *.pyc -delete
 	# https://github.com/nipy/heudiconv/issues/399
 	rm -rf debian/heudiconv/usr/lib/python*/*-packages/Research
