@@ -3,6 +3,9 @@ heudiconv (0.9.0-2) unstable; urgency=medium
   * Replace python with python3 as a Depends (Closes: #982120)
   * Suppress warnings from python while producing manpages to make build
     reproducible.  Thanks Chris Lamb (Closes: #923170)
+  * debian/patches
+    + 0001-BF-datalad-use-public-call_git-added-in-0.12.0-not-d.patch
+      for compatibility with datalad 0.14 which deprecated a protected method
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Sat, 06 Feb 2021 12:24:25 -0500
 

@@ -1,0 +1,26 @@
+From 9dfafb340600684265a0af50f2738f25260838c1 Mon Sep 17 00:00:00 2001
+From: Yaroslav Halchenko <debian@onerussian.com>
+Date: Sat, 6 Feb 2021 12:41:20 -0500
+Subject: [PATCH] BF: datalad - use public call_git (added in 0.12.0), not
+ deprected now protected method
+
+---
+ heudiconv/tests/test_main.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/heudiconv/tests/test_main.py b/heudiconv/tests/test_main.py
+index 89fde8b..31c0142 100644
+--- a/heudiconv/tests/test_main.py
++++ b/heudiconv/tests/test_main.py
+@@ -155,7 +155,7 @@ def test_prepare_for_datalad(tmpdir):
+     assert '.heudiconv/dummy.nii.gz' in ds.repo.get_files()
+ 
+     # Let's now roll back and make it a proper submodule
+-    ds.repo._git_custom_command([], ['git', 'reset', '--hard', old_hexsha])
++    ds.repo.call_git(['reset', '--hard', old_hexsha])
+     # now we do not add dummy to git
+     create_file_if_missing(dummy_path, '')
+     add_to_datalad(str(tmpdir), studydir_, None, False)
+-- 
+2.29.2
+
