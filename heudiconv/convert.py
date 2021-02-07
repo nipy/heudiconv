@@ -681,7 +681,7 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
         else:
             os.remove(res.outputs.bvecs)
             os.remove(res.outputs.bvals)
-            lgr.debug("%s and %s were removmed", res.outputs.bvecs, res.outputs.bvals)
+            lgr.debug("%s and %s were removed since not dwi", res.outputs.bvecs, res.outputs.bvals)
 
     if isinstance(res_files, list):
         res_files = sorted(res_files)
