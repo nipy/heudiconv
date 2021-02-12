@@ -282,7 +282,7 @@ def add_participant_record(studydir, subject, age, sex):
         f.write(
           '\t'.join(map(str, [participant_id,
                               age.lstrip('0').rstrip('Y') if age else 'N/A',
-                              sex,
+                              sex if sex else 'n/a',
                               'control'])) + '\n')
 
 
