@@ -570,7 +570,7 @@ def populate_intended_for(path_to_bids_session):
     fmaps_accounted_for = set()
     for fm_json in fmap_jsons:
         if fm_json not in fmaps_accounted_for:
-            lgr.debug('Looking for runs for {}'.format(fm_json))
+            lgr.debug('Looking for runs for %s', fm_json)
             fm_shims = get_shim_setting(fm_json)
 
             intended_for = []
