@@ -522,7 +522,6 @@ def populate_intended_for(path_to_bids_session):
         path to the session folder (or to the subject folder, if there are no
         sessions).
     """
-    lgr.info('')
     lgr.info('Adding "IntendedFor" to the fieldmaps in {}.'.format(path_to_bids_session))
 
     # Resolve path (eliminate '..')
@@ -536,8 +535,7 @@ def populate_intended_for(path_to_bids_session):
 
     fmap_dir = op.join(path_to_bids_session, 'fmap')
     if not op.exists(fmap_dir):
-        lgr.warning('Fmap folder not found in {}.'.format(path_to_bids_session))
-        lgr.warning('We cannot add the IntendedFor field')
+        lgr.warning('We cannot add the IntendedFor field: no fmap/ in %s', path_to_bids_session)
         return
 
     # Get a list of all fmap json files in the session:
