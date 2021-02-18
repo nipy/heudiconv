@@ -41,6 +41,7 @@ from .dicoms import (
 )
 
 LOCKFILE = 'heudiconv.lock'
+DW_IMAGE_IN_FMAP_FOLDER_WARNING = 'Diffusion-weighted image saved in non dwi folder ({folder})'
 lgr = logging.getLogger(__name__)
 
 
@@ -684,8 +685,8 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
                 os.remove(res.outputs.bvals)
                 lgr.debug("%s and %s were removed since not dwi", res.outputs.bvecs, res.outputs.bvals)
             else:
-                lgr.info("Diffusion-weighted image saved in non dwi folder (%s)", prefix_dirname)
-                lgr.info(".bvec and .bval files will be generated. This is NOT BIDS compliant")
+                lgr.warning(DW_IMAGE_IN_FMAP_FOLDER_WARNING.format(folder= prefix_dirname))
+                lgr.warning(".bvec and .bval files will be generated. This is NOT BIDS compliant")
                 outname_bvecs, outname_bvals = prefix + '.bvec', prefix + '.bval'
                 safe_movefile(res.outputs.bvecs, outname_bvecs, overwrite)
                 safe_movefile(res.outputs.bvals, outname_bvals, overwrite)
