@@ -822,14 +822,13 @@ def  add_taskname_to_infofile(infofiles):
         save_json(infofile, meta_info)
 
 
-def bvals_are_zero(bval_file, threshold=5):
-    """Checks if all entries in a bvals file are zero (or below the threshold).
+def bvals_are_zero(bval_file):
+    """Checks if all entries in a bvals file are zero (or 5, for Siemens files).
     Returns True if that is the case, otherwise returns False
 
     Parameters
     ----------
     bval_file : file with the bvals
-    threshold : b-value below which they are considered to be zero. (Default: 5)
 
     Returns
     -------
@@ -839,4 +838,5 @@ def bvals_are_zero(bval_file, threshold=5):
     with open(bval_file) as f:
         bvals = f.read().split()
 
-    return all(float(b) <= threshold for b in bvals)
+    bvals_unique = set(float(b) for b in bvals)
+    return bvals_unique == {0.} or bvals_unique == {5.}
