@@ -8,7 +8,9 @@ from .utils import TESTS_DATA_PATH
 
 from heudiconv.convert import (update_complex_name,
                                update_multiecho_name,
-                               update_uncombined_name)
+                               update_uncombined_name,
+                               DW_IMAGE_IN_FMAP_FOLDER_WARNING,
+                               )
 from heudiconv.bids import BIDSError
 from heudiconv.cli.run import main as runner
 
@@ -83,10 +85,11 @@ def test_update_uncombined_name():
     assert out_fn_test == out_fn_true
 
 
-def test_b0dwi_for_fmap(tmpdir):
-    """Make sure that we don't copy .bvec and .bval files
-    when the modality is not dwi.
-    We check it by extracting a b-value=0 dwi image as fmap and dwi
+def test_b0dwi_for_fmap(tmpdir, capfd):
+    """Make sure we raise a warning when .bvec and .bval files
+    are present but the modality is not dwi.
+    We check it by extracting a few DICOMs from a series with
+    bvals: 5 5 1500
     """
     tmppath = tmpdir.strpath
     subID = 'b0dwiForFmap'
@@ -96,14 +99,15 @@ def test_b0dwi_for_fmap(tmpdir):
     ).split(' ')
     runner(args)
 
-    # check that the fmap directory has been extracted and it doesn't contain
-    # any *.bvec or *.bval files
-    assert op.isdir(op.join(tmppath, 'sub-%s', 'fmap') % (subID))
-    for ext in ['bval', 'bvec']:
-        assert not glob(op.join(tmppath, 'sub-%s', 'fmap', 'sub-%s_*.%s') % (subID, subID, ext))
+    # assert that it raised a warning that the fmap directory will contain
+    # bvec and bval files.
+    output = capfd.readouterr().err.split('\n')
+    expected_msg = DW_IMAGE_IN_FMAP_FOLDER_WARNING.format(folder=op.join(tmppath, 'sub-%s', 'fmap') % subID)
+    assert [o for o in output if expected_msg in o]
 
-    # check that the dwi directory has been extracted and it does contain a
+    # check that both 'fmap' and 'dwi' directories have been extracted and they contain
     # *.bvec and a *.bval files
-    assert op.isdir(op.join(tmppath, 'sub-%s', 'dwi') % (subID))
-    for ext in ['bval', 'bvec']:
-        assert glob(op.join(tmppath, 'sub-%s', 'dwi', 'sub-%s_*.%s') % (subID, subID, ext))
+    for mod in ['fmap', 'dwi']:
+        assert op.isdir(op.join(tmppath, 'sub-%s', mod) % (subID))
+        for ext in ['bval', 'bvec']:
+            assert glob(op.join(tmppath, 'sub-%s', mod, 'sub-%s_*.%s') % (subID, subID, ext))
