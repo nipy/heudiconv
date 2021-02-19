@@ -114,7 +114,8 @@ def populate_aggregated_jsons(path):
     # way too many -- let's just collect all which are the same!
     # FIELDS_TO_TRACK = {'RepetitionTime', 'FlipAngle', 'EchoTime',
     #                    'Manufacturer', 'SliceTiming', ''}
-    for fpath in find_files('.*_task-.*\_bold\.json', topdir=path,
+    for fpath in find_files('.*_task-.*\_bold\.json',
+                            topdir=glob(op.join(path, 'sub-*')),
                             exclude_vcs=True,
                             exclude="/\.(datalad|heudiconv)/"):
         #
