@@ -41,6 +41,7 @@ from .dicoms import (
 )
 
 LOCKFILE = 'heudiconv.lock'
+DW_IMAGE_IN_FMAP_FOLDER_WARNING = 'Diffusion-weighted image saved in non dwi folder ({folder})'
 lgr = logging.getLogger(__name__)
 
 
@@ -674,9 +675,22 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
         return
 
     if isdefined(res.outputs.bvecs) and isdefined(res.outputs.bvals):
-        outname_bvecs, outname_bvals = prefix + '.bvec', prefix + '.bval'
-        safe_movefile(res.outputs.bvecs, outname_bvecs, overwrite)
-        safe_movefile(res.outputs.bvals, outname_bvals, overwrite)
+        if prefix_dirname.endswith('dwi'):
+            outname_bvecs, outname_bvals = prefix + '.bvec', prefix + '.bval'
+            safe_movefile(res.outputs.bvecs, outname_bvecs, overwrite)
+            safe_movefile(res.outputs.bvals, outname_bvals, overwrite)
+        else:
+            if bvals_are_zero(res.outputs.bvals):
+                os.remove(res.outputs.bvecs)
+                os.remove(res.outputs.bvals)
+                lgr.debug("%s and %s were removed since not dwi", res.outputs.bvecs, res.outputs.bvals)
+            else:
+                lgr.warning(DW_IMAGE_IN_FMAP_FOLDER_WARNING.format(folder= prefix_dirname))
+                lgr.warning(".bvec and .bval files will be generated. This is NOT BIDS compliant")
+                outname_bvecs, outname_bvals = prefix + '.bvec', prefix + '.bval'
+                safe_movefile(res.outputs.bvecs, outname_bvecs, overwrite)
+                safe_movefile(res.outputs.bvals, outname_bvals, overwrite)
+
 
     if isinstance(res_files, list):
         res_files = sorted(res_files)
@@ -806,3 +820,23 @@ def  add_taskname_to_infofile(infofiles):
 
         # write to outfile
         save_json(infofile, meta_info)
+
+
+def bvals_are_zero(bval_file):
+    """Checks if all entries in a bvals file are zero (or 5, for Siemens files).
+    Returns True if that is the case, otherwise returns False
+
+    Parameters
+    ----------
+    bval_file : file with the bvals
+
+    Returns
+    -------
+    True if all are zero; False otherwise.
+    """
+
+    with open(bval_file) as f:
+        bvals = f.read().split()
+
+    bvals_unique = set(float(b) for b in bvals)
+    return bvals_unique == {0.} or bvals_unique == {5.}
