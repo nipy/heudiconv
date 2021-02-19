@@ -43,7 +43,10 @@ EXTRA_REQUIRES = {
     'extras': [
         'duecredit',  # optional dependency
     ],  # Requires patched version ATM ['dcmstack'],
-    'datalad': ['datalad >=%s' % MIN_DATALAD_VERSION]
+    'datalad': ['datalad >=%s' % MIN_DATALAD_VERSION],
+    'physio': [
+        'bidsphysio.dcm2bids >=1.4.3; python_version>"3.5"',   # if dicoms with physio need to be converted
+    ]
 }
 
 # Flatten the lists

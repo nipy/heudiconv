@@ -462,6 +462,8 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
             if outtype == 'dicom':
                 convert_dicom(item_dicoms, bids_options, prefix,
                               outdir, tempdirs, symlink, overwrite)
+            elif outtype == 'physio':
+                convert_physio(item_dicoms, bids_options, prefix)
             elif outtype in ['nii', 'nii.gz']:
                 assert converter == 'dcm2niix', ('Invalid converter '
                                                  '{}'.format(converter))
@@ -579,6 +581,49 @@ def convert_dicom(item_dicoms, bids_options, prefix,
 #                else:
 #                    os.link(filename, outfile)
                 shutil.copyfile(filename, outfile)
+
+
+def convert_physio(item_dicoms, bids_options, prefix):
+    """Save DICOM physiology as BIDS physio files
+
+    Parameters
+    ----------
+    item_dicoms : list of filenames
+        DICOMs to save
+    bids_options : list or None
+        If not None then save to BIDS format. List may be empty
+        or contain bids specific options
+    prefix : string
+        Conversion outname
+
+    Returns
+    -------
+    None
+    """
+    if bids_options is None:
+        return
+
+    try:
+        from bidsphysio.dcm2bids.dcm2bidsphysio import dcm2bids
+    except ImportError:
+        lgr.warning(
+            "bidsphysio.dcm2bids not found. "
+            "Not extracting physiological recordings."
+        )
+        return
+
+    item_dicoms = list(map(op.abspath, item_dicoms)) # absolute paths
+    if len(item_dicoms) > 1:
+        lgr.warning(
+            "More than one PHYSIO file has been found for this series. "
+            "If each file corresponds to a different signal, all is OK. "
+            "If multiple files have the same signal, only the signal "
+            "from the last file will be saved."
+        )
+    for dicom_file in item_dicoms:
+        physio_data = dcm2bids(dicom_file)
+        if physio_data.labels():
+            physio_data.save_to_bids_with_trigger(prefix)
 
 
 def nipype_convert(item_dicoms, prefix, with_prov, bids_options, tmpdir, dcmconfig=None):

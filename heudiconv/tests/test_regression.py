@@ -9,13 +9,24 @@ from heudiconv.cli.run import main as runner
 from heudiconv.external.pydicom import dcm
 from heudiconv.utils import load_json
 # testing utilities
-from .utils import fetch_data, gen_heudiconv_args, TESTS_DATA_PATH
+from .utils import (
+    fetch_data,
+    gen_heudiconv_args,
+    assert_cwd_unchanged,
+    TESTS_DATA_PATH
+)
 
 have_datalad = True
 try:
     from datalad.support.exceptions import IncompleteResultsError
 except ImportError:
     have_datalad = False
+
+have_bidsphysio = True
+try:
+    from bidsphysio.dcm2bids.dcm2bidsphysio import dcm2bids
+except ImportError:
+    have_bidsphysio = False
 
 
 @pytest.mark.skipif(not have_datalad, reason="no datalad")
@@ -82,6 +93,33 @@ def test_multiecho(tmpdir, subject='MEEPI', heuristic='bids_ME.py'):
     events = glob(op.join('out', 'sub-' + subject, 'func', '*events.tsv'))
     for event in events:
         assert 'echo-' not in event
+
+
+@assert_cwd_unchanged(ok_to_chdir=True)  # so we cd back after tmpdir.chdir
+@pytest.mark.skipif(not have_bidsphysio, reason="no bidsphysio")
+def test_physio(tmpdir, subject='samplePhysio', heuristic='bids_physio.py'):
+    tmpdir.chdir()
+    outdir = tmpdir.mkdir('out').strpath
+    template = "{subject}/*/*.dcm"
+    args = gen_heudiconv_args(
+        TESTS_DATA_PATH, outdir, subject, heuristic,template=template
+    )
+    runner(args)  # run conversion
+
+    # Check we get only one image file:
+    func_images = glob(op.join('out', 'sub-' + subject, 'func', '*.nii.gz'))
+    assert len(func_images) == 1
+    # The corresponding json:
+    _json = func_images[0].replace('.nii.gz', '.json')
+    assert op.exists(_json)
+    # For each physiological signal, we get the json and tsv.gz:
+    for s in ['respiratory','cardiac']:
+        expectedFileName = func_images[0].replace(
+            '_bold.nii.gz',
+            '_recording-' + s + '_physio'
+        )
+        assert op.exists(expectedFileName + '.json')
+        assert op.exists(expectedFileName + '.tsv.gz')
 
 
 @pytest.mark.parametrize('subject', ['merged'])
