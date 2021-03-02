@@ -539,8 +539,8 @@ def populate_intended_for(path_to_bids_session):
         return
 
     # Get a list of all fmap json files in the session:
-    # (we will remove elements later on, so don't just iterate)
-    fmap_jsons = sorted([j for j in glob(op.join(path_to_bids_session, 'fmap/*.json'))])
+    # (we will remove elements later on, so don't just get an iterator)
+    fmap_jsons = sorted(glob(op.join(path_to_bids_session, 'fmap/*.json')))
 
     # Get a set with all non-fmap json files in the session (set is easier):
     # We also exclude the SBRef files.
