@@ -522,7 +522,7 @@ def populate_intended_for(path_to_bids_session):
         path to the session folder (or to the subject folder, if there are no
         sessions).
     """
-    lgr.info('Adding "IntendedFor" to the fieldmaps in {}.'.format(path_to_bids_session))
+    lgr.info('Adding "IntendedFor" to the fieldmaps in %s.', path_to_bids_session)
 
     # Resolve path (eliminate '..')
     path_to_bids_session = op.abspath(path_to_bids_session)
