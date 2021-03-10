@@ -311,9 +311,8 @@ def create_dummy_magnitude_phase_bids_session(session_path):
     expected_result : dict
         dictionary with fmap names as keys and the expected "IntendedFor" as
         values.
-    None
-        it returns a third argument (None) to have the same signature as
-        create_dummy_pepolar_bids_session
+    expected_fmap_groups : dict
+        dictionary with the expected fmap groups
     """
     session_parent, session_basename = op.split(session_path)
     if session_basename.startswith('ses-'):
@@ -353,13 +352,25 @@ def create_dummy_magnitude_phase_bids_session(session_path):
         '{p}_acq-case1_{s}.nii.gz'.format(p=prefix, s=suffix): ''
         for suffix in ['phasediff', 'magnitude1', 'magnitude2']
     }
+    expected_fmap_groups = {
+        '{p}_acq-case1'.format(p=prefix): [
+            '{p}_acq-case1_phasediff.json'.format(p=op.join(session_path, 'fmap', prefix))
+        ]
+    }
     fmap_struct.update({
-        '{p}_acq-case1_{s}.json'.format(p=prefix, s='phasediff'): {'ShimSetting': dwi_shims}
+        '{p}_acq-case1_phasediff.json'.format(p=prefix): {'ShimSetting': dwi_shims}
     })
     #    * Case 2:
     fmap_struct.update({
         '{p}_acq-case2_{s}.nii.gz'.format(p=prefix, s=suffix): ''
         for suffix in ['magnitude1', 'magnitude2', 'phase1', 'phase2']
+    })
+    expected_fmap_groups.update({
+        '{p}_acq-case2'.format(p=prefix): [
+            '{p}_acq-case2_phase{n}.json'.format(
+                p=op.join(session_path, 'fmap', prefix), n=n
+            ) for n in [1, 2]
+        ]
     })
     fmap_struct.update({
         '{p}_acq-case2_phase{n}.json'.format(p=prefix, n=n): {'ShimSetting': func_shims_A}
@@ -369,6 +380,11 @@ def create_dummy_magnitude_phase_bids_session(session_path):
     fmap_struct.update({
         '{p}_acq-case3_{s}.nii.gz'.format(p=prefix, s=suffix): ''
         for suffix in ['magnitude', 'fieldmap']
+    })
+    expected_fmap_groups.update({
+        '{p}_acq-case3'.format(p=prefix): [
+            '{p}_acq-case3_fieldmap.json'.format(p=op.join(session_path, 'fmap', prefix))
+        ]
     })
     fmap_struct.update({
         '{p}_acq-case3_fieldmap.json'.format(p=prefix): {'ShimSetting': func_shims_B}
@@ -405,13 +421,14 @@ def create_dummy_magnitude_phase_bids_session(session_path):
             [op.join(expected_prefix, 'func', '{p}_acq-B_bold.nii.gz'.format(p=prefix))]
     })
 
-    return session_struct, expected_result, None
+    return session_struct, expected_result, expected_fmap_groups
 
 
 # Test cases:
 # A) pepolar fmaps with ShimSetting in json files
 @pytest.mark.parametrize(
     "simulation_function", [create_dummy_pepolar_bids_session,
+                            create_dummy_magnitude_phase_bids_session,
                             ]
 )
 def test_find_fmap_groups(tmpdir, simulation_function):
