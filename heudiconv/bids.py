@@ -10,6 +10,7 @@ from datetime import datetime
 import csv
 from random import sample
 from glob import glob
+import errno
 
 from .external.pydicom import dcm
 
@@ -47,8 +48,13 @@ class BIDSError(Exception):
 
 BIDS_VERSION = "1.4.1"
 
+# Dictionary defining allowed criteria for fmap assignment, and the
+# corresponding json keys for each one:
 SHIM_KEY = 'ShimSetting'
-lgr.debug('shim_key: {}'.format(SHIM_KEY))
+AllowedCriteriaForFmapAssignment = [
+    'Shims',
+    'ImagingVolume',
+]
 
 
 def populate_bids_templates(path, defaults={}):
@@ -537,6 +543,44 @@ def find_fmap_groups(fmap_dir):
             fm for fm in fmap_jsons if fmap_regex.sub('', op.splitext(op.basename(fm))[0]) == k
         ]
     return fmap_groups
+
+
+def get_key_info_for_fmap_assignment(json_file, criterion='shims'):
+    """
+    Gets key information needed to assign fmaps to other modalities.
+
+    Parameters:
+    ----------
+    json_file : str or os.path
+        path to the json file
+    criterion : str in ['shims', 'imaging_volume']
+        criterion that will be used to match runs
+
+    Returns:
+    -------
+    key_info : dict
+        part of the json file that will need to match between the fmap and
+        the other image
+    """
+    if not op.exists(json_file):
+        raise FileNotFoundError(
+            errno.ENOENT, os.strerror(errno.ENOENT), json_file
+        )
+    if criterion not in AllowedCriteriaForFmapAssignment:
+        raise ValueError(
+            "Fmap matching criterion %s not allowed." % criterion
+        )
+
+    # loop through the possible criteria and extract the info needed
+    if criterion == 'Shims':
+        key_info = [get_shim_setting(json_file)]
+    elif criterion == 'ImagingVolume':
+        from nibabel import load as nb_load
+        nifti_file = glob(json_file[:-5] + '.nii*')
+        nifti_header = nb_load(nifti_file).header
+        key_info = [nifti_header.affine, nifti_header.dim[1:3]]
+
+    return key_info
 
 
 def populate_intended_for(path_to_bids_session):

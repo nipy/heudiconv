@@ -2,6 +2,9 @@ import re
 import os
 import os.path as op
 from random import random
+from collections import namedtuple
+
+import nibabel
 
 from heudiconv.utils import (
     load_json,
@@ -12,6 +15,7 @@ from heudiconv.bids import (
     find_fmap_groups,
     populate_intended_for,
     get_shim_setting,
+    get_key_info_for_fmap_assignment,
     SHIM_KEY,
 )
 
@@ -43,6 +47,52 @@ def test_get_shim_setting(tmpdir, fname, content, expected_return):
         os.makedirs(json_dir)
     save_json(json_name, content)
     assert get_shim_setting(json_name) == expected_return
+
+
+def test_get_key_info_for_fmap_assignment(tmpdir, monkeypatch):
+    """
+    Test get_key_info_for_fmap_assignment
+    """
+
+    # Stuff needed to mock reading of a NIfTI file header:
+
+    # affines (qforms/sforms) are 4x4 matrices
+    MY_AFFINE = [[random() for i in range(4)] for j in range(4)]
+    # dims are arrays with 8 elements with the first one indicating the number
+    # of dims in the image; remaining elements are 1:
+    MY_DIM = [4] + [round(256 * random()) for i in range(4)] + [1] * 3
+    # We use namedtuples so that we can use the .dot notation, to mock
+    # nibabel headers:
+    MyHeader = namedtuple('MyHeader', 'affine dim')
+    MY_HEADER = MyHeader(MY_AFFINE, MY_DIM)
+    MyMockNifti = namedtuple('MyMockNifti', 'header')
+
+    def mock_nibabel_load(file):
+        """
+        Pretend we run nibabel.load, but return only a header with just a few fields
+        """
+        return MyMockNifti(MY_HEADER)
+    monkeypatch.setattr(nibabel, "load", mock_nibabel_load)
+
+    json_name = 'foo.json'
+
+    # 1) Call for a non-existing file should give an error:
+    with pytest.raises(FileNotFoundError):
+        assert get_key_info_for_fmap_assignment('foo.json')
+
+    # 2) criterion = 'Shims'
+    save_json(json_name, {SHIM_KEY: A_SHIM})      # otherwise get_key_info_for_fmap_assignment will give an error
+    key_info = get_key_info_for_fmap_assignment(
+        'foo.json', criterion='Shims'
+    )
+    assert key_info == [A_SHIM]
+
+    # 3) criterion = 'ImagingVolume'
+    save_json(json_name, {})      # otherwise get_key_info_for_fmap_assignment will give an error
+    key_info = get_key_info_for_fmap_assignment(
+        'foo.json', criterion='ImagingVolume'
+    )
+    assert key_info == [MY_AFFINE, MY_DIM[1:3]]
 
 
 def create_dummy_pepolar_bids_session(session_path):
