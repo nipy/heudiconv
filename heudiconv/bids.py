@@ -583,7 +583,7 @@ def get_key_info_for_fmap_assignment(json_file, criterion='shims'):
     return key_info
 
 
-def populate_intended_for(path_to_bids_session):
+def populate_intended_for(path_to_bids_session, criterion='Shims'):
     """
     Adds the 'IntendedFor' field to the fmap .json files in a session folder.
     It goes through the session folders and checks what runs have the same
@@ -611,7 +611,14 @@ def populate_intended_for(path_to_bids_session):
     path_to_bids_session : str or os.path
         path to the session folder (or to the subject folder, if there are no
         sessions).
+    criterion : str in ['shims', 'imaging_volume']
+        criterion that will be used to match runs
     """
+
+    if criterion not in AllowedCriteriaForFmapAssignment:
+        raise ValueError(
+            "Fmap matching criterion %s not allowed." % criterion
+        )
 
     lgr.info('Adding "IntendedFor" to the fieldmaps in %s.', path_to_bids_session)
 
@@ -661,12 +668,12 @@ def populate_intended_for(path_to_bids_session):
             lgr.debug('Looking for runs for %s', fm_group[0])
             # we are assuming all fmaps in the group have the same shims,
             # since they should have been acquired together.
-            fm_shims = get_shim_setting(fm_group[0])
+            fm_info = get_key_info_for_fmap_assignment(fm_group[0], criterion)
 
             intended_for = []
             for image_json in session_jsons:
-                image_shims = get_shim_setting(image_json)
-                if image_shims == fm_shims:
+                image_info = get_key_info_for_fmap_assignment(image_json, criterion)
+                if image_info == fm_info:
                     # BIDS specifies that the intended for are:
                     # - **image** files
                     # - path relative to the **subject level**
