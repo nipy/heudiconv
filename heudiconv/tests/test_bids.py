@@ -3,6 +3,7 @@ import os
 import os.path as op
 from random import random
 from collections import namedtuple
+from glob import glob
 
 import nibabel
 
@@ -16,6 +17,8 @@ from heudiconv.bids import (
     populate_intended_for,
     get_shim_setting,
     get_key_info_for_fmap_assignment,
+    find_compatible_fmaps_for_run,
+    find_compatible_fmaps_for_session,
     SHIM_KEY,
 )
 
@@ -88,11 +91,16 @@ def test_get_key_info_for_fmap_assignment(tmpdir, monkeypatch):
     assert key_info == [A_SHIM]
 
     # 3) criterion = 'ImagingVolume'
-    save_json(json_name, {})      # otherwise get_key_info_for_fmap_assignment will give an error
     key_info = get_key_info_for_fmap_assignment(
         'foo.json', criterion='ImagingVolume'
     )
     assert key_info == [MY_AFFINE, MY_DIM[1:3]]
+
+    # 4) invalid criterion:
+    with pytest.raises(ValueError):
+        assert get_key_info_for_fmap_assignment(
+            'foo.json', criterion='Invalid'
+        )
 
 
 def create_dummy_pepolar_bids_session(session_path):
@@ -115,6 +123,9 @@ def create_dummy_pepolar_bids_session(session_path):
         values.
     expected_fmap_groups : dict
         dictionary with the expected fmap groups
+    expected_compatible_fmaps : dict
+        dictionary with the expected fmap groups for each non-fmap run in the
+        session
     """
     session_parent, session_basename = op.split(session_path)
     if session_basename.startswith('ses-'):
@@ -200,7 +211,32 @@ def create_dummy_pepolar_bids_session(session_path):
 
     create_tree(session_path, session_struct)
 
-    # 2) Now, let's create a dict with what we expect for the "IntendedFor":
+    # 2) Now, let's create a dict with the fmap groups compatible for each run
+    # -anat: empty
+    expected_compatible_fmaps = {
+        '{p}_{m}.json'.format(p=op.join(session_path, 'anat', prefix), m=mod): []
+        for mod in ['T1w', 'T2w']
+    }
+    # -dwi: each of the runs (1, 2) is compatible with both of the dwi fmaps (1, 2):
+    expected_compatible_fmaps.update({
+        '{p}_acq-A_run-{r}_dwi.json'.format(p=op.join(session_path, 'dwi', prefix), r=runNo): [
+            '{p}_acq-dwi_run-{r}_epi'.format(p=prefix, r=r) for r in [1, 2]
+        ]
+        for runNo in [1, 2]
+    })
+    # -func: acq-A is compatible w/ fmap fMRI run 1; acq-2 w/ fmap fMRI run 2
+    expected_compatible_fmaps.update({
+        '{p}_acq-{a}_bold.json'.format(p=op.join(session_path, 'func', prefix), a=acq): [
+            '{p}_acq-fMRI_run-{r}_epi'.format(p=prefix, r=runNo)
+        ]
+        for runNo, acq in {'1': 'A', '2': 'B'}.items()
+    })
+    # -func (cont): acq-unmatched is empty
+    expected_compatible_fmaps.update({
+        '{p}_acq-unmatched_bold.json'.format(p=op.join(session_path, 'func', prefix)): []
+    })
+
+    # 3) Then, let's create a dict with what we expect for the "IntendedFor":
 
     sub_match = re.findall('(sub-([a-zA-Z0-9]*))', session_path)
     sub_str = sub_match[0][0]
@@ -232,7 +268,7 @@ def create_dummy_pepolar_bids_session(session_path):
         }
     )
     
-    return session_struct, expected_result, expected_fmap_groups
+    return session_struct, expected_result, expected_fmap_groups, expected_compatible_fmaps
 
 
 def create_dummy_no_shim_settings_bids_session(session_path):
@@ -293,6 +329,16 @@ def create_dummy_no_shim_settings_bids_session(session_path):
         for d in ['AP', 'PA']
         for r in [1, 2]
     }
+    expected_fmap_groups = {
+        '{p}_acq-{a}_run-{r}_epi'.format(p=prefix, a=acq, r=r): [
+            '{p}_acq-{a}_dir-{d}_run-{r}_epi.json'.format(
+                p=op.join(session_path, 'fmap', prefix), a=acq, d=d, r=r
+            ) for d in ['AP', 'PA']
+        ]
+        for acq in ['dwi', 'fMRI']
+        for r in [1, 2]
+    }
+
     # structure for the full session:
     session_struct = {
         'anat': anat_struct,
@@ -303,7 +349,28 @@ def create_dummy_no_shim_settings_bids_session(session_path):
 
     create_tree(session_path, session_struct)
 
-    # 2) Now, let's create a dict with what we expect for the "IntendedFor":
+    # 2) Now, let's create a dict with the fmap groups compatible for each run
+    # -anat: empty
+    expected_compatible_fmaps = {
+        '{p}_{m}.json'.format(p=op.join(session_path, 'anat', prefix), m=mod): []
+        for mod in ['T1w', 'T2w']
+    }
+    # -dwi: each of the runs (1, 2) is compatible with both of the dwi fmaps (1, 2):
+    expected_compatible_fmaps.update({
+        '{p}_acq-A_run-{r}_dwi.json'.format(p=op.join(session_path, 'dwi', prefix), r=runNo): [
+            '{p}_acq-dwi_run-{r}_epi'.format(p=prefix, r=r) for r in [1, 2]
+        ]
+        for runNo in [1, 2]
+    })
+    # -func: each of the acq (A, B) is compatible w/ both fmap fMRI runs (1, 2)
+    expected_compatible_fmaps.update({
+        '{p}_acq-{a}_bold.json'.format(p=op.join(session_path, 'func', prefix), a=acq): [
+            '{p}_acq-fMRI_run-{r}_epi'.format(p=prefix, r=r) for r in [1, 2]
+        ]
+        for acq in ['A', 'B']
+    })
+
+    # 3) Now, let's create a dict with what we expect for the "IntendedFor":
     # NOTE: The "expected_prefix" (the beginning of the path to the
     # "IntendedFor") should be relative to the subject level (see:
     # https://bids-specification.readthedocs.io/en/stable/04-modality-specific-files/01-magnetic-resonance-imaging-data.html#fieldmap-data)
@@ -338,7 +405,7 @@ def create_dummy_no_shim_settings_bids_session(session_path):
         }
     )
 
-    return session_struct, expected_result, None
+    return session_struct, expected_result, expected_fmap_groups, expected_compatible_fmaps
 
 
 def create_dummy_magnitude_phase_bids_session(session_path):
@@ -448,7 +515,27 @@ def create_dummy_magnitude_phase_bids_session(session_path):
 
     create_tree(session_path, session_struct)
 
-    # 2) Now, let's create a dict with what we expect for the "IntendedFor":
+    # 2) Now, let's create a dict with the fmap groups compatible for each run
+    # -dwi: each of the runs (1, 2) is compatible with case1 fmap:
+    expected_compatible_fmaps = {
+        '{p}_acq-A_run-{r}_dwi.json'.format(p=op.join(session_path, 'dwi', prefix), r=runNo): [
+            '{p}_acq-case1'.format(p=prefix)
+        ]
+        for runNo in [1, 2]
+    }
+    # -func: acq-A is compatible w/ fmap case2; acq-B w/ fmap case3
+    expected_compatible_fmaps.update({
+        '{p}_acq-{a}_bold.json'.format(p=op.join(session_path, 'func', prefix), a=acq): [
+            '{p}_acq-case{c}'.format(p=prefix, c=caseNo)
+        ]
+        for caseNo, acq in {'2': 'A', '3': 'B'}.items()
+    })
+    # -func (cont): acq-unmatched is empty
+    expected_compatible_fmaps.update({
+        '{p}_acq-unmatched_bold.json'.format(p=op.join(session_path, 'func', prefix)): []
+    })
+
+    # 3) Now, let's create a dict with what we expect for the "IntendedFor":
 
     sub_match = re.findall('(sub-([a-zA-Z0-9]*))', session_path)
     sub_str = sub_match[0][0]
@@ -471,22 +558,89 @@ def create_dummy_magnitude_phase_bids_session(session_path):
             [op.join(expected_prefix, 'func', '{p}_acq-B_bold.nii.gz'.format(p=prefix))]
     })
 
-    return session_struct, expected_result, expected_fmap_groups
+    return session_struct, expected_result, expected_fmap_groups, expected_compatible_fmaps
 
 
 # Test cases:
 # A) pepolar fmaps with ShimSetting in json files
+# B) same, with no ShimSetting
+# C) magnitude/phase, with ShimSetting
 @pytest.mark.parametrize(
     "simulation_function", [create_dummy_pepolar_bids_session,
-                            create_dummy_magnitude_phase_bids_session,
-                            ]
+                            create_dummy_no_shim_settings_bids_session,
+                            create_dummy_magnitude_phase_bids_session]
 )
 def test_find_fmap_groups(tmpdir, simulation_function):
     """ Test for find_fmap_groups """
     folder = op.join(tmpdir, 'sub-foo')
-    _, _, expected_fmap_groups = simulation_function(folder)
+    _, _, expected_fmap_groups, _ = simulation_function(folder)
     fmap_groups = find_fmap_groups(op.join(folder, 'fmap'))
     assert fmap_groups == expected_fmap_groups
+
+
+# Test cases:
+# A) pepolar fmaps with ShimSetting in json files
+# B) same, with no ShimSetting
+# C) magnitude/phase, with ShimSetting
+@pytest.mark.parametrize(
+    "simulation_function", [create_dummy_pepolar_bids_session,
+                            create_dummy_no_shim_settings_bids_session,
+                            create_dummy_magnitude_phase_bids_session]
+)
+def test_find_compatible_fmaps_for_run(tmpdir, simulation_function):
+    """
+    Test find_compatible_fmaps_for_run.
+
+    Parameters:
+    ----------
+    tmpdir
+    simulation_function : function
+        function to create the directory tree and expected results
+    """
+    folder = op.join(tmpdir, 'sub-foo')
+    _, _, expected_fmap_groups, expected_compatible_fmaps = simulation_function(folder)
+    for modality in ['anat', 'dwi', 'func']:
+        for json_file in glob(op.join(folder, modality, '*.json')):
+            compatible_fmaps = find_compatible_fmaps_for_run(
+                json_file,
+                expected_fmap_groups,
+                criterion='Shims'
+            )
+            assert compatible_fmaps == expected_compatible_fmaps[json_file]
+
+
+# Test two scenarios for each case:
+# -study without sessions
+# -study with sessions
+# Cases:
+# A) pepolar fmaps with ShimSetting in json files
+# B) same, with no ShimSetting
+# C) magnitude/phase, with ShimSetting
+@pytest.mark.parametrize(
+    "folder, expected_prefix, simulation_function", [
+        (folder, expected_prefix, sim_func)
+        for folder, expected_prefix in zip(['no_sessions/sub-1', 'sessions/sub-1/ses-pre'], ['', 'ses-pre'])
+        for sim_func in [create_dummy_pepolar_bids_session,
+                         create_dummy_no_shim_settings_bids_session,
+                         create_dummy_magnitude_phase_bids_session]
+    ]
+)
+def test_find_compatible_fmaps_for_session(tmpdir, folder, expected_prefix, simulation_function):
+    """
+    Test find_compatible_fmaps_for_session.
+
+    Parameters:
+    ----------
+    tmpdir
+    simulation_function : function
+        function to create the directory tree and expected results
+    """
+    session_folder = op.join(str(tmpdir), folder)
+    _, _, _, expected_compatible_fmaps = simulation_function(session_folder)
+
+    compatible_fmaps = find_compatible_fmaps_for_session(session_folder, criterion='Shims')
+
+    assert compatible_fmaps == expected_compatible_fmaps
 
 
 # Test two scenarios for each case:
@@ -520,7 +674,7 @@ def test_populate_intended_for(tmpdir, folder, expected_prefix, simulation_funct
     """
 
     session_folder = op.join(str(tmpdir), folder)
-    session_struct, expected_result, _ = simulation_function(session_folder)
+    session_struct, expected_result, _, _ = simulation_function(session_folder)
     populate_intended_for(session_folder)
 
     # Now, loop through the jsons in the fmap folder and make sure it matches
