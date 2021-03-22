@@ -48,10 +48,9 @@ class BIDSError(Exception):
 
 BIDS_VERSION = "1.4.1"
 
-# Dictionary defining allowed criteria for fmap assignment, and the
-# corresponding json keys for each one:
+# List defining allowed parameter matching for fmap assignment:
 SHIM_KEY = 'ShimSetting'
-AllowedCriteriaForFmapAssignment = [
+AllowedFmapParameterMatching = [
     'Shims',
     'ImagingVolume',
 ]
@@ -545,7 +544,7 @@ def find_fmap_groups(fmap_dir):
     return fmap_groups
 
 
-def get_key_info_for_fmap_assignment(json_file, criterion='Shims'):
+def get_key_info_for_fmap_assignment(json_file, matching_parameter='Shims'):
     """
     Gets key information needed to assign fmaps to other modalities.
 
@@ -553,8 +552,8 @@ def get_key_info_for_fmap_assignment(json_file, criterion='Shims'):
     ----------
     json_file : str or os.path
         path to the json file
-    criterion : str in ['shims', 'imaging_volume']
-        criterion that will be used to match runs
+    matching_parameter : str in ['shims', 'imaging_volume']
+        matching_parameter that will be used to match runs
 
     Returns:
     -------
@@ -566,15 +565,15 @@ def get_key_info_for_fmap_assignment(json_file, criterion='Shims'):
         raise FileNotFoundError(
             errno.ENOENT, os.strerror(errno.ENOENT), json_file
         )
-    if criterion not in AllowedCriteriaForFmapAssignment:
+    if matching_parameter not in AllowedFmapParameterMatching:
         raise ValueError(
-            "Fmap matching criterion %s not allowed." % criterion
+            "Fmap matching_parameter %s not allowed." % matching_parameter
         )
 
     # loop through the possible criteria and extract the info needed
-    if criterion == 'Shims':
+    if matching_parameter == 'Shims':
         key_info = [get_shim_setting(json_file)]
-    elif criterion == 'ImagingVolume':
+    elif matching_parameter == 'ImagingVolume':
         from nibabel import load as nb_load
         nifti_file = glob(json_file[:-5] + '.nii*')
         nifti_header = nb_load(nifti_file).header
@@ -583,7 +582,7 @@ def get_key_info_for_fmap_assignment(json_file, criterion='Shims'):
     return key_info
 
 
-def find_compatible_fmaps_for_run(json_file, fmap_groups, criterion='Shims'):
+def find_compatible_fmaps_for_run(json_file, fmap_groups, matching_parameter='Shims'):
     """
     Finds compatible fmaps for a given run, for populate_intended_for.
 
@@ -594,8 +593,8 @@ def find_compatible_fmaps_for_run(json_file, fmap_groups, criterion='Shims'):
     fmap_groups : dict
         key: prefix common to the group
         value: list of all fmap paths in the group
-    criterion : str in ['shims', 'imaging_volume']
-        criterion that will be used to match runs
+    matching_parameter : str in ['shims', 'imaging_volume']
+        matching_parameter that will be used to match runs
 
     Returns:
     -------
@@ -603,24 +602,24 @@ def find_compatible_fmaps_for_run(json_file, fmap_groups, criterion='Shims'):
         List of keys in fmap_groups which match json_file, according
         to the criterion
     """
-    if criterion not in AllowedCriteriaForFmapAssignment:
+    if matching_parameter not in AllowedFmapParameterMatching:
         raise ValueError(
-            "Fmap matching criterion %s not allowed." % criterion
+            "Fmap matching_parameter %s not allowed." % matching_parameter
         )
 
     lgr.debug('Looking for fmaps for %s', json_file)
-    json_info = get_key_info_for_fmap_assignment(json_file, criterion)
+    json_info = get_key_info_for_fmap_assignment(json_file, matching_parameter)
 
     compatible_fmaps = []
     for fm_key, fm_group in fmap_groups.items():
-        fm_info = get_key_info_for_fmap_assignment(fm_group[0], criterion)
+        fm_info = get_key_info_for_fmap_assignment(fm_group[0], matching_parameter)
         if json_info == fm_info:
             compatible_fmaps.append(fm_key)
 
     return compatible_fmaps
 
 
-def find_compatible_fmaps_for_session(path_to_bids_session, criterion='Shims'):
+def find_compatible_fmaps_for_session(path_to_bids_session, matching_parameter='Shims'):
     """
     Finds compatible fmaps for all non-fmap runs in a session.
 
@@ -629,17 +628,17 @@ def find_compatible_fmaps_for_session(path_to_bids_session, criterion='Shims'):
     path_to_bids_session : str or os.path
         path to the session folder (or to the subject folder, if there are no
         sessions).
-    criterion : str in ['shims', 'imaging_volume']
-        criterion that will be used to match runs
+    matching_parameter : str in ['shims', 'imaging_volume']
+        matching_parameter that will be used to match runs
 
     Returns:
     -------
     compatible_fmaps : dict
         Dict of compatible fmaps (values) for each non-fmap run (keys)
     """
-    if criterion not in AllowedCriteriaForFmapAssignment:
+    if matching_parameter not in AllowedFmapParameterMatching:
         raise ValueError(
-            "Fmap matching criterion %s not allowed." % criterion
+            "Fmap matching_parameter %s not allowed." % matching_parameter
         )
 
     lgr.debug('Looking for fmaps for session: %s', path_to_bids_session)
@@ -667,15 +666,15 @@ def find_compatible_fmaps_for_session(path_to_bids_session, criterion='Shims'):
     # Loop through session_jsons and find the compatible fmap_groups for each
     #compatible_fmaps = dict()
     #for j in session_jsons:
-    #    compatible_fmaps[j] = find_compatible_fmaps_for_run(j, fmap_groups, criterion)
+    #    compatible_fmaps[j] = find_compatible_fmaps_for_run(j, fmap_groups, matching_parameter)
     compatible_fmaps = {
-        j: find_compatible_fmaps_for_run(j, fmap_groups, criterion)
+        j: find_compatible_fmaps_for_run(j, fmap_groups, matching_parameter)
         for j in session_jsons
     }
     return compatible_fmaps
 
 
-def populate_intended_for(path_to_bids_session, criterion='Shims'):
+def populate_intended_for(path_to_bids_session, matching_parameter='Shims'):
     """
     Adds the 'IntendedFor' field to the fmap .json files in a session folder.
     It goes through the session folders and checks what runs have the same
@@ -703,13 +702,13 @@ def populate_intended_for(path_to_bids_session, criterion='Shims'):
     path_to_bids_session : str or os.path
         path to the session folder (or to the subject folder, if there are no
         sessions).
-    criterion : str in ['shims', 'imaging_volume']
-        criterion that will be used to match runs
+    matching_parameter : str in ['shims', 'imaging_volume']
+        matching_parameter that will be used to match runs
     """
 
-    if criterion not in AllowedCriteriaForFmapAssignment:
+    if matching_parameter not in AllowedFmapParameterMatching:
         raise ValueError(
-            "Fmap matching criterion %s not allowed." % criterion
+            "Fmap matching_parameter %s not allowed." % matching_parameter
         )
 
     lgr.info('Adding "IntendedFor" to the fieldmaps in %s.', path_to_bids_session)
@@ -760,11 +759,11 @@ def populate_intended_for(path_to_bids_session, criterion='Shims'):
             lgr.debug('Looking for runs for %s', fm_group[0])
             # we are assuming all fmaps in the group have the same shims,
             # since they should have been acquired together.
-            fm_info = get_key_info_for_fmap_assignment(fm_group[0], criterion)
+            fm_info = get_key_info_for_fmap_assignment(fm_group[0], matching_parameter)
 
             intended_for = []
             for image_json in session_jsons:
-                image_info = get_key_info_for_fmap_assignment(image_json, criterion)
+                image_info = get_key_info_for_fmap_assignment(image_json, matching_parameter)
                 if image_info == fm_info:
                     # BIDS specifies that the intended for are:
                     # - **image** files
