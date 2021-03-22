@@ -598,9 +598,11 @@ def find_compatible_fmaps_for_run(json_file, fmap_groups, matching_parameter='Sh
 
     Returns:
     -------
-    compatible_fmaps : list
-        List of keys in fmap_groups which match json_file, according
-        to the criterion
+    compatible_fmap_groups : dict
+        Subset of the fmap_groups which match json_file, according
+        to the matching_parameter.
+        key: prefix common to the group
+        value: list of all fmap paths in the group
     """
     if matching_parameter not in AllowedFmapParameterMatching:
         raise ValueError(
@@ -610,13 +612,13 @@ def find_compatible_fmaps_for_run(json_file, fmap_groups, matching_parameter='Sh
     lgr.debug('Looking for fmaps for %s', json_file)
     json_info = get_key_info_for_fmap_assignment(json_file, matching_parameter)
 
-    compatible_fmaps = []
+    compatible_fmap_groups = {}
     for fm_key, fm_group in fmap_groups.items():
         fm_info = get_key_info_for_fmap_assignment(fm_group[0], matching_parameter)
         if json_info == fm_info:
-            compatible_fmaps.append(fm_key)
+            compatible_fmap_groups[fm_key] = fm_group
 
-    return compatible_fmaps
+    return compatible_fmap_groups
 
 
 def find_compatible_fmaps_for_session(path_to_bids_session, matching_parameter='Shims'):
@@ -633,8 +635,8 @@ def find_compatible_fmaps_for_session(path_to_bids_session, matching_parameter='
 
     Returns:
     -------
-    compatible_fmaps : dict
-        Dict of compatible fmaps (values) for each non-fmap run (keys)
+    compatible_fmap : dict
+        Dict of compatible_fmaps_groups (values) for each non-fmap run (keys)
     """
     if matching_parameter not in AllowedFmapParameterMatching:
         raise ValueError(
@@ -664,9 +666,9 @@ def find_compatible_fmaps_for_session(path_to_bids_session, matching_parameter='
     )
 
     # Loop through session_jsons and find the compatible fmap_groups for each
-    #compatible_fmaps = dict()
+    #compatible_fmap_groups = dict()
     #for j in session_jsons:
-    #    compatible_fmaps[j] = find_compatible_fmaps_for_run(j, fmap_groups, matching_parameter)
+    #    compatible_fmap_groups[j] = find_compatible_fmaps_for_run(j, fmap_groups, matching_parameter)
     compatible_fmaps = {
         j: find_compatible_fmaps_for_run(j, fmap_groups, matching_parameter)
         for j in session_jsons

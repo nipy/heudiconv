@@ -214,26 +214,30 @@ def create_dummy_pepolar_bids_session(session_path):
     # 2) Now, let's create a dict with the fmap groups compatible for each run
     # -anat: empty
     expected_compatible_fmaps = {
-        '{p}_{m}.json'.format(p=op.join(session_path, 'anat', prefix), m=mod): []
+        '{p}_{m}.json'.format(p=op.join(session_path, 'anat', prefix), m=mod): {}
         for mod in ['T1w', 'T2w']
     }
     # -dwi: each of the runs (1, 2) is compatible with both of the dwi fmaps (1, 2):
     expected_compatible_fmaps.update({
-        '{p}_acq-A_run-{r}_dwi.json'.format(p=op.join(session_path, 'dwi', prefix), r=runNo): [
-            '{p}_acq-dwi_run-{r}_epi'.format(p=prefix, r=r) for r in [1, 2]
-        ]
+        '{p}_acq-A_run-{r}_dwi.json'.format(p=op.join(session_path, 'dwi', prefix), r=runNo): {
+            key: val for key, val in expected_fmap_groups.items() if key in [
+                '{p}_acq-dwi_run-{r}_epi'.format(p=prefix, r=r) for r in [1, 2]
+            ]
+        }
         for runNo in [1, 2]
     })
     # -func: acq-A is compatible w/ fmap fMRI run 1; acq-2 w/ fmap fMRI run 2
     expected_compatible_fmaps.update({
-        '{p}_acq-{a}_bold.json'.format(p=op.join(session_path, 'func', prefix), a=acq): [
-            '{p}_acq-fMRI_run-{r}_epi'.format(p=prefix, r=runNo)
-        ]
+        '{p}_acq-{a}_bold.json'.format(p=op.join(session_path, 'func', prefix), a=acq): {
+            key: val for key, val in expected_fmap_groups.items() if key in [
+                '{p}_acq-fMRI_run-{r}_epi'.format(p=prefix, r=runNo)
+            ]
+        }
         for runNo, acq in {'1': 'A', '2': 'B'}.items()
     })
     # -func (cont): acq-unmatched is empty
     expected_compatible_fmaps.update({
-        '{p}_acq-unmatched_bold.json'.format(p=op.join(session_path, 'func', prefix)): []
+        '{p}_acq-unmatched_bold.json'.format(p=op.join(session_path, 'func', prefix)): {}
     })
 
     # 3) Then, let's create a dict with what we expect for the "IntendedFor":
@@ -352,21 +356,25 @@ def create_dummy_no_shim_settings_bids_session(session_path):
     # 2) Now, let's create a dict with the fmap groups compatible for each run
     # -anat: empty
     expected_compatible_fmaps = {
-        '{p}_{m}.json'.format(p=op.join(session_path, 'anat', prefix), m=mod): []
+        '{p}_{m}.json'.format(p=op.join(session_path, 'anat', prefix), m=mod): {}
         for mod in ['T1w', 'T2w']
     }
     # -dwi: each of the runs (1, 2) is compatible with both of the dwi fmaps (1, 2):
     expected_compatible_fmaps.update({
-        '{p}_acq-A_run-{r}_dwi.json'.format(p=op.join(session_path, 'dwi', prefix), r=runNo): [
-            '{p}_acq-dwi_run-{r}_epi'.format(p=prefix, r=r) for r in [1, 2]
-        ]
+        '{p}_acq-A_run-{r}_dwi.json'.format(p=op.join(session_path, 'dwi', prefix), r=runNo): {
+            key: val for key, val in expected_fmap_groups.items() if key in [
+                '{p}_acq-dwi_run-{r}_epi'.format(p=prefix, r=r) for r in [1, 2]
+            ]
+        }
         for runNo in [1, 2]
     })
     # -func: each of the acq (A, B) is compatible w/ both fmap fMRI runs (1, 2)
     expected_compatible_fmaps.update({
-        '{p}_acq-{a}_bold.json'.format(p=op.join(session_path, 'func', prefix), a=acq): [
-            '{p}_acq-fMRI_run-{r}_epi'.format(p=prefix, r=r) for r in [1, 2]
-        ]
+        '{p}_acq-{a}_bold.json'.format(p=op.join(session_path, 'func', prefix), a=acq): {
+            key: val for key, val in expected_fmap_groups.items() if key in [
+                '{p}_acq-fMRI_run-{r}_epi'.format(p=prefix, r=r) for r in [1, 2]
+           ]
+        }
         for acq in ['A', 'B']
     })
 
@@ -518,21 +526,25 @@ def create_dummy_magnitude_phase_bids_session(session_path):
     # 2) Now, let's create a dict with the fmap groups compatible for each run
     # -dwi: each of the runs (1, 2) is compatible with case1 fmap:
     expected_compatible_fmaps = {
-        '{p}_acq-A_run-{r}_dwi.json'.format(p=op.join(session_path, 'dwi', prefix), r=runNo): [
-            '{p}_acq-case1'.format(p=prefix)
-        ]
+        '{p}_acq-A_run-{r}_dwi.json'.format(p=op.join(session_path, 'dwi', prefix), r=runNo): {
+            key: val for key, val in expected_fmap_groups.items() if key in [
+                '{p}_acq-case1'.format(p=prefix)
+            ]
+        }
         for runNo in [1, 2]
     }
     # -func: acq-A is compatible w/ fmap case2; acq-B w/ fmap case3
     expected_compatible_fmaps.update({
-        '{p}_acq-{a}_bold.json'.format(p=op.join(session_path, 'func', prefix), a=acq): [
-            '{p}_acq-case{c}'.format(p=prefix, c=caseNo)
-        ]
+        '{p}_acq-{a}_bold.json'.format(p=op.join(session_path, 'func', prefix), a=acq): {
+            key: val for key, val in expected_fmap_groups.items() if key in [
+                '{p}_acq-case{c}'.format(p=prefix, c=caseNo)
+            ]
+        }
         for caseNo, acq in {'2': 'A', '3': 'B'}.items()
     })
     # -func (cont): acq-unmatched is empty
     expected_compatible_fmaps.update({
-        '{p}_acq-unmatched_bold.json'.format(p=op.join(session_path, 'func', prefix)): []
+        '{p}_acq-unmatched_bold.json'.format(p=op.join(session_path, 'func', prefix)): {}
     })
 
     # 3) Now, let's create a dict with what we expect for the "IntendedFor":
