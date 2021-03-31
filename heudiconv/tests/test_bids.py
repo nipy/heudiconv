@@ -2,6 +2,9 @@ import re
 import os
 import os.path as op
 from random import random
+from datetime import (datetime,
+                      timedelta,
+                      )
 from collections import namedtuple
 from glob import glob
 
@@ -19,12 +22,15 @@ from heudiconv.bids import (
     get_key_info_for_fmap_assignment,
     find_compatible_fmaps_for_run,
     find_compatible_fmaps_for_session,
+    select_fmap_from_compatible_groups,
     SHIM_KEY,
+    AllowedCriteriaForFmapAssignment,
 )
 
 import pytest
 
 SHIM_LENGTH = 6
+TODAY = datetime.today()
 
 
 # Test scenarios:
@@ -101,6 +107,38 @@ def test_get_key_info_for_fmap_assignment(tmpdir, monkeypatch):
         assert get_key_info_for_fmap_assignment(
             'foo.json', matching_parameter='Invalid'
         )
+
+
+def generate_scans_tsv(session_struct):
+    """
+    Generates the contents of the "_scans.tsv" file, given a session structure.
+    Currently, it will have the columns "filename" and "acq_time".
+    The acq_time will increase by one minute from run to run.
+
+    Parameters:
+    ----------
+    session_struct : dict
+        structure for the session, as a dict with modality: files
+
+    Returns:
+    -------
+    scans_file_content : str
+        multi-line string with the content of the file
+    """
+    # for each modality in session_struct (k), get the filenames:
+    scans_fnames = [
+        op.join(k, vk)
+            for k, v in session_struct.items()
+            for vk in v.keys()
+            if vk.endswith('.nii.gz')
+    ]
+    # for each file, increment the acq_time by one minute:
+    scans_file_content = ['filename\tacq_time'] + [
+        '%s\t%s' % (fn, (TODAY + timedelta(minutes=i)).isoformat()) for fn, i in
+        zip(scans_fnames, range(len(scans_fnames)))
+    ]
+    # convert to multiline string:
+    return "\n".join(scans_file_content)
 
 
 def create_dummy_pepolar_bids_session(session_path):
@@ -203,11 +241,14 @@ def create_dummy_pepolar_bids_session(session_path):
     })
     # structure for the full session:
     session_struct = {
+        'fmap': fmap_struct,
         'anat': anat_struct,
         'dwi': dwi_struct,
         'func': func_struct,
-        'fmap': fmap_struct
     }
+    # add "_scans.tsv" file to the session_struct
+    scans_file_content = generate_scans_tsv(session_struct)
+    session_struct.update({'{p}_scans.tsv'.format(p=prefix): scans_file_content})
 
     create_tree(session_path, session_struct)
 
@@ -345,11 +386,14 @@ def create_dummy_no_shim_settings_bids_session(session_path):
 
     # structure for the full session:
     session_struct = {
+        'fmap': fmap_struct,
         'anat': anat_struct,
         'dwi': dwi_struct,
         'func': func_struct,
-        'fmap': fmap_struct
     }
+    # add "_scans.tsv" file to the session_struct
+    scans_file_content = generate_scans_tsv(session_struct)
+    session_struct.update({'{p}_scans.tsv'.format(p=prefix): scans_file_content})
 
     create_tree(session_path, session_struct)
 
@@ -516,10 +560,13 @@ def create_dummy_magnitude_phase_bids_session(session_path):
     })
     # structure for the full session:
     session_struct = {
+        'fmap': fmap_struct,
         'dwi': dwi_struct,
         'func': func_struct,
-        'fmap': fmap_struct
     }
+    # add "_scans.tsv" file to the session_struct
+    scans_file_content = generate_scans_tsv(session_struct)
+    session_struct.update({'{p}_scans.tsv'.format(p=prefix): scans_file_content})
 
     create_tree(session_path, session_struct)
 
@@ -653,6 +700,48 @@ def test_find_compatible_fmaps_for_session(tmpdir, folder, expected_prefix, simu
     compatible_fmaps = find_compatible_fmaps_for_session(session_folder, matching_parameter='Shims')
 
     assert compatible_fmaps == expected_compatible_fmaps
+
+
+# Test two scenarios for each case:
+# -study without sessions
+# -study with sessions
+# Cases:
+# A) pepolar fmaps with ShimSetting in json files
+# B) same, with no ShimSetting
+# C) magnitude/phase, with ShimSetting
+@pytest.mark.parametrize(
+    "folder, expected_prefix, simulation_function", [
+        (folder, expected_prefix, sim_func)
+        for folder, expected_prefix in zip(['no_sessions/sub-1', 'sessions/sub-1/ses-pre'], ['', 'ses-pre'])
+        for sim_func in [create_dummy_pepolar_bids_session,
+                         create_dummy_no_shim_settings_bids_session,
+                         create_dummy_magnitude_phase_bids_session]
+    ]
+)
+def test_select_fmap_from_compatible_groups(tmpdir, folder, expected_prefix, simulation_function):
+    """Test select_fmap_from_compatible_groups"""
+    session_folder = op.join(str(tmpdir), folder)
+    session_struct, _, _, expected_compatible_fmaps = simulation_function(session_folder)
+
+    for json_file, fmap_groups in expected_compatible_fmaps.items():
+        for criterion in AllowedCriteriaForFmapAssignment:
+            if not op.dirname(json_file).endswith('fmap'):
+                selected_fmap = select_fmap_from_compatible_groups(
+                    json_file,
+                    fmap_groups,
+                    criterion=criterion
+                )
+            # when the criterion is 'First', you should get the first of
+            # the compatible_fmaps (for that json_file), if it is 'Closest',
+            # it should be the last one (the fmaps are "run" at the
+            # beginning of the session)
+            if selected_fmap:
+                if criterion == 'First':
+                    assert selected_fmap == list(expected_compatible_fmaps[json_file])[0]
+                elif criterion == 'Closest':
+                    assert selected_fmap == list(expected_compatible_fmaps[json_file])[-1]
+            else:
+                assert not expected_compatible_fmaps[json_file]
 
 
 # Test two scenarios for each case:

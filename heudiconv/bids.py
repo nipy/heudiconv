@@ -54,6 +54,12 @@ AllowedFmapParameterMatching = [
     'Shims',
     'ImagingVolume',
 ]
+# List defining allowed criteria to assign a given fmap to a non-fmap run
+# among the different fmaps with matching parameters:
+AllowedCriteriaForFmapAssignment = [
+    'First',
+    'Closest',
+]
 
 
 def populate_bids_templates(path, defaults={}):
@@ -674,6 +680,93 @@ def find_compatible_fmaps_for_session(path_to_bids_session, matching_parameter='
         for j in session_jsons
     }
     return compatible_fmaps
+
+
+def select_fmap_from_compatible_groups(json_file, compatible_fmap_groups, criterion):
+    """
+    Selects the fmap that will be used to correct for distortions in json_file
+    from the compatible fmap_groups list, based on the given criterium_for_fmap
+
+    Parameters:
+    ----------
+    json_file : str or os.path
+        path to the json file
+    compatible_fmap_groups : dict
+        fmap_groups that are compatible with the specific json_file
+    matching_parameter : str in ['First', 'Closest']
+        matching_parameter that will be used to decide which fmap to use
+
+    Returns:
+    -------
+    selected_fmap_key : str or os.path
+        key from the compatible_fmap_groups for the selected fmap group
+    """
+    if criterion not in AllowedCriteriaForFmapAssignment:
+        raise ValueError(
+            "Fmap assignment criterion %s not allowed." % criterion
+        )
+
+    # before we start, if compatible_fmap_groups has only one entry, that's it:
+    if len(compatible_fmap_groups) == 0:
+        return None
+    elif len(compatible_fmap_groups) == 1:
+        return list(compatible_fmap_groups.keys())[0]
+
+    # get the modality folders, then session folder:
+    modality_folders = set(
+        op.dirname(fmap) for v in compatible_fmap_groups.values() for fmap in v
+    )      # there should be only one value, ending in 'fmap'
+    sess_folder = set(op.dirname(k) for k in modality_folders)
+    if len(sess_folder) > 1:
+        # for now, we only deal with single sessions:
+        raise RuntimeError
+    # if we made it here, we have only one session:
+    sess_folder = list(sess_folder)[0]
+
+    # get acquisition times from '_scans.tsv':
+    try:
+        scans_tsv = glob(op.join(sess_folder,'*_scans.tsv'))[0]
+    except IndexError:
+        raise FileNotFoundError("No '*_scans' file found for session %s" % sess_folder)
+    with open(scans_tsv) as f:
+        # read the contents, splitting by lines and by tab separators:
+        scans_tsv_content = [line.split('\t') for line in f.read().splitlines()]
+    # get column indices for filename and acq_time from the first line:
+    (fname_idx, time_idx) = (scans_tsv_content[0].index(k) for k in ['filename', 'acq_time'])
+    acq_times = {line[fname_idx]: line[time_idx] for line in scans_tsv_content[1:]}
+    # acq_times for the compatible fmaps:
+    acq_times_fmaps = {
+        k: acq_times[
+            v[0].split(sess_folder + op.sep)[1][:-5] + '.nii.gz'
+            ]
+        for k, v in compatible_fmap_groups.items()
+    }
+
+    if criterion == 'First':
+        # find the first acquired fmap_group from the compatible_fmap_groups:
+        first_acq_time = sorted(acq_times_fmaps.values())[0]
+        selected_fmap_key = [
+            k for k, v in acq_times_fmaps.items() if v == first_acq_time
+        ][0]
+    elif criterion == 'Closest':
+        json_acq_time = datetime.strptime(
+            acq_times[
+                json_file.split(sess_folder + op.sep)[1][:-5] + '.nii.gz'
+            ],
+            "%Y-%m-%dT%H:%M:%S.%f"
+        )
+        diff_fmaps_acq_times = {
+            k: abs(datetime.strptime(v, "%Y-%m-%dT%H:%M:%S.%f")-json_acq_time)
+            for k, v in acq_times_fmaps.items()
+        }
+        min_diff_acq_times = sorted(diff_fmaps_acq_times.values())[0]
+        selected_fmap_key = [
+            k for k, v in diff_fmaps_acq_times.items() if v == min_diff_acq_times
+        ][0]
+
+    return selected_fmap_key
+
+
 
 
 def populate_intended_for(path_to_bids_session, matching_parameter='Shims'):
