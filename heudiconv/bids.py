@@ -24,6 +24,8 @@ from .utils import (
     set_readonly,
     is_readonly,
     get_datetime,
+    remove_suffix,
+    remove_prefix,
 )
 
 lgr = logging.getLogger(__name__)
@@ -169,7 +171,7 @@ def populate_aggregated_jsons(path):
                 #   the next for loop iteration:
                 continue
 
-        events_file = fpath[:-len(suf)] + '_events.tsv'
+        events_file = remove_suffix(fpath, suf) + '_events.tsv'
         # do not touch any existing thing, it may be precious
         if not op.lexists(events_file):
             lgr.debug("Generating %s", events_file)
@@ -540,12 +542,12 @@ def find_fmap_groups(fmap_dir):
 
     # Find the unique prefixes ('splitext' removes the extension):
     prefixes = sorted(
-        set(fmap_regex.sub('', op.splitext(op.basename(fm))[0]) for fm in fmap_jsons)
+        set(fmap_regex.sub('', remove_suffix(op.basename(fm), '.json')) for fm in fmap_jsons)
     )
     fmap_groups = OrderedDict()
     for k in prefixes:
         fmap_groups[k] = [
-            fm for fm in fmap_jsons if fmap_regex.sub('', op.splitext(op.basename(fm))[0]) == k
+            fm for fm in fmap_jsons if fmap_regex.sub('', remove_suffix(op.basename(fm), '.json')) == k
         ]
     return fmap_groups
 
@@ -581,7 +583,7 @@ def get_key_info_for_fmap_assignment(json_file, matching_parameter='Shims'):
         key_info = [get_shim_setting(json_file)]
     elif matching_parameter == 'ImagingVolume':
         from nibabel import load as nb_load
-        nifti_file = glob(json_file[:-5] + '.nii*')
+        nifti_file = glob(remove_suffix(json_file, '.json') + '.nii*')
         nifti_header = nb_load(nifti_file).header
         key_info = [nifti_header.affine, nifti_header.dim[1:3]]
 
@@ -666,7 +668,7 @@ def find_compatible_fmaps_for_session(path_to_bids_session, matching_parameter='
     session_jsons = [
         j for j in glob(op.join(path_to_bids_session, '*/*.json')) if not (
             op.basename(op.dirname(j)) == 'fmap'
-            or j[:-5].endswith('_sbref')
+            or remove_suffix(j, '.json').endswith('_sbref')
         )
     ]
 
@@ -734,7 +736,7 @@ def select_fmap_from_compatible_groups(json_file, compatible_fmap_groups, criter
     acq_times_fmaps = {
         k: acq_times[
             # remove session folder and '.json', add '.nii.gz':
-            v[0].split(sess_folder + op.sep)[-1][:-5] + '.nii.gz'
+            remove_suffix(remove_prefix(v[0], sess_folder + op.sep), '.json') + '.nii.gz'
             ]
         for k, v in compatible_fmap_groups.items()
     }
@@ -749,7 +751,7 @@ def select_fmap_from_compatible_groups(json_file, compatible_fmap_groups, criter
         json_acq_time = datetime.strptime(
             acq_times[
                 # remove session folder and '.json', add '.nii.gz':
-                json_file.split(sess_folder + op.sep)[-1][:-5] + '.nii.gz'
+                remove_suffix(remove_prefix(json_file, sess_folder + op.sep), '.json') + '.nii.gz'
             ],
             "%Y-%m-%dT%H:%M:%S.%f"
         )
@@ -842,7 +844,7 @@ def populate_intended_for(path_to_bids_session, matching_parameter='Shims', crit
         for json_file, selected_fmap_group in selected_fmaps.items():
             if selected_fmap_group and (fmap_group in selected_fmap_group):
                 intended_for.append(
-                    op.relpath(json_file[:-5] + '.nii.gz', start=subj_folder)
+                    op.relpath(remove_suffix(json_file, '.json') + '.nii.gz', start=subj_folder)
                 )
         if intended_for:
             intended_for = sorted([str(f) for f in intended_for])
