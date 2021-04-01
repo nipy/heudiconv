@@ -83,7 +83,7 @@ def test_get_key_info_for_fmap_assignment(tmpdir, monkeypatch):
         return MyMockNifti(MY_HEADER)
     monkeypatch.setattr(nibabel, "load", mock_nibabel_load)
 
-    json_name = 'foo.json'
+    json_name = op.join(tmpdir, 'foo.json')
 
     # 1) Call for a non-existing file should give an error:
     with pytest.raises(FileNotFoundError):
@@ -92,20 +92,20 @@ def test_get_key_info_for_fmap_assignment(tmpdir, monkeypatch):
     # 2) matching_parameter = 'Shims'
     save_json(json_name, {SHIM_KEY: A_SHIM})      # otherwise get_key_info_for_fmap_assignment will give an error
     key_info = get_key_info_for_fmap_assignment(
-        'foo.json', matching_parameter='Shims'
+        json_name, matching_parameter='Shims'
     )
     assert key_info == [A_SHIM]
 
     # 3) matching_parameter = 'ImagingVolume'
     key_info = get_key_info_for_fmap_assignment(
-        'foo.json', matching_parameter='ImagingVolume'
+        json_name, matching_parameter='ImagingVolume'
     )
     assert key_info == [MY_AFFINE, MY_DIM[1:3]]
 
     # 4) invalid matching_parameter:
     with pytest.raises(ValueError):
         assert get_key_info_for_fmap_assignment(
-            'foo.json', matching_parameter='Invalid'
+            json_name, matching_parameter='Invalid'
         )
 
 
@@ -721,7 +721,7 @@ def test_find_compatible_fmaps_for_session(tmpdir, folder, expected_prefix, simu
 def test_select_fmap_from_compatible_groups(tmpdir, folder, expected_prefix, simulation_function):
     """Test select_fmap_from_compatible_groups"""
     session_folder = op.join(str(tmpdir), folder)
-    session_struct, _, _, expected_compatible_fmaps = simulation_function(session_folder)
+    _, _, _, expected_compatible_fmaps = simulation_function(session_folder)
 
     for json_file, fmap_groups in expected_compatible_fmaps.items():
         for criterion in AllowedCriteriaForFmapAssignment:
