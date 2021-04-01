@@ -776,7 +776,7 @@ def test_populate_intended_for(tmpdir, folder, expected_prefix, simulation_funct
 
     session_folder = op.join(str(tmpdir), folder)
     session_struct, expected_result, _, _ = simulation_function(session_folder)
-    populate_intended_for(session_folder)
+    populate_intended_for(session_folder, matching_parameter='Shims', criterion='First')
 
     # Now, loop through the jsons in the fmap folder and make sure it matches
     # the expected result:
