@@ -2,6 +2,7 @@
 """
 import os.path as op
 from glob import glob
+from sys import modules as sys_modules
 
 import pytest
 from .utils import TESTS_DATA_PATH
@@ -10,6 +11,7 @@ from heudiconv.convert import (update_complex_name,
                                update_multiecho_name,
                                update_uncombined_name,
                                DW_IMAGE_IN_FMAP_FOLDER_WARNING,
+                               convert,
                                )
 from heudiconv.bids import BIDSError
 from heudiconv.cli.run import main as runner
@@ -138,7 +140,11 @@ def test_convert(tmpdir, monkeypatch, capfd,
         """
         print('session: {}'.format(session))
         return
-    monkeypatch.setattr(convert, "populate_intended_for", mock_populate_intended_for)
+    # mock the "populate_intended_for" attribute for the module from
+    # which "convert" was imported:
+    monkeypatch.setattr(
+        sys_modules[convert.__module__], "populate_intended_for", mock_populate_intended_for
+    )
 
     outdir = op.join(str(tmpdir), 'foo')
     outfolder = op.join(outdir, 'sub-{sID}', 'ses-{ses}' if sesID else '')
@@ -151,14 +157,14 @@ def test_convert(tmpdir, monkeypatch, capfd,
         for s in subjects
     ]
 
-    convert.convert(items,
-                    converter='',
-                    scaninfo_suffix='.json',
-                    custom_callable=None,
-                    with_prov=None,
-                    bids_options=[],
-                    outdir=outdir,
-                    min_meta=True,
-                    overwrite=False)
+    convert(items,
+            converter='',
+            scaninfo_suffix='.json',
+            custom_callable=None,
+            with_prov=None,
+            bids_options=[],
+            outdir=outdir,
+            min_meta=True,
+            overwrite=False)
     output = capfd.readouterr()
     assert ['session: sub-{}'.format(s) in output.out for s in subjects]
