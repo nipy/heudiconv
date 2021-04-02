@@ -584,3 +584,41 @@ def get_datetime(date, time, *, microseconds=True):
     if not microseconds:
         datetime_str = datetime_str.split('.', 1)[0]
     return datetime_str
+
+
+def remove_suffix(s, suf):
+    """
+    Remove suffix from the end of the string
+
+    Parameters:
+    ----------
+    s : str
+    suf : str
+
+    Returns:
+    -------
+    s : str
+        string with "suf" removed from the end (if present)
+    """
+    if suf and s.endswith(suf):
+        return s[:-len(suf)]
+    return s
+
+
+def remove_prefix(s, pre):
+    """
+    Remove prefix from the beginning of the string
+
+    Parameters:
+    ----------
+    s : str
+    pre : str
+
+    Returns:
+    -------
+    s : str
+        string with "pre" removed from the beginning (if present)
+    """
+    if pre and s.startswith(pre):
+        return s[len(pre):]
+    return s

@@ -12,6 +12,8 @@ from heudiconv.utils import (
     save_json,
     add_field_to_json,
     get_datetime,
+    remove_suffix,
+    remove_prefix,
     JSONDecodeError)
 
 import pytest
@@ -85,7 +87,7 @@ def test_load_json(tmpdir, caplog):
     vfname = "valid.json"
     valid_json_file = str(tmpdir / vfname)
     save_json(valid_json_file, vcontent)
-    
+
     assert load_json(valid_json_file) == vcontent
 
 
@@ -122,3 +124,23 @@ def test_get_datetime():
     assert get_datetime('20200512', '162130') == '2020-05-12T16:21:30'
     assert get_datetime('20200512', '162130.5') == '2020-05-12T16:21:30.500000'
     assert get_datetime('20200512', '162130.5', microseconds=False) == '2020-05-12T16:21:30'
+
+
+def test_remove_suffix():
+    """
+    Test utils.remove_suffix()
+    """
+    s = 'jason.bourne'
+    assert remove_suffix(s, '') == s
+    assert remove_suffix(s, 'foo') == s
+    assert remove_suffix(s, '.bourne') == 'jason'
+
+
+def test_remove_prefix():
+    """
+    Test utils.remove_prefix()
+    """
+    s = 'jason.bourne'
+    assert remove_prefix(s, '') == s
+    assert remove_prefix(s, 'foo') == s
+    assert remove_prefix(s, 'jason') == '.bourne'
