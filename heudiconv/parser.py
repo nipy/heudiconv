@@ -24,6 +24,7 @@ atexit.register(tempdirs.cleanup)
 
 _VCS_REGEX = '%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (op.sep, op.sep)
 
+
 @docstring_parameter(_VCS_REGEX)
 def find_files(regex, topdir=op.curdir, exclude=None,
                exclude_vcs=True, dirs=False):
@@ -36,12 +37,16 @@ def find_files(regex, topdir=op.curdir, exclude=None,
     exclude_vcs:
       If True, excludes commonly known VCS subdirectories.  If string, used
       as regex to exclude those files (regex: `{}`)
-    topdir: basestring, optional
+    topdir: basestring or list, optional
       Directory where to search
     dirs: bool, optional
       Either to match directories as well as files
     """
-
+    if isinstance(topdir, (list, tuple)):
+        for topdir_ in topdir:
+            yield from find_files(
+                regex, topdir=topdir_, exclude=exclude, exclude_vcs=exclude_vcs, dirs=dirs)
+        return
     for dirpath, dirnames, filenames in os.walk(topdir):
         names = (dirnames + filenames) if dirs else filenames
         paths = (op.join(dirpath, name) for name in names)
