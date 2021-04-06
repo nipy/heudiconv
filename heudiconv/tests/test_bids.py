@@ -107,7 +107,7 @@ def test_get_key_info_for_fmap_assignment(tmpdir, monkeypatch):
         return MyMockNifti(MY_HEADER)
     monkeypatch.setattr(nibabel, "load", mock_nibabel_load)
 
-    json_name = op.join(tmpdir, 'foo.json')
+    json_name = op.join(str(tmpdir), 'foo.json')
 
     # 1) Call for a non-existing file should give an error:
     with pytest.raises(FileNotFoundError):
@@ -655,7 +655,7 @@ def create_dummy_magnitude_phase_bids_session(session_path):
 )
 def test_find_fmap_groups(tmpdir, simulation_function):
     """ Test for find_fmap_groups """
-    folder = op.join(tmpdir, 'sub-foo')
+    folder = op.join(str(tmpdir), 'sub-foo')
     _, _, expected_fmap_groups, _ = simulation_function(folder)
     fmap_groups = find_fmap_groups(op.join(folder, 'fmap'))
     assert fmap_groups == expected_fmap_groups
@@ -680,7 +680,7 @@ def test_find_compatible_fmaps_for_run(tmpdir, simulation_function):
     simulation_function : function
         function to create the directory tree and expected results
     """
-    folder = op.join(tmpdir, 'sub-foo')
+    folder = op.join(str(tmpdir), 'sub-foo')
     _, _, expected_fmap_groups, expected_compatible_fmaps = simulation_function(folder)
     for modality in ['anat', 'dwi', 'func']:
         for json_file in glob(op.join(folder, modality, '*.json')):
