@@ -191,7 +191,7 @@ def create_dummy_pepolar_bids_session(session_path):
         dictionary with the expected fmap groups for each non-fmap run in the
         session
     """
-    session_parent, session_basename = op.split(session_path)
+    session_parent, session_basename = op.split(session_path.rstrip(op.sep))
     if session_basename.startswith('ses-'):
         prefix = op.split(session_parent)[1] + '_' + session_basename
     else:
@@ -364,7 +364,7 @@ def create_dummy_no_shim_settings_bids_session(session_path):
         it returns a third argument (None) to have the same signature as
         create_dummy_pepolar_bids_session
     """
-    session_parent, session_basename = op.split(session_path)
+    session_parent, session_basename = op.split(session_path.rstrip(op.sep))
     if session_basename.startswith('ses-'):
         prefix = op.split(session_parent)[1] + '_' + session_basename
     else:
@@ -509,7 +509,7 @@ def create_dummy_magnitude_phase_bids_session(session_path):
     expected_fmap_groups : dict
         dictionary with the expected fmap groups
     """
-    session_parent, session_basename = op.split(session_path)
+    session_parent, session_basename = op.split(session_path.rstrip(op.sep))
     if session_basename.startswith('ses-'):
         prefix = op.split(session_parent)[1] + '_' + session_basename
     else:
