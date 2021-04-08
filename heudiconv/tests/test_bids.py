@@ -8,7 +8,9 @@ from random import random
 from datetime import (datetime,
                       timedelta,
                       )
-from collections import namedtuple
+from collections import (namedtuple,
+                         OrderedDict,
+                         )
 from glob import glob
 
 import nibabel
@@ -153,7 +155,7 @@ def generate_scans_tsv(session_struct):
     scans_fnames = [
         op.join(k, vk)
             for k, v in session_struct.items()
-            for vk in v.keys()
+            for vk in sorted(v.keys())
             if vk.endswith('.nii.gz')
     ]
     # for each file, increment the acq_time by one minute:
@@ -263,13 +265,13 @@ def create_dummy_pepolar_bids_session(session_path):
         for r, shims in {'1': func_shims_A, '2': func_shims_B}.items()
         for d in ['AP', 'PA']
     })
-    # structure for the full session:
-    session_struct = {
-        'fmap': fmap_struct,
-        'anat': anat_struct,
-        'dwi': dwi_struct,
-        'func': func_struct,
-    }
+    # structure for the full session (init the OrderedDict as a list to preserve order):
+    session_struct = OrderedDict([
+        ('fmap', fmap_struct),
+        ('anat', anat_struct),
+        ('dwi', dwi_struct),
+        ('func', func_struct),
+    ])
     # add "_scans.tsv" file to the session_struct
     scans_file_content = generate_scans_tsv(session_struct)
     session_struct.update({'{p}_scans.tsv'.format(p=prefix): scans_file_content})
@@ -408,13 +410,13 @@ def create_dummy_no_shim_settings_bids_session(session_path):
         for r in [1, 2]
     }
 
-    # structure for the full session:
-    session_struct = {
-        'fmap': fmap_struct,
-        'anat': anat_struct,
-        'dwi': dwi_struct,
-        'func': func_struct,
-    }
+    # structure for the full session (init the OrderedDict as a list to preserve order):
+    session_struct = OrderedDict([
+        ('fmap', fmap_struct),
+        ('anat', anat_struct),
+        ('dwi', dwi_struct),
+        ('func', func_struct),
+    ])
     # add "_scans.tsv" file to the session_struct
     scans_file_content = generate_scans_tsv(session_struct)
     session_struct.update({'{p}_scans.tsv'.format(p=prefix): scans_file_content})
@@ -582,12 +584,12 @@ def create_dummy_magnitude_phase_bids_session(session_path):
     fmap_struct.update({
         '{p}_acq-case3_fieldmap.json'.format(p=prefix): {'ShimSetting': func_shims_B}
     })
-    # structure for the full session:
-    session_struct = {
-        'fmap': fmap_struct,
-        'dwi': dwi_struct,
-        'func': func_struct,
-    }
+    # structure for the full session (init the OrderedDict as a list to preserve order):
+    session_struct = OrderedDict([
+        ('fmap', fmap_struct),
+        ('dwi', dwi_struct),
+        ('func', func_struct),
+    ])
     # add "_scans.tsv" file to the session_struct
     scans_file_content = generate_scans_tsv(session_struct)
     session_struct.update({'{p}_scans.tsv'.format(p=prefix): scans_file_content})
@@ -761,9 +763,9 @@ def test_select_fmap_from_compatible_groups(tmpdir, folder, expected_prefix, sim
             # beginning of the session)
             if selected_fmap:
                 if criterion == 'First':
-                    assert selected_fmap == list(expected_compatible_fmaps[json_file])[0]
+                    assert selected_fmap == sorted(expected_compatible_fmaps[json_file])[0]
                 elif criterion == 'Closest':
-                    assert selected_fmap == list(expected_compatible_fmaps[json_file])[-1]
+                    assert selected_fmap == sorted(expected_compatible_fmaps[json_file])[-1]
             else:
                 assert not expected_compatible_fmaps[json_file]
 
