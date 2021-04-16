@@ -210,6 +210,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                 converter=converter,
                 scaninfo_suffix=getattr(heuristic, 'scaninfo_suffix', '.json'),
                 custom_callable=getattr(heuristic, 'custom_callable', None),
+                populate_intended_for_opts=getattr(heuristic, 'POPULATE_INTENDED_FOR_OPTS', {}),
                 with_prov=with_prov,
                 bids_options=bids_options,
                 outdir=tdir,
@@ -396,7 +397,7 @@ def update_uncombined_name(metadata, filename, channel_names):
 
 def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
             bids_options, outdir, min_meta, overwrite, symlink=True, prov_file=None,
-            dcmconfig=None):
+            dcmconfig=None, populate_intended_for_opts={}):
     """Perform actual conversion (calls to converter etc) given info from
     heuristic's `infotodict`
 
@@ -543,7 +544,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
         sessions = set()
 
     for ses in sessions:
-        populate_intended_for(ses)
+        populate_intended_for(ses, **populate_intended_for_opts)
 
 
 def convert_dicom(item_dicoms, bids_options, prefix,

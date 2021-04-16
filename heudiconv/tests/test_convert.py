@@ -14,6 +14,7 @@ from heudiconv.convert import (update_complex_name,
                                convert,
                                )
 from heudiconv.bids import BIDSError
+from heudiconv.utils import load_heuristic
 from heudiconv.cli.run import main as runner
 
 
@@ -124,8 +125,13 @@ def test_b0dwi_for_fmap(tmpdir, capfd):
         (['Bourne'], 'Treadstone', op.join('sub-{{sID}}', 'ses-{{ses}}')),
     ]
 )
+# Two possibilities: with or without heuristics:
+@pytest.mark.parametrize(
+    "heuristic", ['example', None]       # heuristics/example.py
+)
 def test_convert(tmpdir, monkeypatch, capfd,
-                 subjects, sesID, expected_session_folder):
+                 subjects, sesID, expected_session_folder,
+                 heuristic):
     """
     Test convert
 
@@ -134,11 +140,13 @@ def test_convert(tmpdir, monkeypatch, capfd,
     More tests can be added here.
     """
 
-    def mock_populate_intended_for(session):
+    def mock_populate_intended_for(session, matching_parameter='Shims', criterion='Closest'):
         """
-        Pretend we run populate_intended_for, but just print out the argument.
+        Pretend we run populate_intended_for, but just print out the arguments.
         """
         print('session: {}'.format(session))
+        print('matching_parameter: {}'.format(matching_parameter))
+        print('criterion: {}'.format(criterion))
         return
     # mock the "populate_intended_for" attribute for the module from
     # which "convert" was imported:
@@ -157,10 +165,12 @@ def test_convert(tmpdir, monkeypatch, capfd,
         for s in subjects
     ]
 
+    heuristic = load_heuristic('example') if heuristic else None
     convert(items,
             converter='',
             scaninfo_suffix='.json',
             custom_callable=None,
+            populate_intended_for_opts=getattr(heuristic, 'POPULATE_INTENDED_FOR_OPTS', {}),
             with_prov=None,
             bids_options=[],
             outdir=outdir,
@@ -168,5 +178,11 @@ def test_convert(tmpdir, monkeypatch, capfd,
             overwrite=False)
     output = capfd.readouterr()
     assert all([
-        'session: ' + outfolder.format(sID=s, ses=sesID) in output.out for s in subjects
+        "\n".join([
+            "session: " + outfolder.format(sID=s, ses=sesID),
+            # "ImagingVolume" is defined in heuristic file; "Shims" is the default
+            "matching_parameter: " + ("ImagingVolume" if heuristic else "Shims"),
+            "criterion: Closest"
+        ]) in output.out
+        for s in subjects
     ])
