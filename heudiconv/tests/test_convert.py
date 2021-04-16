@@ -121,7 +121,7 @@ def test_b0dwi_for_fmap(tmpdir, capfd):
 @pytest.mark.parametrize(
     "subjects, sesID, expected_session_folder", [
         (['Jason', 'Bourne'], None, 'sub-{sID}'),
-        ('Bourne', 'Treadstone', 'sub-{{sID}}{sep}ses-{{ses}}'.format(sep=op.sep)),
+        (['Bourne'], 'Treadstone', op.join('sub-{{sID}}', 'ses-{{ses}}')),
     ]
 )
 def test_convert(tmpdir, monkeypatch, capfd,
@@ -147,13 +147,13 @@ def test_convert(tmpdir, monkeypatch, capfd,
     )
 
     outdir = op.join(str(tmpdir), 'foo')
-    outfolder = op.join(outdir, 'sub-{sID}', 'ses-{ses}' if sesID else '')
+    outfolder = op.join('sub-{sID}', 'ses-{ses}') if sesID else 'sub-{sID}'
     sub_ses = 'sub-{sID}' + ('_ses-{ses}' if sesID else '')
 
     # items are a list of tuples, with each tuple having three elements:
     #   prefix, outtypes, item_dicoms
     items = [
-        (op.join(outfolder, 'anat', sub_ses + '_T1w').format(sID=s, ses=sesID), ('',), [])
+        (op.join(outdir, outfolder, 'anat', sub_ses + '_T1w').format(sID=s, ses=sesID), ('',), [])
         for s in subjects
     ]
 
@@ -167,4 +167,6 @@ def test_convert(tmpdir, monkeypatch, capfd,
             min_meta=True,
             overwrite=False)
     output = capfd.readouterr()
-    assert ['session: sub-{}'.format(s) in output.out for s in subjects]
+    assert all([
+        'session: ' + outfolder.format(sID=s, ses=sesID) in output.out for s in subjects
+    ])
