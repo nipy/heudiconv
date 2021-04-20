@@ -524,7 +524,7 @@ def create_tree(path, tree, archives_leading_dir=True):
         if name.endswith('.json') and isinstance(load, dict):
             # (For a json file, we expect the content to be a dictionary, so
             #  don't continue creating a tree, but just write dict to file)
-            save_json(full_name, load, indent=4)
+            save_json(full_name, load)
         elif isinstance(load, (tuple, list, dict)):
             # if name.endswith('.tar.gz') or name.endswith('.tar') or name.endswith('.zip'):
             #     create_tree_archive(path, name, load, archives_leading_dir=archives_leading_dir)
