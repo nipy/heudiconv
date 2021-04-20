@@ -129,7 +129,7 @@ def test_b0dwi_for_fmap(tmpdir, capfd):
 @pytest.mark.parametrize(
     "heuristic", ['example', None]       # heuristics/example.py
 )
-def test_convert(tmpdir, monkeypatch, capfd,
+def test_populate_intended_for(tmpdir, monkeypatch, capfd,
                  subjects, sesID, expected_session_folder,
                  heuristic):
     """
