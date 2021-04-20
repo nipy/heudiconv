@@ -94,36 +94,6 @@ def treat_age(age):
     return age
 
 
-def maybe_na(val):
-    """Return 'n/a' if non-None value represented as str is not empty
-
-    Primarily for the consistent use of lower case 'n/a' so 'N/A' and 'NA'
-    are also treated as 'n/a'
-    """
-    if val is not None:
-        val = str(val)
-        val = val.strip()
-    return 'n/a' if (not val or val in ('N/A', 'NA')) else val
-
-
-def treat_age(age):
-    """Age might encounter 'Y' suffix or be a float"""
-    age = str(age)
-    if age.endswith('M'):
-        age = age.rstrip('M')
-        age = float(age) / 12
-        age = ('%.2f' if age != int(age) else '%d') % age
-    else:
-        age = age.rstrip('Y')
-    if age:
-        # strip all leading 0s but allow to scan a newborn (age 0Y)
-        age = '0' if not age.lstrip('0') else age.lstrip('0')
-        if age.startswith('.'):
-            # we had float point value, let's prepend 0
-            age = '0' + age
-    return age
-
-
 def populate_bids_templates(path, defaults={}):
     """Premake BIDS text files with templates"""
 
