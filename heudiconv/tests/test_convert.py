@@ -2,17 +2,11 @@
 """
 import os.path as op
 from glob import glob
-from sys import modules as sys_modules
 
 import pytest
 from .utils import TESTS_DATA_PATH
 
-from heudiconv.convert import (update_complex_name,
-                               update_multiecho_name,
-                               update_uncombined_name,
-                               DW_IMAGE_IN_FMAP_FOLDER_WARNING,
-                               convert,
-                               )
+import heudiconv.convert
 from heudiconv.bids import BIDSError
 from heudiconv.utils import load_heuristic
 from heudiconv.cli.run import main as runner
@@ -27,17 +21,17 @@ def test_update_complex_name():
     metadata = {'ImageType': ['ORIGINAL', 'PRIMARY', 'P', 'MB', 'TE3', 'ND', 'MOSAIC']}
     suffix = 3
     out_fn_true = 'sub-X_ses-Y_task-Z_run-01_part-phase_sbref'
-    out_fn_test = update_complex_name(metadata, fn, suffix)
+    out_fn_test = heudiconv.convert.update_complex_name(metadata, fn, suffix)
     assert out_fn_test == out_fn_true
     # Catch an unsupported type and *do not* update
     fn = 'sub-X_ses-Y_task-Z_run-01_phase'
-    out_fn_test = update_complex_name(metadata, fn, suffix)
+    out_fn_test = heudiconv.convert.update_complex_name(metadata, fn, suffix)
     assert out_fn_test == fn
     # Data type is missing from metadata so use suffix
     fn = 'sub-X_ses-Y_task-Z_run-01_sbref'
     metadata = {'ImageType': ['ORIGINAL', 'PRIMARY', 'MB', 'TE3', 'ND', 'MOSAIC']}
     out_fn_true = 'sub-X_ses-Y_task-Z_run-01_part-3_sbref'
-    out_fn_test = update_complex_name(metadata, fn, suffix)
+    out_fn_test = heudiconv.convert.update_complex_name(metadata, fn, suffix)
     assert out_fn_test == out_fn_true
     # Catch existing field with value that *does not match* metadata
     # and raise Exception
@@ -45,7 +39,7 @@ def test_update_complex_name():
     metadata = {'ImageType': ['ORIGINAL', 'PRIMARY', 'P', 'MB', 'TE3', 'ND', 'MOSAIC']}
     suffix = 3
     with pytest.raises(BIDSError):
-        assert update_complex_name(metadata, fn, suffix)
+        assert heudiconv.convert.update_complex_name(metadata, fn, suffix)
 
 
 def test_update_multiecho_name():
@@ -58,15 +52,15 @@ def test_update_multiecho_name():
                 'EchoNumber': 1}
     echo_times = [0.01, 0.02, 0.03]
     out_fn_true = 'sub-X_ses-Y_task-Z_run-01_echo-1_bold'
-    out_fn_test = update_multiecho_name(metadata, fn, echo_times)
+    out_fn_test = heudiconv.convert.update_multiecho_name(metadata, fn, echo_times)
     assert out_fn_test == out_fn_true
     # EchoNumber field is missing from metadata, so use echo_times
     metadata = {'EchoTime': 0.01}
-    out_fn_test = update_multiecho_name(metadata, fn, echo_times)
+    out_fn_test = heudiconv.convert.update_multiecho_name(metadata, fn, echo_times)
     assert out_fn_test == out_fn_true
     # Catch an unsupported type and *do not* update
     fn = 'sub-X_ses-Y_task-Z_run-01_phasediff'
-    out_fn_test = update_multiecho_name(metadata, fn, echo_times)
+    out_fn_test = heudiconv.convert.update_multiecho_name(metadata, fn, echo_times)
     assert out_fn_test == fn
 
 
@@ -79,12 +73,12 @@ def test_update_uncombined_name():
     metadata = {'CoilString': 'H1'}
     channel_names = ['H1', 'H2', 'H3', 'HEA;HEP']
     out_fn_true = 'sub-X_ses-Y_task-Z_run-01_ch-01_bold'
-    out_fn_test = update_uncombined_name(metadata, fn, channel_names)
+    out_fn_test = heudiconv.convert.update_uncombined_name(metadata, fn, channel_names)
     assert out_fn_test == out_fn_true
     # CoilString field has no number in it
     metadata = {'CoilString': 'HEA;HEP'}
     out_fn_true = 'sub-X_ses-Y_task-Z_run-01_ch-04_bold'
-    out_fn_test = update_uncombined_name(metadata, fn, channel_names)
+    out_fn_test = heudiconv.convert.update_uncombined_name(metadata, fn, channel_names)
     assert out_fn_test == out_fn_true
 
 
@@ -105,7 +99,9 @@ def test_b0dwi_for_fmap(tmpdir, capfd):
     # assert that it raised a warning that the fmap directory will contain
     # bvec and bval files.
     output = capfd.readouterr().err.split('\n')
-    expected_msg = DW_IMAGE_IN_FMAP_FOLDER_WARNING.format(folder=op.join(tmppath, 'sub-%s', 'fmap') % subID)
+    expected_msg = heudiconv.convert.DW_IMAGE_IN_FMAP_FOLDER_WARNING.format(
+        folder=op.join(tmppath, 'sub-%s', 'fmap') % subID
+    )
     assert [o for o in output if expected_msg in o]
 
     # check that both 'fmap' and 'dwi' directories have been extracted and they contain
@@ -148,10 +144,9 @@ def test_populate_intended_for(tmpdir, monkeypatch, capfd,
         print('matching_parameter: {}'.format(matching_parameter))
         print('criterion: {}'.format(criterion))
         return
-    # mock the "populate_intended_for" attribute for the module from
-    # which "convert" was imported:
+    # mock the "populate_intended_for":
     monkeypatch.setattr(
-        sys_modules[convert.__module__], "populate_intended_for", mock_populate_intended_for
+        heudiconv.convert, "populate_intended_for", mock_populate_intended_for
     )
 
     outdir = op.join(str(tmpdir), 'foo')
@@ -166,7 +161,7 @@ def test_populate_intended_for(tmpdir, monkeypatch, capfd,
     ]
 
     heuristic = load_heuristic('example') if heuristic else None
-    convert(items,
+    heudiconv.convert.convert(items,
             converter='',
             scaninfo_suffix='.json',
             custom_callable=None,
