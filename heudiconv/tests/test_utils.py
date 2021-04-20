@@ -10,7 +10,7 @@ from heudiconv.utils import (
     load_json,
     create_tree,
     save_json,
-    add_field_to_json,
+    update_json,
     get_datetime,
     remove_suffix,
     remove_prefix,
@@ -91,9 +91,9 @@ def test_load_json(tmpdir, caplog):
     assert load_json(valid_json_file) == vcontent
 
 
-def test_add_field_to_json(tmpdir):
+def test_update_json(tmpdir):
     """
-    Test utils.add_field_to_json()
+    Test utils.update_json()
     """
     dummy_json_file = str(tmpdir / 'dummy.json')
     some_content = {"name": "Jason", "age": 30, "city": "New York"}
@@ -108,7 +108,7 @@ def test_add_field_to_json(tmpdir):
                          "Jason Bourne"
                      ]
                      }
-    add_field_to_json(dummy_json_file, added_content)
+    update_json(dummy_json_file, added_content)
 
     # check that it was added:
     with open(dummy_json_file) as f:

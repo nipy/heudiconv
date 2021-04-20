@@ -20,7 +20,7 @@ from .utils import (
     save_json,
     create_file_if_missing,
     json_dumps_pretty,
-    add_field_to_json,
+    update_json,
     set_readonly,
     is_readonly,
     get_datetime,
@@ -912,4 +912,4 @@ def populate_intended_for(path_to_bids_session, matching_parameter='Shims', crit
             intended_for = sorted([str(f) for f in intended_for])
             # Add this intended_for to all fmap files in the fmap_group:
             for fm_json in unique_fmap_groups[fmap_group]:
-                add_field_to_json(fm_json, {"IntendedFor": intended_for})
+                update_json(fm_json, {"IntendedFor": intended_for})
