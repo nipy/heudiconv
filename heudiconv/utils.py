@@ -278,7 +278,7 @@ def add_field_to_json(json_file, field_and_value):
     """
     for key, value in field_and_value.items():
         lgr.debug(
-            'File: "{f}": Adding {k}: {v}'.format(
+            'File "{f}": Setting {k} to {v}'.format(
                 f=json_file,
                 k=key,
                 v=value,
