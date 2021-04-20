@@ -265,7 +265,7 @@ def json_dumps_pretty(j, indent=2, sort_keys=True):
     return js_
 
 
-def update_json(json_file, new_data):
+def update_json(json_file, new_data, pretty=False):
     """
     Adds a given field (and its value) to a json file
 
@@ -275,6 +275,8 @@ def update_json(json_file, new_data):
         path for the corresponding json file
     new_data : dict
         pair of "key": "value" to add to the json file
+    pretty : bool
+        argument to be passed to save_json
     """
     for key, value in new_data.items():
         lgr.debug(
@@ -288,7 +290,7 @@ def update_json(json_file, new_data):
     with open(json_file) as f:
         data = json.load(f)
     data.update(new_data)
-    save_json(json_file, data, pretty=True)
+    save_json(json_file, data, pretty=pretty)
 
 
 def treat_infofile(filename):
