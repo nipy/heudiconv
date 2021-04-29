@@ -209,7 +209,7 @@ def workflow(*, dicom_dir_template=None, files=None, subjs=None,
     debug : bool, optional
         Do not catch exceptions and show exception traceback. Default is False.
     command : {'heuristics', 'heuristic-info', 'ls', 'populate-templates',
-               'sanitize-jsons', 'treat-jsons', None}, optional
+               'sanitize-jsons', 'treat-jsons', 'populate-intended-for', None}, optional
         Custom action to be performed on provided files instead of regular
         operation. Default is None.
     grouping : {'studyUID', 'accession_number', 'all', 'custom'}, optional

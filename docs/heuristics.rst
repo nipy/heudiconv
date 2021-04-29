@@ -85,3 +85,55 @@ or::
         seqinfos = collections.OrderedDict()
         ...
         return seqinfos  # ordered dict containing seqinfo objects: list of DICOMs
+
+
+-------------------------------
+``POPULATE_INTENDED_FOR_OPTS``
+-------------------------------
+
+Dictionary to specify options to populate the ``'IntendedFor'`` field of the ``fmap``
+jsons.
+
+When a BIDS session has ``fmaps``, they can automatically be assigned to be used for
+susceptibility distortion correction of other non-``fmap`` images in the session
+(populating the ``'IntendedFor'`` field in the ``fmap`` json file).
+
+For this automated assignment, ``fmaps`` are taken as groups (``_phase`` and ``_phasediff``
+images and the corresponding ``_magnitude`` images; consecutive Spin-Echo images collected
+with opposite phase encoding polarity (``pepolar`` case); etc.).
+
+This is achieved by checking, for every non-``fmap`` image in the session, which ``fmap``
+groups are suitable candidates to correct for distortions in that image.  Then, if there is
+more than one candidate (e.g., if there was a ``fmap`` collected at the beginning of the
+session and another one at the end), the user can specify which one to use.
+
+The parameters that can be specified and the allowed options are defined in ``bids.py``:
+ - ``'matching_parameter'``: The imaging parameter that needs to match between the ``fmap``
+   and an image for the ``fmap`` to be considered as a suitable to correct that image.
+   Allowed options are:
+
+   * ``'Shims'``: ``heudiconv`` will check the ``ShimSetting`` in the ``.json`` files and
+     will only assign ``fmaps`` to images if the ``ShimSettings`` are identical for both.
+   * ``'ImagingVolume'``: both ``fmaps`` and images will need to have the same the imaging
+     volume (the header affine transformation: position, orientation and voxel size, as well
+     as number of voxels along each dimensions).
+
+
+ - ``'criterion'``: Criterion to decide which of the candidate ``fmaps`` will be assigned to
+   a given file, if there are more than one. Allowed values are:
+
+   * ``'First'``: The first matching ``fmap``.
+   * ``'Closest'``: The closest in time to the beginning of the image acquisition.
+
+.. note::
+  Example::
+
+    POPULATE_INTENDED_FOR_OPTS = {
+            'matching_parameter': 'ImagingVolume',
+            'criterion': 'Closest'
+    }
+
+.. note::
+    To have ``heudiconv`` automatically populate the ``'IntededFor'`` fields in the ``fmap``
+    json files, you need to run ``heudiconv`` a first time, and when it has finished, run it
+    a second time adding ``--command populate-intended-for``.
