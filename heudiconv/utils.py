@@ -147,21 +147,6 @@ def write_config(outfile, info):
         fp.writelines(PrettyPrinter().pformat(info))
 
 
-def _canonical_dumps(json_obj, **kwargs):
-    """ Dump `json_obj` to string, allowing for Python newline bug
-
-    Runs ``json.dumps(json_obj, \*\*kwargs), then removes trailing whitespaces
-    added when doing indent in some Python versions. See
-    https://bugs.python.org/issue16333. Bug seems to be fixed in 3.4, for now
-    fixing manually not only for aestetics but also to guarantee the same
-    result across versions of Python.
-    """
-    out = json.dumps(json_obj, **kwargs)
-    if 'indent' in kwargs:
-        out = out.replace(' \n', '\n')
-    return out
-
-
 def load_json(filename):
     """Load data from a json file
 
@@ -220,10 +205,16 @@ def save_json(filename, data, indent=2, sort_keys=True, pretty=False):
                 % (str(exc), filename)
             )
     if not pretty:
-        j = _canonical_dumps(data, **dumps_kw)
+        j = json_dumps(data, **dumps_kw)
     assert j is not None  # one way or another it should have been set to a str
     with open(filename, 'w') as fp:
         fp.write(j)
+
+
+def json_dumps(json_obj, indent=2, sort_keys=True):
+    """Unified (default indent and sort_keys) invocation of json.dumps
+    """
+    return json.dumps(json_obj, indent=indent, sort_keys=sort_keys)
 
 
 def json_dumps_pretty(j, indent=2, sort_keys=True):
@@ -232,7 +223,7 @@ def json_dumps_pretty(j, indent=2, sort_keys=True):
 
     If resultant structure differs from original -- throws exception
     """
-    js = _canonical_dumps(j, indent=indent, sort_keys=sort_keys)
+    js = json_dumps(j, indent=indent, sort_keys=sort_keys)
     # trim away \n and spaces between entries of numbers
     js_ = re.sub(
         '[\n ]+("?[-+.0-9e]+"?,?) *\n(?= *"?[-+.0-9e]+"?)', r' \1',
