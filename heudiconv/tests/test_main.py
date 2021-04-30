@@ -84,7 +84,8 @@ def test_populate_bids_templates(tmpdir):
     assert "something" not in description_file.read()
     assert "TODO" in description_file.read()
 
-    assert load_json(tmpdir / "scans.json") == SCANS_FILE_FIELDS
+    # Explicit str() is needed for py 3.5. TODO: remove when dropping 3.5
+    assert load_json(str(tmpdir / "scans.json")) == SCANS_FILE_FIELDS
 
 
 def test_add_participant_record(tmpdir):
