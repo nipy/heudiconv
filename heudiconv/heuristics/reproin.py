@@ -381,13 +381,17 @@ def get_study_hash(seqinfo):
 def fix_canceled_runs(seqinfo):
     """Function that adds cancelme_ to known bad runs which were forgotten
     """
-    accession_number = get_unique(seqinfo, 'accession_number')
-    if accession_number in fix_accession2run:
-        lgr.info("Considering some runs possibly marked to be "
-                 "canceled for accession %s", accession_number)
-        badruns = fix_accession2run[accession_number]
-        badruns_pattern = '|'.join(badruns)
-        for i, s in enumerate(seqinfo):
+    if not fix_accession2run:
+        return seqinfo  # nothing to do
+    for i, s in enumerate(seqinfo):
+        accession_number = getattr(s, 'accession_number')
+        if accession_number and accession_number in fix_accession2run:
+            lgr.info("Considering some runs possibly marked to be "
+                     "canceled for accession %s", accession_number)
+            # This code is reminiscent of prior logic when operating on
+            # a single accession, but left as is for now
+            badruns = fix_accession2run[accession_number]
+            badruns_pattern = '|'.join(badruns)
             if re.match(badruns_pattern, s.series_id):
                 lgr.info('Fixing bad run {0}'.format(s.series_id))
                 fixedkwargs = dict()
