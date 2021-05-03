@@ -19,7 +19,7 @@ from .utils import (
     load_json,
     save_json,
     create_file_if_missing,
-    json_dumps_pretty,
+    json_dumps,
     update_json,
     set_readonly,
     is_readonly,
@@ -137,6 +137,9 @@ def populate_bids_templates(path, defaults={}):
     create_file_if_missing(op.join(path, 'README'),
         "TODO: Provide description for the dataset -- basic details about the "
         "study, possibly pointing to pre-registration (if public or embargoed)")
+    create_file_if_missing(op.join(path, 'scans.json'),
+        json_dumps(SCANS_FILE_FIELDS, sort_keys=False)
+    )
 
     populate_aggregated_jsons(path)
 
@@ -421,11 +424,6 @@ def add_rows_to_scans_keys_file(fn, newrows):
         os.unlink(fn)
     else:
         fnames2info = newrows
-        # Populate _scans.json (an optional file to describe column names in
-        # _scans.tsv). This auto generation will make BIDS-validator happy.
-        scans_json = '.'.join(fn.split('.')[:-1] + ['json'])
-        if not op.lexists(scans_json):
-            save_json(scans_json, SCANS_FILE_FIELDS, sort_keys=False)
 
     header = SCANS_FILE_FIELDS
     # prepare all the data rows
@@ -882,4 +880,4 @@ def populate_intended_for(path_to_bids_session, matching_parameter='Shims', crit
             intended_for = sorted([str(f) for f in intended_for])
             # Add this intended_for to all fmap files in the fmap_group:
             for fm_json in unique_fmap_groups[fmap_group]:
-                update_json(fm_json, {"IntendedFor": intended_for})
+                update_json(fm_json, {"IntendedFor": intended_for}, pretty=True)
