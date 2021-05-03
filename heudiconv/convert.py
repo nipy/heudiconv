@@ -544,7 +544,8 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
         sessions = set()
 
     for ses in sessions:
-        populate_intended_for(ses, **populate_intended_for_opts)
+        session_path = op.join(outdir, ses)
+        populate_intended_for(session_path, **populate_intended_for_opts)
 
 
 def convert_dicom(item_dicoms, bids_options, prefix,

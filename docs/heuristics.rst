@@ -133,7 +133,5 @@ The parameters that can be specified and the allowed options are defined in ``bi
             'criterion': 'Closest'
     }
 
-.. note::
-    To have ``heudiconv`` automatically populate the ``'IntededFor'`` fields in the ``fmap``
-    json files, you need to run ``heudiconv`` a first time, and when it has finished, run it
-    a second time adding ``--command populate-intended-for``.
+If ``POPULATE_INTENDED_FOR_OPTS`` is not present in the heuristic file, ``IntendedFor``
+will not be populated automatically.

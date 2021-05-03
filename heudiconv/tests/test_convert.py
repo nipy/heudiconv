@@ -153,13 +153,13 @@ def test_populate_intended_for(tmpdir, monkeypatch, capfd,
     )
 
     outdir = op.join(str(tmpdir), 'foo')
-    outfolder = op.join('sub-{sID}', 'ses-{ses}') if sesID else 'sub-{sID}'
+    outfolder = op.join(outdir, 'sub-{sID}', 'ses-{ses}') if sesID else op.join(outdir,'sub-{sID}')
     sub_ses = 'sub-{sID}' + ('_ses-{ses}' if sesID else '')
 
     # items are a list of tuples, with each tuple having three elements:
     #   prefix, outtypes, item_dicoms
     items = [
-        (op.join(outdir, outfolder, 'anat', sub_ses + '_T1w').format(sID=s, ses=sesID), ('',), [])
+        (op.join(outfolder, 'anat', sub_ses + '_T1w').format(sID=s, ses=sesID), ('',), [])
         for s in subjects
     ]
 
