@@ -168,19 +168,23 @@ def test_populate_intended_for(tmpdir, monkeypatch, capfd,
             converter='',
             scaninfo_suffix='.json',
             custom_callable=None,
-            populate_intended_for_opts=getattr(heuristic, 'POPULATE_INTENDED_FOR_OPTS', {}),
+            populate_intended_for_opts=getattr(heuristic, 'POPULATE_INTENDED_FOR_OPTS', None),
             with_prov=None,
             bids_options=[],
             outdir=outdir,
             min_meta=True,
             overwrite=False)
     output = capfd.readouterr()
-    assert all([
-        "\n".join([
-            "session: " + outfolder.format(sID=s, ses=sesID),
-            # "ImagingVolume" is defined in heuristic file; "Shims" is the default
-            "matching_parameter: " + ("ImagingVolume" if heuristic else "Shims"),
-            "criterion: Closest"
-        ]) in output.out
-        for s in subjects
-    ])
+    if heuristic:
+        assert all([
+            "\n".join([
+                "session: " + outfolder.format(sID=s, ses=sesID),
+                # "ImagingVolume" is defined in heuristic file; "Shims" is the default
+                "matching_parameter: " + ("ImagingVolume" if heuristic else "Shims"),
+                "criterion: Closest"
+            ]) in output.out
+            for s in subjects
+        ])
+    else:
+        # If there was no heuristic, make sure populate_intended_for was not called
+        assert not output.out
