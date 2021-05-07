@@ -21,10 +21,13 @@ class TempDirs:
         """Cleanup tracked temporary directories"""
         import shutil
 
+        self.lgr.debug("Removing %d temporary directories", len(self.dirs))
         for tmpdir in self.dirs:
             try:
+                self.lgr.debug("Removing %s", tmpdir)
                 shutil.rmtree(tmpdir)
             except FileNotFoundError:
                 pass
+
 
 tmpdirs = TempDirs()
