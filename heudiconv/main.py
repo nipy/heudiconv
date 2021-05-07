@@ -370,3 +370,5 @@ def workflow(*, dicom_dir_template=None, files=None, subjs=None,
     #
     # TODO: record_collection of the sid/session although that information
     # is pretty much present in .heudiconv/SUBJECT/info so we could just poke there
+    from ._tmpdirs import tmpdirs
+    tmpdirs.cleanup()

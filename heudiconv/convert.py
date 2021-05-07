@@ -4,9 +4,9 @@ import os.path as op
 import logging
 from math import nan
 import shutil
-import sys
 import random
 import re
+import tempfile
 
 from .due import due, Doi
 
@@ -15,12 +15,10 @@ from .utils import (
     load_json,
     save_json,
     write_config,
-    TempDirs,
     safe_copyfile,
     safe_movefile,
     treat_infofile,
     set_readonly,
-    clear_temp_dicoms,
     seqinfo_fields,
     assure_no_file_exists,
     file_md5sum
@@ -215,9 +213,6 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                 min_meta=min_meta,
                 overwrite=overwrite,
                 dcmconfig=dcmconfig,)
-
-    for item_dicoms in filegroup.values():
-        clear_temp_dicoms(item_dicoms)
 
     if bids_options is not None and 'notop' not in bids_options:
         lockfile = op.join(anon_outdir, LOCKFILE)
@@ -417,7 +412,6 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
     None
     """
     prov_files = []
-    tempdirs = TempDirs()
 
     if bids_options is not None:
         due.cite(
@@ -461,7 +455,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
 
             if outtype == 'dicom':
                 convert_dicom(item_dicoms, bids_options, prefix,
-                              outdir, tempdirs, symlink, overwrite)
+                              outdir, symlink, overwrite)
             elif outtype in ['nii', 'nii.gz']:
                 assert converter == 'dcm2niix', ('Invalid converter '
                                                  '{}'.format(converter))
@@ -470,28 +464,37 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                                      prefix + scaninfo_suffix)
 
                 if not op.exists(outname) or overwrite:
-                    tmpdir = tempdirs('dcm2niix')
+                    with tempfile.TemporaryDirectory(prefix='dcm2niix') as tmpdir:
 
-                    # run conversion through nipype
-                    res, prov_file = nipype_convert(item_dicoms, prefix, with_prov,
-                                                    bids_options, tmpdir, dcmconfig)
+                        # run conversion through nipype
+                        res, prov_file = nipype_convert(
+                            item_dicoms, prefix,
+                            with_prov,
+                            bids_options,
+                            tmpdir,
+                            dcmconfig
+                        )
 
-                    bids_outfiles = save_converted_files(res, item_dicoms, bids_options,
-                                                         outtype, prefix,
-                                                         outname_bids,
-                                                         overwrite=overwrite)
+                        bids_outfiles = save_converted_files(
+                            res,
+                            item_dicoms,
+                            bids_options,
+                            outtype,
+                            prefix,
+                            outname_bids,
+                            overwrite=overwrite
+                        )
 
-                    # save acquisition time information if it's BIDS
-                    # at this point we still have acquisition date
-                    if bids_options is not None:
-                        save_scans_key(item, bids_outfiles)
-                    # Fix up and unify BIDS files
-                    tuneup_bids_json_files(bids_outfiles)
+                        # save acquisition time information if it's BIDS
+                        # at this point we still have acquisition date
+                        if bids_options is not None:
+                            save_scans_key(item, bids_outfiles)
+                        # Fix up and unify BIDS files
+                        tuneup_bids_json_files(bids_outfiles)
 
-                    if prov_file:
-                        prov_files.append(prov_file)
+                        if prov_file:
+                            prov_files.append(prov_file)
 
-                    tempdirs.rmtree(tmpdir)
                 else:
                     raise RuntimeError(
                         "was asked to convert into %s but destination already exists"
@@ -509,7 +512,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
             lgr.debug("No BIDS files were produced, nothing to embed to then")
         elif outname and not min_meta:
             embed_metadata_from_dicoms(bids_options, item_dicoms, outname, outname_bids,
-                                       prov_file, scaninfo, tempdirs, with_prov)
+                                       prov_file, scaninfo, with_prov)
         if scaninfo and op.exists(scaninfo):
             lgr.info("Post-treating %s file", scaninfo)
             treat_infofile(scaninfo)
@@ -524,7 +527,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
 
 
 def convert_dicom(item_dicoms, bids_options, prefix,
-                  outdir, tempdirs, symlink, overwrite):
+                  outdir, symlink, overwrite):
     """Save DICOMs as output (default is by symbolic link)
 
     Parameters
@@ -538,9 +541,6 @@ def convert_dicom(item_dicoms, bids_options, prefix,
         Conversion outname
     outdir : string
         Output directory
-    tempdirs : TempDirs instance
-        Object to handle temporary directories created
-        TODO: remove
     symlink : bool
         Create softlink to DICOMs - if False, create hardlink instead.
     overwrite : bool
@@ -561,7 +561,6 @@ def convert_dicom(item_dicoms, bids_options, prefix,
 
         compress_dicoms(item_dicoms,
                         op.join(sourcedir_, op.basename(prefix)),
-                        tempdirs,
                         overwrite)
     else:
         dicomdir = prefix + '_dicom'

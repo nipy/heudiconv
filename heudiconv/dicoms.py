@@ -4,6 +4,7 @@ import os.path as op
 import logging
 from collections import OrderedDict
 import tarfile
+import tempfile
 
 from .external.pydicom import dcm
 from .utils import (
@@ -329,7 +330,7 @@ def get_dicom_series_time(dicom_list):
     return calendar.timegm(time.strptime(dicom_time_str, '%Y%m%d%H%M%S'))
 
 
-def compress_dicoms(dicom_list, out_prefix, tempdirs, overwrite):
+def compress_dicoms(dicom_list, out_prefix, overwrite):
     """Archives DICOMs into a tarball
 
     Also tries to do it reproducibly, so takes the date for files
@@ -342,8 +343,6 @@ def compress_dicoms(dicom_list, out_prefix, tempdirs, overwrite):
     out_prefix : str
       output path prefix, including the portion of the output file name
       before .dicom.tgz suffix
-    tempdirs : object
-      TempDirs object to handle multiple tmpdirs
     overwrite : bool
       Overwrite existing tarfiles
 
@@ -353,7 +352,6 @@ def compress_dicoms(dicom_list, out_prefix, tempdirs, overwrite):
       Result tarball
     """
 
-    tmpdir = tempdirs(prefix='dicomtar')
     outtar = out_prefix + '.dicom.tgz'
 
     if op.exists(outtar) and not overwrite:
@@ -373,27 +371,27 @@ def compress_dicoms(dicom_list, out_prefix, tempdirs, overwrite):
         return ti
 
     # poor man mocking since can't rely on having mock
-    try:
-        import time
-        _old_time = time.time
-        time.time = lambda: dcm_time
-        if op.lexists(outtar):
-            os.unlink(outtar)
-        with tarfile.open(outtar, 'w:gz', dereference=True) as tar:
-            for filename in dicom_list:
-                outfile = op.join(tmpdir, op.basename(filename))
-                if not op.islink(outfile):
-                    os.symlink(op.realpath(filename), outfile)
-                # place into archive stripping any lead directories and
-                # adding the one corresponding to prefix
-                tar.add(outfile,
-                        arcname=op.join(op.basename(out_prefix),
-                                        op.basename(outfile)),
-                        recursive=False,
-                        filter=_assign_dicom_time)
-    finally:
-        time.time = _old_time
-        tempdirs.rmtree(tmpdir)
+    with tempfile.TemporaryDirectory(prefix='dicomtar') as tmpdir:
+        try:
+            import time
+            _old_time = time.time
+            time.time = lambda: dcm_time
+            if op.lexists(outtar):
+                os.unlink(outtar)
+            with tarfile.open(outtar, 'w:gz', dereference=True) as tar:
+                for filename in dicom_list:
+                    outfile = op.join(tmpdir, op.basename(filename))
+                    if not op.islink(outfile):
+                        os.symlink(op.realpath(filename), outfile)
+                    # place into archive stripping any lead directories and
+                    # adding the one corresponding to prefix
+                    tar.add(outfile,
+                            arcname=op.join(op.basename(out_prefix),
+                                            op.basename(outfile)),
+                            recursive=False,
+                            filter=_assign_dicom_time)
+        finally:
+            time.time = _old_time
 
     return outtar
 
@@ -455,7 +453,7 @@ def embed_dicom_and_nifti_metadata(dcmfiles, niftifile, infofile, bids_info):
 
 
 def embed_metadata_from_dicoms(bids_options, item_dicoms, outname, outname_bids,
-                               prov_file, scaninfo, tempdirs, with_prov):
+                               prov_file, scaninfo, with_prov):
     """
     Enhance sidecar information file with more information from DICOMs
 
@@ -467,7 +465,6 @@ def embed_metadata_from_dicoms(bids_options, item_dicoms, outname, outname_bids,
     outname_bids
     prov_file
     scaninfo
-    tempdirs
     with_prov
 
     Returns
@@ -475,40 +472,40 @@ def embed_metadata_from_dicoms(bids_options, item_dicoms, outname, outname_bids,
 
     """
     from nipype import Node, Function
-    tmpdir = tempdirs(prefix='embedmeta')
 
     # We need to assure that paths are absolute if they are relative
     item_dicoms = list(map(op.abspath, item_dicoms))
 
-    embedfunc = Node(Function(input_names=['dcmfiles', 'niftifile', 'infofile',
-                                           'bids_info',],
-                              function=embed_dicom_and_nifti_metadata),
-                     name='embedder')
-    embedfunc.inputs.dcmfiles = item_dicoms
-    embedfunc.inputs.niftifile = op.abspath(outname)
-    embedfunc.inputs.infofile = op.abspath(scaninfo)
-    embedfunc.inputs.bids_info = load_json(op.abspath(outname_bids)) if (bids_options is not None) else None
-    embedfunc.base_dir = tmpdir
-    cwd = os.getcwd()
+    with tempfile.TemporaryDirectory(prefix='embedmeta') as tmpdir:
+        embedfunc = Node(Function(input_names=['dcmfiles', 'niftifile', 'infofile',
+                                            'bids_info',],
+                                function=embed_dicom_and_nifti_metadata),
+                        name='embedder')
+        embedfunc.inputs.dcmfiles = item_dicoms
+        embedfunc.inputs.niftifile = op.abspath(outname)
+        embedfunc.inputs.infofile = op.abspath(scaninfo)
+        embedfunc.inputs.bids_info = load_json(op.abspath(outname_bids)) if (bids_options is not None) else None
+        embedfunc.base_dir = tmpdir
+        cwd = os.getcwd()
 
-    lgr.debug("Embedding into %s based on dicoms[0]=%s for nifti %s",
-              scaninfo, item_dicoms[0], outname)
-    try:
-        if op.lexists(scaninfo):
-            # TODO: handle annexed file case
-            if not op.islink(scaninfo):
-                set_readonly(scaninfo, False)
-        res = embedfunc.run()
-        set_readonly(scaninfo)
-        if with_prov:
-            g = res.provenance.rdf()
-            g.parse(prov_file,
-                    format='turtle')
-            g.serialize(prov_file, format='turtle')
-            set_readonly(prov_file)
-    except Exception as exc:
-        lgr.error("Embedding failed: %s", str(exc))
-        os.chdir(cwd)
+        lgr.debug("Embedding into %s based on dicoms[0]=%s for nifti %s",
+                scaninfo, item_dicoms[0], outname)
+        try:
+            if op.lexists(scaninfo):
+                # TODO: handle annexed file case
+                if not op.islink(scaninfo):
+                    set_readonly(scaninfo, False)
+            res = embedfunc.run()
+            set_readonly(scaninfo)
+            if with_prov:
+                g = res.provenance.rdf()
+                g.parse(prov_file,
+                        format='turtle')
+                g.serialize(prov_file, format='turtle')
+                set_readonly(prov_file)
+        except Exception as exc:
+            lgr.error("Embedding failed: %s", str(exc))
+            os.chdir(cwd)
 
 def parse_private_csa_header(dcm_data, public_attr, private_attr, default=None):
     """
