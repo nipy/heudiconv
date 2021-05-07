@@ -3,7 +3,9 @@ from heudiconv.cli.run import main as runner
 import os
 import os.path as op
 from mock import patch
+from pathlib import Path
 from six.moves import StringIO
+import tempfile
 
 from glob import glob
 from os.path import join as pjoin, dirname
@@ -35,6 +37,9 @@ def test_smoke_convertall(tmpdir):
 
     args.extend(['-f', 'convertall'])
     runner(args)
+
+    # ensure we are not leaving lingering temporary directories
+    assert not list(Path(tempfile.gettempdir()).glob('heudiconv*'))
 
 
 @pytest.mark.parametrize('heuristic', ['reproin', 'convertall'])
