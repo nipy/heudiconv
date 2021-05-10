@@ -139,12 +139,12 @@ def test_populate_intended_for(tmpdir, monkeypatch, capfd,
     More tests can be added here.
     """
 
-    def mock_populate_intended_for(session, matching_parameter='Shims', criterion='Closest'):
+    def mock_populate_intended_for(session, matching_parameters='Shims', criterion='Closest'):
         """
         Pretend we run populate_intended_for, but just print out the arguments.
         """
         print('session: {}'.format(session))
-        print('matching_parameter: {}'.format(matching_parameter))
+        print('matching_parameters: {}'.format(matching_parameters))
         print('criterion: {}'.format(criterion))
         return
     # mock the "populate_intended_for":
@@ -182,7 +182,7 @@ def test_populate_intended_for(tmpdir, monkeypatch, capfd,
             "\n".join([
                 "session: " + outfolder.format(sID=s, ses=sesID),
                 # "ImagingVolume" is defined in heuristic file; "Shims" is the default
-                "matching_parameter: " + "ImagingVolume",
+                "matching_parameters: " + "ImagingVolume",
                 "criterion: Closest"
             ]) in output.out
             for s in subjects

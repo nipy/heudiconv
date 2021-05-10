@@ -115,20 +115,20 @@ def test_get_key_info_for_fmap_assignment(tmpdir, monkeypatch):
     with pytest.raises(FileNotFoundError):
         assert get_key_info_for_fmap_assignment('foo.json')
 
-    # 2) matching_parameter = 'Shims'
+    # 2) matching_parameters = 'Shims'
     save_json(json_name, {SHIM_KEY: A_SHIM})      # otherwise get_key_info_for_fmap_assignment will give an error
     key_info = get_key_info_for_fmap_assignment(
         json_name, matching_parameter='Shims'
     )
     assert key_info == [A_SHIM]
 
-    # 3) matching_parameter = 'ImagingVolume'
+    # 3) matching_parameters = 'ImagingVolume'
     key_info = get_key_info_for_fmap_assignment(
         json_name, matching_parameter='ImagingVolume'
     )
     assert key_info == [MY_AFFINE, MY_DIM[1:3]]
 
-    # 4) invalid matching_parameter:
+    # 4) invalid matching_parameters:
     with pytest.raises(ValueError):
         assert get_key_info_for_fmap_assignment(
             json_name, matching_parameter='Invalid'
@@ -689,7 +689,7 @@ def test_find_compatible_fmaps_for_run(tmpdir, simulation_function):
             compatible_fmaps = find_compatible_fmaps_for_run(
                 json_file,
                 expected_fmap_groups,
-                matching_parameter='Shims'
+                matching_parameters='Shims'
             )
             assert compatible_fmaps == expected_compatible_fmaps[json_file]
 
@@ -723,7 +723,7 @@ def test_find_compatible_fmaps_for_session(tmpdir, folder, expected_prefix, simu
     session_folder = op.join(str(tmpdir), folder)
     _, _, _, expected_compatible_fmaps = simulation_function(session_folder)
 
-    compatible_fmaps = find_compatible_fmaps_for_session(session_folder, matching_parameter='Shims')
+    compatible_fmaps = find_compatible_fmaps_for_session(session_folder, matching_parameters='Shims')
 
     assert compatible_fmaps == expected_compatible_fmaps
 
@@ -802,7 +802,7 @@ def test_populate_intended_for(tmpdir, folder, expected_prefix, simulation_funct
 
     session_folder = op.join(str(tmpdir), folder)
     session_struct, expected_result, _, _ = simulation_function(session_folder)
-    populate_intended_for(session_folder, matching_parameter='Shims', criterion='First')
+    populate_intended_for(session_folder, matching_parameters='Shims', criterion='First')
 
     # Now, loop through the jsons in the fmap folder and make sure it matches
     # the expected result:
