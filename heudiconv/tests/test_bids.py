@@ -60,29 +60,21 @@ SHIM_LENGTH = 6
 TODAY = datetime.today()
 
 
-# Test scenarios:
-# -file with "ShimSetting" field
-# -file with no "ShimSetting", in "foo" dir, should return "foo"
-# -file with no "ShimSetting", in "fmap" dir, acq-CatchThis, should return
-#       "CatchThis"
-# -file with no "ShimSetting", in "fmap" dir, acq-fMRI, should return "func"
 A_SHIM = ['{0:.4f}'.format(random()) for i in range(SHIM_LENGTH)]
-@pytest.mark.parametrize(
-    "fname, content, expected_return", [
-        (op.join('foo', 'bar.json'), {SHIM_KEY: A_SHIM}, A_SHIM),
-        (op.join('dont_catch_this', 'foo', 'bar.json'), {}, 'foo'),
-        (op.join('dont_catch_this', 'fmap', 'bar_acq-CatchThis.json'), {}, 'CatchThis'),
-        (op.join('dont_catch_this', 'fmap', 'bar_acq-fMRI.json'), {}, 'func'),
-    ]
-)
-def test_get_shim_setting(tmpdir, fname, content, expected_return):
+def test_get_shim_setting(tmpdir):
     """ Tests for get_shim_setting """
-    json_name = op.join(str(tmpdir), fname)
-    json_dir = op.dirname(json_name)
+    json_dir = op.join(str(tmpdir), 'foo')
     if not op.exists(json_dir):
         os.makedirs(json_dir)
-    save_json(json_name, content)
-    assert get_shim_setting(json_name) == expected_return
+    json_name = op.join(json_dir, 'sub-foo.json')
+    # 1) file with no "ShimSetting", should return None
+    save_json(json_name, {})
+    with pytest.raises(KeyError):
+        assert get_shim_setting(json_name)
+
+    # -file with "ShimSetting" field
+    save_json(json_name, {SHIM_KEY: A_SHIM})
+    assert get_shim_setting(json_name) == A_SHIM
 
 
 def test_get_key_info_for_fmap_assignment(tmpdir, monkeypatch):
@@ -134,6 +126,26 @@ def test_get_key_info_for_fmap_assignment(tmpdir, monkeypatch):
         json_name, matching_parameter='Force'
     )
     assert key_info == [KeyInfoForForce]
+
+    # 5) matching_parameter = 'AcquisitionLabel'
+    for d in ['fmap', 'func', 'dwi', 'anat']:
+        os.makedirs(op.join(str(tmpdir), d))
+    for (dirname, fname, expected_key_info) in [
+        ('fmap', 'sub-foo_acq-fmri_epi.json', 'func'),
+        ('fmap', 'sub-foo_acq-bold_epi.json', 'func'),
+        ('fmap', 'sub-foo_acq-func_epi.json', 'func'),
+        ('fmap', 'sub-foo_acq-diff_epi.json', 'dwi'),
+        ('fmap', 'sub-foo_acq-anat_epi.json', 'anat'),
+        ('fmap', 'sub-foo_acq-struct_epi.json', 'anat'),
+        ('func', 'sub-foo_bold.json', 'func'),
+        ('dwi', 'sub-foo_dwi.json', 'dwi'),
+        ('anat', 'sub-foo_T1w.json', 'anat'),
+    ]:
+        json_name = op.join(str(tmpdir), dirname, fname)
+        save_json(json_name, {SHIM_KEY: A_SHIM})
+        assert [expected_key_info] == get_key_info_for_fmap_assignment(
+            json_name, matching_parameter='AcquisitionLabel'
+        )
 
     # Finally: invalid matching_parameters:
     with pytest.raises(ValueError):
@@ -207,6 +219,7 @@ def create_dummy_pepolar_bids_session(session_path):
     # 1) Simulate the file structure for a session:
 
     # Generate some random ShimSettings:
+    anat_shims = ['{0:.4f}'.format(random()) for i in range(SHIM_LENGTH)]
     dwi_shims = ['{0:.4f}'.format(random()) for i in range(SHIM_LENGTH)]
     func_shims_A = ['{0:.4f}'.format(random()) for i in range(SHIM_LENGTH)]
     func_shims_B = ['{0:.4f}'.format(random()) for i in range(SHIM_LENGTH)]
@@ -215,7 +228,7 @@ def create_dummy_pepolar_bids_session(session_path):
     # -anat:
     anat_struct = {
         '{p}_{m}.{e}'.format(p=prefix, m=mod, e=ext): dummy_content
-        for ext, dummy_content in zip(['nii.gz', 'json'], ['', {}])
+        for ext, dummy_content in zip(['nii.gz', 'json'], ['', {'ShimSetting': anat_shims}])
         for mod in ['T1w', 'T2w']
     }
     # -dwi:
@@ -675,11 +688,13 @@ def test_find_fmap_groups(tmpdir, simulation_function):
 # B) same, with no ShimSetting
 # C) magnitude/phase, with ShimSetting
 @pytest.mark.parametrize(
-    "simulation_function", [create_dummy_pepolar_bids_session,
-                            create_dummy_no_shim_settings_bids_session,
-                            create_dummy_magnitude_phase_bids_session]
+    "simulation_function, match_param", [
+        (create_dummy_pepolar_bids_session, 'Shims'),
+        (create_dummy_no_shim_settings_bids_session, 'AcquisitionLabel'),
+        (create_dummy_magnitude_phase_bids_session, 'Shims')
+    ]
 )
-def test_find_compatible_fmaps_for_run(tmpdir, simulation_function):
+def test_find_compatible_fmaps_for_run(tmpdir, simulation_function, match_param):
     """
     Test find_compatible_fmaps_for_run.
 
@@ -688,6 +703,8 @@ def test_find_compatible_fmaps_for_run(tmpdir, simulation_function):
     tmpdir
     simulation_function : function
         function to create the directory tree and expected results
+    match_param : str
+        matching_parameter for assigning fmaps
     """
     folder = op.join(str(tmpdir), 'sub-foo')
     _, _, expected_fmap_groups, expected_compatible_fmaps = simulation_function(folder)
@@ -696,7 +713,7 @@ def test_find_compatible_fmaps_for_run(tmpdir, simulation_function):
             compatible_fmaps = find_compatible_fmaps_for_run(
                 json_file,
                 expected_fmap_groups,
-                matching_parameters='Shims'
+                matching_parameters=match_param
             )
             assert compatible_fmaps == expected_compatible_fmaps[json_file]
 
@@ -709,28 +726,42 @@ def test_find_compatible_fmaps_for_run(tmpdir, simulation_function):
 # B) same, with no ShimSetting
 # C) magnitude/phase, with ShimSetting
 @pytest.mark.parametrize(
-    "folder, expected_prefix, simulation_function", [
-        (folder, expected_prefix, sim_func)
+    "folder, expected_prefix, simulation_function, match_param", [
+        (folder, expected_prefix, sim_func, mp)
         for folder, expected_prefix in zip(['no_sessions/sub-1', 'sessions/sub-1/ses-pre'], ['', 'ses-pre'])
-        for sim_func in [create_dummy_pepolar_bids_session,
-                         create_dummy_no_shim_settings_bids_session,
-                         create_dummy_magnitude_phase_bids_session]
+        for sim_func, mp in [
+            (create_dummy_pepolar_bids_session, 'Shims'),
+            (create_dummy_no_shim_settings_bids_session, 'AcquisitionLabel'),
+            (create_dummy_magnitude_phase_bids_session, 'Shims')
+        ]
     ]
 )
-def test_find_compatible_fmaps_for_session(tmpdir, folder, expected_prefix, simulation_function):
+def test_find_compatible_fmaps_for_session(
+        tmpdir,
+        folder,
+        expected_prefix,
+        simulation_function,
+        match_param
+):
     """
     Test find_compatible_fmaps_for_session.
 
     Parameters:
     ----------
     tmpdir
+    folder : str or os.path
+        path to BIDS study to be simulated, relative to tmpdir
+    expected_prefix : str
+        expected start of the "IntendedFor" elements
     simulation_function : function
         function to create the directory tree and expected results
+    match_param : str
+        matching_parameter for assigning fmaps
     """
     session_folder = op.join(str(tmpdir), folder)
     _, _, _, expected_compatible_fmaps = simulation_function(session_folder)
 
-    compatible_fmaps = find_compatible_fmaps_for_session(session_folder, matching_parameters='Shims')
+    compatible_fmaps = find_compatible_fmaps_for_session(session_folder, matching_parameters=match_param)
 
     assert compatible_fmaps == expected_compatible_fmaps
 
@@ -785,15 +816,23 @@ def test_select_fmap_from_compatible_groups(tmpdir, folder, expected_prefix, sim
 # B) same, with no ShimSetting
 # C) magnitude/phase, with ShimSetting
 @pytest.mark.parametrize(
-    "folder, expected_prefix, simulation_function", [
-        (folder, expected_prefix, sim_func)
+    "folder, expected_prefix, simulation_function, match_param", [
+        (folder, expected_prefix, sim_func, mp)
         for folder, expected_prefix in zip(['no_sessions/sub-1', 'sessions/sub-1/ses-pre'], ['', 'ses-pre'])
-        for sim_func in [create_dummy_pepolar_bids_session,
-                         create_dummy_no_shim_settings_bids_session,
-                         create_dummy_magnitude_phase_bids_session]
+        for sim_func, mp in [
+            (create_dummy_pepolar_bids_session, 'Shims'),
+            (create_dummy_no_shim_settings_bids_session, 'AcquisitionLabel'),
+            (create_dummy_magnitude_phase_bids_session, 'Shims')
+        ]
     ]
 )
-def test_populate_intended_for(tmpdir, folder, expected_prefix, simulation_function):
+def test_populate_intended_for(
+    tmpdir,
+    folder,
+    expected_prefix,
+    simulation_function,
+    match_param
+):
     """
     Test populate_intended_for.
     Parameters:
@@ -805,11 +844,13 @@ def test_populate_intended_for(tmpdir, folder, expected_prefix, simulation_funct
         expected start of the "IntendedFor" elements
     simulation_function : function
         function to create the directory tree and expected results
+    match_param : str
+        matching_parameter for assigning fmaps
     """
 
     session_folder = op.join(str(tmpdir), folder)
     session_struct, expected_result, _, _ = simulation_function(session_folder)
-    populate_intended_for(session_folder, matching_parameters='Shims', criterion='First')
+    populate_intended_for(session_folder, matching_parameters=match_param, criterion='First')
 
     # Now, loop through the jsons in the fmap folder and make sure it matches
     # the expected result:

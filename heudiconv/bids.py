@@ -55,6 +55,7 @@ SHIM_KEY = 'ShimSetting'
 AllowedFmapParameterMatching = [
     'Shims',
     'ImagingVolume',
+    'AcquisitionLabel',
     'Force',
 ]
 # Key info returned by get_key_info_for_fmap_assignment when
@@ -513,9 +514,7 @@ def convert_sid_bids(subject_id):
 def get_shim_setting(json_file):
     """
     Gets the "ShimSetting" field from a json_file.
-    If not present:
-    - for fmap files: use the <acq> entity from the file name
-    - for other files: use the folder name ('anat', 'func', 'dwi', ...)
+    If no "ShimSetting" present, return error
 
     Parameters:
     ----------
@@ -523,20 +522,15 @@ def get_shim_setting(json_file):
 
     Returns:
     -------
-    str with "ShimSetting" value or <acq> entity
+    str with "ShimSetting" value
     """
     data = load_json(json_file)
-    if SHIM_KEY in data.keys():
+    try:
         shims = data[SHIM_KEY]
-    else:
-        modality = op.basename(op.dirname(json_file))
-        if modality == 'fmap':
-            # extract the <acq> entity:
-            shims = re.search('(?<=[/_]acq-)\w+',json_file).group(0).split('_')[0]
-            if shims.lower() in ['fmri', 'bold']:
-                shims = 'func'
-        else:
-            shims = modality
+    except KeyError as e:
+        lgr.error('File %s does not have "ShimSetting".'
+                  'Please use a different "matching_parameters" in your heuristic file', json_file)
+        raise KeyError
     return shims
 
 
@@ -620,6 +614,20 @@ def get_key_info_for_fmap_assignment(json_file, matching_parameter='ImagingVolum
         nifti_file = glob(remove_suffix(json_file, '.json') + '.nii*')
         nifti_header = nb_load(nifti_file).header
         key_info = [nifti_header.affine, nifti_header.dim[1:3]]
+    elif matching_parameter == 'AcquisitionLabel':
+        # Check the acq label for the fmap and the modality for others:
+        modality = op.basename(op.dirname(json_file))
+        if modality == 'fmap':
+            # extract the <acq> entity:
+            acq_label = re.search('(?<=[/_]acq-)\w+', json_file).group(0).split('_')[0]
+            if any(s in acq_label.lower() for s in ['fmri', 'bold', 'func']):
+                key_info = ['func']
+            elif any(s in acq_label.lower() for s in ['diff', 'dwi']):
+                key_info = ['dwi']
+            elif any(s in acq_label.lower() for s in ['anat', 'struct']):
+                key_info = ['anat']
+        else:
+            key_info = [modality]
     elif matching_parameter == 'Force':
         # We want to force the matching, so just return some string
         # regardless of the image
