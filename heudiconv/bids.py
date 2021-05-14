@@ -55,7 +55,11 @@ SHIM_KEY = 'ShimSetting'
 AllowedFmapParameterMatching = [
     'Shims',
     'ImagingVolume',
+    'Force',
 ]
+# Key info returned by get_key_info_for_fmap_assignment when
+# matching_parameter = "Force"
+KeyInfoForForce = "Forced"
 # List defining allowed criteria to assign a given fmap to a non-fmap run
 # among the different fmaps with matching parameters:
 AllowedCriteriaForFmapAssignment = [
@@ -616,6 +620,10 @@ def get_key_info_for_fmap_assignment(json_file, matching_parameter='ImagingVolum
         nifti_file = glob(remove_suffix(json_file, '.json') + '.nii*')
         nifti_header = nb_load(nifti_file).header
         key_info = [nifti_header.affine, nifti_header.dim[1:3]]
+    elif matching_parameter == 'Force':
+        # We want to force the matching, so just return some string
+        # regardless of the image
+        key_info = [KeyInfoForForce]
 
     return key_info
 

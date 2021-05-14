@@ -32,6 +32,7 @@ from heudiconv.bids import (
     select_fmap_from_compatible_groups,
     SHIM_KEY,
     AllowedCriteriaForFmapAssignment,
+    KeyInfoForForce,
 )
 
 import pytest
@@ -128,7 +129,13 @@ def test_get_key_info_for_fmap_assignment(tmpdir, monkeypatch):
     )
     assert key_info == [MY_AFFINE, MY_DIM[1:3]]
 
-    # 4) invalid matching_parameters:
+    # 4) matching_parameters = 'Force'
+    key_info = get_key_info_for_fmap_assignment(
+        json_name, matching_parameter='Force'
+    )
+    assert key_info == [KeyInfoForForce]
+
+    # Finally: invalid matching_parameters:
     with pytest.raises(ValueError):
         assert get_key_info_for_fmap_assignment(
             json_name, matching_parameter='Invalid'

@@ -117,6 +117,8 @@ The parameters that can be specified and the allowed options are defined in ``bi
    * ``'ImagingVolume'``: both ``fmaps`` and images will need to have the same the imaging
      volume (the header affine transformation: position, orientation and voxel size, as well
      as number of voxels along each dimensions).
+   * ``'Force'``: forces ``heudiconv`` to consider any ``fmaps`` in the session to be
+     suitable for any image, no matter what the imaging parameters are.
 
 
  - ``'criterion'``: Criterion to decide which of the candidate ``fmaps`` will be assigned to
