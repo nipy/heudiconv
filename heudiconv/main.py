@@ -109,11 +109,15 @@ def process_extra_commands(outdir, command, files, dicom_dir_template,
         from .utils import get_heuristic_description
         print(get_heuristic_description(heuristic, full=True))
     elif command == 'populate-intended-for':
+        kwargs = {}
+        if heuristic:
+            heuristic = load_heuristic(heuristic)
+            kwargs = getattr(heuristic, 'POPULATE_INTENDED_FOR_OPTS', {})
         for subj in subjs:
             session_path = op.join(outdir, 'sub-' + subj)
             if session:
                 session_path = op.join(session_path, 'ses-' + session)
-            populate_intended_for(session_path)
+            populate_intended_for(session_path, **kwargs)
     else:
         raise ValueError("Unknown command %s" % command)
     return
