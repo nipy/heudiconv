@@ -8,8 +8,7 @@ from random import random
 from datetime import (datetime,
                       timedelta,
                       )
-from collections import (namedtuple,
-                         OrderedDict,
+from collections import (OrderedDict,
                          )
 from glob import glob
 
