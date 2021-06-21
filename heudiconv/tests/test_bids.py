@@ -8,18 +8,20 @@ from random import random
 from datetime import (datetime,
                       timedelta,
                       )
-from collections import (namedtuple,
-                         OrderedDict,
+from collections import (OrderedDict,
                          )
 from glob import glob
 
 import nibabel
+from numpy import testing as np_testing
 
 from heudiconv.utils import (
     load_json,
     save_json,
     create_tree,
+    remove_suffix,
 )
+
 from heudiconv.bids import (
     maybe_na,
     treat_age,
@@ -33,6 +35,10 @@ from heudiconv.bids import (
     SHIM_KEY,
     AllowedCriteriaForFmapAssignment,
     KeyInfoForForce,
+)
+
+from .utils import (
+    TESTS_DATA_PATH,
 )
 
 import pytest
@@ -60,7 +66,7 @@ SHIM_LENGTH = 6
 TODAY = datetime.today()
 
 
-A_SHIM = ['{0:.4f}'.format(random()) for i in range(SHIM_LENGTH)]
+A_SHIM = [random() for i in range(SHIM_LENGTH)]
 def test_get_shim_setting(tmpdir):
     """ Tests for get_shim_setting """
     json_dir = op.join(str(tmpdir), 'foo')
@@ -77,38 +83,24 @@ def test_get_shim_setting(tmpdir):
     assert get_shim_setting(json_name) == A_SHIM
 
 
-def test_get_key_info_for_fmap_assignment(tmpdir, monkeypatch):
+def test_get_key_info_for_fmap_assignment(tmpdir):
     """
     Test get_key_info_for_fmap_assignment
     """
 
-    # Stuff needed to mock reading of a NIfTI file header:
-
-    # affines (qforms/sforms) are 4x4 matrices
-    MY_AFFINE = [[random() for i in range(4)] for j in range(4)]
-    # dims are arrays with 8 elements with the first one indicating the number
-    # of dims in the image; remaining elements are 1:
-    MY_DIM = [4] + [round(256 * random()) for i in range(4)] + [1] * 3
-    # We use namedtuples so that we can use the .dot notation, to mock
-    # nibabel headers:
-    MyHeader = namedtuple('MyHeader', 'affine dim')
-    MY_HEADER = MyHeader(MY_AFFINE, MY_DIM)
-    MyMockNifti = namedtuple('MyMockNifti', 'header')
-
-    def mock_nibabel_load(file):
-        """
-        Pretend we run nibabel.load, but return only a header with just a few fields
-        """
-        return MyMockNifti(MY_HEADER)
-    monkeypatch.setattr(nibabel, "load", mock_nibabel_load)
-
-    json_name = op.join(str(tmpdir), 'foo.json')
+    nifti_file = op.join(TESTS_DATA_PATH, 'sample_nifti.nii.gz')
+    # Get the expected parameters from the NIfTI header:
+    MY_HEADER = nibabel.ni1.np.loadtxt(
+        op.join(TESTS_DATA_PATH, remove_suffix(nifti_file, '.nii.gz') + '_params.txt')
+    )
+    json_name = op.join(TESTS_DATA_PATH, remove_suffix(nifti_file, '.nii.gz') + '.json')
 
     # 1) Call for a non-existing file should give an error:
     with pytest.raises(FileNotFoundError):
         assert get_key_info_for_fmap_assignment('foo.json')
 
     # 2) matching_parameters = 'Shims'
+    json_name = op.join(TESTS_DATA_PATH, remove_suffix(nifti_file, '.nii.gz') + '.json')
     save_json(json_name, {SHIM_KEY: A_SHIM})      # otherwise get_key_info_for_fmap_assignment will give an error
     key_info = get_key_info_for_fmap_assignment(
         json_name, matching_parameter='Shims'
@@ -119,7 +111,8 @@ def test_get_key_info_for_fmap_assignment(tmpdir, monkeypatch):
     key_info = get_key_info_for_fmap_assignment(
         json_name, matching_parameter='ImagingVolume'
     )
-    assert key_info == [MY_AFFINE, MY_DIM[1:3]]
+    np_testing.assert_almost_equal(key_info[0], MY_HEADER[:4], decimal=6)
+    np_testing.assert_almost_equal(key_info[1], MY_HEADER[4][:3], decimal=6)
 
     # 4) matching_parameters = 'Force'
     key_info = get_key_info_for_fmap_assignment(
@@ -219,10 +212,10 @@ def create_dummy_pepolar_bids_session(session_path):
     # 1) Simulate the file structure for a session:
 
     # Generate some random ShimSettings:
-    anat_shims = ['{0:.4f}'.format(random()) for i in range(SHIM_LENGTH)]
-    dwi_shims = ['{0:.4f}'.format(random()) for i in range(SHIM_LENGTH)]
-    func_shims_A = ['{0:.4f}'.format(random()) for i in range(SHIM_LENGTH)]
-    func_shims_B = ['{0:.4f}'.format(random()) for i in range(SHIM_LENGTH)]
+    anat_shims = [random() for i in range(SHIM_LENGTH)]
+    dwi_shims = [random() for i in range(SHIM_LENGTH)]
+    func_shims_A = [random() for i in range(SHIM_LENGTH)]
+    func_shims_B = [random() for i in range(SHIM_LENGTH)]
 
     # Dict with the file structure for the session:
     # -anat:
@@ -246,7 +239,7 @@ def create_dummy_pepolar_bids_session(session_path):
         '{p}_acq-A_bold.json'.format(p=prefix): {'ShimSetting': func_shims_A},
         '{p}_acq-B_bold.json'.format(p=prefix): {'ShimSetting': func_shims_B},
         '{p}_acq-unmatched_bold.json'.format(p=prefix): {
-            'ShimSetting': ['{0:.4f}'.format(random()) for i in range(SHIM_LENGTH)]
+            'ShimSetting': [random() for i in range(SHIM_LENGTH)]
         },
     })
     # -fmap:
@@ -538,9 +531,9 @@ def create_dummy_magnitude_phase_bids_session(session_path):
     # 1) Simulate the file structure for a session:
 
     # Generate some random ShimSettings:
-    dwi_shims = ['{0:.4f}'.format(random()) for i in range(SHIM_LENGTH)]
-    func_shims_A = ['{0:.4f}'.format(random()) for i in range(SHIM_LENGTH)]
-    func_shims_B = ['{0:.4f}'.format(random()) for i in range(SHIM_LENGTH)]
+    dwi_shims = [random() for i in range(SHIM_LENGTH)]
+    func_shims_A = [random() for i in range(SHIM_LENGTH)]
+    func_shims_B = [random() for i in range(SHIM_LENGTH)]
 
     # Dict with the file structure for the session:
     # -dwi:
@@ -558,7 +551,7 @@ def create_dummy_magnitude_phase_bids_session(session_path):
         '{p}_acq-A_bold.json'.format(p=prefix): {'ShimSetting': func_shims_A},
         '{p}_acq-B_bold.json'.format(p=prefix): {'ShimSetting': func_shims_B},
         '{p}_acq-unmatched_bold.json'.format(p=prefix): {
-            'ShimSetting': ['{0:.4f}'.format(random()) for i in range(SHIM_LENGTH)]
+            'ShimSetting': [random() for i in range(SHIM_LENGTH)]
         },
     })
     # -fmap:

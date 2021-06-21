@@ -680,8 +680,12 @@ def find_compatible_fmaps_for_run(json_file, fmap_groups, matching_parameters=['
         compatible = False
         for param in matching_parameters:
             fm_info = get_key_info_for_fmap_assignment(fm_group[0], param)
-            # allow for tiny differences between the affines etc
-            compatible = all(np.allclose(x, y) for x, y in zip(json_info[param], fm_info))
+            # for the case in which key_info is a list of strings:
+            if type(json_info[param][0]):
+                compatible = json_info[param] == fm_info
+            else:
+                # allow for tiny differences between the affines etc
+                compatible = all(np.allclose(x, y) for x, y in zip(json_info[param], fm_info))
             if not compatible:
                 continue     # don't bother checking more params
         if compatible:
