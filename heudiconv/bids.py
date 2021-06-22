@@ -4,6 +4,7 @@ import hashlib
 import os
 import os.path as op
 import logging
+import numpy as np
 import re
 from collections import OrderedDict
 from datetime import datetime
@@ -612,8 +613,10 @@ def get_key_info_for_fmap_assignment(json_file, matching_parameter='ImagingVolum
     elif matching_parameter == 'ImagingVolume':
         from nibabel import load as nb_load
         nifti_file = glob(remove_suffix(json_file, '.json') + '.nii*')
+        assert len(nifti_file) == 1
+        nifti_file = nifti_file[0] 
         nifti_header = nb_load(nifti_file).header
-        key_info = [nifti_header.affine, nifti_header.dim[1:3]]
+        key_info = [nifti_header.get_best_affine(), nifti_header.get_data_shape()[:3]]
     elif matching_parameter == 'AcquisitionLabel':
         # Check the acq label for the fmap and the modality for others:
         modality = op.basename(op.dirname(json_file))
@@ -677,10 +680,13 @@ def find_compatible_fmaps_for_run(json_file, fmap_groups, matching_parameters=['
         compatible = False
         for param in matching_parameters:
             fm_info = get_key_info_for_fmap_assignment(fm_group[0], param)
-            if json_info[param] == fm_info:
-                compatible = True
+            # for the case in which key_info is a list of strings:
+            if type(json_info[param][0]):
+                compatible = json_info[param] == fm_info
             else:
-                compatible = False
+                # allow for tiny differences between the affines etc
+                compatible = all(np.allclose(x, y) for x, y in zip(json_info[param], fm_info))
+            if not compatible:
                 continue     # don't bother checking more params
         if compatible:
             compatible_fmap_groups[fm_key] = fm_group
