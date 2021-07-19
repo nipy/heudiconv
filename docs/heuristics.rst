@@ -133,7 +133,7 @@ The parameters that can be specified and the allowed options are defined in ``bi
   Example::
 
     POPULATE_INTENDED_FOR_OPTS = {
-            'matching_parameter': 'ImagingVolume',
+            'matching_parameters': ['ImagingVolume', 'Shims'],
             'criterion': 'Closest'
     }
 
