@@ -100,7 +100,7 @@ def test_get_key_info_for_fmap_assignment(tmpdir):
 
     # 1) Call for a non-existing file should give an error:
     with pytest.raises(FileNotFoundError):
-        assert get_key_info_for_fmap_assignment('foo.json')
+        assert get_key_info_for_fmap_assignment('foo.json', 'ImagingVolume')
 
     # 2) matching_parameters = 'Shims'
     json_name = op.join(TESTS_DATA_PATH, remove_suffix(nifti_file, '.nii.gz') + '.json')

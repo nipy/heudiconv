@@ -325,12 +325,13 @@ def test_populate_intended_for(session, expected_folder, capfd):
     # Because the function .utils.populate_intended_for already has its own
     # tests, here we just test that "process_extra_commands", when 'command'
     # is 'populate_intended_for' does what we expect (loop through the list of
-    # subjects and calls 'populate_intended_for'). We call it using folders
+    # subjects and calls 'populate_intended_for' using the 'POPULATE_INTENDED_FOR_OPTS'
+    # defined in the heuristic file 'example.py'). We call it using folders
     # that don't exist, and check that the output is the expected.
     bids_folder = expected_folder.split('sub-')[0]
     subjects = ['1', '2']
     process_extra_commands(bids_folder, 'populate-intended-for', [], '',
-                           '', session, subjects, None)
+                           'example', session, subjects, None)
     captured_output = capfd.readouterr().err
     for s in subjects:
         expected_info = 'Adding "IntendedFor" to the fieldmaps in ' + expected_folder.format(sID=s)

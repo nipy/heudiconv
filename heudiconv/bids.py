@@ -581,7 +581,7 @@ def find_fmap_groups(fmap_dir):
     return fmap_groups
 
 
-def get_key_info_for_fmap_assignment(json_file, matching_parameter='ImagingVolume'):
+def get_key_info_for_fmap_assignment(json_file, matching_parameter):
     """
     Gets key information needed to assign fmaps to other modalities.
 
@@ -639,7 +639,7 @@ def get_key_info_for_fmap_assignment(json_file, matching_parameter='ImagingVolum
     return key_info
 
 
-def find_compatible_fmaps_for_run(json_file, fmap_groups, matching_parameters=['ImagingVolume']):
+def find_compatible_fmaps_for_run(json_file, fmap_groups, matching_parameters):
     """
     Finds compatible fmaps for a given run, for populate_intended_for.
 
@@ -694,7 +694,7 @@ def find_compatible_fmaps_for_run(json_file, fmap_groups, matching_parameters=['
     return compatible_fmap_groups
 
 
-def find_compatible_fmaps_for_session(path_to_bids_session, matching_parameters=['ImagingVolume']):
+def find_compatible_fmaps_for_session(path_to_bids_session, matching_parameters):
     """
     Finds compatible fmaps for all non-fmap runs in a session.
 
@@ -835,7 +835,7 @@ def select_fmap_from_compatible_groups(json_file, compatible_fmap_groups, criter
     return selected_fmap_key
 
 
-def populate_intended_for(path_to_bids_session, matching_parameters='ImagingVolume', criterion='Closest'):
+def populate_intended_for(path_to_bids_session, matching_parameters, criterion):
     """
     Adds the 'IntendedFor' field to the fmap .json files in a session folder.
     It goes through the session folders and for every json file, it finds
