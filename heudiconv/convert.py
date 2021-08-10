@@ -464,7 +464,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
                                      prefix + scaninfo_suffix)
 
                 if not op.exists(outname) or overwrite:
-                    with tempfile.TemporaryDirectory(prefix='dcm2niix') as tmpdir:
+                    with tempfile.TemporaryDirectory(prefix='heudiconv-dcm2niix') as tmpdir:
 
                         # run conversion through nipype
                         res, prov_file = nipype_convert(

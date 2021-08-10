@@ -371,7 +371,7 @@ def compress_dicoms(dicom_list, out_prefix, overwrite):
         return ti
 
     # poor man mocking since can't rely on having mock
-    with tempfile.TemporaryDirectory(prefix='dicomtar') as tmpdir:
+    with tempfile.TemporaryDirectory(prefix='heudiconv-dicomtar') as tmpdir:
         try:
             import time
             _old_time = time.time
@@ -476,7 +476,7 @@ def embed_metadata_from_dicoms(bids_options, item_dicoms, outname, outname_bids,
     # We need to assure that paths are absolute if they are relative
     item_dicoms = list(map(op.abspath, item_dicoms))
 
-    with tempfile.TemporaryDirectory(prefix='embedmeta') as tmpdir:
+    with tempfile.TemporaryDirectory(prefix='heudiconv-embedmeta') as tmpdir:
         embedfunc = Node(Function(input_names=['dcmfiles', 'niftifile', 'infofile',
                                             'bids_info',],
                                 function=embed_dicom_and_nifti_metadata),

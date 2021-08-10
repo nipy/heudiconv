@@ -72,7 +72,7 @@ def get_extracted_dicoms(fl):
     # of all files in all tarballs
 
     from ._tmpdirs import tmpdirs
-    tmpdir = tmpdirs.add_tmpdir(prefix="heudiconvDCM")
+    tmpdir = tmpdirs.add_tmpdir(prefix="heudiconv-DCM")
 
     sessions = defaultdict(list)
     session = 0
