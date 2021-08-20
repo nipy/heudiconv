@@ -20,6 +20,8 @@ before_install:
   - bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
   - travis_retry sudo apt-get update -qq
   - travis_retry sudo apt-get install git-annex-standalone dcm2niix
+  # Test experimental version of dcm2niix from debian-devel of neurodebian
+  - sudo sed -e 's,\(deb .*/debian\) \(.*\),\1 \2\n\1-devel \2,g' /etc/apt/sources.list.d/neurodebian.sources.list && sudo apt-get update -qq && sudo apt-get install dcm2niix 
   # Install in our own virtualenv
   - python -m pip install --upgrade pip
   - pip install --upgrade virtualenv
