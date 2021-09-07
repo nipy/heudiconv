@@ -529,8 +529,9 @@ def get_shim_setting(json_file):
     try:
         shims = data[SHIM_KEY]
     except KeyError as e:
-        lgr.error('File %s does not have "ShimSetting".'
-                  'Please use a different "matching_parameters" in your heuristic file', json_file)
+        lgr.error('File %s does not have "%s". '
+                  'Please use a different "matching_parameters" in your heuristic file',
+                   json_file, SHIM_KEY)
         raise KeyError
     return shims
 
