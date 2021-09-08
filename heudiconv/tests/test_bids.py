@@ -144,10 +144,9 @@ def test_get_key_info_for_fmap_assignment(tmpdir):
         )
 
     # Finally: invalid matching_parameters:
-    with pytest.raises(ValueError):
-        assert get_key_info_for_fmap_assignment(
+    assert get_key_info_for_fmap_assignment(
             json_name, matching_parameter='Invalid'
-        )
+        ) == []
 
 
 def generate_scans_tsv(session_struct):
@@ -709,7 +708,7 @@ def test_find_compatible_fmaps_for_run(tmpdir, simulation_function, match_param)
             compatible_fmaps = find_compatible_fmaps_for_run(
                 json_file,
                 expected_fmap_groups,
-                matching_parameters=match_param
+                matching_parameters=[match_param]
             )
             assert compatible_fmaps == expected_compatible_fmaps[json_file]
 
@@ -757,7 +756,7 @@ def test_find_compatible_fmaps_for_session(
     session_folder = op.join(str(tmpdir), folder)
     _, _, _, expected_compatible_fmaps = simulation_function(session_folder)
 
-    compatible_fmaps = find_compatible_fmaps_for_session(session_folder, matching_parameters=match_param)
+    compatible_fmaps = find_compatible_fmaps_for_session(session_folder, matching_parameters=[match_param])
 
     assert compatible_fmaps == expected_compatible_fmaps
 

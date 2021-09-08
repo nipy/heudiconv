@@ -585,6 +585,8 @@ def find_fmap_groups(fmap_dir):
 def get_key_info_for_fmap_assignment(json_file, matching_parameter):
     """
     Gets key information needed to assign fmaps to other modalities.
+    (Note: It is the responsibility of the calling function to make sure
+    the arguments are OK)
 
     Parameters:
     ----------
@@ -602,10 +604,6 @@ def get_key_info_for_fmap_assignment(json_file, matching_parameter):
     if not op.exists(json_file):
         raise FileNotFoundError(
             errno.ENOENT, os.strerror(errno.ENOENT), json_file
-        )
-    if matching_parameter not in AllowedFmapParameterMatching:
-        raise ValueError(
-            "Fmap matching_parameter %s not allowed." % matching_parameter
         )
 
     # loop through the possible criteria and extract the info needed
@@ -636,6 +634,9 @@ def get_key_info_for_fmap_assignment(json_file, matching_parameter):
         # We want to force the matching, so just return some string
         # regardless of the image
         key_info = [KeyInfoForForce]
+    else:
+        # fallback:
+        key_info = []
 
     return key_info
 
@@ -643,6 +644,8 @@ def get_key_info_for_fmap_assignment(json_file, matching_parameter):
 def find_compatible_fmaps_for_run(json_file, fmap_groups, matching_parameters):
     """
     Finds compatible fmaps for a given run, for populate_intended_for.
+    (Note: It is the responsibility of the calling function to make sure
+    the arguments are OK)
 
     Parameters:
     ----------
@@ -662,16 +665,9 @@ def find_compatible_fmaps_for_run(json_file, fmap_groups, matching_parameters):
         key: prefix common to the group
         value: list of all fmap paths in the group
     """
-    if type(matching_parameters) is not list:
-        matching_parameters = [matching_parameters]
-
     lgr.debug('Looking for fmaps for %s', json_file)
     json_info = {}
     for param in matching_parameters:
-        if param not in AllowedFmapParameterMatching:
-            raise ValueError(
-                "Fmap matching_parameter %s not allowed." % param
-            )
         json_info[param] = get_key_info_for_fmap_assignment(json_file, param)
 
     compatible_fmap_groups = {}
@@ -698,6 +694,8 @@ def find_compatible_fmaps_for_run(json_file, fmap_groups, matching_parameters):
 def find_compatible_fmaps_for_session(path_to_bids_session, matching_parameters):
     """
     Finds compatible fmaps for all non-fmap runs in a session.
+    (Note: It is the responsibility of the calling function to make sure
+    the arguments are OK)
 
     Parameters:
     ----------
@@ -712,15 +710,6 @@ def find_compatible_fmaps_for_session(path_to_bids_session, matching_parameters)
     compatible_fmap : dict
         Dict of compatible_fmaps_groups (values) for each non-fmap run (keys)
     """
-    if not isinstance(matching_parameters, list):
-        assert isinstance(matching_parameters, str), "matching_parameters must be a str or a list, got %s" % matching_parameters
-        matching_parameters = [matching_parameters]
-    for param in matching_parameters:
-        if param not in AllowedFmapParameterMatching:
-            raise ValueError(
-                "Fmap matching_parameter %s not allowed." % param
-            )
-
     lgr.debug('Looking for fmaps for session: %s', path_to_bids_session)
 
     # Resolve path (eliminate '..')
@@ -753,6 +742,8 @@ def select_fmap_from_compatible_groups(json_file, compatible_fmap_groups, criter
     """
     Selects the fmap that will be used to correct for distortions in json_file
     from the compatible fmap_groups list, based on the given criterion
+    (Note: It is the responsibility of the calling function to make sure
+    the arguments are OK)
 
     Parameters:
     ----------
@@ -768,11 +759,6 @@ def select_fmap_from_compatible_groups(json_file, compatible_fmap_groups, criter
     selected_fmap_key : str or os.path
         key from the compatible_fmap_groups for the selected fmap group
     """
-    if criterion not in AllowedCriteriaForFmapAssignment:
-        raise ValueError(
-            "Fmap assignment criterion '%s' not allowed." % criterion
-        )
-
     if len(compatible_fmap_groups) == 0:
         return None
     # if compatible_fmap_groups has only one entry, that's it:
@@ -862,7 +848,8 @@ def populate_intended_for(path_to_bids_session, matching_parameters, criterion):
         fmaps to use
     """
 
-    if type(matching_parameters) is not list:
+    if not isinstance(matching_parameters, list):
+        assert isinstance(matching_parameters, str), "matching_parameters must be a str or a list, got %s" % matching_parameters
         matching_parameters = [matching_parameters]
     for param in matching_parameters:
         if param not in AllowedFmapParameterMatching:
