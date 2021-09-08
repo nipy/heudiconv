@@ -712,7 +712,8 @@ def find_compatible_fmaps_for_session(path_to_bids_session, matching_parameters)
     compatible_fmap : dict
         Dict of compatible_fmaps_groups (values) for each non-fmap run (keys)
     """
-    if type(matching_parameters) is not list:
+    if not isinstance(matching_parameters, list):
+        assert isinstance(matching_parameters, str), "matching_parameters must be a str or a list, got %s" % matching_parameters
         matching_parameters = [matching_parameters]
     for param in matching_parameters:
         if param not in AllowedFmapParameterMatching:
