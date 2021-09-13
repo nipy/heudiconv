@@ -157,7 +157,7 @@ def populate_aggregated_jsons(path):
         # TODO: if we are to fix it, then old ones (without _acq) should be
         # removed first
         task = re.sub('.*_(task-[^_\.]*(_acq-[^_\.]*)?)_.*', r'\1', fpath)
-        json_ = load_json(fpath)
+        json_ = load_json(fpath, retry=100)
         if task not in tasks:
             tasks[task] = json_
         else:
@@ -212,7 +212,7 @@ def populate_aggregated_jsons(path):
             "CogAtlasID": "http://www.cognitiveatlas.org/task/id/TODO",
         }
         if op.lexists(task_file):
-            j = load_json(task_file)
+            j = load_json(task_file, retry=100)
             # Retain possibly modified placeholder fields
             for f in placeholders:
                 if f in j:

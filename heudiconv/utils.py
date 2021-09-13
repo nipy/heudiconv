@@ -14,6 +14,7 @@ from collections import namedtuple
 from glob import glob
 from subprocess import check_output
 from datetime import datetime
+from time import sleep
 
 from nipype.utils.filemanip import which
 
@@ -147,24 +148,40 @@ def write_config(outfile, info):
         fp.writelines(PrettyPrinter().pformat(info))
 
 
-def load_json(filename):
+def load_json(filename, retry=0):
     """Load data from a json file
 
     Parameters
     ----------
     filename : str
         Filename to load data from.
+    retry: int, optional
+        Number of times to retry opening/loading the file in case of
+        failure.  Code will sleep for 0.1 seconds between retries.
+        Could be used in code which is not sensitive to order effects
+        (e.g. like populating bids templates where the last one to
+        do it, would make sure it would be the correct/final state).
 
     Returns
     -------
     data : dict
     """
-    try:
-        with open(filename, 'r') as fp:
-            data = json.load(fp)
-    except JSONDecodeError:
-        lgr.error("{fname} is not a valid json file".format(fname=filename))
-        raise
+    assert retry >= 0
+    for i in range(retry + 1):  # >= 10 sec wait
+        try:
+            try:
+                with open(filename, 'r') as fp:
+                    data = json.load(fp)
+                    break
+            except JSONDecodeError:
+                lgr.error("{fname} is not a valid json file".format(fname=filename))
+                raise
+        except (JSONDecodeError, FileNotFoundError) as exc:
+            if i >= retry:
+                raise
+            lgr.warning("Caught %s. Will retry again", exc)
+            sleep(0.1)
+            continue
 
     return data
     
