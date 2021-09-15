@@ -38,7 +38,7 @@ TESTS_REQUIRES = [
     'inotify',
 ]
 
-MIN_DATALAD_VERSION = '0.12.4'
+MIN_DATALAD_VERSION = '0.13.0'
 EXTRA_REQUIRES = {
     'tests': TESTS_REQUIRES,
     'extras': [
