@@ -1,4 +1,4 @@
-__version__ = "0.9.0"
+__version__ = "0.10.0"
 __author__ = "HeuDiConv team and contributors"
 __url__ = "https://github.com/nipy/heudiconv"
 __packagename__ = 'heudiconv'
