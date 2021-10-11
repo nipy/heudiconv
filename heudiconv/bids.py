@@ -23,6 +23,7 @@ from .utils import (
     is_readonly,
     get_datetime,
 )
+from . import __version__
 
 lgr = logging.getLogger(__name__)
 
@@ -39,6 +40,10 @@ SCANS_FILE_FIELDS = OrderedDict([
         ("LongName", "Random string"),
         ("Description", "md5 hash of UIDs")])),
 ])
+
+#: JSON Key where we will embed our version in the newly produced .json files
+HEUDICONV_VERSION_JSON_KEY = 'HeudiconvVersion'
+
 
 class BIDSError(Exception):
     pass
@@ -244,6 +249,10 @@ def tuneup_bids_json_files(json_files):
             # Let's hope no word 'Date' comes within a study name or smth like
             # that
             raise ValueError("There must be no dates in .json sidecar")
+        # Those files should not have our version field already - should have been
+        # freshly produced
+        assert HEUDICONV_VERSION_JSON_KEY not in json_
+        json_[HEUDICONV_VERSION_JSON_KEY] = str(__version__)
         save_json(jsonfile, json_)
 
     # Load the beast
