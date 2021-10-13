@@ -2,6 +2,7 @@
 from glob import glob
 import os
 import os.path as op
+import re
 
 import pytest
 
@@ -19,7 +20,7 @@ except ImportError:
 
 
 @pytest.mark.skipif(not have_datalad, reason="no datalad")
-@pytest.mark.parametrize('subject', ['sub-sid000143'])
+@pytest.mark.parametrize('subject', ['sid000143'])
 @pytest.mark.parametrize('heuristic', ['reproin.py'])
 @pytest.mark.parametrize('anon_cmd', [None, 'anonymize_script.py'])
 def test_conversion(tmpdir, subject, heuristic, anon_cmd):
@@ -27,22 +28,40 @@ def test_conversion(tmpdir, subject, heuristic, anon_cmd):
     try:
         datadir = fetch_data(tmpdir.strpath,
                              "dbic/QA",  # path from datalad database root
-                             getpath=op.join('sourcedata', subject))
+                             getpath=op.join('sourcedata', f'sub-{subject}'))
     except IncompleteResultsError as exc:
         pytest.skip("Failed to fetch test data: %s" % str(exc))
     outdir = tmpdir.mkdir('out').strpath
 
     args = gen_heudiconv_args(
         datadir, outdir, subject, heuristic, anon_cmd,
-        template=op.join('sourcedata/{subject}/*/*/*.tgz')
+        template='sourcedata/sub-{subject}/*/*/*.tgz'
     )
     runner(args)  # run conversion
 
+    # Get the possibly anonymized subject id and verify that it was
+    # anonymized or not:
+    subject_maybe_anon = glob(f'{outdir}/sub-*')
+    assert len(subject_maybe_anon) == 1  # just one should be there
+    subject_maybe_anon = op.basename(subject_maybe_anon[0])[4:]
+
+    if anon_cmd:
+        assert subject_maybe_anon != subject
+    else:
+        assert subject_maybe_anon == subject
+
     # verify functionals were converted
-    assert (
-        glob('{}/{}/func/*'.format(outdir, subject)) ==
-        glob('{}/{}/func/*'.format(datadir, subject))
-    )
+    outfiles = sorted([f[len(outdir):] for f in glob(f'{outdir}/sub-{subject_maybe_anon}/func/*')])
+    assert outfiles
+    datafiles = sorted([f[len(datadir):] for f in glob(f'{datadir}/sub-{subject}/ses-*/func/*')])
+    # original data has ses- but because we are converting only func, and not
+    # providing any session, we will not "match". Let's strip away the session
+    datafiles = [re.sub(r'[/\\_]ses-[^/\\_]*', '', f) for f in datafiles]
+    if not anon_cmd:
+        assert outfiles == datafiles
+    else:
+        assert outfiles != datafiles  # sid was anonymized
+        assert len(outfiles) == len(datafiles)  # but we have the same number of files
 
     # compare some json metadata
     json_ = '{}/task-rest_acq-24mm64sl1000tr32te600dyn_bold.json'.format
