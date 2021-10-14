@@ -111,7 +111,13 @@ def docstring_parameter(*sub):
 
 
 def anonymize_sid(sid, anon_sid_cmd):
-
+    """
+    Raises
+    ------
+    ValueError
+      if script returned an empty string (after whitespace stripping),
+      or output with multiple words/lines.
+    """
     cmd = [anon_sid_cmd, sid]
     shell_return = check_output(cmd)
 
@@ -120,7 +126,14 @@ def anonymize_sid(sid, anon_sid_cmd):
     else:
         anon_sid = shell_return
 
-    return anon_sid.strip()
+    anon_sid = anon_sid.strip()
+    if not anon_sid:
+        raise ValueError(f"{anon_sid_cmd!r} {sid!r} returned empty sid")
+    # rudimentary check for sanity: no multiple lines or words (in general
+    # ok, but not ok for BIDS) in the output
+    if len(anon_sid.split()) > 1:
+        raise ValueError(f"{anon_sid_cmd!r} {sid!r} returned multiline output")
+    return anon_sid
 
 
 def create_file_if_missing(filename, content):
