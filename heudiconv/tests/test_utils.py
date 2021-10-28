@@ -2,6 +2,8 @@ import json
 import os
 import os.path as op
 
+import mock
+
 from heudiconv.utils import (
     get_known_heuristics_with_descriptions,
     get_heuristic_description,
@@ -80,6 +82,13 @@ def test_load_json(tmpdir, caplog):
     with pytest.raises(JSONDecodeError):
         load_json(str(invalid_json_file))
 
+    # and even if we ask to retry a few times -- should be the same
+    with pytest.raises(JSONDecodeError):
+        load_json(str(invalid_json_file), retry=3)
+
+    with pytest.raises(FileNotFoundError):
+        load_json("absent123not.there", retry=3)
+
     assert ifname in caplog.text
 
     # test valid json
@@ -89,6 +98,23 @@ def test_load_json(tmpdir, caplog):
     save_json(valid_json_file, vcontent)
 
     assert load_json(valid_json_file) == vcontent
+
+    calls = [0]
+    json_load = json.load
+
+    def json_load_patched(fp):
+        calls[0] += 1
+        if calls[0] == 1:
+            # just reuse bad file
+            load_json(str(invalid_json_file))
+        elif calls[0] == 2:
+            raise FileNotFoundError()
+        else:
+            return json_load(fp)
+
+    with mock.patch.object(json, 'load', json_load_patched):
+        assert load_json(valid_json_file, retry=3) == vcontent
+
 
 
 def test_update_json(tmpdir):

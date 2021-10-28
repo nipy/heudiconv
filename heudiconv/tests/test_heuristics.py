@@ -7,8 +7,13 @@ from six.moves import StringIO
 
 from glob import glob
 from os.path import join as pjoin, dirname
+from pathlib import Path
 import csv
 import re
+
+from .. import __version__
+from ..bids import HEUDICONV_VERSION_JSON_KEY
+from ..utils import load_json
 
 import pytest
 from .utils import TESTS_DATA_PATH
@@ -140,16 +145,22 @@ def test_scout_conversion(tmpdir):
     ).split(' ') + ['-o', tmppath]
     runner(args)
 
-    assert not op.exists(pjoin(
-        tmppath,
-        'Halchenko/Yarik/950_bids_test4/sub-phantom1sid1/ses-localizer/anat'))
+    dspath = Path(tmppath) / 'Halchenko/Yarik/950_bids_test4'
+    sespath = dspath / 'sub-phantom1sid1/ses-localizer'
 
-    assert op.exists(pjoin(
-        tmppath,
-        'Halchenko/Yarik/950_bids_test4/sourcedata/sub-phantom1sid1/'
-        'ses-localizer/anat/sub-phantom1sid1_ses-localizer_scout.dicom.tgz'
-    )
-    )
+    assert not (sespath / 'anat').exists()
+    assert (
+        dspath /
+        'sourcedata/sub-phantom1sid1/ses-localizer/'
+        'anat/sub-phantom1sid1_ses-localizer_scout.dicom.tgz'
+    ).exists()
+
+    # Let's do some basic checks on produced files
+    j = load_json(sespath / 'fmap/sub-phantom1sid1_ses-localizer_acq-3mm_phasediff.json')
+    # We store HeuDiConv version in each produced .json file
+    # TODO: test that we are not somehow overwritting that version in existing
+    # files which we have not produced in a particular run.
+    assert j[HEUDICONV_VERSION_JSON_KEY] == __version__
 
 
 @pytest.mark.parametrize(

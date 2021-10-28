@@ -14,6 +14,7 @@ from collections import namedtuple
 from glob import glob
 from subprocess import check_output
 from datetime import datetime
+from time import sleep
 
 from nipype.utils.filemanip import which
 
@@ -110,7 +111,13 @@ def docstring_parameter(*sub):
 
 
 def anonymize_sid(sid, anon_sid_cmd):
-
+    """
+    Raises
+    ------
+    ValueError
+      if script returned an empty string (after whitespace stripping),
+      or output with multiple words/lines.
+    """
     cmd = [anon_sid_cmd, sid]
     shell_return = check_output(cmd)
 
@@ -119,7 +126,14 @@ def anonymize_sid(sid, anon_sid_cmd):
     else:
         anon_sid = shell_return
 
-    return anon_sid.strip()
+    anon_sid = anon_sid.strip()
+    if not anon_sid:
+        raise ValueError(f"{anon_sid_cmd!r} {sid!r} returned empty sid")
+    # rudimentary check for sanity: no multiple lines or words (in general
+    # ok, but not ok for BIDS) in the output
+    if len(anon_sid.split()) > 1:
+        raise ValueError(f"{anon_sid_cmd!r} {sid!r} returned multiline output")
+    return anon_sid
 
 
 def create_file_if_missing(filename, content):
@@ -147,24 +161,40 @@ def write_config(outfile, info):
         fp.writelines(PrettyPrinter().pformat(info))
 
 
-def load_json(filename):
+def load_json(filename, retry=0):
     """Load data from a json file
 
     Parameters
     ----------
     filename : str
         Filename to load data from.
+    retry: int, optional
+        Number of times to retry opening/loading the file in case of
+        failure.  Code will sleep for 0.1 seconds between retries.
+        Could be used in code which is not sensitive to order effects
+        (e.g. like populating bids templates where the last one to
+        do it, would make sure it would be the correct/final state).
 
     Returns
     -------
     data : dict
     """
-    try:
-        with open(filename, 'r') as fp:
-            data = json.load(fp)
-    except JSONDecodeError:
-        lgr.error("{fname} is not a valid json file".format(fname=filename))
-        raise
+    assert retry >= 0
+    for i in range(retry + 1):  # >= 10 sec wait
+        try:
+            try:
+                with open(filename, 'r') as fp:
+                    data = json.load(fp)
+                    break
+            except JSONDecodeError:
+                lgr.error("{fname} is not a valid json file".format(fname=filename))
+                raise
+        except (JSONDecodeError, FileNotFoundError) as exc:
+            if i >= retry:
+                raise
+            lgr.warning("Caught %s. Will retry again", exc)
+            sleep(0.1)
+            continue
 
     return data
     

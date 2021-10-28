@@ -28,6 +28,7 @@ from .utils import (
     remove_suffix,
     remove_prefix,
 )
+from . import __version__
 
 lgr = logging.getLogger(__name__)
 
@@ -44,6 +45,10 @@ SCANS_FILE_FIELDS = OrderedDict([
         ("LongName", "Random string"),
         ("Description", "md5 hash of UIDs")])),
 ])
+
+#: JSON Key where we will embed our version in the newly produced .json files
+HEUDICONV_VERSION_JSON_KEY = 'HeudiconvVersion'
+
 
 class BIDSError(Exception):
     pass
@@ -180,7 +185,7 @@ def populate_aggregated_jsons(path):
         # TODO: if we are to fix it, then old ones (without _acq) should be
         # removed first
         task = re.sub('.*_(task-[^_\.]*(_acq-[^_\.]*)?)_.*', r'\1', fpath)
-        json_ = load_json(fpath)
+        json_ = load_json(fpath, retry=100)
         if task not in tasks:
             tasks[task] = json_
         else:
@@ -235,7 +240,7 @@ def populate_aggregated_jsons(path):
             "CogAtlasID": "http://www.cognitiveatlas.org/task/id/TODO",
         }
         if op.lexists(task_file):
-            j = load_json(task_file)
+            j = load_json(task_file, retry=100)
             # Retain possibly modified placeholder fields
             for f in placeholders:
                 if f in j:
@@ -267,6 +272,10 @@ def tuneup_bids_json_files(json_files):
             # Let's hope no word 'Date' comes within a study name or smth like
             # that
             raise ValueError("There must be no dates in .json sidecar")
+        # Those files should not have our version field already - should have been
+        # freshly produced
+        assert HEUDICONV_VERSION_JSON_KEY not in json_
+        json_[HEUDICONV_VERSION_JSON_KEY] = str(__version__)
         save_json(jsonfile, json_)
 
     # Load the beast

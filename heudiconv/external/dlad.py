@@ -58,7 +58,7 @@ def add_to_datalad(topdir, studydir, msg, bids):
             ds_ = dl.create(curdir_, dataset=superds,
                          force=True,
                          # initiate annex only at the bottom repository
-                         no_annex=isubdir<(len(subdirs)-1),
+                         annex=isubdir==(len(subdirs)-1),
                          fake_dates=True,
                          # shared_access='all',
                          )

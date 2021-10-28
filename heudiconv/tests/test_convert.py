@@ -87,12 +87,14 @@ def test_update_uncombined_name():
     assert out_fn_test == out_fn_true
 
 
-def test_b0dwi_for_fmap(tmpdir, capfd):
+def test_b0dwi_for_fmap(tmpdir, caplog):
     """Make sure we raise a warning when .bvec and .bval files
     are present but the modality is not dwi.
     We check it by extracting a few DICOMs from a series with
     bvals: 5 5 1500
     """
+    import logging
+    caplog.set_level(logging.WARNING)
     tmppath = tmpdir.strpath
     subID = 'b0dwiForFmap'
     args = (
@@ -103,9 +105,8 @@ def test_b0dwi_for_fmap(tmpdir, capfd):
 
     # assert that it raised a warning that the fmap directory will contain
     # bvec and bval files.
-    output = capfd.readouterr().err.split('\n')
     expected_msg = DW_IMAGE_IN_FMAP_FOLDER_WARNING.format(folder=op.join(tmppath, 'sub-%s', 'fmap') % subID)
-    assert [o for o in output if expected_msg in o]
+    assert any(expected_msg in c.message for c in caplog.records)
 
     # check that both 'fmap' and 'dwi' directories have been extracted and they contain
     # *.bvec and a *.bval files

@@ -1,4 +1,4 @@
-__version__ = "0.9.0"
+__version__ = "0.10.0"
 __author__ = "HeuDiConv team and contributors"
 __url__ = "https://github.com/nipy/heudiconv"
 __packagename__ = 'heudiconv'
@@ -12,13 +12,14 @@ CLASSIFIERS = [
     'Environment :: Console',
     'Intended Audience :: Science/Research',
     'License :: OSI Approved :: Apache Software License',
-    'Programming Language :: Python :: 3.5',
     'Programming Language :: Python :: 3.6',
     'Programming Language :: Python :: 3.7',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
     'Topic :: Scientific/Engineering'
 ]
 
-PYTHON_REQUIRES = ">=3.5"
+PYTHON_REQUIRES = ">=3.6"
 
 REQUIRES = [
     'nibabel',
@@ -37,7 +38,7 @@ TESTS_REQUIRES = [
     'inotify',
 ]
 
-MIN_DATALAD_VERSION = '0.12.4'
+MIN_DATALAD_VERSION = '0.13.0'
 EXTRA_REQUIRES = {
     'tests': TESTS_REQUIRES,
     'extras': [
