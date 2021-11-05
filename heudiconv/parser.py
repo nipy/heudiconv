@@ -97,7 +97,7 @@ def get_extracted_dicoms(fl):
         for tm in tmembers:
             tm.mode = 0o700
         # get all files, assemble full path in tmp dir
-        tf_content = [m.name for m in tmembers if m.isfile()]
+        tf_content = sorted([m.name for m in tmembers if m.isfile()])
         # store full paths to each file, so we don't need to drag along
         # tmpdir as some basedir
         sessions[session] = [op.join(tmpdir, f) for f in tf_content]
