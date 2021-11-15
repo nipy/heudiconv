@@ -1,0 +1,38 @@
+From d09cec11b975ad4642a6978d4660b9d6bde45e7a Mon Sep 17 00:00:00 2001
+From: Yaroslav Halchenko <debian@onerussian.com>
+Date: Wed, 15 Sep 2021 12:00:47 -0400
+Subject: [PATCH] BF: account for datalad.create no_annex removal, deprecated
+ in 0.13.0
+
+(now minimal supported version)
+---
+ heudiconv/external/dlad.py | 2 +-
+ heudiconv/info.py          | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/heudiconv/external/dlad.py b/heudiconv/external/dlad.py
+index 01c229b6..db8907f1 100644
+--- a/heudiconv/external/dlad.py
++++ b/heudiconv/external/dlad.py
+@@ -58,7 +58,7 @@ def add_to_datalad(topdir, studydir, msg, bids):
+             ds_ = dl.create(curdir_, dataset=superds,
+                          force=True,
+                          # initiate annex only at the bottom repository
+-                         no_annex=isubdir<(len(subdirs)-1),
++                         annex=isubdir==(len(subdirs)-1),
+                          fake_dates=True,
+                          # shared_access='all',
+                          )
+diff --git a/heudiconv/info.py b/heudiconv/info.py
+index 24e4c32f..2b065847 100644
+--- a/heudiconv/info.py
++++ b/heudiconv/info.py
+@@ -38,7 +38,7 @@
+     'inotify',
+ ]
+ 
+-MIN_DATALAD_VERSION = '0.12.4'
++MIN_DATALAD_VERSION = '0.13.0'
+ EXTRA_REQUIRES = {
+     'tests': TESTS_REQUIRES,
+     'extras': [

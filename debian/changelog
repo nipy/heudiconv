@@ -1,3 +1,12 @@
+heudiconv (0.9.0-2.1) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * Fix autopkgtests
+  * d/watch: Fix broken regex in watch file
+  * Pull upstream patch to fix compatibility with new datalad
+
+ -- Nilesh Patra <nilesh@debian.org>  Sat, 13 Nov 2021 11:23:03 +0000
+
 heudiconv (0.9.0-2) unstable; urgency=medium
 
   * Replace python with python3 as a Depends (Closes: #982120)

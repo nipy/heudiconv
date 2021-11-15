@@ -1,2 +1,2 @@
-Test-Command: pytest -s -v .
-Depends: @, @builddeps@
+Test-Command: pytest-3 -s -v .
+Depends: @, python3-pytest, python3-mock
