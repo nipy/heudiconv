@@ -1,2 +1,0 @@
-Test-Command: pytest-3 -s -v .
-Depends: @, python3-pytest, python3-mock
