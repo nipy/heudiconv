@@ -102,6 +102,9 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                 "BIDS requires alphanumeric subject ID. Got an empty value")
         if not sid.isalnum():  # alphanumeric only
             sid, old_sid = convert_sid_bids(sid)
+            
+        if ses and not ses.isalnum():  # alphanumeric only
+            ses, old_ses = convert_sid_bids(ses)
 
     if not anon_sid:
         anon_sid = sid
