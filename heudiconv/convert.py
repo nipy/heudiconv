@@ -338,7 +338,8 @@ def update_multiecho_name(metadata, filename, echo_times):
     filetype = '_' + filename.split('_')[-1]
 
     # Insert it **before** the following string(s), whichever appears first.
-    for label in ['_recording', '_proc', '_space', filetype]:
+    # https://bids-specification.readthedocs.io/en/stable/99-appendices/04-entity-table.html
+    for label in ['_flip', '_inv', '_mt', '_part', '_recording', '_proc', '_space', filetype]:
         if (label == filetype) or (label in filename):
             filename = filename.replace(
                 label, "_echo-%s%s" % (echo_number, label)
