@@ -239,7 +239,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                                     getattr(heuristic, 'DEFAULT_FIELDS', {}))
 
 
-def update_complex_name(metadata, filename, suffix):
+def update_complex_name(metadata, filename, suffix_counter):
     """
     Insert `_part-<mag|phase>` entity into filename if data are from a
     sequence with magnitude/phase part.
@@ -250,7 +250,7 @@ def update_complex_name(metadata, filename, suffix):
         Scan metadata dictionary from BIDS sidecar file.
     filename : str
         Incoming filename
-    suffix : str
+    suffix_counter : str
         An index used for cases where a single scan produces multiple files,
         but the differences between those files are unknown.
 
@@ -275,7 +275,7 @@ def update_complex_name(metadata, filename, suffix):
     elif 'P' in metadata.get('ImageType'):
         mag_or_phase = 'phase'
     else:
-        mag_or_phase = suffix
+        mag_or_phase = suffix_counter
 
     # Determine scan suffix
     filetype = '_' + filename.split('_')[-1]
