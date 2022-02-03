@@ -311,7 +311,8 @@ def update_multiecho_name(metadata, filename, echo_times):
     filename : str
         Updated filename with echo entity added, if appropriate.
     """
-    # Field maps separate echoes differently
+    # Field maps separate echoes differently, so do not attempt to update any filenames with these
+    # suffixes
     unsupported_types = [
         '_magnitude', '_magnitude1', '_magnitude2',
         '_phasediff', '_phase1', '_phase2', '_fieldmap'
@@ -319,13 +320,19 @@ def update_multiecho_name(metadata, filename, echo_times):
     if any(ut in filename for ut in unsupported_types):
         return filename
 
-    assert isinstance(echo_times, list), 'Argument "echo_times" must be a list.'
+    if not isinstance(echo_times, list):
+        raise TypeError(f'Argument "echo_times" must be a list, not a {type(echo_times)}')
 
-    # Get the EchoNumber from json file info.  If not present, use EchoTime
+    # Get the EchoNumber from json file info.  If not present, use EchoTime.
     if 'EchoNumber' in metadata.keys():
         echo_number = metadata['EchoNumber']
-    else:
+    elif 'EchoTime' in metadata.keys():
         echo_number = echo_times.index(metadata['EchoTime']) + 1
+    else:
+        raise KeyError(
+            'Either "EchoNumber" or "EchoTime" must be in metadata keys. '
+            f'Keys detected: {metadata.keys()}'
+        )
 
     # Determine scan suffix
     filetype = '_' + filename.split('_')[-1]
@@ -366,7 +373,8 @@ def update_uncombined_name(metadata, filename, channel_names):
     if any(ut in filename for ut in unsupported_types):
         return filename
 
-    assert isinstance(channel_names, list), 'Argument "channel_names" must be a list.'
+    if not isinstance(channel_names, list):
+        raise TypeError(f'Argument "channel_names" must be a list, not a {type(channel_names)}')
 
     # Determine the channel number
     channel_number = ''.join([c for c in metadata['CoilString'] if c.isdigit()])
@@ -694,9 +702,12 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
         for metadata in bids_metas:
             if not metadata:
                 continue
+
+            # If the field is not available, fill that entry in the set with a False.
             echo_times.add(metadata.get('EchoTime', False))
             channel_names.add(metadata.get('CoilString', False))
             image_types.update(metadata.get('ImageType', [False]))
+
         is_multiecho = len(set(filter(bool, echo_times))) > 1  # Check for varying echo times
         is_uncombined = len(set(filter(bool, channel_names))) > 1  # Check for uncombined data
         is_complex = 'M' in image_types and 'P' in image_types  # Determine if data are complex (magnitude + phase)
