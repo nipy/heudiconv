@@ -280,7 +280,7 @@ def update_complex_name(metadata, filename, suffix_counter):
     # Determine scan suffix
     filetype = '_' + filename.split('_')[-1]
 
-    # Insert rec label
+    # Insert part label
     if not ('_part-%s' % mag_or_phase) in filename:
         # If "_part-" is specified, prepend the 'mag_or_phase' value.
         if '_part-' in filename:
@@ -290,7 +290,21 @@ def update_complex_name(metadata, filename, suffix_counter):
             )
 
         # Insert it **before** the following string(s), whichever appears first.
-        for label in ['_recording', '_proc', '_space', filetype]:
+        # https://bids-specification.readthedocs.io/en/stable/99-appendices/09-entities.html
+        entities_after_part = [
+            "_proc",
+            "_hemi",
+            "_space",
+            "_split",
+            "_recording",
+            "_chunk",
+            "_res",
+            "_den",
+            "_label",
+            "_desc",
+            filetype,
+        ]
+        for label in entities_after_part:
             if (label == filetype) or (label in filename):
                 filename = filename.replace(
                     label, "_part-%s%s" % (mag_or_phase, label)
@@ -347,8 +361,25 @@ def update_multiecho_name(metadata, filename, echo_times):
     filetype = '_' + filename.split('_')[-1]
 
     # Insert it **before** the following string(s), whichever appears first.
-    # https://bids-specification.readthedocs.io/en/stable/99-appendices/04-entity-table.html
-    for label in ['_flip', '_inv', '_mt', '_part', '_recording', '_proc', '_space', filetype]:
+    # https://bids-specification.readthedocs.io/en/stable/99-appendices/09-entities.html
+    entities_after_echo = [
+        "_flip",
+        "_inv",
+        "_mt",
+        "_part",
+        "_proc",
+        "_hemi",
+        "_space",
+        "_split",
+        "_recording",
+        "_chunk",
+        "_res",
+        "_den",
+        "_label",
+        "_desc",
+        filetype,
+    ]
+    for label in entities_after_echo:
         if (label == filetype) or (label in filename):
             filename = filename.replace(
                 label, "_echo-%s%s" % (echo_number, label)
@@ -397,7 +428,21 @@ def update_uncombined_name(metadata, filename, channel_names):
 
     # Insert it **before** the following string(s), whichever appears first.
     # Choosing to put channel near the end since it's not in the specification yet.
-    for label in ['_recording', '_proc', '_space', filetype]:
+    # See https://bids-specification.readthedocs.io/en/stable/99-appendices/09-entities.html
+    entities_after_ch = [
+        "_proc",
+        "_hemi",
+        "_space",
+        "_split",
+        "_recording",
+        "_chunk",
+        "_res",
+        "_den",
+        "_label",
+        "_desc",
+        filetype,
+    ]
+    for label in entities_after_ch:
         if (label == filetype) or (label in filename):
             filename = filename.replace(
                 label, "_ch-%s%s" % (channel_number, label)
