@@ -2,9 +2,7 @@ import filelock
 import os
 import os.path as op
 import logging
-from math import nan
 import shutil
-import sys
 import random
 import re
 
