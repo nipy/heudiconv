@@ -123,6 +123,8 @@ from collections import OrderedDict
 import hashlib
 from glob import glob
 
+from heudiconv.due import due, Doi
+
 import logging
 lgr = logging.getLogger('heudiconv')
 
@@ -146,150 +148,55 @@ series_spec_fields = ('protocol_name', 'series_description')
 # NOTE: even if filename has number that is 0-padded, internally no padding
 # is done
 fix_accession2run = {
-    'A000005': ['^1-'],
-    'A000035': ['^8-', '^9-'],
-    'A000067': ['^9-'],
-    'A000072': ['^5-'],
-    'A000081': ['^5-'],
-    'A000082': ['^5-'],
-    'A000088': ['^9-'],
-    'A000090': ['^5-'],
-    'A000127': ['^21-'],
-    'A000130': ['^15-'],
-    'A000137': ['^9-', '^11-'],
-    'A000297': ['^12-'],
-    'A000326': ['^15-'],
-    'A000376': ['^15-'],
-    'A000384': ['^8-', '^11-'],
-    'A000467': ['^15-'],
-    'A000490': ['^15-'],
-    'A000511': ['^15-'],
-    'A000797': ['^[1-7]-'],
+    # e.g.:
+    # 'A000035': ['^8-', '^9-'],
 }
 
-# dictionary containing fixes, keys are md5sum of study_description from
-# dicoms, in the form of PI-Experimenter^protocolname
-# values are list of tuples in the form (regex_pattern, substitution)
+# A dictionary containing fixes/remapping for sequence names per study.
+# Keys are md5sum of study_description from DICOMs, in the form of PI-Experimenter^protocolname
+# You can use `heudiconv -f reproin --command ls --files  PATH
+# to list the "study hash".
+# Values are list of tuples in the form (regex_pattern, substitution).
+# If the  key is an empty string`''''`, it would apply to any study.
 protocols2fix = {
-    # QA
-    '43b67d9139e8c7274578b7451ab21123':
-        [
-         # ('anat-scout.*', 'anat-scout_ses-{date}'),
-         # do not change it so we retain _ses-{date}
-         # ('anat-scout.*', 'anat-scout'),
-         ('BOLD_p2_s4_3\.5mm', 'func_task-rest_acq-p2-s4-3.5mm'),
-         ('BOLD_p2_s4',        'func_task-rest_acq-p2-s4'),
-         ('BOLD_p2_noprescannormalize', 'func-bold_task-rest_acq-p2noprescannormalize'),
-         ('BOLD_p2',                    'func-bold_task-rest_acq-p2'),
-         ('BOLD_', 'func_task-rest'),
-         ('DTI_30_p2_s4_3\.5mm', 'dwi_acq-DTI-30-p2-s4-3.5mm'),
-         ('DTI_30_p2_s4',        'dwi_acq-DTI-30-p2-s4'),
-         ('DTI_30_p2',           'dwi_acq-DTI-30-p2'),
-         ('_p2_s4_3\.5mm', '_acq-p2-s4-3.5mm'),
-         ('_p2_s4',        '_acq-p2-s4'),
-         ('_p2', '_acq-p2'),
-        ],
-    '9d148e2a05f782273f6343507733309d':
-        [('anat_', 'anat-'),
-         ('run-life[0-9]', 'run+_task-life'),
-         ('scout_run\+', 'scout'),
-         ('T2w', 'T2w_run+'),
-         # substitutions for old protocol names
-         ('AAHead_Scout_32ch-head-coil', 'anat-scout'),
-         ('MPRAGE', 'anat-T1w_acq-MPRAGE_run+'),
-         ('gre_field_mapping_2mm', 'fmap_run+_acq-2mm'),
-         ('gre_field_mapping_3mm', 'fmap_run+_acq-3mm'),
-         ('epi_bold_sms_p2_s4_2mm_life1_748',
-            'func_run+_task-life_acq-2mm748'),
-         ('epi_bold_sms_p2_s4_2mm_life2_692',
-            'func_run+_task-life_acq-2mm692'),
-         ('epi_bold_sms_p2_s4_2mm_life3_754',
-            'func_run+_task-life_acq-2mm754'),
-         ('epi_bold_sms_p2_s4_2mm_life4_824',
-            'func_run+_task-life_acq-2mm824'),
-         ('epi_bold_p2_3mm_nofs_life1_374',
-            'func_run+_task-life_acq-3mmnofs374'),
-         ('epi_bold_p2_3mm_nofs_life2_346',
-          'func_run+_task-life_acq-3mmnofs346'),
-         ('epi_bold_p2_3mm_nofs_life3_377',
-          'func_run+_task-life_acq-3mmnofs377'),
-         ('epi_bold_p2_3mm_nofs_life4_412',
-          'func_run+_task-life_acq-3mmnofs412'),
-         ('t2_space_sag_p4_iso', 'anat-T2w_run+'),
-         ('gre_field_mapping_2.4mm', 'fmap_run+_acq-2.4mm'),
-         ('rest_p2_sms4_2.4mm_64sl_1000tr_32te_600dyn',
-            'func_run+_task-rest_acq-2.4mm64sl1000tr32te600dyn'),
-         ('DTI_30', 'dwi_run+_acq-30'),
-         ('t1_space_sag_p2_iso', 'anat-T1w_acq-060mm_run+')],
-    '76b36c80231b0afaf509e2d52046e964':
-        [('fmap_run\+_2mm', 'fmap_run+_acq-2mm')],
-    'c6d8fbccc72990bee61d28e73b2618a4':
-        [('run=', 'run+')],
-    'a751cc977f1e354fcafcb0ea2de123bd':
-        [
-          ('_unlabeled', '_task-unlabeled'),
-          ('_mSense', '_acq-mSense'),
-          ('_p1_sms4_2.5mm', '_acq-p1-sms4-2.5mm'),
-          ('_p1_sms4_3mm', '_acq-p1-sms4-3mm'),
-        ],
-    'd160113cf5ea8c5d0cbbbe14ef625e76':
-        [
-          ('_run0', '_run-0'),
-        ],
-    '1bd62e10672fe0b435a9aa8d75b45425':
-        [
-            # need to add incrementing session -- study should have 2
-            # and no need for run+ for the scout!
-            ('scout(_run\+)?$', 'scout_ses+'),
-        ],
-    'da218a66de902adb3ad9407d514e3639':
-        [
-            # those sequences renamed later to include DTI- in their acq-
-            # so fot consistency
-            ('hardi_64',  'dwi_acq-DTI-hardi64'),
-            ('acq-hardi', 'acq-DTI-hardi'),
-        ],
-    'ed20c1ad4a0861b2b65768e159258eec':
-        [
-            ('fmap_acq-discorr-dti-', 'fmap_acq-dwi_dir-'),
-            ('_test', ''),
-        ],
-    '1996f745c30c1df1d3851844e56d294f':
-        [
-            ('fmap_acq-discorr-dti-', 'fmap_acq-dwi_dir-'),
-        ],
-    # '022969bfde39c2940c114edf1db3fabc':
-    #    [  # should be applied only for ses-03!
-    #        ('_acq-MPRAGE_ses-02', '_acq-MPRAGE_ses-03'),
-    #    ],
-    # to be used only once for one interrupted accession but we cannot
-    # fix per accession yet
-    #    '23763823d2b9b4b09dafcadc8e8edf21':
-    #        [
-    #            ('anat-T1w_acq-MPRAGE', 'anat-T1w_acq-MPRAGE_run-06'),
-    #            ('anat_T2w', 'anat_T2w_run-06'),
-    #            ('fmap_acq-3mm', 'fmap_acq-3mm_run-06'),
-    #        ],
+    # e.g., QA:
+    # '43b67d9139e8c7274578b7451ab21123':
+    #     [
+    #      ('BOLD_p2_s4_3\.5mm', 'func_task-rest_acq-p2-s4-3.5mm'),
+    #      ('BOLD_', 'func_task-rest'),
+    #      ('_p2_s4',        '_acq-p2-s4'),
+    #      ('_p2', '_acq-p2'),
+    #     ],
+    # '':  # for any study example with regexes used
+    #     [
+    #         ('AAHead_Scout_.*', 'anat-scout'),
+    #         ('^dti_.*', 'dwi'),
+    #         ('^.*_distortion_corr.*_([ap]+)_([12])', r'fmap-epi_dir-\1_run-\2'),
+    #         ('^(.+)_ap.*_r(0[0-9])', r'func_task-\1_run-\2'),
+    #         ('^t1w_.*', 'anat-T1w'),
+    #         # problematic case -- multiple identically named pepolar fieldmap runs
+    #         # I guess we will just sacrifice ability to detect canceled runs here.
+    #         # And we cannot just use _run+ since it would increment independently
+    #         # for ap and then for pa.  We will rely on having ap preceding pa.
+    #         # Added  _acq-mb8  so they match the one in funcs
+    #         ('func_task-discorr_acq-ap', r'fmap-epi_dir-ap_acq-mb8_run+'),
+    #         ('func_task-discorr_acq-pa', r'fmap-epi_dir-pa_acq-mb8_run='),
+    # ]
 }
-# there was also screw up in the locator specification
-# so we need to fix in both
-# protocols2fix['67ae5e641ea9d487b6fdf56fb91aeb93'] = protocols2fix['022969bfde39c2940c114edf1db3fabc']
 
 # list containing StudyInstanceUID to skip -- hopefully doesn't happen too often
 dicoms2skip = [
-    '1.3.12.2.1107.5.2.43.66112.30000016110117002435700000001',
-    '1.3.12.2.1107.5.2.43.66112.30000016102813152550600000004',  # double scout
+    # e.g.
+    # '1.3.12.2.1107.5.2.43.66112.30000016110117002435700000001',
 ]
 
 DEFAULT_FIELDS = {
     # Let it just be in each json file extracted
-    # 'Manufacturer': "Siemens",
-    # 'ManufacturersModelName': "Prisma",
     "Acknowledgements":
         "We thank Terry Sacket and the rest of the DBIC (Dartmouth Brain Imaging "
         "Center) personnel for assistance in data collection, and "
-        "Yaroslav Halchenko and Matteo Visconti for preparing BIDS dataset. "
-        "TODO: more",
+        "Yaroslav O. Halchenko for preparing BIDS dataset. "
+        "TODO: adjust to your case.",
 }
 
 
@@ -309,38 +216,10 @@ def filter_dicom(dcmdata):
 
 def filter_files(fn):
     """Return True if a file should be kept, else False.
-    We're using it to filter out files that do not start with a number."""
 
-    # do not check for these accession numbers because they haven't been
-    # recopied with the initial number
-    donotfilter = ['A000012', 'A000013', 'A000020', 'A000041']
-
-    split = os.path.split(fn)
-    split2 = os.path.split(split[0])
-    sequence_dir = split2[1]
-    split3 = os.path.split(split2[0])
-    accession_number = split3[1]
+    ATM reproin does not do any filtering. Override if you need to add some
+    """
     return True
-    if accession_number == 'A000043':
-        # crazy one that got copied for some runs but not for others,
-        # so we are going to discard those that got copied and let heudiconv
-        # figure out the rest
-        return False if re.match('^[0-9]+-', sequence_dir) else True
-    elif accession_number == 'unknown':
-        # this one had some stuff without study description, filter stuff before
-        # collecting info, so it doesn't crash completely
-        return False if re.match('^[34][07-9]-sn', sequence_dir) else True
-    elif accession_number in donotfilter:
-        return True
-    elif accession_number.startswith('phantom-'):
-        # Accessions on phantoms, e.g. in dartmouth-phantoms/bids_test4-20161014
-        return True
-    elif accession_number.startswith('heudiconvdcm'):
-        # we were given some tarball with dicoms which was extracted so we
-        # better obey
-        return True
-    else:
-        return True if re.match('^[0-9]+-', sequence_dir) else False
 
 
 def create_key(subdir, file_suffix, outtype=('nii.gz', 'dicom'),
@@ -379,13 +258,17 @@ def get_study_hash(seqinfo):
 def fix_canceled_runs(seqinfo):
     """Function that adds cancelme_ to known bad runs which were forgotten
     """
-    accession_number = get_unique(seqinfo, 'accession_number')
-    if accession_number in fix_accession2run:
-        lgr.info("Considering some runs possibly marked to be "
-                 "canceled for accession %s", accession_number)
-        badruns = fix_accession2run[accession_number]
-        badruns_pattern = '|'.join(badruns)
-        for i, s in enumerate(seqinfo):
+    if not fix_accession2run:
+        return seqinfo  # nothing to do
+    for i, s in enumerate(seqinfo):
+        accession_number = getattr(s, 'accession_number')
+        if accession_number and accession_number in fix_accession2run:
+            lgr.info("Considering some runs possibly marked to be "
+                     "canceled for accession %s", accession_number)
+            # This code is reminiscent of prior logic when operating on
+            # a single accession, but left as is for now
+            badruns = fix_accession2run[accession_number]
+            badruns_pattern = '|'.join(badruns)
             if re.match(badruns_pattern, s.series_id):
                 lgr.info('Fixing bad run {0}'.format(s.series_id))
                 fixedkwargs = dict()
@@ -467,6 +350,10 @@ def ls(study_session, seqinfo):
 # XXX we killed session indicator!  what should we do now?!!!
 # WE DON:T NEED IT -- it will be provided into conversion_info as `session`
 # So we just need subdir and file_suffix!
+@due.dcite(
+    Doi('10.5281/zenodo.1207117'),
+    path='heudiconv.heuristics.reproin',
+    description='ReproIn heudiconv heuristic for turnkey conversion into BIDS')
 def infotodict(seqinfo):
     """Heuristic evaluator for determining which runs belong where
 

@@ -1,12 +1,18 @@
 import os.path as op
 import json
+from glob import glob
 
 import pytest
 
 from heudiconv.external.pydicom import dcm
 from heudiconv.cli.run import main as runner
 from heudiconv.convert import nipype_convert
-from heudiconv.dicoms import parse_private_csa_header, embed_dicom_and_nifti_metadata
+from heudiconv.dicoms import (
+    OrderedDict,
+    embed_dicom_and_nifti_metadata,
+    group_dicoms_into_seqinfos,
+    parse_private_csa_header,
+)
 from .utils import (
     assert_cwd_unchanged,
     TESTS_DATA_PATH,
@@ -64,3 +70,18 @@ def test_embed_dicom_and_nifti_metadata(tmpdir):
 
     assert out3.pop("existing") == "data"
     assert out3 == out2
+
+
+def test_group_dicoms_into_seqinfos(tmpdir):
+    """Tests for group_dicoms_into_seqinfos"""
+
+    # 1) Check that it works for PhoenixDocuments:
+    # set up testing files
+    dcmfolder = op.join(TESTS_DATA_PATH, 'Phoenix')
+    dcmfiles = glob(op.join(dcmfolder, '*', '*.dcm'))
+
+    seqinfo = group_dicoms_into_seqinfos(dcmfiles, 'studyUID', flatten=True)
+
+    assert type(seqinfo) is OrderedDict
+    assert len(seqinfo) == len(dcmfiles)
+    assert [s.series_description for s in seqinfo] == ['AAHead_Scout_32ch-head-coil', 'PhoenixZIPReport']

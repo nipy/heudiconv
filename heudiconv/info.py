@@ -1,4 +1,4 @@
-__version__ = "0.8.0"
+__version__ = "0.10.0"
 __author__ = "HeuDiConv team and contributors"
 __url__ = "https://github.com/nipy/heudiconv"
 __packagename__ = 'heudiconv'
@@ -12,18 +12,19 @@ CLASSIFIERS = [
     'Environment :: Console',
     'Intended Audience :: Science/Research',
     'License :: OSI Approved :: Apache Software License',
-    'Programming Language :: Python :: 3.5',
     'Programming Language :: Python :: 3.6',
     'Programming Language :: Python :: 3.7',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
     'Topic :: Scientific/Engineering'
 ]
 
-PYTHON_REQUIRES = ">=3.5"
+PYTHON_REQUIRES = ">=3.6"
 
 REQUIRES = [
     'nibabel',
     'pydicom',
-    'nipype >=1.0.0',
+    'nipype >=1.2.3',
     'dcmstack>=0.8',
     'etelemetry',
     'filelock>=3.0.12',
@@ -37,10 +38,12 @@ TESTS_REQUIRES = [
     'inotify',
 ]
 
-MIN_DATALAD_VERSION = '0.12.4'
+MIN_DATALAD_VERSION = '0.13.0'
 EXTRA_REQUIRES = {
     'tests': TESTS_REQUIRES,
-    'extras': [],  # Requires patched version ATM ['dcmstack'],
+    'extras': [
+        'duecredit',  # optional dependency
+    ],  # Requires patched version ATM ['dcmstack'],
     'datalad': ['datalad >=%s' % MIN_DATALAD_VERSION]
 }
 

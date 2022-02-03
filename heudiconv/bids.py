@@ -18,11 +18,12 @@ from .utils import (
     load_json,
     save_json,
     create_file_if_missing,
-    json_dumps_pretty,
+    json_dumps,
     set_readonly,
     is_readonly,
     get_datetime,
 )
+from . import __version__
 
 lgr = logging.getLogger(__name__)
 
@@ -40,8 +41,45 @@ SCANS_FILE_FIELDS = OrderedDict([
         ("Description", "md5 hash of UIDs")])),
 ])
 
+#: JSON Key where we will embed our version in the newly produced .json files
+HEUDICONV_VERSION_JSON_KEY = 'HeudiconvVersion'
+
+
 class BIDSError(Exception):
     pass
+
+
+BIDS_VERSION = "1.4.1"
+
+
+def maybe_na(val):
+    """Return 'n/a' if non-None value represented as str is not empty
+
+    Primarily for the consistent use of lower case 'n/a' so 'N/A' and 'NA'
+    are also treated as 'n/a'
+    """
+    if val is not None:
+        val = str(val)
+        val = val.strip()
+    return 'n/a' if (not val or val in ('N/A', 'NA')) else val
+
+
+def treat_age(age):
+    """Age might encounter 'Y' suffix or be a float"""
+    age = str(age)
+    if age.endswith('M'):
+        age = age.rstrip('M')
+        age = float(age) / 12
+        age = ('%.2f' if age != int(age) else '%d') % age
+    else:
+        age = age.rstrip('Y')
+    if age:
+        # strip all leading 0s but allow to scan a newborn (age 0Y)
+        age = '0' if not age.lstrip('0') else age.lstrip('0')
+        if age.startswith('.'):
+            # we had float point value, let's prepend 0
+            age = '0' + age
+    return age
 
 
 def populate_bids_templates(path, defaults={}):
@@ -53,7 +91,7 @@ def populate_bids_templates(path, defaults={}):
         save_json(descriptor,
               OrderedDict([
                   ('Name', "TODO: name of the dataset"),
-                  ('BIDSVersion', "1.0.1"),
+                  ('BIDSVersion', BIDS_VERSION),
                   ('License', defaults.get('License',
                         "TODO: choose a license, e.g. PDDL "
                         "(http://opendatacommons.org/licenses/pddl/)")),
@@ -87,6 +125,9 @@ def populate_bids_templates(path, defaults={}):
     create_file_if_missing(op.join(path, 'README'),
         "TODO: Provide description for the dataset -- basic details about the "
         "study, possibly pointing to pre-registration (if public or embargoed)")
+    create_file_if_missing(op.join(path, 'scans.json'),
+        json_dumps(SCANS_FILE_FIELDS, sort_keys=False)
+    )
 
     populate_aggregated_jsons(path)
 
@@ -111,7 +152,8 @@ def populate_aggregated_jsons(path):
     # way too many -- let's just collect all which are the same!
     # FIELDS_TO_TRACK = {'RepetitionTime', 'FlipAngle', 'EchoTime',
     #                    'Manufacturer', 'SliceTiming', ''}
-    for fpath in find_files('.*_task-.*\_bold\.json', topdir=path,
+    for fpath in find_files('.*_task-.*\_bold\.json',
+                            topdir=glob(op.join(path, 'sub-*')),
                             exclude_vcs=True,
                             exclude="/\.(datalad|heudiconv)/"):
         #
@@ -120,7 +162,7 @@ def populate_aggregated_jsons(path):
         # TODO: if we are to fix it, then old ones (without _acq) should be
         # removed first
         task = re.sub('.*_(task-[^_\.]*(_acq-[^_\.]*)?)_.*', r'\1', fpath)
-        json_ = load_json(fpath)
+        json_ = load_json(fpath, retry=100)
         if task not in tasks:
             tasks[task] = json_
         else:
@@ -172,10 +214,10 @@ def populate_aggregated_jsons(path):
         placeholders = {
             "TaskName": ("TODO: full task name for %s" %
                          task_acq.split('_')[0].split('-')[1]),
-            "CogAtlasID": "TODO",
+            "CogAtlasID": "http://www.cognitiveatlas.org/task/id/TODO",
         }
         if op.lexists(task_file):
-            j = load_json(task_file)
+            j = load_json(task_file, retry=100)
             # Retain possibly modified placeholder fields
             for f in placeholders:
                 if f in j:
@@ -207,6 +249,10 @@ def tuneup_bids_json_files(json_files):
             # Let's hope no word 'Date' comes within a study name or smth like
             # that
             raise ValueError("There must be no dates in .json sidecar")
+        # Those files should not have our version field already - should have been
+        # freshly produced
+        assert HEUDICONV_VERSION_JSON_KEY not in json_
+        json_[HEUDICONV_VERSION_JSON_KEY] = str(__version__)
         save_json(jsonfile, json_)
 
     # Load the beast
@@ -274,12 +320,13 @@ def add_participant_record(studydir, subject, age, sex):
                             "control group)")])),
                 ]),
                 sort_keys=False)
+
     # Add a new participant
     with open(participants_tsv, 'a') as f:
         f.write(
           '\t'.join(map(str, [participant_id,
-                              age.lstrip('0').rstrip('Y') if age else 'N/A',
-                              sex,
+                              maybe_na(treat_age(age)),
+                              maybe_na(sex),
                               'control'])) + '\n')
 
 
@@ -369,11 +416,6 @@ def add_rows_to_scans_keys_file(fn, newrows):
         os.unlink(fn)
     else:
         fnames2info = newrows
-        # Populate _scans.json (an optional file to describe column names in
-        # _scans.tsv). This auto generation will make BIDS-validator happy.
-        scans_json = '.'.join(fn.split('.')[:-1] + ['json'])
-        if not op.lexists(scans_json):
-            save_json(scans_json, SCANS_FILE_FIELDS, sort_keys=False)
 
     header = SCANS_FILE_FIELDS
     # prepare all the data rows
@@ -404,10 +446,10 @@ def get_formatted_scans_key_row(dcm_fn):
     """
     dcm_data = dcm.read_file(dcm_fn, stop_before_pixels=True, force=True)
     # we need to store filenames and acquisition times
-    # parse date and time and get it into isoformat
+    # parse date and time of start of run acquisition and get it into isoformat
     try:
-        date = dcm_data.ContentDate
-        time = dcm_data.ContentTime
+        date = dcm_data.AcquisitionDate
+        time = dcm_data.AcquisitionTime
         acq_time = get_datetime(date, time)
     except (AttributeError, ValueError) as exc:
         lgr.warning("Failed to get date/time for the content: %s", str(exc))

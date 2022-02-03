@@ -4,13 +4,16 @@ from heudiconv.cli.run import main as runner
 from heudiconv.main import workflow
 from heudiconv import __version__
 from heudiconv.utils import (create_file_if_missing,
+                             load_json,
                              set_readonly,
                              is_readonly)
 from heudiconv.bids import (populate_bids_templates,
                             add_participant_record,
                             get_formatted_scans_key_row,
                             add_rows_to_scans_keys_file,
-                            find_subj_ses)
+                            find_subj_ses,
+                            SCANS_FILE_FIELDS,
+                            )
 from heudiconv.external.dlad import MIN_VERSION, add_to_datalad
 
 from .utils import TESTS_DATA_PATH
@@ -81,6 +84,8 @@ def test_populate_bids_templates(tmpdir):
     assert "something" not in description_file.read()
     assert "TODO" in description_file.read()
 
+    assert load_json(tmpdir / "scans.json") == SCANS_FILE_FIELDS
+
 
 def test_add_participant_record(tmpdir):
     tf = tmpdir.join('participants.tsv')
@@ -127,6 +132,7 @@ def test_prepare_for_datalad(tmpdir):
         '.gitattributes',
         '.datalad/config', '.datalad/.gitattributes',
         'dataset_description.json',
+        'scans.json',
         'CHANGES', 'README'}
     assert set(ds.repo.get_indexed_files()) == target_files
     # and all are under git
@@ -155,7 +161,7 @@ def test_prepare_for_datalad(tmpdir):
     assert '.heudiconv/dummy.nii.gz' in ds.repo.get_files()
 
     # Let's now roll back and make it a proper submodule
-    ds.repo._git_custom_command([], ['git', 'reset', '--hard', old_hexsha])
+    ds.repo.call_git(['reset', '--hard', old_hexsha])
     # now we do not add dummy to git
     create_file_if_missing(dummy_path, '')
     add_to_datalad(str(tmpdir), studydir_, None, False)
@@ -171,7 +177,7 @@ def test_get_formatted_scans_key_row():
 
     row1 = get_formatted_scans_key_row(dcm_fn)
     assert len(row1) == 3
-    assert row1[0] == '2016-10-14T09:26:36.693000'
+    assert row1[0] == '2016-10-14T09:26:34.692500'
     assert row1[1] == 'n/a'
     prandstr1 = row1[2]
 
@@ -217,7 +223,9 @@ def test_add_rows_to_scans_keys_file(tmpdir):
         assert dates == sorted(dates)
 
     _check_rows(fn, rows)
-    assert op.exists(opj(tmpdir.strpath, 'file.json'))
+    # we no longer produce a sidecar .json file there and only generate
+    # it while populating templates for BIDS
+    assert not op.exists(opj(tmpdir.strpath, 'file.json'))
     # add a new one
     extra_rows = {
         'a_new_file.nii.gz': ['2016adsfasd23', '', 'fasadfasdf'],
@@ -282,6 +290,11 @@ def test_cache(tmpdir):
     assert (cachedir / 'dicominfo.tsv').exists()
     assert (cachedir / 'S01.auto.txt').exists()
     assert (cachedir / 'S01.edit.txt').exists()
+
+    # check dicominfo has "time" as last column:
+    with open(str(cachedir / 'dicominfo.tsv'), 'r') as f:
+        cols = f.readline().split()
+    assert cols[26] == "time"
 
 
 def test_no_etelemetry():

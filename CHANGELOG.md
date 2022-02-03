@@ -4,16 +4,78 @@ All notable changes to this project will be documented (for humans) in this file
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [0.8.1] - Date
+## [0.10.0] - 2021-09-16
 
-TODO Summary
+Various improvements and compatibility/support (dcm2niix, datalad) changes.
 
 ### Added
+
+- Add "AcquisitionTime" to the seqinfo ([#487][])
+- Add support for saving the Phoenix Report in the sourcedata folder ([#489][])
+
 ### Changed
-### Deprecated
+
+- Python 3.5 EOLed, supported (tested) versions now: 3.6 - 3.9
+- In reprorin heuristic, allow for having multiple accessions since now there is
+  `-g all` groupping ([#508][])
+- For BIDS, produce a singular `scans.json` at the top level, and not one per
+  sub/ses (generates too many identical files) ([#507][])
+
+
 ### Fixed
+
+- Compatibility with DataLad 0.15.0. Minimal version is 0.13.0 now.
+- Try to open top level BIDS .json files a number of times for adjustment,
+  so in the case of competition across parallel processes, they just end up
+  with the last one "winning over" ([#523][])
+- Don't fail if etelemetry.get_project returns None ([#501][])
+- Consistently use `n/a` for age/sex, also handle ?M for months ([#500][])
+- To avoid crashing on unrelated derivatives files etc, make `find_files` to
+  take list of topdirs (excluding `derivatives/` etc),
+  and look for _bold only under sub-* directories ([#496][])
+- Ensure bvec/bval files are only created for dwi output ([#491][])
+
 ### Removed
-### Security
+
+- In reproin heuristic, old hardcoded sequence renamings and filters ([#508][])
+
+
+## [0.9.0] - 2020-12-23
+
+Various improvements and compatibility/support (dcm2niix, datalad,
+duecredit) changes.  Major change is placement of output files to the
+target output directory during conversion.
+
+### Added
+
+- #454 zenodo referencing in README.rst and support for ducredit for
+  heudiconv and reproin heuristic
+- #445 more tutorial references in README.md
+
+### Changed
+
+- [#485][] placed files during conversion right away into the target
+  directory (with a `_heudiconv???` suffix, renamed into ultimate target
+  name later on), which avoids hitting file size limits of /tmp ([#481][]) and
+  helped to avoid a regression in dcm2nixx 1.0.20201102
+- [#477][] replaced `rec-<magnitude|phase>` with `part-<mag|phase>` now
+  hat BIDSsupports the part entity
+- [#473][] made default for CogAtlasID to be a TODO URL
+- [#459][] made AcquisitionTime used for acq_time scans file field
+- [#451][] retained sub-second resolution in scans files
+- [#442][] refactored code so there is now heudiconv.main.workflow for
+  more convenient use as a Python module
+
+### Fixed
+
+- minimal version of nipype set to 1.2.3 to guarantee correct handling
+  of DWI files ([#480][])
+- `heudiconvDCM*` temporary directories are removed now ([#462][])
+- compatibility with DataLad 0.13 ([#464][])
+
+### Removed
+
+- #443 pathlib as a dependency (we are Python3 only now)
 
 
 ## [0.8.0] - 2020-04-15
@@ -323,6 +385,12 @@ TODO Summary
 [#366]: https://github.com/nipy/heudiconv/issues/366
 [#368]: https://github.com/nipy/heudiconv/issues/368
 [#373]: https://github.com/nipy/heudiconv/issues/373
+[#485]: https://github.com/nipy/heudiconv/issues/485
+[#442]: https://github.com/nipy/heudiconv/issues/442
+[#451]: https://github.com/nipy/heudiconv/issues/451
+[#459]: https://github.com/nipy/heudiconv/issues/459
+[#473]: https://github.com/nipy/heudiconv/issues/473
+[#477]: https://github.com/nipy/heudiconv/issues/477
 [#293]: https://github.com/nipy/heudiconv/issues/293
 [#304]: https://github.com/nipy/heudiconv/issues/304
 [#306]: https://github.com/nipy/heudiconv/issues/306
@@ -360,11 +428,16 @@ TODO Summary
 [#434]: https://github.com/nipy/heudiconv/issues/434
 [#436]: https://github.com/nipy/heudiconv/issues/436
 [#437]: https://github.com/nipy/heudiconv/issues/437
-[#425]: https://github.com/nipy/heudiconv/issues/425
-[#420]: https://github.com/nipy/heudiconv/issues/420
-[#425]: https://github.com/nipy/heudiconv/issues/425
-[#430]: https://github.com/nipy/heudiconv/issues/430
-[#432]: https://github.com/nipy/heudiconv/issues/432
-[#434]: https://github.com/nipy/heudiconv/issues/434
-[#436]: https://github.com/nipy/heudiconv/issues/436
-[#437]: https://github.com/nipy/heudiconv/issues/437
+[#462]: https://github.com/nipy/heudiconv/issues/462
+[#464]: https://github.com/nipy/heudiconv/issues/464
+[#480]: https://github.com/nipy/heudiconv/issues/480
+[#481]: https://github.com/nipy/heudiconv/issues/481
+[#487]: https://github.com/nipy/heudiconv/issues/487
+[#489]: https://github.com/nipy/heudiconv/issues/489
+[#491]: https://github.com/nipy/heudiconv/issues/491
+[#496]: https://github.com/nipy/heudiconv/issues/496
+[#500]: https://github.com/nipy/heudiconv/issues/500
+[#501]: https://github.com/nipy/heudiconv/issues/501
+[#507]: https://github.com/nipy/heudiconv/issues/507
+[#508]: https://github.com/nipy/heudiconv/issues/508
+[#523]: https://github.com/nipy/heudiconv/issues/523

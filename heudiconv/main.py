@@ -5,6 +5,7 @@ import sys
 from . import __version__, __packagename__
 from .bids import populate_bids_templates, tuneup_bids_json_files
 from .convert import prep_conversion
+from .due import due, Doi
 from .parser import get_study_sessions
 from .queue import queue_conversion
 from .utils import anonymize_sid, load_heuristic, treat_infofile, SeqInfo
@@ -122,6 +123,12 @@ def ensure_heuristic_arg(heuristic=None):
                          % ', '.join(get_known_heuristic_names()))
 
 
+@due.dcite(
+    Doi('10.5281/zenodo.1012598'),
+    path='heudiconv',
+    description='Flexible DICOM converter for organizing brain imaging data',
+    version=__version__,
+    cite_module=True)
 def workflow(*, dicom_dir_template=None, files=None, subjs=None,
              converter='dcm2niix', outdir='.', locator=None, conv_outdir=None,
              anon_cmd=None, heuristic=None, with_prov=False, session=None,
@@ -245,16 +252,16 @@ def workflow(*, dicom_dir_template=None, files=None, subjs=None,
 
     outdir = op.abspath(outdir)
 
+    latest = None
     try:
         import etelemetry
         latest = etelemetry.get_project("nipy/heudiconv")
     except Exception as e:
         lgr.warning("Could not check for version updates: %s", str(e))
-        latest = {"version": 'Unknown'}
 
     lgr.info(INIT_MSG(packname=__packagename__,
                       version=__version__,
-                      latest=latest["version"]))
+                      latest=(latest or {}).get("version", "Unknown")))
 
     if command:
         process_extra_commands(outdir, command, files, dicom_dir_template,

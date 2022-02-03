@@ -1,23 +1,30 @@
 """Test functions in heudiconv.convert module.
 """
+import os.path as op
+from glob import glob
+
 import pytest
 from heudiconv.bids import BIDSError
+from heudiconv.cli.run import main as runner
 from heudiconv.convert import (
+    DW_IMAGE_IN_FMAP_FOLDER_WARNING,
     update_complex_name,
     update_multiecho_name,
     update_uncombined_name,
 )
 
+from .utils import TESTS_DATA_PATH
+
 
 def test_update_complex_name():
     """Unit testing for heudiconv.convert.update_complex_name(), which updates
-    filenames with the rec field if appropriate.
+    filenames with the part field if appropriate.
     """
     # Standard name update
     fn = 'sub-X_ses-Y_task-Z_run-01_sbref'
     metadata = {'ImageType': ['ORIGINAL', 'PRIMARY', 'P', 'MB', 'TE3', 'ND', 'MOSAIC']}
     suffix = 3
-    out_fn_true = 'sub-X_ses-Y_task-Z_rec-phase_run-01_sbref'
+    out_fn_true = 'sub-X_ses-Y_task-Z_run-01_part-phase_sbref'
     out_fn_test = update_complex_name(metadata, fn, suffix)
     assert out_fn_test == out_fn_true
 
@@ -29,13 +36,13 @@ def test_update_complex_name():
     # Data type is missing from metadata so use suffix
     fn = 'sub-X_ses-Y_task-Z_run-01_sbref'
     metadata = {'ImageType': ['ORIGINAL', 'PRIMARY', 'MB', 'TE3', 'ND', 'MOSAIC']}
-    out_fn_true = 'sub-X_ses-Y_task-Z_rec-3_run-01_sbref'
+    out_fn_true = 'sub-X_ses-Y_task-Z_run-01_part-3_sbref'
     out_fn_test = update_complex_name(metadata, fn, suffix)
     assert out_fn_test == out_fn_true
 
     # Catch existing field with value that *does not match* metadata
     # and raise Exception
-    fn = 'sub-X_ses-Y_task-Z_rec-magnitude_run-01_sbref'
+    fn = 'sub-X_ses-Y_task-Z_run-01_part-mag_sbref'
     metadata = {'ImageType': ['ORIGINAL', 'PRIMARY', 'P', 'MB', 'TE3', 'ND', 'MOSAIC']}
     suffix = 3
     with pytest.raises(BIDSError):
@@ -123,3 +130,32 @@ def test_update_uncombined_name():
     fn = 'sub-X_ses-Y_task-Z_run-01_bold'
     with pytest.raises(TypeError):
         update_uncombined_name(metadata, fn, set(channel_names))
+
+
+def test_b0dwi_for_fmap(tmpdir, caplog):
+    """Make sure we raise a warning when .bvec and .bval files
+    are present but the modality is not dwi.
+    We check it by extracting a few DICOMs from a series with
+    bvals: 5 5 1500
+    """
+    import logging
+    caplog.set_level(logging.WARNING)
+    tmppath = tmpdir.strpath
+    subID = 'b0dwiForFmap'
+    args = (
+        "-c dcm2niix -o %s -b -f test_b0dwi_for_fmap --files %s -s %s"
+        % (tmpdir, op.join(TESTS_DATA_PATH, 'b0dwiForFmap'), subID)
+    ).split(' ')
+    runner(args)
+
+    # assert that it raised a warning that the fmap directory will contain
+    # bvec and bval files.
+    expected_msg = DW_IMAGE_IN_FMAP_FOLDER_WARNING.format(folder=op.join(tmppath, 'sub-%s', 'fmap') % subID)
+    assert any(expected_msg in c.message for c in caplog.records)
+
+    # check that both 'fmap' and 'dwi' directories have been extracted and they contain
+    # *.bvec and a *.bval files
+    for mod in ['fmap', 'dwi']:
+        assert op.isdir(op.join(tmppath, 'sub-%s', mod) % (subID))
+        for ext in ['bval', 'bvec']:
+            assert glob(op.join(tmppath, 'sub-%s', mod, 'sub-%s_*.%s') % (subID, subID, ext))

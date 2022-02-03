@@ -5,7 +5,10 @@ import logging
 from math import nan
 import shutil
 import sys
+import random
 import re
+
+from .due import due, Doi
 
 from .utils import (
     read_config,
@@ -14,6 +17,7 @@ from .utils import (
     write_config,
     TempDirs,
     safe_copyfile,
+    safe_movefile,
     treat_infofile,
     set_readonly,
     clear_temp_dicoms,
@@ -27,7 +31,8 @@ from .bids import (
     save_scans_key,
     tuneup_bids_json_files,
     add_participant_record,
-    BIDSError
+    BIDSError,
+    BIDS_VERSION,
 )
 from .dicoms import (
     group_dicoms_into_seqinfos,
@@ -36,6 +41,7 @@ from .dicoms import (
 )
 
 LOCKFILE = 'heudiconv.lock'
+DW_IMAGE_IN_FMAP_FOLDER_WARNING = 'Diffusion-weighted image saved in non dwi folder ({folder})'
 lgr = logging.getLogger(__name__)
 
 
@@ -235,7 +241,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
 
 def update_complex_name(metadata, filename, suffix):
     """
-    Insert `_rec-<magnitude|phase>` entity into filename if data are from a
+    Insert `_part-<mag|phase>` entity into filename if data are from a
     sequence with magnitude/phase part.
 
     Parameters
@@ -254,7 +260,10 @@ def update_complex_name(metadata, filename, suffix):
         Updated filename with rec entity added in appropriate position.
     """
     # Some scans separate magnitude/phase differently
-    unsupported_types = ['_bold', '_phase',
+    # A small note: _phase is deprecated, but this may add part-mag to
+    # magnitude data while leaving phase data with a separate suffix,
+    # depending on how one sets up their heuristic.
+    unsupported_types = ['_phase',
                          '_magnitude', '_magnitude1', '_magnitude2',
                          '_phasediff', '_phase1', '_phase2']
     if any(ut in filename for ut in unsupported_types):
@@ -262,7 +271,7 @@ def update_complex_name(metadata, filename, suffix):
 
     # Check to see if it is magnitude or phase part:
     if 'M' in metadata.get('ImageType'):
-        mag_or_phase = 'magnitude'
+        mag_or_phase = 'mag'
     elif 'P' in metadata.get('ImageType'):
         mag_or_phase = 'phase'
     else:
@@ -272,19 +281,19 @@ def update_complex_name(metadata, filename, suffix):
     filetype = '_' + filename.split('_')[-1]
 
     # Insert rec label
-    if not ('_rec-%s' % mag_or_phase) in filename:
-        # If "_rec-" is specified, prepend the 'mag_or_phase' value.
-        if '_rec-' in filename:
+    if not ('_part-%s' % mag_or_phase) in filename:
+        # If "_part-" is specified, prepend the 'mag_or_phase' value.
+        if '_part-' in filename:
             raise BIDSError(
-                "Reconstruction label for images will be automatically set, "
+                "Part label for images will be automatically set, "
                 "remove from heuristic"
             )
 
         # Insert it **before** the following string(s), whichever appears first.
-        for label in ['_dir', '_run', '_mod', '_echo', '_recording', '_proc', '_space', filetype]:
+        for label in ['_recording', '_proc', '_space', filetype]:
             if (label == filetype) or (label in filename):
                 filename = filename.replace(
-                    label, "_rec-%s%s" % (mag_or_phase, label)
+                    label, "_part-%s%s" % (mag_or_phase, label)
                 )
                 break
 
@@ -338,7 +347,8 @@ def update_multiecho_name(metadata, filename, echo_times):
     filetype = '_' + filename.split('_')[-1]
 
     # Insert it **before** the following string(s), whichever appears first.
-    for label in ['_recording', '_proc', '_space', filetype]:
+    # https://bids-specification.readthedocs.io/en/stable/99-appendices/04-entity-table.html
+    for label in ['_flip', '_inv', '_mt', '_part', '_recording', '_proc', '_space', filetype]:
         if (label == filetype) or (label in filename):
             filename = filename.replace(
                 label, "_echo-%s%s" % (echo_number, label)
@@ -421,6 +431,20 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
     """
     prov_files = []
     tempdirs = TempDirs()
+
+    if bids_options is not None:
+        due.cite(
+            # doi matches the BIDS_VERSION
+            Doi("10.5281/zenodo.4085321"),
+            description="Brain Imaging Data Structure (BIDS) Specification",
+            path="bids",
+            version=BIDS_VERSION,
+            tags=["implementation"])
+        due.cite(
+            Doi("10.1038/sdata.2016.44"),
+            description="Brain Imaging Data Structure (BIDS), Original paper",
+            path="bids",
+            tags=["documentation"])
 
     for item_idx, item in enumerate(items):
 
@@ -606,7 +630,11 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids_options, tmpdir, dcmconf
     convertnode = Node(Dcm2niix(from_file=fromfile), name='convert')
     convertnode.base_dir = tmpdir
     convertnode.inputs.source_names = item_dicoms
-    convertnode.inputs.out_filename = prefix
+    convertnode.inputs.out_filename = op.basename(prefix) + "_heudiconv%03d" % random.randint(0, 999)
+    prefix_dir = op.dirname(prefix)
+    # if provided prefix had a path in it -- pass is as output_dir instead of default curdir
+    if prefix_dir:
+        convertnode.inputs.output_dir = prefix_dir
 
     if nipype.__version__.split('.')[0] == '0':
         # deprecated since 1.0, might be needed(?) before
@@ -619,7 +647,7 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids_options, tmpdir, dcmconf
     # prov information
     prov_file = prefix + '_prov.ttl' if with_prov else None
     if prov_file:
-        safe_copyfile(op.join(convertnode.base_dir,
+        safe_movefile(op.join(convertnode.base_dir,
                               convertnode.name,
                               'provenance.ttl'),
                       prov_file)
@@ -660,9 +688,22 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
         return
 
     if isdefined(res.outputs.bvecs) and isdefined(res.outputs.bvals):
-        outname_bvecs, outname_bvals = prefix + '.bvec', prefix + '.bval'
-        safe_copyfile(res.outputs.bvecs, outname_bvecs, overwrite)
-        safe_copyfile(res.outputs.bvals, outname_bvals, overwrite)
+        if prefix_dirname.endswith('dwi'):
+            outname_bvecs, outname_bvals = prefix + '.bvec', prefix + '.bval'
+            safe_movefile(res.outputs.bvecs, outname_bvecs, overwrite)
+            safe_movefile(res.outputs.bvals, outname_bvals, overwrite)
+        else:
+            if bvals_are_zero(res.outputs.bvals):
+                os.remove(res.outputs.bvecs)
+                os.remove(res.outputs.bvals)
+                lgr.debug("%s and %s were removed since not dwi", res.outputs.bvecs, res.outputs.bvals)
+            else:
+                lgr.warning(DW_IMAGE_IN_FMAP_FOLDER_WARNING.format(folder= prefix_dirname))
+                lgr.warning(".bvec and .bval files will be generated. This is NOT BIDS compliant")
+                outname_bvecs, outname_bvals = prefix + '.bvec', prefix + '.bval'
+                safe_movefile(res.outputs.bvecs, outname_bvecs, overwrite)
+                safe_movefile(res.outputs.bvals, outname_bvals, overwrite)
+
 
     if isinstance(res_files, list):
         res_files = sorted(res_files)
@@ -751,19 +792,19 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
             outfile = outname + '.' + outtype
 
             # Write the files needed:
-            safe_copyfile(fl, outfile, overwrite)
+            safe_movefile(fl, outfile, overwrite)
             if bids_file:
                 outname_bids_file = "%s.json" % (outname)
-                safe_copyfile(bids_file, outname_bids_file, overwrite)
+                safe_movefile(bids_file, outname_bids_file, overwrite)
                 bids_outfiles.append(outname_bids_file)
 
     # res_files is not a list
     else:
         outname = "{}.{}".format(prefix, outtype)
-        safe_copyfile(res_files, outname, overwrite)
+        safe_movefile(res_files, outname, overwrite)
         if isdefined(res.outputs.bids):
             try:
-                safe_copyfile(res.outputs.bids, outname_bids, overwrite)
+                safe_movefile(res.outputs.bids, outname_bids, overwrite)
                 bids_outfiles.append(outname_bids)
             except TypeError as exc:  ##catch lists
                 raise TypeError("Multiple BIDS sidecars detected.")
@@ -797,3 +838,23 @@ def  add_taskname_to_infofile(infofiles):
 
         # write to outfile
         save_json(infofile, meta_info)
+
+
+def bvals_are_zero(bval_file):
+    """Checks if all entries in a bvals file are zero (or 5, for Siemens files).
+    Returns True if that is the case, otherwise returns False
+
+    Parameters
+    ----------
+    bval_file : file with the bvals
+
+    Returns
+    -------
+    True if all are zero; False otherwise.
+    """
+
+    with open(bval_file) as f:
+        bvals = f.read().split()
+
+    bvals_unique = set(float(b) for b in bvals)
+    return bvals_unique == {0.} or bvals_unique == {5.}
