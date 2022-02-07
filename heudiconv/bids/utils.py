@@ -11,10 +11,10 @@ import csv
 from random import sample
 from glob import glob
 
-from .external.pydicom import dcm
+from ..external.pydicom import dcm
 
-from .parser import find_files
-from .utils import (
+from ..parser import find_files
+from ..utils import (
     load_json,
     save_json,
     create_file_if_missing,
@@ -23,7 +23,7 @@ from .utils import (
     is_readonly,
     get_datetime,
 )
-from . import __version__
+from .. import __version__
 
 lgr = logging.getLogger(__name__)
 

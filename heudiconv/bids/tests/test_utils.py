@@ -1,7 +1,7 @@
 """Test functions in heudiconv.bids module.
 """
 
-from heudiconv.bids import (
+from ..utils import (
     maybe_na,
     treat_age,
 )
