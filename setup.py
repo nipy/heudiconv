@@ -59,6 +59,9 @@ def main():
                         op.join('data', '*.dcm'),
                         op.join('data', '*', '*.dcm')
             ],
+            'heudiconv.bids.data.schema': [
+                '*/*.yaml'
+            ],
         }
     )
 

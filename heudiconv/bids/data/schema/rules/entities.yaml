@@ -1,0 +1,30 @@
+---
+# This file simply defines the order in which entities should appear within filenames.
+# Entity definitions appear in the `objects/entities.yaml` file.
+- subject
+- session
+- sample
+- task
+- acquisition
+- ceagent
+- tracer
+- stain
+- reconstruction
+- direction
+- run
+- modality
+- echo
+- flip
+- inversion
+- mtransfer
+- part
+- processing
+- hemisphere
+- space
+- split
+- recording
+- chunk
+- resolution
+- density
+- label
+- description
