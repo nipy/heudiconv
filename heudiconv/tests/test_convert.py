@@ -23,37 +23,33 @@ def test_update_complex_name():
     # Standard name update
     base_fn = 'sub-X_ses-Y_task-Z_run-01_sbref'
     metadata = {'ImageType': ['ORIGINAL', 'PRIMARY', 'P', 'MB', 'TE3', 'ND', 'MOSAIC']}
-    file_counter = 3  # This is the third file with the same name
     out_fn_true = 'sub-X_ses-Y_task-Z_run-01_part-phase_sbref'
-    out_fn_test = update_complex_name(metadata, base_fn, file_counter)
+    out_fn_test = update_complex_name(metadata, base_fn)
     assert out_fn_test == out_fn_true
 
     # Catch an unsupported type and *do not* update
     base_fn = 'sub-X_ses-Y_task-Z_run-01_phase'
-    out_fn_test = update_complex_name(metadata, base_fn, file_counter)
+    out_fn_test = update_complex_name(metadata, base_fn)
     assert out_fn_test == base_fn
 
-    # Data type is missing from metadata so use suffix
+    # Data type is missing from metadata so raise a RuntimeError
     base_fn = 'sub-X_ses-Y_task-Z_run-01_sbref'
     metadata = {'ImageType': ['ORIGINAL', 'PRIMARY', 'MB', 'TE3', 'ND', 'MOSAIC']}
-    out_fn_true = 'sub-X_ses-Y_task-Z_run-01_part-3_sbref'
-    out_fn_test = update_complex_name(metadata, base_fn, file_counter)
-    assert out_fn_test == out_fn_true
+    with pytest.raises(RuntimeError):
+        update_complex_name(metadata, base_fn)
 
     # Catch existing field with value (part is already in the filename)
     # that *does not match* metadata and raise Exception
     base_fn = 'sub-X_ses-Y_task-Z_run-01_part-mag_sbref'
     metadata = {'ImageType': ['ORIGINAL', 'PRIMARY', 'P', 'MB', 'TE3', 'ND', 'MOSAIC']}
-    file_counter = 3
     with pytest.raises(BIDSError):
-        update_complex_name(metadata, base_fn, file_counter)
+        update_complex_name(metadata, base_fn)
 
     # Catch existing field with value (part is already in the filename)
     # that *does match* metadata and do not update
     base_fn = 'sub-X_ses-Y_task-Z_run-01_part-phase_sbref'
     metadata = {'ImageType': ['ORIGINAL', 'PRIMARY', 'P', 'MB', 'TE3', 'ND', 'MOSAIC']}
-    file_counter = 3
-    out_fn_test = update_complex_name(metadata, base_fn, file_counter)
+    out_fn_test = update_complex_name(metadata, base_fn)
     assert out_fn_test == base_fn
 
 
