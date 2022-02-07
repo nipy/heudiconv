@@ -28,7 +28,7 @@ from heudiconv.utils import (
     remove_suffix,
 )
 
-from heudiconv.bids import (
+from .. import (
     maybe_na,
     treat_age,
     find_fmap_groups,
@@ -44,7 +44,7 @@ from heudiconv.bids import (
     BIDSFile,
 )
 
-from .utils import (
+from heudiconv.tests.utils import (
     TESTS_DATA_PATH,
 )
 
