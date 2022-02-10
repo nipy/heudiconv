@@ -500,9 +500,8 @@ def get_formatted_scans_key_row(dcm_fn):
     row = ['n/a' if not str(e) else e for e in row]
     return row
 
-
 def convert_sid_bids(subject_id):
-    """Strips any non-BIDS compliant characters within subject_id
+    """Shim for stripping any non-BIDS compliant characters within subject_id
 
     Parameters
     ----------
@@ -515,14 +514,10 @@ def convert_sid_bids(subject_id):
     subject_id : string
         Original subject ID
     """
-    cleaner = lambda y: ''.join([x for x in y if x.isalnum()])
-    sid = cleaner(subject_id)
-    if not sid:
-        raise ValueError(
-            "Subject ID became empty after cleanup.  Please provide manually "
-            "a suitable alphanumeric subject ID")
-    lgr.warning('{0} contained nonalphanumeric character(s), subject '
-                'ID was cleaned to be {1}'.format(subject_id, sid))
+    sid, subject_id = sanitize_label(subject_id)
+    lgr.warning('Deprecation warning: convert_sid_bids() is deprecated, '
+                'please use sanitize_label() instead.')
+    
     return sid, subject_id
 
 
@@ -1028,3 +1023,29 @@ class BIDSFile(object):
     @property
     def extension(self):
         return self._extension
+
+
+def sanitize_label(label):
+    """Strips any non-BIDS compliant characters within label
+
+    Parameters
+    ----------
+    label : string
+
+    Returns
+    -------
+    clean_label : string
+        New, sanitized label
+    label : string
+        Original label
+    """
+    cleaner = lambda y: ''.join([x for x in y if x.isalnum()])
+    clean_label = cleaner(label)
+    if not clean_label:
+        raise ValueError(
+            "Label became empty after cleanup.  Please provide manually "
+            "a suitable alphanumeric label.")
+    if clean_label != label:
+        lgr.warning('{0} contained nonalphanumeric character(s), label '
+                    'was cleaned to be {1}'.format(label, clean_label))
+    return clean_label, label
