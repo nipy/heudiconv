@@ -117,8 +117,16 @@ The parameters that can be specified and the allowed options are defined in ``bi
    * ``'ImagingVolume'``: both ``fmaps`` and images will need to have the same the imaging
      volume (the header affine transformation: position, orientation and voxel size, as well
      as number of voxels along each dimensions).
-   * ``'AcquisitionLabel'``: it checks for what modality (``anat``, ``func``, ``dwi``) each
-     ``fmap`` is intended by checking the ``_acq-`` label in the filename
+   * ``'ModalityAcquisitionLabel'``: it checks for what modality (``anat``, ``func``, ``dwi``) each
+     ``fmap`` is intended by checking the ``_acq-`` label in the ``fmap`` filename and finding
+     corresponding modalities (e.g. ``_acq-fmri``, ``_acq-bold`` and ``_acq-func`` will be matched
+     with the ``func`` modality)
+   * ``'CustomAcquisitionLabel'``: it checks for what modality images each  ``fmap`` is intended
+     by checking the ``_acq-`` custom label (e.g. ``_acq-XYZ42``) in the ``fmap`` filename, and
+     matching it with:
+     - the corresponding modality image ``_acq-`` label for modalities other than ``func``
+     (e.g. ``_acq-XYZ42`` for ``dwi`` images)
+     - the corresponding image ``_task-`` label for the ``func`` modality (e.g. ``_task-XYZ42``)
    * ``'Force'``: forces ``heudiconv`` to consider any ``fmaps`` in the session to be
      suitable for any image, no matter what the imaging parameters are.
 
