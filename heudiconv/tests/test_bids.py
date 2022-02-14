@@ -385,7 +385,7 @@ def create_dummy_pepolar_bids_session(session_path):
     return session_struct, expected_result, expected_fmap_groups, expected_compatible_fmaps
 
 
-def create_dummy_no_shim_settings_bids_session(session_path, label_seed=42, label_size=4):
+def create_dummy_no_shim_settings_bids_session(session_path):
     """
     Creates a dummy BIDS session, with slim json files and empty nii.gz
     The fmap files are pepolar
