@@ -541,6 +541,10 @@ def create_dummy_no_shim_settings_custom_label_bids_session(session_path, label_
     ----------
     session_path : str or os.path
         path to the session (or subject) level folder
+    label_size : int, optional
+        size of the random label
+    label_seed : int, optionall
+        seed for the random label creation
 
     Returns:
     -------
