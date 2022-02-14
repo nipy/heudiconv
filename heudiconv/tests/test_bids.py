@@ -99,7 +99,11 @@ def test_get_shim_setting(tmpdir):
 
 def test_get_key_info_for_fmap_assignment(tmpdir, label_size=4, label_seed=42):
     """
-    Test get_key_info_for_fmap_assignment
+    Test get_key_info_for_fmap_assignment.
+    
+    label_size and label_seed are used for the "CustomAcquisitionLabel" matching
+    parameter. label_size is the size of the random label while label_seed is 
+    the seed for the random label creation.
     """
 
     nifti_file = op.join(TESTS_DATA_PATH, 'sample_nifti.nii.gz')
@@ -543,7 +547,7 @@ def create_dummy_no_shim_settings_custom_label_bids_session(session_path, label_
         path to the session (or subject) level folder
     label_size : int, optional
         size of the random label
-    label_seed : int, optionall
+    label_seed : int, optional
         seed for the random label creation
 
     Returns:
