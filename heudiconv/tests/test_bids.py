@@ -7,7 +7,8 @@ import os.path as op
 from pathlib import Path
 from random import (random,
                     shuffle,
-                    choice
+                    choice,
+                    seed
                     )
 from datetime import (datetime,
                       timedelta,
@@ -18,7 +19,6 @@ from glob import glob
 
 import nibabel
 import string
-import numpy as np
 from numpy import testing as np_testing
 
 from heudiconv.utils import (
@@ -51,9 +51,9 @@ from .utils import (
 import pytest
 
 def gen_rand_label(label_size, label_seed):
-    np.random.seed(label_seed)
+    seed(label_seed)
     rand_char = ''.join(choice(string.ascii_letters) for _ in range(label_size-1))
-    np.random.seed(label_seed)
+    seed(label_seed)
     rand_num = choice(string.digits)
     return rand_char + rand_num
 
