@@ -6,3 +6,5 @@
 venvs/
 _build/
 build/
+.vscode/
+

@@ -61,7 +61,8 @@ SHIM_KEY = 'ShimSetting'
 AllowedFmapParameterMatching = [
     'Shims',
     'ImagingVolume',
-    'AcquisitionLabel',
+    'ModalityAcquisitionLabel',
+    'CustomAcquisitionLabel',
     'Force',
 ]
 # Key info returned by get_key_info_for_fmap_assignment when
@@ -625,7 +626,7 @@ def get_key_info_for_fmap_assignment(json_file, matching_parameter):
         nifti_file = nifti_file[0] 
         nifti_header = nb_load(nifti_file).header
         key_info = [nifti_header.get_best_affine(), nifti_header.get_data_shape()[:3]]
-    elif matching_parameter == 'AcquisitionLabel':
+    elif matching_parameter == 'ModalityAcquisitionLabel':
         # Check the acq label for the fmap and the modality for others:
         modality = op.basename(op.dirname(json_file))
         if modality == 'fmap':
@@ -639,6 +640,16 @@ def get_key_info_for_fmap_assignment(json_file, matching_parameter):
                 key_info = ['anat']
         else:
             key_info = [modality]
+    elif matching_parameter == 'CustomAcquisitionLabel':
+        modality = op.basename(op.dirname(json_file))
+        if modality  == 'func':
+            # extract the <task> entity:
+            custom_label = BIDSFile.parse(op.basename(json_file))['task']
+        else:
+            # extract the <acq> entity:
+            custom_label = BIDSFile.parse(op.basename(json_file))['acq']
+        # Get the custom acquisition label, acq_label is None if no custom field found
+        key_info = [custom_label]
     elif matching_parameter == 'Force':
         # We want to force the matching, so just return some string
         # regardless of the image
@@ -648,7 +659,6 @@ def get_key_info_for_fmap_assignment(json_file, matching_parameter):
         key_info = []
 
     return key_info
-
 
 def find_compatible_fmaps_for_run(json_file, fmap_groups, matching_parameters):
     """
@@ -685,10 +695,14 @@ def find_compatible_fmaps_for_run(json_file, fmap_groups, matching_parameters):
         # the fmaps in the group:
         compatible = False
         for param in matching_parameters:
+            json_info_1st_item = json_info[param][0]
             fm_info = get_key_info_for_fmap_assignment(fm_group[0], param)
             # for the case in which key_info is a list of strings:
-            if isinstance(json_info[param][0], str):
+            if isinstance(json_info_1st_item, str):
                 compatible = json_info[param] == fm_info
+            # for the case when no key info was found (e.g. "acq" field does not exist)
+            elif json_info_1st_item is None:
+                compatible = False
             else:
                 # allow for tiny differences between the affines etc
                 compatible = all(np.allclose(x, y) for x, y in zip(json_info[param], fm_info))

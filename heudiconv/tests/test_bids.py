@@ -4,8 +4,11 @@
 import re
 import os
 import os.path as op
+from pathlib import Path
 from random import (random,
                     shuffle,
+                    choice,
+                    seed
                     )
 from datetime import (datetime,
                       timedelta,
@@ -15,6 +18,7 @@ from collections import (OrderedDict,
 from glob import glob
 
 import nibabel
+import string
 from numpy import testing as np_testing
 
 from heudiconv.utils import (
@@ -46,6 +50,15 @@ from .utils import (
 
 import pytest
 
+def gen_rand_label(label_size, label_seed, seed_stdout=True):
+    seed(label_seed)
+    rand_char = ''.join(choice(string.ascii_letters) for _ in range(label_size-1))
+    seed(label_seed)
+    rand_num = choice(string.digits)
+    if seed_stdout:
+        print(f'Seed used to generate custom label: {label_seed}')
+    return rand_char + rand_num
+
 def test_maybe_na():
     for na in '', ' ', None, 'n/a', 'N/A', 'NA':
         assert maybe_na(na) == 'n/a'
@@ -67,7 +80,7 @@ def test_treat_age():
 
 SHIM_LENGTH = 6
 TODAY = datetime.today()
-
+LABEL_SEED = int.from_bytes(os.urandom(8), byteorder="big")
 
 A_SHIM = [random() for i in range(SHIM_LENGTH)]
 def test_get_shim_setting(tmpdir):
@@ -86,9 +99,13 @@ def test_get_shim_setting(tmpdir):
     assert get_shim_setting(json_name) == A_SHIM
 
 
-def test_get_key_info_for_fmap_assignment(tmpdir):
+def test_get_key_info_for_fmap_assignment(tmpdir, label_size=4, label_seed=LABEL_SEED):
     """
-    Test get_key_info_for_fmap_assignment
+    Test get_key_info_for_fmap_assignment.
+    
+    label_size and label_seed are used for the "CustomAcquisitionLabel" matching
+    parameter. label_size is the size of the random label while label_seed is 
+    the seed for the random label creation.
     """
 
     nifti_file = op.join(TESTS_DATA_PATH, 'sample_nifti.nii.gz')
@@ -123,9 +140,9 @@ def test_get_key_info_for_fmap_assignment(tmpdir):
     )
     assert key_info == [KeyInfoForForce]
 
-    # 5) matching_parameter = 'AcquisitionLabel'
+    # 5) matching_parameter = 'ModalityAcquisitionLabel'
     for d in ['fmap', 'func', 'dwi', 'anat']:
-        os.makedirs(op.join(str(tmpdir), d))
+        Path(op.join(str(tmpdir), d)).mkdir(parents=True, exist_ok=True)
     for (dirname, fname, expected_key_info) in [
         ('fmap', 'sub-foo_acq-fmri_epi.json', 'func'),
         ('fmap', 'sub-foo_acq-bold_epi.json', 'func'),
@@ -140,7 +157,24 @@ def test_get_key_info_for_fmap_assignment(tmpdir):
         json_name = op.join(str(tmpdir), dirname, fname)
         save_json(json_name, {SHIM_KEY: A_SHIM})
         assert [expected_key_info] == get_key_info_for_fmap_assignment(
-            json_name, matching_parameter='AcquisitionLabel'
+            json_name, matching_parameter='ModalityAcquisitionLabel'
+        )
+
+    # 6) matching_parameter = 'CustomAcquisitionLabel'
+    A_LABEL = gen_rand_label(label_size, label_seed)
+    for d in ['fmap', 'func', 'dwi', 'anat']:
+        Path(op.join(str(tmpdir), d)).mkdir(parents=True, exist_ok=True)
+        
+    for (dirname, fname, expected_key_info) in [
+        ('fmap', f'sub-foo_acq-{A_LABEL}_epi.json', A_LABEL),
+        ('func', f'sub-foo_task-{A_LABEL}_acq-foo_bold.json', A_LABEL),
+        ('dwi', f'sub-foo_acq-{A_LABEL}_dwi.json', A_LABEL),
+        ('anat', f'sub-foo_acq-{A_LABEL}_T1w.json', A_LABEL),
+    ]:
+        json_name = op.join(str(tmpdir), dirname, fname)
+        save_json(json_name, {SHIM_KEY: A_SHIM})
+        assert [expected_key_info] == get_key_info_for_fmap_assignment(
+            json_name, matching_parameter='CustomAcquisitionLabel'
         )
 
     # Finally: invalid matching_parameters:
@@ -500,6 +534,158 @@ def create_dummy_no_shim_settings_bids_session(session_path):
 
     return session_struct, expected_result, expected_fmap_groups, expected_compatible_fmaps
 
+def create_dummy_no_shim_settings_custom_label_bids_session(session_path, label_size=4, label_seed=LABEL_SEED):
+    """
+    Creates a dummy BIDS session, with slim json files and empty nii.gz
+    The fmap files are pepolar
+    The json files don't have ShimSettings
+    The fmap files have a custom ACQ label matching:
+        - TASK label for <func> modality
+        - ACQ label for any other modality (e.g. <dwi>)
+
+    Parameters:
+    ----------
+    session_path : str or os.path
+        path to the session (or subject) level folder
+    label_size : int, optional
+        size of the random label
+    label_seed : int, optional
+        seed for the random label creation
+
+    Returns:
+    -------
+    session_struct : dict
+        Structure of the directory that was created
+    expected_result : dict
+        dictionary with fmap names as keys and the expected "IntendedFor" as
+        values.
+    None
+        it returns a third argument (None) to have the same signature as
+        create_dummy_pepolar_bids_session
+    """
+    session_parent, session_basename = op.split(session_path.rstrip(op.sep))
+    if session_basename.startswith('ses-'):
+        prefix = op.split(session_parent)[1] + '_' + session_basename
+    else:
+        prefix = session_basename
+
+    # 1) Simulate the file structure for a session:
+
+    # Dict with the file structure for the session.
+    # All json files will be empty.
+    # -anat:
+    anat_struct = {
+        f'{prefix}_{mod}.{ext}': dummy_content
+        for ext, dummy_content in zip(['nii.gz', 'json'], ['', {}])
+        for mod in ['T1w', 'T2w']
+    }
+    # -dwi:
+    label_seed += 1
+    DWI_LABEL = gen_rand_label(label_size, label_seed)
+    dwi_struct = {
+        f'{prefix}_acq-{DWI_LABEL}_run-{runNo}_dwi.{ext}': dummy_content
+        for ext, dummy_content in zip(['nii.gz', 'json'], ['', {}])
+        for runNo in [1, 2]
+    }
+    # -func:
+    label_seed += 1
+    FUNC_LABEL = gen_rand_label(label_size, label_seed)
+    func_struct = {
+        f'{prefix}_task-{FUNC_LABEL}_acq-{acq}_bold.{ext}': dummy_content
+        for ext, dummy_content in zip(['nii.gz', 'json'], ['', {}])
+        for acq in ['A', 'B']
+    }
+    # -fmap:
+    fmap_struct = {
+        f'{prefix}_acq-{acq}_dir-{d}_run-{r}_epi.{ext}': dummy_content
+        for ext, dummy_content in zip(['nii.gz', 'json'], ['', {}])
+        for acq in [DWI_LABEL, FUNC_LABEL]
+        for d in ['AP', 'PA']
+        for r in [1, 2]
+    }
+    expected_fmap_groups = {
+        f'{prefix}_acq-{acq}_run-{r}_epi': [
+            f'{op.join(session_path, "fmap", prefix)}_acq-{acq}_dir-{d}_run-{r}_epi.json'
+            for d in ['AP', 'PA']
+        ]
+        for acq in [DWI_LABEL, FUNC_LABEL]
+        for r in [1, 2]
+    }
+
+    # structure for the full session (init the OrderedDict as a list to preserve order):
+    session_struct = OrderedDict([
+        ('fmap', fmap_struct),
+        ('anat', anat_struct),
+        ('dwi', dwi_struct),
+        ('func', func_struct),
+    ])
+    # add "_scans.tsv" file to the session_struct
+    scans_file_content = generate_scans_tsv(session_struct)
+    session_struct.update({'{p}_scans.tsv'.format(p=prefix): scans_file_content})
+
+    create_tree(session_path, session_struct)
+
+    # 2) Now, let's create a dict with the fmap groups compatible for each run
+    # -anat: empty
+    expected_compatible_fmaps = {
+        f'{op.join(session_path, "anat", prefix)}_{mod}.json': {}
+        for mod in ['T1w', 'T2w']
+    }
+    # -dwi: each of the runs (1, 2) is compatible with both of the dwi fmaps (1, 2):
+    expected_compatible_fmaps.update({
+        f'{op.join(session_path, "dwi", prefix)}_acq-{DWI_LABEL}_run-{runNo}_dwi.json': {
+            key: val for key, val in expected_fmap_groups.items() if key in [
+                f'{prefix}_acq-{DWI_LABEL}_run-{r}_epi' for r in [1, 2]
+            ]
+        }
+        for runNo in [1, 2]
+    })
+    # -func: each of the acq (A, B) is compatible w/ both fmap fMRI runs (1, 2)
+    expected_compatible_fmaps.update({
+        f'{op.join(session_path, "func", prefix)}_task-{FUNC_LABEL}_acq-{acq}_bold.json': {
+            key: val for key, val in expected_fmap_groups.items() if key in [
+                f'{prefix}_acq-{FUNC_LABEL}_run-{r}_epi' for r in [1, 2]
+           ]
+        }
+        for acq in ['A', 'B']
+    })
+
+    # 3) Now, let's create a dict with what we expect for the "IntendedFor":
+    # NOTE: The "expected_prefix" (the beginning of the path to the
+    # "IntendedFor") should be relative to the subject level (see:
+    # https://bids-specification.readthedocs.io/en/stable/04-modality-specific-files/01-magnetic-resonance-imaging-data.html#fieldmap-data)
+
+    sub_match = re.findall('(sub-([a-zA-Z0-9]*))', session_path)
+    sub_str = sub_match[0][0]
+    expected_prefix = session_path.split(sub_str)[-1].split(op.sep)[-1]
+
+    # dict, with fmap names as keys and the expected "IntendedFor" as values.
+    expected_result = {
+        # (runNo=1 goes with the long list, runNo=2 goes with None):
+        f'{prefix}_acq-{DWI_LABEL}_dir-{d}_run-{runNo}_epi.json': intended_for
+        for runNo, intended_for in zip(
+            [1, 2],
+            [[op.join(expected_prefix, 'dwi', f'{prefix}_acq-{DWI_LABEL}_run-{r}_dwi.nii.gz') for r in [1,2]],
+             None]
+        )
+        for d in ['AP', 'PA']
+    }
+    expected_result.update(
+        {
+            # The first "fMRI" run gets all files in the "func" folder;
+            # the second shouldn't get any.
+            f'{prefix}_acq-{FUNC_LABEL}_dir-{d}_run-{runNo}_epi.json': intended_for
+            for runNo, intended_for in zip(
+                [1, 2],
+                [[op.join(expected_prefix, 'func', f'{prefix}_task-{FUNC_LABEL}_acq-{acq}_bold.nii.gz')
+                  for acq in ['A', 'B']],
+                  None]
+            )
+            for d in ['AP', 'PA']
+        }
+    )
+
+    return session_struct, expected_result, expected_fmap_groups, expected_compatible_fmaps
 
 def create_dummy_magnitude_phase_bids_session(session_path):
     """
@@ -685,7 +871,8 @@ def test_find_fmap_groups(tmpdir, simulation_function):
 @pytest.mark.parametrize(
     "simulation_function, match_param", [
         (create_dummy_pepolar_bids_session, 'Shims'),
-        (create_dummy_no_shim_settings_bids_session, 'AcquisitionLabel'),
+        (create_dummy_no_shim_settings_bids_session, 'ModalityAcquisitionLabel'),
+        (create_dummy_no_shim_settings_custom_label_bids_session, 'CustomAcquisitionLabel'),
         (create_dummy_magnitude_phase_bids_session, 'Shims')
     ]
 )
@@ -726,7 +913,8 @@ def test_find_compatible_fmaps_for_run(tmpdir, simulation_function, match_param)
         for folder, expected_prefix in zip(['no_sessions/sub-1', 'sessions/sub-1/ses-pre'], ['', 'ses-pre'])
         for sim_func, mp in [
             (create_dummy_pepolar_bids_session, 'Shims'),
-            (create_dummy_no_shim_settings_bids_session, 'AcquisitionLabel'),
+            (create_dummy_no_shim_settings_bids_session, 'ModalityAcquisitionLabel'),
+            (create_dummy_no_shim_settings_custom_label_bids_session, 'CustomAcquisitionLabel'),
             (create_dummy_magnitude_phase_bids_session, 'Shims')
         ]
     ]
@@ -816,7 +1004,8 @@ def test_select_fmap_from_compatible_groups(tmpdir, folder, expected_prefix, sim
         for folder, expected_prefix in zip(['no_sessions/sub-1', 'sessions/sub-1/ses-pre'], ['', 'ses-pre'])
         for sim_func, mp in [
             (create_dummy_pepolar_bids_session, 'Shims'),
-            (create_dummy_no_shim_settings_bids_session, 'AcquisitionLabel'),
+            (create_dummy_no_shim_settings_bids_session, 'ModalityAcquisitionLabel'),
+            (create_dummy_no_shim_settings_custom_label_bids_session, 'CustomAcquisitionLabel'),
             (create_dummy_magnitude_phase_bids_session, 'Shims')
         ]
     ]
