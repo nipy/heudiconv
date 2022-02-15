@@ -50,11 +50,13 @@ from .utils import (
 
 import pytest
 
-def gen_rand_label(label_size, label_seed):
+def gen_rand_label(label_size, label_seed, seed_stdout=True):
     seed(label_seed)
     rand_char = ''.join(choice(string.ascii_letters) for _ in range(label_size-1))
     seed(label_seed)
     rand_num = choice(string.digits)
+    if seed_stdout:
+        print(f'Seed used to generate custom label: {label_seed}')
     return rand_char + rand_num
 
 def test_maybe_na():
@@ -78,7 +80,7 @@ def test_treat_age():
 
 SHIM_LENGTH = 6
 TODAY = datetime.today()
-
+LABEL_SEED = int.from_bytes(os.urandom(8), byteorder="big")
 
 A_SHIM = [random() for i in range(SHIM_LENGTH)]
 def test_get_shim_setting(tmpdir):
@@ -97,7 +99,7 @@ def test_get_shim_setting(tmpdir):
     assert get_shim_setting(json_name) == A_SHIM
 
 
-def test_get_key_info_for_fmap_assignment(tmpdir, label_size=4, label_seed=42):
+def test_get_key_info_for_fmap_assignment(tmpdir, label_size=4, label_seed=LABEL_SEED):
     """
     Test get_key_info_for_fmap_assignment.
     
@@ -532,7 +534,7 @@ def create_dummy_no_shim_settings_bids_session(session_path):
 
     return session_struct, expected_result, expected_fmap_groups, expected_compatible_fmaps
 
-def create_dummy_no_shim_settings_custom_label_bids_session(session_path, label_size=4, label_seed=42):
+def create_dummy_no_shim_settings_custom_label_bids_session(session_path, label_size=4, label_seed=LABEL_SEED):
     """
     Creates a dummy BIDS session, with slim json files and empty nii.gz
     The fmap files are pepolar
