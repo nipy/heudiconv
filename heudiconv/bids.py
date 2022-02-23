@@ -390,7 +390,7 @@ def save_scans_key(item, bids_files):
         subj_, ses_ = find_subj_ses(f_name)
         if not subj_:
             lgr.warning(
-                "Failed to detect fullfilled BIDS layout.  "
+                "Failed to detect fulfilled BIDS layout.  "
                 "No scans.tsv file(s) will be produced for %s",
                 ", ".join(bids_files)
             )
@@ -929,7 +929,7 @@ def populate_intended_for(path_to_bids_session, matching_parameters, criterion):
                     op.relpath(remove_suffix(json_file, '.json') + '.nii.gz', start=subj_folder)
                 )
         if intended_for:
-            intended_for = sorted([str(f) for f in intended_for])
+            intended_for = sorted(str(f) for f in intended_for)
             # Add this intended_for to all fmap files in the fmap_group:
             for fm_json in unique_fmap_groups[fmap_group]:
                 update_json(fm_json, {"IntendedFor": intended_for}, pretty=True)
