@@ -26,6 +26,7 @@ from .utils import (
 from .bids import (
     convert_sid_bids,
     populate_bids_templates,
+    populate_intended_for,
     save_scans_key,
     tuneup_bids_json_files,
     add_participant_record,
@@ -207,6 +208,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                 converter=converter,
                 scaninfo_suffix=getattr(heuristic, 'scaninfo_suffix', '.json'),
                 custom_callable=getattr(heuristic, 'custom_callable', None),
+                populate_intended_for_opts=getattr(heuristic, 'POPULATE_INTENDED_FOR_OPTS', None),
                 with_prov=with_prov,
                 bids_options=bids_options,
                 outdir=tdir,
@@ -448,7 +450,7 @@ def update_uncombined_name(metadata, filename, channel_names):
 
 def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
             bids_options, outdir, min_meta, overwrite, symlink=True, prov_file=None,
-            dcmconfig=None):
+            dcmconfig=None, populate_intended_for_opts={}):
     """Perform actual conversion (calls to converter etc) given info from
     heuristic's `infotodict`
 
@@ -574,6 +576,30 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
 
         if custom_callable is not None:
             custom_callable(*item)
+
+    # Populate "IntendedFor" for fmap files if requested in heuristic
+    if populate_intended_for_opts is not None:
+        # Because fmap files can only be used to correct for distortions in images
+        # collected within the same scanning session, find unique subject/session
+        # combinations from the outname in each item:
+        outnames = [item[0] for item in items]
+        # - grab "sub-<sID>[/ses-<ses>]", and keep only unique ones:
+        try:
+            sessions = set(
+                re.search(
+                    'sub-(?P<subj>[a-zA-Z0-9]*)([{0}_]ses-(?P<ses>[a-zA-Z0-9]*))?'.format(op.sep),
+                    oname
+                ).group(0)
+                for oname in outnames
+            )
+        except AttributeError:
+            # "sub-<sID>[/ses-<ses>]" is not present, so this is not BIDS compliant
+            # and it doesn't make sense to add "IntendedFor":
+            sessions = set()
+
+        for ses in sessions:
+            session_path = op.join(outdir, ses)
+            populate_intended_for(session_path, **populate_intended_for_opts)
 
 
 def convert_dicom(item_dicoms, bids_options, prefix,

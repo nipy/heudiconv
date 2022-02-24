@@ -4,7 +4,9 @@ import os.path as op
 from glob import glob
 
 import pytest
+import heudiconv.convert
 from heudiconv.bids import BIDSError
+from heudiconv.utils import load_heuristic
 from heudiconv.cli.run import main as runner
 from heudiconv.convert import (
     DW_IMAGE_IN_FMAP_FOLDER_WARNING,
@@ -163,3 +165,80 @@ def test_b0dwi_for_fmap(tmpdir, caplog):
         assert op.isdir(op.join(tmppath, 'sub-%s', mod) % (subID))
         for ext in ['bval', 'bvec']:
             assert glob(op.join(tmppath, 'sub-%s', mod, 'sub-%s_*.%s') % (subID, subID, ext))
+
+
+# Test two scenarios for each case:
+# -study without sessions
+# -study with sessions
+@pytest.mark.parametrize(
+    "subjects, sesID, expected_session_folder", [
+        (['Jason', 'Bourne'], None, 'sub-{sID}'),
+        (['Bourne'], 'Treadstone', op.join('sub-{{sID}}', 'ses-{{ses}}')),
+    ]
+)
+# Two possibilities: with or without heuristics:
+@pytest.mark.parametrize(
+    "heuristic", ['example', 'reproin', None]       # heuristics/example.py, heuristics/reproin.py
+)
+def test_populate_intended_for(tmpdir, monkeypatch, capfd,
+                 subjects, sesID, expected_session_folder,
+                 heuristic):
+    """
+    Test convert
+
+    For now, I'm just going to test that the call to populate_intended_for is
+    done with the correct argument.
+    More tests can be added here.
+    """
+
+    def mock_populate_intended_for(session, matching_parameters='Shims', criterion='Closest'):
+        """
+        Pretend we run populate_intended_for, but just print out the arguments.
+        """
+        print('session: {}'.format(session))
+        print('matching_parameters: {}'.format(matching_parameters))
+        print('criterion: {}'.format(criterion))
+        return
+    # mock the "populate_intended_for":
+    monkeypatch.setattr(
+        heudiconv.convert, "populate_intended_for", mock_populate_intended_for
+    )
+
+    outdir = op.join(str(tmpdir), 'foo')
+    outfolder = op.join(outdir, 'sub-{sID}', 'ses-{ses}') if sesID else op.join(outdir,'sub-{sID}')
+    sub_ses = 'sub-{sID}' + ('_ses-{ses}' if sesID else '')
+
+    # items are a list of tuples, with each tuple having three elements:
+    #   prefix, outtypes, item_dicoms
+    items = [
+        (op.join(outfolder, 'anat', sub_ses + '_T1w').format(sID=s, ses=sesID), ('',), [])
+        for s in subjects
+    ]
+
+    heuristic = load_heuristic(heuristic) if heuristic else None
+    heudiconv.convert.convert(items,
+            converter='',
+            scaninfo_suffix='.json',
+            custom_callable=None,
+            populate_intended_for_opts=getattr(heuristic, 'POPULATE_INTENDED_FOR_OPTS', None),
+            with_prov=None,
+            bids_options=[],
+            outdir=outdir,
+            min_meta=True,
+            overwrite=False)
+    output = capfd.readouterr()
+    # if the heuristic module has a 'POPULATE_INTENDED_FOR_OPTS' field, we expect
+    # to get the output of the mock_populate_intended_for, otherwise, no output:
+    if getattr(heuristic, 'POPULATE_INTENDED_FOR_OPTS', None):
+        assert all([
+            "\n".join([
+                "session: " + outfolder.format(sID=s, ses=sesID),
+                # "ImagingVolume" is defined in heuristic file; "Shims" is the default
+                "matching_parameters: " + "ImagingVolume",
+                "criterion: Closest"
+            ]) in output.out
+            for s in subjects
+        ])
+    else:
+        # If there was no heuristic, make sure populate_intended_for was not called
+        assert not output.out
