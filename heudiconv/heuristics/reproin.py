@@ -199,6 +199,10 @@ DEFAULT_FIELDS = {
         "TODO: adjust to your case.",
 }
 
+POPULATE_INTENDED_FOR_OPTS = {
+    'matching_parameters': ['ImagingVolume', 'Shims'],
+    'criterion': 'Closest'
+}
 
 def _delete_chars(from_str, deletechars):
     """ Delete characters from string allowing for Python 2 / 3 difference
