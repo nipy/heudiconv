@@ -229,13 +229,14 @@ def test_populate_intended_for(tmpdir, monkeypatch, capfd,
     output = capfd.readouterr()
     # if the heuristic module has a 'POPULATE_INTENDED_FOR_OPTS' field, we expect
     # to get the output of the mock_populate_intended_for, otherwise, no output:
-    if getattr(heuristic, 'POPULATE_INTENDED_FOR_OPTS', None):
+    pif_cfg = getattr(heuristic, 'POPULATE_INTENDED_FOR_OPTS', None)
+    if pif_cfg:
         assert all([
             "\n".join([
                 "session: " + outfolder.format(sID=s, ses=sesID),
                 # "ImagingVolume" is defined in heuristic file; "Shims" is the default
-                "matching_parameters: " + "ImagingVolume",
-                "criterion: Closest"
+                f"matching_parameters: {pif_cfg['matching_parameters']}",
+                f"criterion: {pif_cfg['criterion']}"
             ]) in output.out
             for s in subjects
         ])
