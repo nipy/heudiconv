@@ -4,15 +4,18 @@ import os.path as op
 from glob import glob
 
 import pytest
-from .utils import TESTS_DATA_PATH
-
-from heudiconv.convert import (update_complex_name,
-                               update_multiecho_name,
-                               update_uncombined_name,
-                               DW_IMAGE_IN_FMAP_FOLDER_WARNING,
-                               )
+import heudiconv.convert
 from heudiconv.bids import BIDSError
+from heudiconv.utils import load_heuristic
 from heudiconv.cli.run import main as runner
+from heudiconv.convert import (
+    DW_IMAGE_IN_FMAP_FOLDER_WARNING,
+    update_complex_name,
+    update_multiecho_name,
+    update_uncombined_name,
+)
+
+from .utils import TESTS_DATA_PATH
 
 
 def test_update_complex_name():
@@ -20,29 +23,36 @@ def test_update_complex_name():
     filenames with the part field if appropriate.
     """
     # Standard name update
-    fn = 'sub-X_ses-Y_task-Z_run-01_sbref'
+    base_fn = 'sub-X_ses-Y_task-Z_run-01_sbref'
     metadata = {'ImageType': ['ORIGINAL', 'PRIMARY', 'P', 'MB', 'TE3', 'ND', 'MOSAIC']}
-    suffix = 3
     out_fn_true = 'sub-X_ses-Y_task-Z_run-01_part-phase_sbref'
-    out_fn_test = update_complex_name(metadata, fn, suffix)
+    out_fn_test = update_complex_name(metadata, base_fn)
     assert out_fn_test == out_fn_true
+
     # Catch an unsupported type and *do not* update
-    fn = 'sub-X_ses-Y_task-Z_run-01_phase'
-    out_fn_test = update_complex_name(metadata, fn, suffix)
-    assert out_fn_test == fn
-    # Data type is missing from metadata so use suffix
-    fn = 'sub-X_ses-Y_task-Z_run-01_sbref'
+    base_fn = 'sub-X_ses-Y_task-Z_run-01_phase'
+    out_fn_test = update_complex_name(metadata, base_fn)
+    assert out_fn_test == base_fn
+
+    # Data type is missing from metadata so raise a RuntimeError
+    base_fn = 'sub-X_ses-Y_task-Z_run-01_sbref'
     metadata = {'ImageType': ['ORIGINAL', 'PRIMARY', 'MB', 'TE3', 'ND', 'MOSAIC']}
-    out_fn_true = 'sub-X_ses-Y_task-Z_run-01_part-3_sbref'
-    out_fn_test = update_complex_name(metadata, fn, suffix)
-    assert out_fn_test == out_fn_true
-    # Catch existing field with value that *does not match* metadata
-    # and raise Exception
-    fn = 'sub-X_ses-Y_task-Z_run-01_part-mag_sbref'
+    with pytest.raises(RuntimeError):
+        update_complex_name(metadata, base_fn)
+
+    # Catch existing field with value (part is already in the filename)
+    # that *does not match* metadata and raise Exception
+    base_fn = 'sub-X_ses-Y_task-Z_run-01_part-mag_sbref'
     metadata = {'ImageType': ['ORIGINAL', 'PRIMARY', 'P', 'MB', 'TE3', 'ND', 'MOSAIC']}
-    suffix = 3
     with pytest.raises(BIDSError):
-        assert update_complex_name(metadata, fn, suffix)
+        update_complex_name(metadata, base_fn)
+
+    # Catch existing field with value (part is already in the filename)
+    # that *does match* metadata and do not update
+    base_fn = 'sub-X_ses-Y_task-Z_run-01_part-phase_sbref'
+    metadata = {'ImageType': ['ORIGINAL', 'PRIMARY', 'P', 'MB', 'TE3', 'ND', 'MOSAIC']}
+    out_fn_test = update_complex_name(metadata, base_fn)
+    assert out_fn_test == base_fn
 
 
 def test_update_multiecho_name():
@@ -50,21 +60,43 @@ def test_update_multiecho_name():
     filenames with the echo field if appropriate.
     """
     # Standard name update
-    fn = 'sub-X_ses-Y_task-Z_run-01_bold'
+    base_fn = 'sub-X_ses-Y_task-Z_run-01_bold'
     metadata = {'EchoTime': 0.01,
                 'EchoNumber': 1}
     echo_times = [0.01, 0.02, 0.03]
     out_fn_true = 'sub-X_ses-Y_task-Z_run-01_echo-1_bold'
-    out_fn_test = update_multiecho_name(metadata, fn, echo_times)
+    out_fn_test = update_multiecho_name(metadata, base_fn, echo_times)
     assert out_fn_test == out_fn_true
+
     # EchoNumber field is missing from metadata, so use echo_times
     metadata = {'EchoTime': 0.01}
-    out_fn_test = update_multiecho_name(metadata, fn, echo_times)
+    out_fn_test = update_multiecho_name(metadata, base_fn, echo_times)
     assert out_fn_test == out_fn_true
+
     # Catch an unsupported type and *do not* update
-    fn = 'sub-X_ses-Y_task-Z_run-01_phasediff'
-    out_fn_test = update_multiecho_name(metadata, fn, echo_times)
-    assert out_fn_test == fn
+    base_fn = 'sub-X_ses-Y_task-Z_run-01_phasediff'
+    out_fn_test = update_multiecho_name(metadata, base_fn, echo_times)
+    assert out_fn_test == base_fn
+
+    # EchoTime is missing, but use EchoNumber (which is the first thing it checks)
+    base_fn = 'sub-X_ses-Y_task-Z_run-01_bold'
+    out_fn_true = 'sub-X_ses-Y_task-Z_run-01_echo-1_bold'
+    metadata = {'EchoNumber': 1}
+    echo_times = [False, 0.02, 0.03]
+    out_fn_test = update_multiecho_name(metadata, base_fn, echo_times)
+    assert out_fn_test == out_fn_true
+
+    # Both EchoTime and EchoNumber are missing, which raises a KeyError
+    base_fn = 'sub-X_ses-Y_task-Z_run-01_bold'
+    metadata = {}
+    echo_times = [False, 0.02, 0.03]
+    with pytest.raises(KeyError):
+        update_multiecho_name(metadata, base_fn, echo_times)
+
+    # Providing echo times as something other than a list should raise a TypeError
+    base_fn = 'sub-X_ses-Y_task-Z_run-01_bold'
+    with pytest.raises(TypeError):
+        update_multiecho_name(metadata, base_fn, set(echo_times))
 
 
 def test_update_uncombined_name():
@@ -72,17 +104,38 @@ def test_update_uncombined_name():
     filenames with the ch field if appropriate.
     """
     # Standard name update
-    fn = 'sub-X_ses-Y_task-Z_run-01_bold'
+    base_fn = 'sub-X_ses-Y_task-Z_run-01_bold'
     metadata = {'CoilString': 'H1'}
     channel_names = ['H1', 'H2', 'H3', 'HEA;HEP']
     out_fn_true = 'sub-X_ses-Y_task-Z_run-01_ch-01_bold'
-    out_fn_test = update_uncombined_name(metadata, fn, channel_names)
+    out_fn_test = update_uncombined_name(metadata, base_fn, channel_names)
     assert out_fn_test == out_fn_true
-    # CoilString field has no number in it
+
+    # CoilString field has no number in it, so we index the channel_names list
     metadata = {'CoilString': 'HEA;HEP'}
     out_fn_true = 'sub-X_ses-Y_task-Z_run-01_ch-04_bold'
-    out_fn_test = update_uncombined_name(metadata, fn, channel_names)
+    out_fn_test = update_uncombined_name(metadata, base_fn, channel_names)
     assert out_fn_test == out_fn_true
+
+    # Extract the number from the CoilString and use that
+    channel_names = ['H1', 'B1', 'H3', 'HEA;HEP']
+    metadata = {'CoilString': 'H1'}
+    out_fn_true = 'sub-X_ses-Y_task-Z_run-01_ch-01_bold'
+    out_fn_test = update_uncombined_name(metadata, base_fn, channel_names)
+    assert out_fn_test == out_fn_true
+
+    # NOTE: Extracting the number does not protect against multiple coils with the same number
+    # (but, say, different letters)
+    # Note that this is still "ch-01"
+    metadata = {'CoilString': 'B1'}
+    out_fn_true = 'sub-X_ses-Y_task-Z_run-01_ch-01_bold'
+    out_fn_test = update_uncombined_name(metadata, base_fn, channel_names)
+    assert out_fn_test == out_fn_true
+
+    # Providing echo times as something other than a list should raise a TypeError
+    base_fn = 'sub-X_ses-Y_task-Z_run-01_bold'
+    with pytest.raises(TypeError):
+        update_uncombined_name(metadata, base_fn, set(channel_names))
 
 
 def test_b0dwi_for_fmap(tmpdir, caplog):
@@ -112,3 +165,81 @@ def test_b0dwi_for_fmap(tmpdir, caplog):
         assert op.isdir(op.join(tmppath, 'sub-%s', mod) % (subID))
         for ext in ['bval', 'bvec']:
             assert glob(op.join(tmppath, 'sub-%s', mod, 'sub-%s_*.%s') % (subID, subID, ext))
+
+
+# Test two scenarios for each case:
+# -study without sessions
+# -study with sessions
+@pytest.mark.parametrize(
+    "subjects, sesID, expected_session_folder", [
+        (['Jason', 'Bourne'], None, 'sub-{sID}'),
+        (['Bourne'], 'Treadstone', op.join('sub-{{sID}}', 'ses-{{ses}}')),
+    ]
+)
+# Two possibilities: with or without heuristics:
+@pytest.mark.parametrize(
+    "heuristic", ['example', 'reproin', None]       # heuristics/example.py, heuristics/reproin.py
+)
+def test_populate_intended_for(tmpdir, monkeypatch, capfd,
+                 subjects, sesID, expected_session_folder,
+                 heuristic):
+    """
+    Test convert
+
+    For now, I'm just going to test that the call to populate_intended_for is
+    done with the correct argument.
+    More tests can be added here.
+    """
+
+    def mock_populate_intended_for(session, matching_parameters='Shims', criterion='Closest'):
+        """
+        Pretend we run populate_intended_for, but just print out the arguments.
+        """
+        print('session: {}'.format(session))
+        print('matching_parameters: {}'.format(matching_parameters))
+        print('criterion: {}'.format(criterion))
+        return
+    # mock the "populate_intended_for":
+    monkeypatch.setattr(
+        heudiconv.convert, "populate_intended_for", mock_populate_intended_for
+    )
+
+    outdir = op.join(str(tmpdir), 'foo')
+    outfolder = op.join(outdir, 'sub-{sID}', 'ses-{ses}') if sesID else op.join(outdir,'sub-{sID}')
+    sub_ses = 'sub-{sID}' + ('_ses-{ses}' if sesID else '')
+
+    # items are a list of tuples, with each tuple having three elements:
+    #   prefix, outtypes, item_dicoms
+    items = [
+        (op.join(outfolder, 'anat', sub_ses + '_T1w').format(sID=s, ses=sesID), ('',), [])
+        for s in subjects
+    ]
+
+    heuristic = load_heuristic(heuristic) if heuristic else None
+    heudiconv.convert.convert(items,
+            converter='',
+            scaninfo_suffix='.json',
+            custom_callable=None,
+            populate_intended_for_opts=getattr(heuristic, 'POPULATE_INTENDED_FOR_OPTS', None),
+            with_prov=None,
+            bids_options=[],
+            outdir=outdir,
+            min_meta=True,
+            overwrite=False)
+    output = capfd.readouterr()
+    # if the heuristic module has a 'POPULATE_INTENDED_FOR_OPTS' field, we expect
+    # to get the output of the mock_populate_intended_for, otherwise, no output:
+    pif_cfg = getattr(heuristic, 'POPULATE_INTENDED_FOR_OPTS', None)
+    if pif_cfg:
+        assert all([
+            "\n".join([
+                "session: " + outfolder.format(sID=s, ses=sesID),
+                # "ImagingVolume" is defined in heuristic file; "Shims" is the default
+                f"matching_parameters: {pif_cfg['matching_parameters']}",
+                f"criterion: {pif_cfg['criterion']}"
+            ]) in output.out
+            for s in subjects
+        ])
+    else:
+        # If there was no heuristic, make sure populate_intended_for was not called
+        assert not output.out

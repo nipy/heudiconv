@@ -286,6 +286,34 @@ def json_dumps_pretty(j, indent=2, sort_keys=True):
     return js_
 
 
+def update_json(json_file, new_data, pretty=False):
+    """
+    Adds a given field (and its value) to a json file
+
+    Parameters:
+    -----------
+    json_file : str or Path
+        path for the corresponding json file
+    new_data : dict
+        pair of "key": "value" to add to the json file
+    pretty : bool
+        argument to be passed to save_json
+    """
+    for key, value in new_data.items():
+        lgr.debug(
+            'File "{f}": Setting {k} to {v}'.format(
+                f=json_file,
+                k=key,
+                v=value,
+            )
+        )
+
+    with open(json_file) as f:
+        data = json.load(f)
+    data.update(new_data)
+    save_json(json_file, data, pretty=pretty)
+
+
 def treat_infofile(filename):
     """Tune up generated .json file (slim down, pretty-print for humans).
     """
@@ -516,7 +544,11 @@ def create_tree(path, tree, archives_leading_dir=True):
             executable = False
             name = file_
         full_name = op.join(path, name)
-        if isinstance(load, (tuple, list, dict)):
+        if name.endswith('.json') and isinstance(load, dict):
+            # (For a json file, we expect the content to be a dictionary, so
+            #  don't continue creating a tree, but just write dict to file)
+            save_json(full_name, load)
+        elif isinstance(load, (tuple, list, dict)):
             # if name.endswith('.tar.gz') or name.endswith('.tar') or name.endswith('.zip'):
             #     create_tree_archive(path, name, load, archives_leading_dir=archives_leading_dir)
             # else:
@@ -575,3 +607,41 @@ def get_datetime(date, time, *, microseconds=True):
     if not microseconds:
         datetime_str = datetime_str.split('.', 1)[0]
     return datetime_str
+
+
+def remove_suffix(s, suf):
+    """
+    Remove suffix from the end of the string
+
+    Parameters:
+    ----------
+    s : str
+    suf : str
+
+    Returns:
+    -------
+    s : str
+        string with "suf" removed from the end (if present)
+    """
+    if suf and s.endswith(suf):
+        return s[:-len(suf)]
+    return s
+
+
+def remove_prefix(s, pre):
+    """
+    Remove prefix from the beginning of the string
+
+    Parameters:
+    ----------
+    s : str
+    pre : str
+
+    Returns:
+    -------
+    s : str
+        string with "pre" removed from the beginning (if present)
+    """
+    if pre and s.startswith(pre):
+        return s[len(pre):]
+    return s

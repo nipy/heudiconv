@@ -1,9 +1,10 @@
 import logging
 import os.path as op
 import sys
+from glob import glob
 
 from . import __version__, __packagename__
-from .bids import populate_bids_templates, tuneup_bids_json_files
+from .bids import populate_bids_templates, tuneup_bids_json_files, populate_intended_for
 from .convert import prep_conversion
 from .due import due, Doi
 from .parser import get_study_sessions
@@ -47,13 +48,13 @@ def process_extra_commands(outdir, command, files, dicom_dir_template,
                            heuristic, session, subjs, grouping):
     """
     Perform custom command instead of regular operations. Supported commands:
-    ['treat-json', 'ls', 'populate-templates']
+    ['treat-json', 'ls', 'populate-templates', 'populate-intended-for']
 
     Parameters
     ----------
     outdir : str
         Output directory
-    command : {'treat-json', 'ls', 'populate-templates'}
+    command : {'treat-json', 'ls', 'populate-templates', 'populate-intended-for'}
         Heudiconv command to run
     files : list of str
         List of files
@@ -108,6 +109,47 @@ def process_extra_commands(outdir, command, files, dicom_dir_template,
         ensure_heuristic_arg(heuristic)
         from .utils import get_heuristic_description
         print(get_heuristic_description(heuristic, full=True))
+    elif command == 'populate-intended-for':
+        kwargs = {}
+        if heuristic:
+            heuristic = load_heuristic(heuristic)
+            kwargs = getattr(heuristic, 'POPULATE_INTENDED_FOR_OPTS', {})
+        if not subjs:
+            subjs = [
+                # search outdir for 'sub-*'; if it is a directory (not a regular file), remove
+                # the initial 'sub-':
+                op.basename(s)[len('sub-'):] for s in glob(op.join(outdir, 'sub-*')) if op.isdir(s)
+            ]
+            # read the subjects from the participants.tsv file to compare:
+            participants_tsv = op.join(outdir, 'participants.tsv')
+            if op.lexists(participants_tsv):
+                with open(participants_tsv, 'r') as f:
+                    # read header line and find index for 'participant_id':
+                    participant_id_index = f.readline().split('\t').index('participant_id')
+                    # read all participants, removing the initial 'sub-':
+                    known_subjects = [
+                        l.split('\t')[participant_id_index][len('sub-'):] for l in f.readlines()
+                    ]
+                if not set(subjs) == set(known_subjects):
+                    # issue a warning, but continue with the 'subjs' list (the subjects for
+                    # which there is data):
+                    lgr.warning(
+                        "'participants.tsv' contents are not identical to subjects found "
+                        "in the BIDS dataset %s", outdir
+                    )
+
+        for subj in subjs:
+            subject_path = op.join(outdir, 'sub-' + subj)
+            if session:
+                session_paths = [op.join(subject_path, 'ses-' + session)]
+            else:
+                # check to see if the data for this subject is organized by sessions; if not
+                # just use the subject_path
+                session_paths = [
+                    s for s in glob(op.join(subject_path, 'ses-*')) if op.isdir(s)
+                ] or [subject_path]
+            for session_path in session_paths:
+                populate_intended_for(session_path, **kwargs)
     else:
         raise ValueError("Unknown command %s" % command)
     return
@@ -203,7 +245,7 @@ def workflow(*, dicom_dir_template=None, files=None, subjs=None,
     debug : bool, optional
         Do not catch exceptions and show exception traceback. Default is False.
     command : {'heuristics', 'heuristic-info', 'ls', 'populate-templates',
-               'sanitize-jsons', 'treat-jsons', None}, optional
+               'sanitize-jsons', 'treat-jsons', 'populate-intended-for', None}, optional
         Custom action to be performed on provided files instead of regular
         operation. Default is None.
     grouping : {'studyUID', 'accession_number', 'all', 'custom'}, optional

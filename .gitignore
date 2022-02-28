@@ -5,3 +5,6 @@
 .idea/
 venvs/
 _build/
+build/
+.vscode/
+

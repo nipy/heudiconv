@@ -136,6 +136,7 @@ def get_parser():
             'heuristics', 'heuristic-info',
             'ls', 'populate-templates',
             'sanitize-jsons', 'treat-jsons',
+            'populate-intended-for'
         ),
         help='Custom action to be performed on provided files instead of '
              'regular operation.')

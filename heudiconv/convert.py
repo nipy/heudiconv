@@ -2,9 +2,7 @@ import filelock
 import os
 import os.path as op
 import logging
-from math import nan
 import shutil
-import sys
 import random
 import re
 
@@ -28,6 +26,7 @@ from .utils import (
 from .bids import (
     convert_sid_bids,
     populate_bids_templates,
+    populate_intended_for,
     save_scans_key,
     tuneup_bids_json_files,
     add_participant_record,
@@ -209,6 +208,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                 converter=converter,
                 scaninfo_suffix=getattr(heuristic, 'scaninfo_suffix', '.json'),
                 custom_callable=getattr(heuristic, 'custom_callable', None),
+                populate_intended_for_opts=getattr(heuristic, 'POPULATE_INTENDED_FOR_OPTS', None),
                 with_prov=with_prov,
                 bids_options=bids_options,
                 outdir=tdir,
@@ -239,7 +239,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                                     getattr(heuristic, 'DEFAULT_FIELDS', {}))
 
 
-def update_complex_name(metadata, filename, suffix):
+def update_complex_name(metadata, filename):
     """
     Insert `_part-<mag|phase>` entity into filename if data are from a
     sequence with magnitude/phase part.
@@ -250,14 +250,11 @@ def update_complex_name(metadata, filename, suffix):
         Scan metadata dictionary from BIDS sidecar file.
     filename : str
         Incoming filename
-    suffix : str
-        An index used for cases where a single scan produces multiple files,
-        but the differences between those files are unknown.
 
     Returns
     -------
     filename : str
-        Updated filename with rec entity added in appropriate position.
+        Updated filename with part entity added in appropriate position.
     """
     # Some scans separate magnitude/phase differently
     # A small note: _phase is deprecated, but this may add part-mag to
@@ -275,12 +272,12 @@ def update_complex_name(metadata, filename, suffix):
     elif 'P' in metadata.get('ImageType'):
         mag_or_phase = 'phase'
     else:
-        mag_or_phase = suffix
+        raise RuntimeError("Data type could not be inferred from the metadata.")
 
     # Determine scan suffix
     filetype = '_' + filename.split('_')[-1]
 
-    # Insert rec label
+    # Insert part label
     if not ('_part-%s' % mag_or_phase) in filename:
         # If "_part-" is specified, prepend the 'mag_or_phase' value.
         if '_part-' in filename:
@@ -290,7 +287,21 @@ def update_complex_name(metadata, filename, suffix):
             )
 
         # Insert it **before** the following string(s), whichever appears first.
-        for label in ['_recording', '_proc', '_space', filetype]:
+        # https://bids-specification.readthedocs.io/en/stable/99-appendices/09-entities.html
+        entities_after_part = [
+            "_proc",
+            "_hemi",
+            "_space",
+            "_split",
+            "_recording",
+            "_chunk",
+            "_res",
+            "_den",
+            "_label",
+            "_desc",
+            filetype,
+        ]
+        for label in entities_after_part:
             if (label == filetype) or (label in filename):
                 filename = filename.replace(
                     label, "_part-%s%s" % (mag_or_phase, label)
@@ -320,7 +331,8 @@ def update_multiecho_name(metadata, filename, echo_times):
     filename : str
         Updated filename with echo entity added, if appropriate.
     """
-    # Field maps separate echoes differently
+    # Field maps separate echoes differently, so do not attempt to update any filenames with these
+    # suffixes
     unsupported_types = [
         '_magnitude', '_magnitude1', '_magnitude2',
         '_phasediff', '_phase1', '_phase2', '_fieldmap'
@@ -328,18 +340,43 @@ def update_multiecho_name(metadata, filename, echo_times):
     if any(ut in filename for ut in unsupported_types):
         return filename
 
-    # Get the EchoNumber from json file info.  If not present, use EchoTime
+    if not isinstance(echo_times, list):
+        raise TypeError(f'Argument "echo_times" must be a list, not a {type(echo_times)}')
+
+    # Get the EchoNumber from json file info.  If not present, use EchoTime.
     if 'EchoNumber' in metadata.keys():
         echo_number = metadata['EchoNumber']
-    else:
+    elif 'EchoTime' in metadata.keys():
         echo_number = echo_times.index(metadata['EchoTime']) + 1
+    else:
+        raise KeyError(
+            'Either "EchoNumber" or "EchoTime" must be in metadata keys. '
+            f'Keys detected: {metadata.keys()}'
+        )
 
     # Determine scan suffix
     filetype = '_' + filename.split('_')[-1]
 
     # Insert it **before** the following string(s), whichever appears first.
-    # https://bids-specification.readthedocs.io/en/stable/99-appendices/04-entity-table.html
-    for label in ['_flip', '_inv', '_mt', '_part', '_recording', '_proc', '_space', filetype]:
+    # https://bids-specification.readthedocs.io/en/stable/99-appendices/09-entities.html
+    entities_after_echo = [
+        "_flip",
+        "_inv",
+        "_mt",
+        "_part",
+        "_proc",
+        "_hemi",
+        "_space",
+        "_split",
+        "_recording",
+        "_chunk",
+        "_res",
+        "_den",
+        "_label",
+        "_desc",
+        filetype,
+    ]
+    for label in entities_after_echo:
         if (label == filetype) or (label in filename):
             filename = filename.replace(
                 label, "_echo-%s%s" % (echo_number, label)
@@ -374,6 +411,9 @@ def update_uncombined_name(metadata, filename, channel_names):
     if any(ut in filename for ut in unsupported_types):
         return filename
 
+    if not isinstance(channel_names, list):
+        raise TypeError(f'Argument "channel_names" must be a list, not a {type(channel_names)}')
+
     # Determine the channel number
     channel_number = ''.join([c for c in metadata['CoilString'] if c.isdigit()])
     if not channel_number:
@@ -385,7 +425,21 @@ def update_uncombined_name(metadata, filename, channel_names):
 
     # Insert it **before** the following string(s), whichever appears first.
     # Choosing to put channel near the end since it's not in the specification yet.
-    for label in ['_recording', '_proc', '_space', filetype]:
+    # See https://bids-specification.readthedocs.io/en/stable/99-appendices/09-entities.html
+    entities_after_ch = [
+        "_proc",
+        "_hemi",
+        "_space",
+        "_split",
+        "_recording",
+        "_chunk",
+        "_res",
+        "_den",
+        "_label",
+        "_desc",
+        filetype,
+    ]
+    for label in entities_after_ch:
         if (label == filetype) or (label in filename):
             filename = filename.replace(
                 label, "_ch-%s%s" % (channel_number, label)
@@ -396,7 +450,7 @@ def update_uncombined_name(metadata, filename, channel_names):
 
 def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
             bids_options, outdir, min_meta, overwrite, symlink=True, prov_file=None,
-            dcmconfig=None):
+            dcmconfig=None, populate_intended_for_opts={}):
     """Perform actual conversion (calls to converter etc) given info from
     heuristic's `infotodict`
 
@@ -522,6 +576,30 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
 
         if custom_callable is not None:
             custom_callable(*item)
+
+    # Populate "IntendedFor" for fmap files if requested in heuristic
+    if populate_intended_for_opts is not None:
+        # Because fmap files can only be used to correct for distortions in images
+        # collected within the same scanning session, find unique subject/session
+        # combinations from the outname in each item:
+        outnames = [item[0] for item in items]
+        # - grab "sub-<sID>[/ses-<ses>]", and keep only unique ones:
+        try:
+            sessions = set(
+                re.search(
+                    'sub-(?P<subj>[a-zA-Z0-9]*)([{0}_]ses-(?P<ses>[a-zA-Z0-9]*))?'.format(op.sep),
+                    oname
+                ).group(0)
+                for oname in outnames
+            )
+        except AttributeError:
+            # "sub-<sID>[/ses-<ses>]" is not present, so this is not BIDS compliant
+            # and it doesn't make sense to add "IntendedFor":
+            sessions = set()
+
+        for ses in sessions:
+            session_path = op.join(outdir, ses)
+            populate_intended_for(session_path, **populate_intended_for_opts)
 
 
 def convert_dicom(item_dicoms, bids_options, prefix,
@@ -731,12 +809,17 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
         for metadata in bids_metas:
             if not metadata:
                 continue
-            echo_times.add(metadata.get('EchoTime', nan))
-            channel_names.add(metadata.get('CoilString', nan))
-            image_types.update(metadata.get('ImageType', [nan]))
+
+            # If the field is not available, fill that entry in the set with a False.
+            echo_times.add(metadata.get('EchoTime', False))
+            channel_names.add(metadata.get('CoilString', False))
+            image_types.update(metadata.get('ImageType', [False]))
+
         is_multiecho = len(set(filter(bool, echo_times))) > 1  # Check for varying echo times
         is_uncombined = len(set(filter(bool, channel_names))) > 1  # Check for uncombined data
         is_complex = 'M' in image_types and 'P' in image_types  # Determine if data are complex (magnitude + phase)
+        echo_times = sorted(echo_times)  # also converts to list
+        channel_names = sorted(channel_names)  # also converts to list
 
         ### Loop through the bids_files, set the output name and save files
         for fl, suffix, bids_file, bids_meta in zip(res_files, suffixes, bids_files, bids_metas):
@@ -756,7 +839,7 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
 
                 if is_complex:
                     this_prefix_basename = update_complex_name(
-                        bids_meta, this_prefix_basename, suffix
+                        bids_meta, this_prefix_basename
                     )
 
                 if is_uncombined:
