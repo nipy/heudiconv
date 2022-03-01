@@ -1128,7 +1128,7 @@ def test_ME_mag_phase_conversion(tmpdir):
     subID = 'MEGRE'
     args = (
         "-c dcm2niix -o %s -b -f bids_ME --files %s -s %s"
-        % (tmpdir, pjoin(TESTS_DATA_PATH, subID), subID)
+        % (tmpdir, op.join(TESTS_DATA_PATH, subID), subID)
     ).split(' ')
     runner(args)
 
