@@ -53,6 +53,13 @@ from .utils import (
 
 import pytest
 
+have_datalad = True
+try:
+    from datalad.support.exceptions import IncompleteResultsError
+except ImportError:
+    have_datalad = False
+
+
 def gen_rand_label(label_size, label_seed, seed_stdout=True):
     seed(label_seed)
     rand_char = ''.join(choice(string.ascii_letters) for _ in range(label_size-1))
