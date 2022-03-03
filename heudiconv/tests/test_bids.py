@@ -46,6 +46,8 @@ from heudiconv.bids import (
 from heudiconv.cli.run import main as runner
 
 from .utils import (
+    fetch_data,
+    gen_heudiconv_args,
     TESTS_DATA_PATH,
 )
 
@@ -1119,18 +1121,22 @@ def test_BIDSFile():
     assert my_bids_file['echo'] == '2'
 
 
-def test_ME_mag_phase_conversion(tmpdir):
+@pytest.mark.skipif(not have_datalad, reason="no datalad")
+def test_ME_mag_phase_conversion(tmpdir, subID='MEGRE', heuristic='bids_ME'):
     """ Unit test for the case of multi-echo GRE data with
     magnitude and phase.
     The different echoes should be labeled automatically.
     """
+    tmpdir.chdir()
     tmppath = tmpdir.strpath
-    subID = 'MEGRE'
-    args = (
-        "-c dcm2niix -o %s -b -f bids_ME --files %s -s %s"
-        % (tmpdir, op.join(TESTS_DATA_PATH, subID), subID)
-    ).split(' ')
-    runner(args)
+    try:
+        datadir = fetch_data(tmppath, "dicoms/velasco/{subID}")
+    except IncompleteResultsError as exc:
+        pytest.skip("Failed to fetch test data: %s" % str(exc))
+
+    outdir = tmpdir.mkdir('out').strpath
+    args = gen_heudiconv_args(datadir, outdir, subID, heuristic)
+    runner(args)  # run conversion
 
     # Check that the expected files have been extracted.
     # This also checks that the "echo" entity comes before "part":
@@ -1138,7 +1144,7 @@ def test_ME_mag_phase_conversion(tmpdir):
         for e in range(1,4):
             for ext in ['nii.gz', 'json']:
                 assert op.exists(
-                    op.join(tmppath, 'sub-%s', 'anat', 'sub-%s_echo-%s_part-%s_MEGRE.%s')
+                    op.join(outdir, 'sub-%s', 'anat', 'sub-%s_echo-%s_part-%s_MEGRE.%s')
                     % (subID, subID, e, part, ext)
                 )
 
