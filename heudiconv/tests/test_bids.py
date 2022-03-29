@@ -1137,7 +1137,7 @@ def test_ME_mag_phase_conversion(tmpdir, subID='MEGRE', heuristic='bids_ME'):
     tmpdir.chdir()
     tmppath = tmpdir.strpath
     try:
-        datadir = fetch_data(tmppath, "dicoms/velasco/{subID}")
+        datadir = fetch_data(tmppath, f"dicoms/velasco/{subID}")
     except IncompleteResultsError as exc:
         pytest.skip("Failed to fetch test data: %s" % str(exc))
 
