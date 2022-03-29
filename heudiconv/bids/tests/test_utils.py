@@ -1,52 +1,50 @@
 """Test functions of heudiconv.bids.utils module.
 """
 
-import re
 import os
 import os.path as op
-from pathlib import Path
-from random import (random,
-                    choice,
-                    seed
-                    )
-from datetime import (datetime,
-                      timedelta,
-                      )
-from collections import (OrderedDict,
-                         )
+import re
+import string
+from collections import OrderedDict
+from datetime import (
+    datetime,
+    timedelta,
+)
 from glob import glob
+from pathlib import Path
+from random import (
+    choice,
+    random,
+    seed,
+)
 
 import nibabel
-import string
+import pytest
 from numpy import testing as np_testing
 
+from heudiconv.tests.utils import TESTS_DATA_PATH
 from heudiconv.utils import (
-    load_json,
-    save_json,
     create_tree,
+    load_json,
     remove_suffix,
+    save_json,
 )
 
 from .. import (
-    maybe_na,
-    treat_age,
-    find_fmap_groups,
-    populate_intended_for,
-    get_shim_setting,
-    get_key_info_for_fmap_assignment,
-    find_compatible_fmaps_for_run,
-    find_compatible_fmaps_for_session,
-    select_fmap_from_compatible_groups,
     SHIM_KEY,
     AllowedCriteriaForFmapAssignment,
     KeyInfoForForce,
+    find_compatible_fmaps_for_run,
+    find_compatible_fmaps_for_session,
+    find_fmap_groups,
+    get_key_info_for_fmap_assignment,
+    get_shim_setting,
+    maybe_na,
+    populate_intended_for,
+    select_fmap_from_compatible_groups,
+    treat_age,
 )
 
-from heudiconv.tests.utils import (
-    TESTS_DATA_PATH,
-)
-
-import pytest
 
 def gen_rand_label(label_size, label_seed, seed_stdout=True):
     seed(label_seed)

@@ -1,37 +1,35 @@
 """Handle BIDS specific operations"""
 
+import csv
+import errno
 import hashlib
+import logging
 import os
 import os.path as op
-import logging
-import numpy as np
 import re
 from collections import OrderedDict
 from datetime import datetime
-import csv
-from random import sample
 from glob import glob
-import errno
+from random import sample
 
+import numpy as np
+
+from .. import __version__
 from ..external.pydicom import dcm
-
 from ..parser import find_files
 from ..utils import (
-    load_json,
-    save_json,
     create_file_if_missing,
-    json_dumps,
-    update_json,
-    set_readonly,
-    is_readonly,
     get_datetime,
-    remove_suffix,
+    is_readonly,
+    json_dumps,
+    load_json,
     remove_prefix,
+    remove_suffix,
+    save_json,
+    set_readonly,
+    update_json,
 )
-from .. import __version__
-
 from .schema import BIDSFile
-
 
 lgr = logging.getLogger(__name__)
 

@@ -1,10 +1,10 @@
-from pathlib import Path
+import logging
 import re
+from pathlib import Path
+
 import yaml
 
 from heudiconv.utils import remove_prefix
-
-import logging
 
 lgr = logging.getLogger(__name__)
 
