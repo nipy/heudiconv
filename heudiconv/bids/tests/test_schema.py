@@ -11,6 +11,10 @@ def test_BIDSFile_known_entries():
     assert len(BIDSFile._known_entities) > 10  # we do have many
     assert 'run' in BIDSFile._known_entities
 
+    good_entities = dict(sub='me')
+    BIDSFile(good_entities, None, None)  # just to ensure we are good
+    with pytest.raises(ValueError):
+        BIDSFile(dict(good_entities, badentity="good"), None, None)
 
 def test_BIDSFile():
     """ Tests for the BIDSFile class """

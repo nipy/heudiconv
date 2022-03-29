@@ -31,8 +31,8 @@ from .bids import (
     tuneup_bids_json_files,
     add_participant_record,
     BIDSError,
-    BIDS_VERSION,
 )
+from .bids.consts import BIDS_VERSION
 from .dicoms import (
     group_dicoms_into_seqinfos,
     embed_metadata_from_dicoms,

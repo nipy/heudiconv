@@ -10,10 +10,10 @@ import re
 from collections import OrderedDict
 from datetime import datetime
 from glob import glob
-from random import sample
 
 import numpy as np
 
+from .consts import BIDS_VERSION
 from .. import __version__
 from ..external.pydicom import dcm
 from ..parser import find_files
@@ -54,8 +54,6 @@ HEUDICONV_VERSION_JSON_KEY = 'HeudiconvVersion'
 class BIDSError(Exception):
     pass
 
-
-BIDS_VERSION = "1.7.0"
 
 # List defining allowed parameter matching for fmap assignment:
 SHIM_KEY = 'ShimSetting'

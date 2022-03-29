@@ -6,6 +6,8 @@ import yaml
 
 from heudiconv.utils import remove_prefix
 
+from .consts import BIDS_VERSION
+
 lgr = logging.getLogger(__name__)
 
 
@@ -31,6 +33,9 @@ class BIDSFile:
     _known_entities = _load_entities_order()
 
     def __init__(self, entities, suffix, extension):
+        unknown_entities = set(entities).difference(self._known_entities)
+        if unknown_entities:
+            raise ValueError(f"Unknown to BIDS {BIDS_VERSION} entities provided: {', '.join(unknown_entities)}")
         self._entities = entities
         self._suffix = suffix
         self._extension = extension
@@ -38,14 +43,11 @@ class BIDSFile:
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
             return False
-        if (
+        return (
             all([other[k] == v for k, v in self._entities.items()])
             and self.extension == other.extension
             and self.suffix == other.suffix
-        ):
-            return True
-        else:
-            return False
+        )
 
     @classmethod
     def parse(cls, filename):
