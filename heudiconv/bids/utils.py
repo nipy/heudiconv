@@ -54,7 +54,7 @@ class BIDSError(Exception):
     pass
 
 
-BIDS_VERSION = "1.4.1"
+BIDS_VERSION = "1.7.0"
 
 # List defining allowed parameter matching for fmap assignment:
 SHIM_KEY = 'ShimSetting'
