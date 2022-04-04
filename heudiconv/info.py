@@ -22,29 +22,30 @@ CLASSIFIERS = [
 PYTHON_REQUIRES = ">=3.6"
 
 REQUIRES = [
-    'nibabel',
-    'pydicom',
-    'nipype >=1.2.3',
     'dcmstack>=0.8',
     'etelemetry',
     'filelock>=3.0.12',
+    'nibabel',
+    'nipype >=1.2.3',
+    'pydicom',
+    'pyyaml',
 ]
 
 TESTS_REQUIRES = [
-    'six',
-    'pytest',
-    'mock',
-    'tinydb',
     'inotify',
+    'mock',
+    'pytest',
+    'six',
+    'tinydb',
 ]
 
 MIN_DATALAD_VERSION = '0.13.0'
 EXTRA_REQUIRES = {
-    'tests': TESTS_REQUIRES,
+    'datalad': ['datalad >=%s' % MIN_DATALAD_VERSION],
     'extras': [
         'duecredit',  # optional dependency
     ],  # Requires patched version ATM ['dcmstack'],
-    'datalad': ['datalad >=%s' % MIN_DATALAD_VERSION]
+    'tests': TESTS_REQUIRES,
 }
 
 # Flatten the lists
