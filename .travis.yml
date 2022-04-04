@@ -2,10 +2,11 @@
 language: python
 dist: bionic
 python:
-  - 3.6
   - 3.7
   - 3.8
   - 3.9
+  # causes issues, disabled for now
+  # - '3.10'
 
 cache:
   - apt
