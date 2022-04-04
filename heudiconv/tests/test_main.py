@@ -1,4 +1,5 @@
 # TODO: break this up by modules
+import logging
 
 from heudiconv.cli.run import main as runner
 from heudiconv.main import (workflow,
@@ -316,7 +317,7 @@ def test_no_etelemetry():
         ('pre', 'foo/sub-{sID}/ses-pre')
     ]
 )
-def test_populate_intended_for(tmpdir, session, expected_folder, capfd):
+def test_populate_intended_for(tmpdir, session, expected_folder, caplog):
     """
     Tests for "process_extra_commands" when the command is
     'populate-intended-for'
@@ -329,12 +330,12 @@ def test_populate_intended_for(tmpdir, session, expected_folder, capfd):
     # that don't exist, and check that the output is the expected.
     bids_folder = expected_folder.split('sub-')[0]
     subjects = ['1', '2']
+    caplog.set_level(logging.INFO)
     process_extra_commands(bids_folder, 'populate-intended-for', [], '',
                            'example', session, subjects, None)
-    captured_output = capfd.readouterr().err
     for s in subjects:
         expected_info = 'Adding "IntendedFor" to the fieldmaps in ' + expected_folder.format(sID=s)
-        assert expected_info in captured_output
+        assert any(expected_info in co.message for co in caplog.records)
 
     # try the same, but without specifying the subjects or the session.
     # the code in main should find any subject in the output folder and call
@@ -342,6 +343,7 @@ def test_populate_intended_for(tmpdir, session, expected_folder, capfd):
     # the data for that subject is organized in sessions):
     # TODO: Add a 'participants.tsv' file with one of the subjects missing;
     #  the 'process_extra_commands' call should print out a warning
+    caplog.clear()
     outdir = opj(str(tmpdir), bids_folder)
     for subj in subjects:
         subj_dir = opj(outdir, 'sub-' + subj)
@@ -351,9 +353,8 @@ def test_populate_intended_for(tmpdir, session, expected_folder, capfd):
             os.makedirs(opj(subj_dir, 'ses-' + session))
     process_extra_commands(outdir, 'populate-intended-for', [], '',
                            'example', [], [], None)
-    captured_output = capfd.readouterr().err
     for s in subjects:
         expected_info = 'Adding "IntendedFor" to the fieldmaps in ' + opj(str(tmpdir), expected_folder.format(sID=s))
-        assert expected_info in captured_output
+        assert any(expected_info in co.message for co in caplog.records)
 
 
