@@ -1129,7 +1129,7 @@ def test_BIDSFile():
 
 
 @pytest.mark.skipif(not have_datalad, reason="no datalad")
-def test_ME_mag_phase_conversion(tmpdir, subID='MEGRE', heuristic='bids_ME'):
+def test_ME_mag_phase_conversion(tmpdir, subID='MEGRE', heuristic='bids_ME.py'):
     """ Unit test for the case of multi-echo GRE data with
     magnitude and phase.
     The different echoes should be labeled automatically.
