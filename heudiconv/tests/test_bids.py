@@ -43,12 +43,22 @@ from heudiconv.bids import (
     KeyInfoForForce,
     BIDSFile,
 )
+from heudiconv.cli.run import main as runner
 
 from .utils import (
+    fetch_data,
+    gen_heudiconv_args,
     TESTS_DATA_PATH,
 )
 
 import pytest
+
+have_datalad = True
+try:
+    from datalad.support.exceptions import IncompleteResultsError
+except ImportError:
+    have_datalad = False
+
 
 def gen_rand_label(label_size, label_seed, seed_stdout=True):
     seed(label_seed)
@@ -1116,3 +1126,32 @@ def test_BIDSFile():
     # -for an existing entity, you can overwrite it with "set":
     my_bids_file.set('echo', '2')
     assert my_bids_file['echo'] == '2'
+
+
+@pytest.mark.skipif(not have_datalad, reason="no datalad")
+def test_ME_mag_phase_conversion(tmpdir, subID='MEGRE', heuristic='bids_ME.py'):
+    """ Unit test for the case of multi-echo GRE data with
+    magnitude and phase.
+    The different echoes should be labeled automatically.
+    """
+    tmpdir.chdir()
+    tmppath = tmpdir.strpath
+    try:
+        datadir = fetch_data(tmppath, f"dicoms/velasco/{subID}")
+    except IncompleteResultsError as exc:
+        pytest.skip("Failed to fetch test data: %s" % str(exc))
+
+    outdir = tmpdir.mkdir('out').strpath
+    args = gen_heudiconv_args(datadir, outdir, subID, heuristic)
+    runner(args)  # run conversion
+
+    # Check that the expected files have been extracted.
+    # This also checks that the "echo" entity comes before "part":
+    for part in ['mag', 'phase']:
+        for e in range(1,4):
+            for ext in ['nii.gz', 'json']:
+                assert op.exists(
+                    op.join(outdir, 'sub-%s', 'anat', 'sub-%s_echo-%s_part-%s_MEGRE.%s')
+                    % (subID, subID, e, part, ext)
+                )
+
