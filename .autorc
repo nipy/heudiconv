@@ -1,0 +1,16 @@
+{
+    "onlyPublishWithReleaseLabel": true,
+    "baseBranch": "master",
+    "author": "auto <auto@nil>",
+    "noVersionPrefix": false,
+    "plugins": [
+        "git-tag",
+        [
+            "exec",
+            {
+                "afterChangelog": "bump2version \"$(printf '%s\n' \"$ARG_0\" | jq -r .bump)\"",
+                "afterRelease": "python -m build && twine upload dist/*"
+            }
+        ]
+    ]
+}
