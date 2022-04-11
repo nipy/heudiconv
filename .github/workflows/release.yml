@@ -40,13 +40,20 @@ jobs:
 
       - name: Install Python dependencies
         if: steps.auto-version.outputs.version != ''
-        run: python -m pip install build bump2version twine
+        run: python -m pip install build twine
 
       - name: Create release
         if: steps.auto-version.outputs.version != ''
         run: ~/auto shipit
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & upload to PyPI
+        if: steps.auto-version.outputs.version != ''
+        run: |
+          python -m build
+          twine upload dist/*
+        env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
 
