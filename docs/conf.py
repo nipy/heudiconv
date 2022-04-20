@@ -19,6 +19,8 @@
 
 # -- Project information -----------------------------------------------------
 
+from heudiconv import __version__
+
 project = 'heudiconv'
 copyright = '2019, Heudiconv team'
 author = 'Heudiconv team'
@@ -26,7 +28,7 @@ author = 'Heudiconv team'
 # The short X.Y version
 version = ''
 # The full version, including alpha/beta/rc tags
-release = '0.10.0'
+release = __version__
 
 
 # -- General configuration ---------------------------------------------------

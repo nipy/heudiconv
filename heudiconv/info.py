@@ -1,4 +1,3 @@
-__version__ = "0.10.0"
 __author__ = "HeuDiConv team and contributors"
 __url__ = "https://github.com/nipy/heudiconv"
 __packagename__ = 'heudiconv'
@@ -29,6 +28,7 @@ REQUIRES = [
     'dcmstack>=0.8',
     'etelemetry',
     'filelock>=3.0.12',
+    'importlib-metadata; python_version < "3.8"',
 ]
 
 TESTS_REQUIRES = [

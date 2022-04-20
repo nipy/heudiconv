@@ -1,0 +1,30 @@
+name: Build Docker image
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v2
+
+      - name: Generate Dockerfile
+        run: bash gen-docker-image.sh
+        working-directory: utils
+
+      - name: Build Docker image
+        run: docker build -t nipy/heudiconv:master .
+
+      - name: Push Docker image
+        run: |
+          docker login -u "$DOCKER_LOGIN" --password-stdin <<<"$DOCKER_TOKEN"
+          docker push nipy/heudiconv:master
+        env:
+          DOCKER_LOGIN: ${{ secrets.DOCKER_LOGIN }}
+          DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+
+# vim:set sts=2:
