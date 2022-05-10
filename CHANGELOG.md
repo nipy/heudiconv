@@ -1,3 +1,15 @@
+# v0.11.1 (Tue May 10 2022)
+
+#### 🏠 Internal
+
+- Remove .git/ from .dockerignore so that versioning works while building docker image [#564](https://github.com/nipy/heudiconv/pull/564) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 1
+
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v0.11.0 (Tue May 10 2022)
 
 #### 🚀 Enhancement
