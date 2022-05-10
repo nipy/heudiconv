@@ -11,6 +11,9 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
 
       - name: Generate Dockerfile
         run: bash gen-docker-image.sh
