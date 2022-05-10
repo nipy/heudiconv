@@ -79,7 +79,7 @@ def process(paths2process, db, wait=WAIT_TIME, logdir='log'):
 
 def monitor(topdir='/tmp/new_dir', check_ptrn='/20../../..',
             db=None, wait=WAIT_TIME, logdir='log'):
-    # make logdir if not existant
+    # make logdir if not existent
     try:
         os.makedirs(logdir)
     except OSError:
