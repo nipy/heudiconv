@@ -71,7 +71,7 @@ def get_extracted_dicoms(fl):
     #     raise ValueError("some but not all input files are tar files")
 
     # tarfiles already know what they contain, and often the filenames
-    # are unique, or at least in a unqiue subdir per session
+    # are unique, or at least in a unique subdir per session
     # strategy: extract everything in a temp dir and assemble a list
     # of all files in all tarballs
 

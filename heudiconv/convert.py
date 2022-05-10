@@ -51,7 +51,7 @@ def conversion_info(subject, outdir, info, filegroup, ses):
             continue
         template, outtype = key[0], key[1]
         # So no annotation_classes of any kind!  so if not used -- what was the
-        # intension???? XXX
+        # intention???? XXX
         outpath = outdir
         for idx, itemgroup in enumerate(items):
             if not isinstance(itemgroup, list):
@@ -131,7 +131,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
     # ref: https://github.com/nipy/heudiconv/issues/84#issuecomment-330048609
     # for more automagical wishes
     target_heuristic_filename = op.join(idir, 'heuristic.py')
-    # faciliates change - TODO: remove in 1.0
+    # facilitates change - TODO: remove in 1.0
     old_heuristic_filename = op.join(idir, op.basename(heuristic.filename))
     if op.exists(old_heuristic_filename):
         assure_no_file_exists(target_heuristic_filename)

@@ -551,7 +551,7 @@ def infotodict(seqinfo):
                                   if isinstance(current_run, int)
                                   else current_run)
         else:
-            # if there is no _run -- no run label addded
+            # if there is no _run -- no run label added
             run_label = None
 
         # yoh: had a wrong assumption

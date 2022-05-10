@@ -69,7 +69,7 @@ def test_reproin_largely_smoke(tmpdir, heuristic, invocation):
             runner(args + ['--subjects', 'sub1', 'sub2'])
 
         if heuristic != 'reproin':
-            # if subject is not overriden, raise error
+            # if subject is not overridden, raise error
             with pytest.raises(NotImplementedError):
                 runner(args)
             return
@@ -158,7 +158,7 @@ def test_scout_conversion(tmpdir):
     # Let's do some basic checks on produced files
     j = load_json(sespath / 'fmap/sub-phantom1sid1_ses-localizer_acq-3mm_phasediff.json')
     # We store HeuDiConv version in each produced .json file
-    # TODO: test that we are not somehow overwritting that version in existing
+    # TODO: test that we are not somehow overwriting that version in existing
     # files which we have not produced in a particular run.
     assert j[HEUDICONV_VERSION_JSON_KEY] == __version__
 
