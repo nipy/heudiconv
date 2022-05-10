@@ -1,3 +1,51 @@
+# v0.11.0 (Tue May 10 2022)
+
+#### 🚀 Enhancement
+
+- RF: drop Python 3.6 (EOLed), fix dcm2niix version in neurodocker script [#555](https://github.com/nipy/heudiconv/pull/555) ([@yarikoptic](https://github.com/yarikoptic))
+- ENH: Adds populate_intended_for for fmaps [#482](https://github.com/nipy/heudiconv/pull/482) ([@pvelasco](https://github.com/pvelasco) [@yarikoptic](https://github.com/yarikoptic) bids@dbic.dartmouth.edu [@neurorepro](https://github.com/neurorepro))
+
+#### 🐛 Bug Fix
+
+- bids_ME heuristic: add test for the dataset that raised #541, add support for MEGRE [#547](https://github.com/nipy/heudiconv/pull/547) ([@pvelasco](https://github.com/pvelasco) [@yarikoptic](https://github.com/yarikoptic))
+- reproin heuristic: specify POPULATE_INTENDED_FOR_OPTS [#546](https://github.com/nipy/heudiconv/pull/546) ([@yarikoptic](https://github.com/yarikoptic))
+- FIX: Convert sets to lists for filename updaters [#461](https://github.com/nipy/heudiconv/pull/461) ([@tsalo](https://github.com/tsalo))
+- Added new infofilestyle compatible with BIDS [#12](https://github.com/nipy/heudiconv/pull/12) ([@chrisgorgo](https://github.com/chrisgorgo))
+- try a simple fix for wrongly ordered files in tar file [#535](https://github.com/nipy/heudiconv/pull/535) ([@bpinsard](https://github.com/bpinsard))
+- BF: Fix the order of the 'echo' entity in the filename [#542](https://github.com/nipy/heudiconv/pull/542) ([@pvelasco](https://github.com/pvelasco))
+- ENH: add HeudiconvVersion to sidecar .json files [#529](https://github.com/nipy/heudiconv/pull/529) ([@yarikoptic](https://github.com/yarikoptic))
+- BF (TST): make anonymize_script actually output anything and map determinstically [#511](https://github.com/nipy/heudiconv/pull/511) ([@yarikoptic](https://github.com/yarikoptic))
+- Rename DICOMCONVERT_README.md to README.md [#4](https://github.com/nipy/heudiconv/pull/4) ([@satra](https://github.com/satra))
+
+#### ⚠️ Pushed to `master`
+
+- Dockerfile - use bullseye for the base and fresh dcm2niix ([@yarikoptic](https://github.com/yarikoptic))
+
+#### 🏠 Internal
+
+- Run codespell on some obvious typos [#563](https://github.com/nipy/heudiconv/pull/563) ([@yarikoptic](https://github.com/yarikoptic))
+- Set up auto [#558](https://github.com/nipy/heudiconv/pull/558) ([@jwodder](https://github.com/jwodder) [@yarikoptic](https://github.com/yarikoptic))
+
+#### 🧪 Tests
+
+- BF(TST): use caplog to control logging level, use python3 in shebang [#553](https://github.com/nipy/heudiconv/pull/553) ([@yarikoptic](https://github.com/yarikoptic))
+- BF(TST): use caplog instead of capfd for testing if we log a warning [#534](https://github.com/nipy/heudiconv/pull/534) ([@yarikoptic](https://github.com/yarikoptic))
+- Travis - Use bionic for the base [#533](https://github.com/nipy/heudiconv/pull/533) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 9
+
+- Basile ([@bpinsard](https://github.com/bpinsard))
+- Chris Gorgolewski ([@chrisgorgo](https://github.com/chrisgorgo))
+- DBIC BIDS Team (bids@dbic.dartmouth.edu)
+- John T. Wodder II ([@jwodder](https://github.com/jwodder))
+- Michael ([@neurorepro](https://github.com/neurorepro))
+- Pablo Velasco ([@pvelasco](https://github.com/pvelasco))
+- Satrajit Ghosh ([@satra](https://github.com/satra))
+- Taylor Salo ([@tsalo](https://github.com/tsalo))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # [0.10.0] - 2021-09-16
 
 Various improvements and compatibility/support (dcm2niix, datalad) changes.
