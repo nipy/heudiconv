@@ -1,3 +1,17 @@
+# v0.11.2 (Thu May 12 2022)
+
+#### 🏠 Internal
+
+- Make versioningit write version to file; make setup.py read version as fallback [#566](https://github.com/nipy/heudiconv/pull/566) ([@jwodder](https://github.com/jwodder))
+- BF: add fetch-depth: 0 to get all tags into docker builds of master [#566](https://github.com/nipy/heudiconv/pull/566) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 2
+
+- John T. Wodder II ([@jwodder](https://github.com/jwodder))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v0.11.1 (Tue May 10 2022)
 
 #### 🏠 Internal
