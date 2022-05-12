@@ -2,13 +2,7 @@
 import logging
 import os
 from .info import __packagename__
-
-try:
-    from importlib.metadata import version
-except ImportError:
-    from importlib_metadata import version
-
-__version__ = version(__name__)
+from ._version import __version__
 
 # Rudimentary logging support.
 lgr = logging.getLogger(__name__)
