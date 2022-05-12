@@ -1,3 +1,15 @@
+# v0.11.3 (Thu May 12 2022)
+
+#### 🏠 Internal
+
+- BF: add recently tests data missing from distribution [#567](https://github.com/nipy/heudiconv/pull/567) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 1
+
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v0.11.2 (Thu May 12 2022)
 
 #### 🏠 Internal
