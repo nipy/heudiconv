@@ -67,7 +67,9 @@ def main():
         package_data={
             'heudiconv.tests': [
                         op.join('data', '*.dcm'),
-                        op.join('data', '*', '*.dcm')
+                        op.join('data', '*', '*.dcm'),
+                        op.join('data', '*', '*', '*.dcm'),
+                        op.join('data', 'sample_nifti*'),
             ],
         },
         **kwargs,
