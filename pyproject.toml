@@ -6,4 +6,5 @@ requires = [
 ]
 build-backend = "setuptools.build_meta"
 
-[tool.versioningit]
+[tool.versioningit.write]
+file = "heudiconv/_version.py"

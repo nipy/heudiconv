@@ -28,7 +28,6 @@ REQUIRES = [
     'dcmstack>=0.8',
     'etelemetry',
     'filelock>=3.0.12',
-    'importlib-metadata; python_version < "3.8"',
 ]
 
 TESTS_REQUIRES = [
