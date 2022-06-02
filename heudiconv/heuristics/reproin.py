@@ -918,7 +918,7 @@ def fixup_subjectid(subjectid):
     """Just in case someone managed to miss a zero or added an extra one"""
     # make it lowercase
     subjectid = subjectid.lower()
-    reg = re.match("sid0*(\d+)$", subjectid)
+    reg = re.match(r"sid0*(\d+)$", subjectid)
     if not reg:
         # some completely other pattern
         # just filter out possible _- in it
