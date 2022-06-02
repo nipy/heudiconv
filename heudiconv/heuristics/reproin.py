@@ -28,7 +28,7 @@ per each session.
 Sequence names on the scanner must follow this specification to avoid manual
 conversion/handling:
 
-  [PREFIX:][WIP ]<seqtype[-label]>[_ses-<SESID>][_task-<TASKID>][_acq-<ACQLABEL>][_run-<RUNID>][_dir-<DIR>][<more BIDS>][__<custom>]
+  [PREFIX:][WIP ]<datatype[-<suffix>]>[_ses-<SESID>][_task-<TASKID>][_acq-<ACQLABEL>][_run-<RUNID>][_dir-<DIR>][<more BIDS>][__<custom>]
 
 where
  [PREFIX:] - leading capital letters followed by : are stripped/ignored
@@ -42,23 +42,32 @@ where
        descriptive ones for e.g. SESID (_ses-movie, _ses-localizer)
 
 
-<seqtype[-label]>
-   a known BIDS sequence type which is usually a name of the folder under
-   subject's directory. And (optional) label is specific per sequence type
-   (e.g. typical "bold" for func, or "T1w" for "anat"), which could often
-   (but not always) be deduced from DICOM. Known to BIDS modalities are:
+<datatype[-suffix]>
+   a known BIDS sequence datatype which is usually a name of the folder under
+   subject's directory. And (optional) suffix is a specific sequence type
+   (e.g., "bold" for func, or "T1w" for "anat"), which could often
+   (but not always) be deduced from DICOM. Known to ReproIn BIDS modalities
+   are:
 
      anat - anatomical data.  Might also be collected multiple times across
             runs (e.g. if subject is taken out of magnet etc), so could
             (optionally) have "_run" definition attached. For "standard anat"
-            labels, please consult to "8.3 Anatomy imaging data" but most
-            common are 'T1w', 'T2w', 'angio'
+            suffixes, please consult to "8.3 Anatomy imaging data" but most
+            common are 'T1w', 'T2w', 'angio'.
+     beh  - behavioral data. known but not "treated".
      func - functional (AKA task, including resting state) data.
             Typically contains multiple runs, and might have multiple different
             tasks different per each run
             (e.g. _task-memory_run-01, _task-oddball_run-02)
      fmap - field maps
      dwi  - diffusion weighted imaging (also can as well have runs)
+
+   The other BIDS modalities are not known ATM and their data will not be
+   converted and will be just skipped (with a warning). Full list of datatypes
+   can be found at
+   https://github.com/bids-standard/bids-specification/blob/v1.7.0/src/schema/objects/datatypes.yaml
+   and their corresponding suffixes at
+   https://github.com/bids-standard/bids-specification/tree/v1.7.0/src/schema/rules/datatypes
 
 _ses-<SESID> (optional)
     a session.  Having a single sequence within a study would make that study
