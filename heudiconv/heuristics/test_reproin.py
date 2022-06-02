@@ -169,7 +169,7 @@ def test_parse_series_spec():
 
     assert pdpn("bids_func-bold") == \
            pdpn("func-bold") == \
-           {'seqtype': 'func', 'seqtype_label': 'bold'}
+           {'datatype': 'func', 'datatype_suffix': 'bold'}
 
     # pdpn("bids_func_ses+_task-boo_run+") == \
     # order and PREFIX: should not matter, as well as trailing spaces
@@ -179,8 +179,8 @@ def test_parse_series_spec():
         pdpn("WIP func_ses+_task-boo_run+") == \
         pdpn("bids_func_ses+_run+_task-boo") == \
            {
-               'seqtype': 'func',
-               # 'seqtype_label': 'bold',
+               'datatype': 'func',
+               # 'datatype_suffix': 'bold',
                'session': '+',
                'run': '+',
                'task': 'boo',
@@ -191,7 +191,7 @@ def test_parse_series_spec():
            pdpn("bids_func-pace_ses-1_run-2_task-boo_acq-bu_bids-please__therest") == \
            pdpn("func-pace_ses-1_task-boo_acq-bu_bids-please_run-2") == \
            {
-               'seqtype': 'func', 'seqtype_label': 'pace',
+               'datatype': 'func', 'datatype_suffix': 'pace',
                'session': '1',
                'run': '2',
                'task': 'boo',
@@ -201,24 +201,24 @@ def test_parse_series_spec():
 
     assert pdpn("bids_anat-scout_ses+") == \
            {
-               'seqtype': 'anat',
-               'seqtype_label': 'scout',
+               'datatype': 'anat',
+               'datatype_suffix': 'scout',
                'session': '+',
            }
 
     assert pdpn("anat_T1w_acq-MPRAGE_run+") == \
            {
-                'seqtype': 'anat',
+                'datatype': 'anat',
                 'run': '+',
                 'acq': 'MPRAGE',
-                'seqtype_label': 'T1w'
+                'datatype_suffix': 'T1w'
            }
 
     # Check for currently used {date}, which should also should get adjusted
     # from (date) since Philips does not allow for {}
     assert pdpn("func_ses-{date}") == \
            pdpn("func_ses-(date)") == \
-           {'seqtype': 'func', 'session': '{date}'}
+           {'datatype': 'func', 'session': '{date}'}
 
     assert pdpn("fmap_dir-AP_ses-01") == \
-           {'seqtype': 'fmap', 'session': '01', 'dir': 'AP'}
+           {'datatype': 'fmap', 'session': '01', 'dir': 'AP'}
