@@ -417,9 +417,9 @@ def infotodict(seqinfo):
             # 1 - PRIMARY/SECONDARY
             # 3 - Image IOD specific specialization (optional)
             dcm_image_iod_spec = s.image_type[2]
-            image_type_seqtype = {
+            image_type_datatype = {
                 # Note: P and M are too generic to make a decision here, could be
-                #  for different seqtypes (bold, fmap, etc)
+                #  for different datatypes (bold, fmap, etc)
                 'FMRI': 'func',
                 'MPR': 'anat',
                 'DIFFUSION': 'dwi',
@@ -428,7 +428,7 @@ def infotodict(seqinfo):
                 'MIP_TRA': 'anat',  # angiography
             }.get(dcm_image_iod_spec, None)
         else:
-            dcm_image_iod_spec = image_type_seqtype = None
+            dcm_image_iod_spec = image_type_datatype = None
 
         series_info = {}  # For please lintian and its friends
         for sfield in series_spec_fields:
@@ -453,19 +453,19 @@ def infotodict(seqinfo):
         if dcm_image_iod_spec and dcm_image_iod_spec.startswith('MIP'):
             series_info['acq'] = series_info.get('acq', '') + sanitize_str(dcm_image_iod_spec)
 
-        seqtype = series_info.pop('seqtype')
-        seqtype_label = series_info.pop('seqtype_label', None)
+        datatype = series_info.pop('datatype')
+        datatype_suffix = series_info.pop('datatype_suffix', None)
 
-        if image_type_seqtype and seqtype != image_type_seqtype:
+        if image_type_datatype and datatype != image_type_datatype:
             lgr.warning(
-                "Deduced seqtype to be %s from DICOM, but got %s out of %s",
-                image_type_seqtype, seqtype, series_spec)
+                "Deduced datatype to be %s from DICOM, but got %s out of %s",
+                image_type_datatype, datatype, series_spec)
 
         # if s.is_derived:
         #     # Let's for now stash those close to original images
         #     # TODO: we might want a separate tree for all of this!?
         #     # so more of a parameter to the create_key
-        #     #seqtype += '/derivative'
+        #     #datatype += '/derivative'
         #     # just keep it lower case and without special characters
         #     # XXXX what for???
         #     #seq.append(s.series_description.lower())
@@ -475,26 +475,26 @@ def infotodict(seqinfo):
         prefix = ''
 
         #
-        # Figure out the seqtype_label (BIDS _suffix)
+        # Figure out the datatype_suffix (BIDS _suffix)
         #
         # If none was provided -- let's deduce it from the information we find:
         # analyze s.protocol_name (series_id is based on it) for full name mapping etc
-        if not seqtype_label:
-            if seqtype == 'func':
+        if not datatype_suffix:
+            if datatype == 'func':
                 if '_pace_' in series_spec:
-                    seqtype_label = 'pace'  # or should it be part of seq-
+                    datatype_suffix = 'pace'  # or should it be part of seq-
                 elif 'P' in s.image_type:
-                    seqtype_label = 'phase'
+                    datatype_suffix = 'phase'
                 elif 'M' in s.image_type:
-                    seqtype_label = 'bold'
+                    datatype_suffix = 'bold'
                 else:
                     # assume bold by default
-                    seqtype_label = 'bold'
-            elif seqtype == 'fmap':
+                    datatype_suffix = 'bold'
+            elif datatype == 'fmap':
                 # TODO: support phase1 phase2 like in "Case 2: Two phase images ..."
                 if not dcm_image_iod_spec:
                     raise ValueError("Do not know image data type yet to make decision")
-                seqtype_label = {
+                datatype_suffix = {
                     # might want explicit {file_index}  ?
                     # _epi for pepolar fieldmaps, see
                     # https://bids-specification.readthedocs.io/en/stable/04-modality-specific-files/01-magnetic-resonance-imaging-data.html#case-4-multiple-phase-encoded-directions-pepolar
@@ -502,19 +502,19 @@ def infotodict(seqinfo):
                     'P': 'phasediff',
                     'DIFFUSION': 'epi',  # according to KODI those DWI are the EPIs we need
                 }[dcm_image_iod_spec]
-            elif seqtype == 'dwi':
+            elif datatype == 'dwi':
                 # label for dwi as well
-                seqtype_label = 'dwi'
+                datatype_suffix = 'dwi'
 
         #
-        # Even if seqtype_label was provided, for some data we might need to override,
+        # Even if datatype_suffix was provided, for some data we might need to override,
         # since they are complementary files produced along-side with original
         # ones.
         #
         if s.series_description.endswith('_SBRef'):
-            seqtype_label = 'sbref'
+            datatype_suffix = 'sbref'
 
-        if not seqtype_label:
+        if not datatype_suffix:
             # Might be provided by the bids ending within series_spec, we would
             # just want to check if that the last element is not _key-value pair
             bids_ending = series_info.get('bids', None)
@@ -584,7 +584,12 @@ def infotodict(seqinfo):
             else:
                 return None
 
-        suffix_parts = [
+        # TODO: get order from schema, do not hardcode. ATM could be checked at
+        # https://bids-specification.readthedocs.io/en/stable/99-appendices/04-entity-table.html
+        # https://github.com/bids-standard/bids-specification/blob/HEAD/src/schema/rules/entities.yaml
+        # ATM we at large rely on possible (re)ordering according to schema to be done
+        # by heudiconv, not reproin here.
+        filename_suffix_parts = [
             from_series_info('task'),
             from_series_info('acq'),
             # But we want to add an indicator in case it was motion corrected
@@ -593,10 +598,10 @@ def infotodict(seqinfo):
             from_series_info('dir'),
             series_info.get('bids'),
             run_label,
-            seqtype_label,
+            datatype_suffix,
         ]
         # filter those which are None, and join with _
-        suffix = '_'.join(filter(bool, suffix_parts))
+        suffix = '_'.join(filter(bool, filename_suffix_parts))
 
         # # .series_description in case of
         # sdesc = s.study_description
@@ -615,12 +620,12 @@ def infotodict(seqinfo):
         # For scouts -- we want only dicoms
         # https://github.com/nipy/heudiconv/issues/145
         if "_Scout" in s.series_description or \
-                (seqtype == 'anat' and seqtype_label and seqtype_label.startswith('scout')):
+                (datatype == 'anat' and datatype_suffix and datatype_suffix.startswith('scout')):
             outtype = ('dicom',)
         else:
             outtype = ('nii.gz', 'dicom')
 
-        template = create_key(seqtype, suffix, prefix=prefix, outtype=outtype)
+        template = create_key(datatype, suffix, prefix=prefix, outtype=outtype)
         # we wanted ordered dict for consistent demarcation of dups
         if template not in info:
             info[template] = []
@@ -862,17 +867,17 @@ def parse_series_spec(series_spec):
         return s, None
 
     # Let's analyze first element which should tell us sequence type
-    seqtype, seqtype_label = split2(split[0])
-    if seqtype not in KNOWN_DATATYPES:
+    datatype, datatype_suffix = split2(split[0])
+    if datatype not in KNOWN_DATATYPES:
         # It is not something we don't consume
         if bids:
             lgr.warning("It was instructed to be BIDS datatype but unknown "
-                        "%s found. Known are: %s", seqtype, ', '.join(KNOWN_DATATYPES))
+                        "%s found. Known are: %s", datatype, ', '.join(KNOWN_DATATYPES))
         return {}
 
-    regd = dict(seqtype=seqtype)
-    if seqtype_label:
-        regd['seqtype_label'] = seqtype_label
+    regd = dict(datatype=datatype)
+    if datatype_suffix:
+        regd['datatype_suffix'] = datatype_suffix
     # now go through each to see if one which we care
     bids_leftovers = []
     for s in split[1:]:
@@ -899,12 +904,12 @@ def parse_series_spec(series_spec):
     # TODO: might want to check for all known "standard" BIDS suffixes here
     # among bids_leftovers, thus serve some kind of BIDS validator
 
-    # if not regd.get('seqtype_label', None):
-    #     # might need to assign a default label for each seqtype if was not
+    # if not regd.get('datatype_suffix', None):
+    #     # might need to assign a default label for each datatype if was not
     #     # given
-    #     regd['seqtype_label'] = {
+    #     regd['datatype_suffix'] = {
     #         'func': 'bold'
-    #     }.get(regd['seqtype'], None)
+    #     }.get(regd['datatype'], None)
 
     return regd
 
