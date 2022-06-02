@@ -213,6 +213,10 @@ POPULATE_INTENDED_FOR_OPTS = {
     'criterion': 'Closest'
 }
 
+
+KNOWN_DATATYPES = {'anat', 'func', 'dwi', 'behav', 'fmap'}
+
+
 def _delete_chars(from_str, deletechars):
     """ Delete characters from string allowing for Python 2 / 3 difference
     """
@@ -859,11 +863,11 @@ def parse_series_spec(series_spec):
 
     # Let's analyze first element which should tell us sequence type
     seqtype, seqtype_label = split2(split[0])
-    if seqtype not in {'anat', 'func', 'dwi', 'behav', 'fmap'}:
+    if seqtype not in KNOWN_DATATYPES:
         # It is not something we don't consume
         if bids:
-            lgr.warning("It was instructed to be BIDS sequence but unknown "
-                        "type %s found", seqtype)
+            lgr.warning("It was instructed to be BIDS datatype but unknown "
+                        "%s found. Known are: %s", seqtype, ', '.join(KNOWN_DATATYPES))
         return {}
 
     regd = dict(seqtype=seqtype)
