@@ -572,7 +572,7 @@ def infotodict(seqinfo):
         #     assert s.is_derived, "Motion corrected images must be 'derived'"
 
         if s.is_motion_corrected and 'rec-' in series_info.get('bids', ''):
-            raise NotImplementedError("want to add _acq-moco but there is _acq- already")
+            raise NotImplementedError("want to add _rec-moco but there is _rec- already")
 
         def from_series_info(name):
             """A little helper to provide _name-value if series_info knows it
