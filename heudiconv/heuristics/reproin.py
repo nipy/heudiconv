@@ -28,7 +28,7 @@ per each session.
 Sequence names on the scanner must follow this specification to avoid manual
 conversion/handling:
 
-  [PREFIX:][WIP ]<seqtype[-label]>[_ses-<SESID>][_task-<TASKID>][_acq-<ACQLABEL>][_run-<RUNID>][_dir-<DIR>][<more BIDS>][__<custom>]
+  [PREFIX:][WIP ]<datatype[-<suffix>]>[_ses-<SESID>][_task-<TASKID>][_acq-<ACQLABEL>][_run-<RUNID>][_dir-<DIR>][<more BIDS>][__<custom>]
 
 where
  [PREFIX:] - leading capital letters followed by : are stripped/ignored
@@ -42,23 +42,32 @@ where
        descriptive ones for e.g. SESID (_ses-movie, _ses-localizer)
 
 
-<seqtype[-label]>
-   a known BIDS sequence type which is usually a name of the folder under
-   subject's directory. And (optional) label is specific per sequence type
-   (e.g. typical "bold" for func, or "T1w" for "anat"), which could often
-   (but not always) be deduced from DICOM. Known to BIDS modalities are:
+<datatype[-suffix]>
+   a known BIDS sequence datatype which is usually a name of the folder under
+   subject's directory. And (optional) suffix is a specific sequence type
+   (e.g., "bold" for func, or "T1w" for "anat"), which could often
+   (but not always) be deduced from DICOM. Known to ReproIn BIDS modalities
+   are:
 
      anat - anatomical data.  Might also be collected multiple times across
             runs (e.g. if subject is taken out of magnet etc), so could
             (optionally) have "_run" definition attached. For "standard anat"
-            labels, please consult to "8.3 Anatomy imaging data" but most
-            common are 'T1w', 'T2w', 'angio'
+            suffixes, please consult to "8.3 Anatomy imaging data" but most
+            common are 'T1w', 'T2w', 'angio'.
+     beh  - behavioral data. known but not "treated".
      func - functional (AKA task, including resting state) data.
             Typically contains multiple runs, and might have multiple different
             tasks different per each run
             (e.g. _task-memory_run-01, _task-oddball_run-02)
      fmap - field maps
      dwi  - diffusion weighted imaging (also can as well have runs)
+
+   The other BIDS modalities are not known ATM and their data will not be
+   converted and will be just skipped (with a warning). Full list of datatypes
+   can be found at
+   https://github.com/bids-standard/bids-specification/blob/v1.7.0/src/schema/objects/datatypes.yaml
+   and their corresponding suffixes at
+   https://github.com/bids-standard/bids-specification/tree/v1.7.0/src/schema/rules/datatypes
 
 _ses-<SESID> (optional)
     a session.  Having a single sequence within a study would make that study
@@ -203,6 +212,10 @@ POPULATE_INTENDED_FOR_OPTS = {
     'matching_parameters': ['ImagingVolume', 'Shims'],
     'criterion': 'Closest'
 }
+
+
+KNOWN_DATATYPES = {'anat', 'func', 'dwi', 'behav', 'fmap'}
+
 
 def _delete_chars(from_str, deletechars):
     """ Delete characters from string allowing for Python 2 / 3 difference
@@ -404,9 +417,9 @@ def infotodict(seqinfo):
             # 1 - PRIMARY/SECONDARY
             # 3 - Image IOD specific specialization (optional)
             dcm_image_iod_spec = s.image_type[2]
-            image_type_seqtype = {
+            image_type_datatype = {
                 # Note: P and M are too generic to make a decision here, could be
-                #  for different seqtypes (bold, fmap, etc)
+                #  for different datatypes (bold, fmap, etc)
                 'FMRI': 'func',
                 'MPR': 'anat',
                 'DIFFUSION': 'dwi',
@@ -415,7 +428,7 @@ def infotodict(seqinfo):
                 'MIP_TRA': 'anat',  # angiography
             }.get(dcm_image_iod_spec, None)
         else:
-            dcm_image_iod_spec = image_type_seqtype = None
+            dcm_image_iod_spec = image_type_datatype = None
 
         series_info = {}  # For please lintian and its friends
         for sfield in series_spec_fields:
@@ -440,19 +453,19 @@ def infotodict(seqinfo):
         if dcm_image_iod_spec and dcm_image_iod_spec.startswith('MIP'):
             series_info['acq'] = series_info.get('acq', '') + sanitize_str(dcm_image_iod_spec)
 
-        seqtype = series_info.pop('seqtype')
-        seqtype_label = series_info.pop('seqtype_label', None)
+        datatype = series_info.pop('datatype')
+        datatype_suffix = series_info.pop('datatype_suffix', None)
 
-        if image_type_seqtype and seqtype != image_type_seqtype:
+        if image_type_datatype and datatype != image_type_datatype:
             lgr.warning(
-                "Deduced seqtype to be %s from DICOM, but got %s out of %s",
-                image_type_seqtype, seqtype, series_spec)
+                "Deduced datatype to be %s from DICOM, but got %s out of %s",
+                image_type_datatype, datatype, series_spec)
 
         # if s.is_derived:
         #     # Let's for now stash those close to original images
         #     # TODO: we might want a separate tree for all of this!?
         #     # so more of a parameter to the create_key
-        #     #seqtype += '/derivative'
+        #     #datatype += '/derivative'
         #     # just keep it lower case and without special characters
         #     # XXXX what for???
         #     #seq.append(s.series_description.lower())
@@ -462,26 +475,26 @@ def infotodict(seqinfo):
         prefix = ''
 
         #
-        # Figure out the seqtype_label (BIDS _suffix)
+        # Figure out the datatype_suffix (BIDS _suffix)
         #
         # If none was provided -- let's deduce it from the information we find:
         # analyze s.protocol_name (series_id is based on it) for full name mapping etc
-        if not seqtype_label:
-            if seqtype == 'func':
+        if not datatype_suffix:
+            if datatype == 'func':
                 if '_pace_' in series_spec:
-                    seqtype_label = 'pace'  # or should it be part of seq-
+                    datatype_suffix = 'pace'  # or should it be part of seq-
                 elif 'P' in s.image_type:
-                    seqtype_label = 'phase'
+                    datatype_suffix = 'phase'
                 elif 'M' in s.image_type:
-                    seqtype_label = 'bold'
+                    datatype_suffix = 'bold'
                 else:
                     # assume bold by default
-                    seqtype_label = 'bold'
-            elif seqtype == 'fmap':
+                    datatype_suffix = 'bold'
+            elif datatype == 'fmap':
                 # TODO: support phase1 phase2 like in "Case 2: Two phase images ..."
                 if not dcm_image_iod_spec:
                     raise ValueError("Do not know image data type yet to make decision")
-                seqtype_label = {
+                datatype_suffix = {
                     # might want explicit {file_index}  ?
                     # _epi for pepolar fieldmaps, see
                     # https://bids-specification.readthedocs.io/en/stable/04-modality-specific-files/01-magnetic-resonance-imaging-data.html#case-4-multiple-phase-encoded-directions-pepolar
@@ -489,19 +502,19 @@ def infotodict(seqinfo):
                     'P': 'phasediff',
                     'DIFFUSION': 'epi',  # according to KODI those DWI are the EPIs we need
                 }[dcm_image_iod_spec]
-            elif seqtype == 'dwi':
+            elif datatype == 'dwi':
                 # label for dwi as well
-                seqtype_label = 'dwi'
+                datatype_suffix = 'dwi'
 
         #
-        # Even if seqtype_label was provided, for some data we might need to override,
+        # Even if datatype_suffix was provided, for some data we might need to override,
         # since they are complementary files produced along-side with original
         # ones.
         #
         if s.series_description.endswith('_SBRef'):
-            seqtype_label = 'sbref'
+            datatype_suffix = 'sbref'
 
-        if not seqtype_label:
+        if not datatype_suffix:
             # Might be provided by the bids ending within series_spec, we would
             # just want to check if that the last element is not _key-value pair
             bids_ending = series_info.get('bids', None)
@@ -559,7 +572,7 @@ def infotodict(seqinfo):
         #     assert s.is_derived, "Motion corrected images must be 'derived'"
 
         if s.is_motion_corrected and 'rec-' in series_info.get('bids', ''):
-            raise NotImplementedError("want to add _acq-moco but there is _acq- already")
+            raise NotImplementedError("want to add _rec-moco but there is _rec- already")
 
         def from_series_info(name):
             """A little helper to provide _name-value if series_info knows it
@@ -571,7 +584,12 @@ def infotodict(seqinfo):
             else:
                 return None
 
-        suffix_parts = [
+        # TODO: get order from schema, do not hardcode. ATM could be checked at
+        # https://bids-specification.readthedocs.io/en/stable/99-appendices/04-entity-table.html
+        # https://github.com/bids-standard/bids-specification/blob/HEAD/src/schema/rules/entities.yaml
+        # ATM we at large rely on possible (re)ordering according to schema to be done
+        # by heudiconv, not reproin here.
+        filename_suffix_parts = [
             from_series_info('task'),
             from_series_info('acq'),
             # But we want to add an indicator in case it was motion corrected
@@ -580,10 +598,10 @@ def infotodict(seqinfo):
             from_series_info('dir'),
             series_info.get('bids'),
             run_label,
-            seqtype_label,
+            datatype_suffix,
         ]
         # filter those which are None, and join with _
-        suffix = '_'.join(filter(bool, suffix_parts))
+        suffix = '_'.join(filter(bool, filename_suffix_parts))
 
         # # .series_description in case of
         # sdesc = s.study_description
@@ -602,12 +620,12 @@ def infotodict(seqinfo):
         # For scouts -- we want only dicoms
         # https://github.com/nipy/heudiconv/issues/145
         if "_Scout" in s.series_description or \
-                (seqtype == 'anat' and seqtype_label and seqtype_label.startswith('scout')):
+                (datatype == 'anat' and datatype_suffix and datatype_suffix.startswith('scout')):
             outtype = ('dicom',)
         else:
             outtype = ('nii.gz', 'dicom')
 
-        template = create_key(seqtype, suffix, prefix=prefix, outtype=outtype)
+        template = create_key(datatype, suffix, prefix=prefix, outtype=outtype)
         # we wanted ordered dict for consistent demarcation of dups
         if template not in info:
             info[template] = []
@@ -849,17 +867,17 @@ def parse_series_spec(series_spec):
         return s, None
 
     # Let's analyze first element which should tell us sequence type
-    seqtype, seqtype_label = split2(split[0])
-    if seqtype not in {'anat', 'func', 'dwi', 'behav', 'fmap'}:
+    datatype, datatype_suffix = split2(split[0])
+    if datatype not in KNOWN_DATATYPES:
         # It is not something we don't consume
         if bids:
-            lgr.warning("It was instructed to be BIDS sequence but unknown "
-                        "type %s found", seqtype)
+            lgr.warning("It was instructed to be BIDS datatype but unknown "
+                        "%s found. Known are: %s", datatype, ', '.join(KNOWN_DATATYPES))
         return {}
 
-    regd = dict(seqtype=seqtype)
-    if seqtype_label:
-        regd['seqtype_label'] = seqtype_label
+    regd = dict(datatype=datatype)
+    if datatype_suffix:
+        regd['datatype_suffix'] = datatype_suffix
     # now go through each to see if one which we care
     bids_leftovers = []
     for s in split[1:]:
@@ -886,12 +904,12 @@ def parse_series_spec(series_spec):
     # TODO: might want to check for all known "standard" BIDS suffixes here
     # among bids_leftovers, thus serve some kind of BIDS validator
 
-    # if not regd.get('seqtype_label', None):
-    #     # might need to assign a default label for each seqtype if was not
+    # if not regd.get('datatype_suffix', None):
+    #     # might need to assign a default label for each datatype if was not
     #     # given
-    #     regd['seqtype_label'] = {
+    #     regd['datatype_suffix'] = {
     #         'func': 'bold'
-    #     }.get(regd['seqtype'], None)
+    #     }.get(regd['datatype'], None)
 
     return regd
 
@@ -900,7 +918,7 @@ def fixup_subjectid(subjectid):
     """Just in case someone managed to miss a zero or added an extra one"""
     # make it lowercase
     subjectid = subjectid.lower()
-    reg = re.match("sid0*(\d+)$", subjectid)
+    reg = re.match(r"sid0*(\d+)$", subjectid)
     if not reg:
         # some completely other pattern
         # just filter out possible _- in it
