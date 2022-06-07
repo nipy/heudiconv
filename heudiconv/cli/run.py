@@ -134,7 +134,8 @@ def get_parser():
         '--command',
         choices=(
             'heuristics', 'heuristic-info',
-            'ls', 'populate-templates',
+            'ls', 'ls-studysessions',
+            'populate-templates',
             'sanitize-jsons', 'treat-jsons',
             'populate-intended-for'
         ),

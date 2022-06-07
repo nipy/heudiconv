@@ -94,6 +94,46 @@ def process_extra_commands(outdir, command, files, dicom_dir_template,
                     "\t%s %d sequences%s"
                     % (str(study_session), len(sequences), suf)
                 )
+    elif command == 'ls-studysessions':
+        ensure_heuristic_arg(heuristic)
+        heuristic = load_heuristic(heuristic)
+        # heuristic_ls = getattr(heuristic, 'ls', None)
+        study_sessions = get_study_sessions(
+            dicom_dir_template, files, heuristic, outdir,
+            session, subjs, grouping=grouping)
+        for ss, seqinfos in study_sessions.items():
+            print(f"{ss}:")
+            # deduce unique attributes
+            from heudiconv.utils import get_dicts_intersection
+            seqinfo_dicts = [s._asdict() for s in seqinfos]
+            common_seqinfo = get_dicts_intersection(seqinfo_dicts)
+
+            diff_seqinfo = []
+            for sd in seqinfo_dicts:
+                diff = {
+                    k: v for k, v in sd.items()
+                    if (k not in common_seqinfo) and
+                        (k not in {'total_files_till_now', 'series_uid'})}
+                # some transformations might be needed to please pyout
+                for k, v in diff.items():
+                    if isinstance(v, tuple):
+                        diff[k] = ', '.join(v)
+                diff_seqinfo.append(diff)
+
+            if diff_seqinfo == [{}]:
+                print(f" only common: {common_seqinfo}")
+                continue
+            from pyout import Tabular
+            with Tabular(
+                columns=['example_dcm_file', 'series_files', 'series_id', 'protocol_name', 'series_description'],
+                style={"header_": dict(bold=True,),
+                       "example_dcm_file": dict(bold=True,),
+                       "image_type": dict(transform=str)},
+                mode='final'
+            ) as out:
+                for diffs, files in zip(diff_seqinfo, seqinfos.values()):
+                    out(diffs)
+                    # print(f"{path_id} {diffs}")
     elif command == 'populate-templates':
         ensure_heuristic_arg(heuristic)
         heuristic = load_heuristic(heuristic)
