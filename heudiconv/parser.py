@@ -113,8 +113,18 @@ def get_extracted_dicoms(fl):
 
     return sessions.items()
 
+from fscacher import PersistentCache
+from ._version import __version__
 
-def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
+study_sessions_cache =  PersistentCache(
+    name="heudiconv-study-sessions",
+    tokens=[__version__],
+    envvar="HEUDICONV_CACHE",
+)
+
+
+@study_sessions_cache.memoize_paths
+def get_study_sessions(files_opt, dicom_dir_template, heuristic, outdir,
                        session, sids, grouping='studyUID'):
     """Given options from cmdline sort files or dicom seqinfos into
     study_sessions which put together files for a single session of a subject
