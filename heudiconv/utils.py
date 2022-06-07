@@ -645,3 +645,17 @@ def remove_prefix(s, pre):
     if pre and s.startswith(pre):
         return s[len(pre):]
     return s
+
+
+def get_dicts_intersection(recs: list[dict]) -> dict:
+    """Given a list of dictionaries, return a dict of key:values which are the same
+    across all entries
+    """
+    if not recs:
+        return {}
+    common_keys = recs[0].copy()
+    for r in recs[1:]:
+        for k, v in common_keys.copy().items():
+            if k not in r or r[k] != v:
+                common_keys.pop(k)
+    return common_keys
