@@ -42,6 +42,7 @@ from heudiconv.bids import (
     AllowedCriteriaForFmapAssignment,
     KeyInfoForForce,
     BIDSFile,
+    sanitize_label,
 )
 from heudiconv.cli.run import main as runner
 
@@ -62,12 +63,14 @@ except ImportError:
 
 def gen_rand_label(label_size, label_seed, seed_stdout=True):
     seed(label_seed)
-    rand_char = ''.join(choice(string.ascii_letters) for _ in range(label_size-1))
+    rand_char = ''.join(choice(string.ascii_letters)
+                        for _ in range(label_size-1))
     seed(label_seed)
     rand_num = choice(string.digits)
     if seed_stdout:
         print(f'Seed used to generate custom label: {label_seed}')
     return rand_char + rand_num
+
 
 def test_maybe_na():
     for na in '', ' ', None, 'n/a', 'N/A', 'NA':
@@ -93,6 +96,8 @@ TODAY = datetime.today()
 LABEL_SEED = int.from_bytes(os.urandom(8), byteorder="big")
 
 A_SHIM = [random() for i in range(SHIM_LENGTH)]
+
+
 def test_get_shim_setting(tmpdir):
     """ Tests for get_shim_setting """
     json_dir = op.join(str(tmpdir), 'foo')
@@ -112,7 +117,7 @@ def test_get_shim_setting(tmpdir):
 def test_get_key_info_for_fmap_assignment(tmpdir, label_size=4, label_seed=LABEL_SEED):
     """
     Test get_key_info_for_fmap_assignment.
-    
+
     label_size and label_seed are used for the "CustomAcquisitionLabel" matching
     parameter. label_size is the size of the random label while label_seed is 
     the seed for the random label creation.
@@ -121,17 +126,21 @@ def test_get_key_info_for_fmap_assignment(tmpdir, label_size=4, label_seed=LABEL
     nifti_file = op.join(TESTS_DATA_PATH, 'sample_nifti.nii.gz')
     # Get the expected parameters from the NIfTI header:
     MY_HEADER = nibabel.ni1.np.loadtxt(
-        op.join(TESTS_DATA_PATH, remove_suffix(nifti_file, '.nii.gz') + '_params.txt')
+        op.join(TESTS_DATA_PATH, remove_suffix(
+            nifti_file, '.nii.gz') + '_params.txt')
     )
-    json_name = op.join(TESTS_DATA_PATH, remove_suffix(nifti_file, '.nii.gz') + '.json')
+    json_name = op.join(TESTS_DATA_PATH, remove_suffix(
+        nifti_file, '.nii.gz') + '.json')
 
     # 1) Call for a non-existing file should give an error:
     with pytest.raises(FileNotFoundError):
         assert get_key_info_for_fmap_assignment('foo.json', 'ImagingVolume')
 
     # 2) matching_parameters = 'Shims'
-    json_name = op.join(TESTS_DATA_PATH, remove_suffix(nifti_file, '.nii.gz') + '.json')
-    save_json(json_name, {SHIM_KEY: A_SHIM})      # otherwise get_key_info_for_fmap_assignment will give an error
+    json_name = op.join(TESTS_DATA_PATH, remove_suffix(
+        nifti_file, '.nii.gz') + '.json')
+    # otherwise get_key_info_for_fmap_assignment will give an error
+    save_json(json_name, {SHIM_KEY: A_SHIM})
     key_info = get_key_info_for_fmap_assignment(
         json_name, matching_parameter='Shims'
     )
@@ -174,7 +183,7 @@ def test_get_key_info_for_fmap_assignment(tmpdir, label_size=4, label_seed=LABEL
     A_LABEL = gen_rand_label(label_size, label_seed)
     for d in ['fmap', 'func', 'dwi', 'anat']:
         Path(op.join(str(tmpdir), d)).mkdir(parents=True, exist_ok=True)
-        
+
     for (dirname, fname, expected_key_info) in [
         ('fmap', f'sub-foo_acq-{A_LABEL}_epi.json', A_LABEL),
         ('func', f'sub-foo_task-{A_LABEL}_acq-foo_bold.json', A_LABEL),
@@ -189,8 +198,8 @@ def test_get_key_info_for_fmap_assignment(tmpdir, label_size=4, label_seed=LABEL
 
     # Finally: invalid matching_parameters:
     assert get_key_info_for_fmap_assignment(
-            json_name, matching_parameter='Invalid'
-        ) == []
+        json_name, matching_parameter='Invalid'
+    ) == []
 
 
 def generate_scans_tsv(session_struct):
@@ -212,9 +221,9 @@ def generate_scans_tsv(session_struct):
     # for each modality in session_struct (k), get the filenames:
     scans_fnames = [
         op.join(k, vk)
-            for k, v in session_struct.items()
-            for vk in sorted(v.keys())
-            if vk.endswith('.nii.gz')
+        for k, v in session_struct.items()
+        for vk in sorted(v.keys())
+        if vk.endswith('.nii.gz')
     ]
     # for each file, increment the acq_time by one minute:
     scans_file_content = ['filename\tacq_time'] + [
@@ -333,7 +342,8 @@ def create_dummy_pepolar_bids_session(session_path):
     ])
     # add "_scans.tsv" file to the session_struct
     scans_file_content = generate_scans_tsv(session_struct)
-    session_struct.update({'{p}_scans.tsv'.format(p=prefix): scans_file_content})
+    session_struct.update(
+        {'{p}_scans.tsv'.format(p=prefix): scans_file_content})
 
     create_tree(session_path, session_struct)
 
@@ -379,7 +389,7 @@ def create_dummy_pepolar_bids_session(session_path):
         # (runNo=1 goes with the long list, runNo=2 goes with None):
         for runNo, intended_for in zip(
             [1, 2],
-            [[op.join(expected_prefix, 'dwi', '{p}_acq-A_run-{r}_dwi.nii.gz'.format(p=prefix, r=r)) for r in [1,2]],
+            [[op.join(expected_prefix, 'dwi', '{p}_acq-A_run-{r}_dwi.nii.gz'.format(p=prefix, r=r)) for r in [1, 2]],
              None]
         )
         for d in ['AP', 'PA']
@@ -397,7 +407,7 @@ def create_dummy_pepolar_bids_session(session_path):
             for d in ['AP', 'PA']
         }
     )
-    
+
     return session_struct, expected_result, expected_fmap_groups, expected_compatible_fmaps
 
 
@@ -478,7 +488,8 @@ def create_dummy_no_shim_settings_bids_session(session_path):
     ])
     # add "_scans.tsv" file to the session_struct
     scans_file_content = generate_scans_tsv(session_struct)
-    session_struct.update({'{p}_scans.tsv'.format(p=prefix): scans_file_content})
+    session_struct.update(
+        {'{p}_scans.tsv'.format(p=prefix): scans_file_content})
 
     create_tree(session_path, session_struct)
 
@@ -502,7 +513,7 @@ def create_dummy_no_shim_settings_bids_session(session_path):
         '{p}_acq-{a}_bold.json'.format(p=op.join(session_path, 'func', prefix), a=acq): {
             key: val for key, val in expected_fmap_groups.items() if key in [
                 '{p}_acq-fMRI_run-{r}_epi'.format(p=prefix, r=r) for r in [1, 2]
-           ]
+            ]
         }
         for acq in ['A', 'B']
     })
@@ -522,7 +533,7 @@ def create_dummy_no_shim_settings_bids_session(session_path):
         '{p}_acq-dwi_dir-{d}_run-{r}_epi.json'.format(p=prefix, d=d, r=runNo): intended_for
         for runNo, intended_for in zip(
             [1, 2],
-            [[op.join(expected_prefix, 'dwi', '{p}_acq-A_run-{r}_dwi.nii.gz'.format(p=prefix, r=r)) for r in [1,2]],
+            [[op.join(expected_prefix, 'dwi', '{p}_acq-A_run-{r}_dwi.nii.gz'.format(p=prefix, r=r)) for r in [1, 2]],
              None]
         )
         for d in ['AP', 'PA']
@@ -536,13 +547,14 @@ def create_dummy_no_shim_settings_bids_session(session_path):
                 [1, 2],
                 [[op.join(expected_prefix, 'func', '{p}_acq-{a}_bold.nii.gz'.format(p=prefix, a=acq))
                   for acq in ['A', 'B']],
-                  None]
+                 None]
             )
             for d in ['AP', 'PA']
         }
     )
 
     return session_struct, expected_result, expected_fmap_groups, expected_compatible_fmaps
+
 
 def create_dummy_no_shim_settings_custom_label_bids_session(session_path, label_size=4, label_seed=LABEL_SEED):
     """
@@ -631,7 +643,8 @@ def create_dummy_no_shim_settings_custom_label_bids_session(session_path, label_
     ])
     # add "_scans.tsv" file to the session_struct
     scans_file_content = generate_scans_tsv(session_struct)
-    session_struct.update({'{p}_scans.tsv'.format(p=prefix): scans_file_content})
+    session_struct.update(
+        {'{p}_scans.tsv'.format(p=prefix): scans_file_content})
 
     create_tree(session_path, session_struct)
 
@@ -655,7 +668,7 @@ def create_dummy_no_shim_settings_custom_label_bids_session(session_path, label_
         f'{op.join(session_path, "func", prefix)}_task-{FUNC_LABEL}_acq-{acq}_bold.json': {
             key: val for key, val in expected_fmap_groups.items() if key in [
                 f'{prefix}_acq-{FUNC_LABEL}_run-{r}_epi' for r in [1, 2]
-           ]
+            ]
         }
         for acq in ['A', 'B']
     })
@@ -675,7 +688,7 @@ def create_dummy_no_shim_settings_custom_label_bids_session(session_path, label_
         f'{prefix}_acq-{DWI_LABEL}_dir-{d}_run-{runNo}_epi.json': intended_for
         for runNo, intended_for in zip(
             [1, 2],
-            [[op.join(expected_prefix, 'dwi', f'{prefix}_acq-{DWI_LABEL}_run-{r}_dwi.nii.gz') for r in [1,2]],
+            [[op.join(expected_prefix, 'dwi', f'{prefix}_acq-{DWI_LABEL}_run-{r}_dwi.nii.gz') for r in [1, 2]],
              None]
         )
         for d in ['AP', 'PA']
@@ -689,13 +702,14 @@ def create_dummy_no_shim_settings_custom_label_bids_session(session_path, label_
                 [1, 2],
                 [[op.join(expected_prefix, 'func', f'{prefix}_task-{FUNC_LABEL}_acq-{acq}_bold.nii.gz')
                   for acq in ['A', 'B']],
-                  None]
+                 None]
             )
             for d in ['AP', 'PA']
         }
     )
 
     return session_struct, expected_result, expected_fmap_groups, expected_compatible_fmaps
+
 
 def create_dummy_magnitude_phase_bids_session(session_path):
     """
@@ -760,7 +774,8 @@ def create_dummy_magnitude_phase_bids_session(session_path):
     }
     expected_fmap_groups = {
         '{p}_acq-case1'.format(p=prefix): [
-            '{p}_acq-case1_phasediff.json'.format(p=op.join(session_path, 'fmap', prefix))
+            '{p}_acq-case1_phasediff.json'.format(
+                p=op.join(session_path, 'fmap', prefix))
         ]
     }
     fmap_struct.update({
@@ -789,7 +804,8 @@ def create_dummy_magnitude_phase_bids_session(session_path):
     })
     expected_fmap_groups.update({
         '{p}_acq-case3'.format(p=prefix): [
-            '{p}_acq-case3_fieldmap.json'.format(p=op.join(session_path, 'fmap', prefix))
+            '{p}_acq-case3_fieldmap.json'.format(
+                p=op.join(session_path, 'fmap', prefix))
         ]
     })
     fmap_struct.update({
@@ -803,7 +819,8 @@ def create_dummy_magnitude_phase_bids_session(session_path):
     ])
     # add "_scans.tsv" file to the session_struct
     scans_file_content = generate_scans_tsv(session_struct)
-    session_struct.update({'{p}_scans.tsv'.format(p=prefix): scans_file_content})
+    session_struct.update(
+        {'{p}_scans.tsv'.format(p=prefix): scans_file_content})
 
     create_tree(session_path, session_struct)
 
@@ -840,18 +857,21 @@ def create_dummy_magnitude_phase_bids_session(session_path):
     # dict, with fmap names as keys and the expected "IntendedFor" as values.
     expected_result = {
         '{p}_acq-case1_{s}.json'.format(p=prefix, s='phasediff'):
-            [op.join(expected_prefix, 'dwi', '{p}_acq-A_run-{r}_dwi.nii.gz'.format(p=prefix, r=r)) for r in [1, 2]]
+            [op.join(expected_prefix, 'dwi',
+                     '{p}_acq-A_run-{r}_dwi.nii.gz'.format(p=prefix, r=r)) for r in [1, 2]]
     }
     expected_result.update({
         '{p}_acq-case2_phase{n}.json'.format(p=prefix, n=n):
             # populate_intended_for writes lists:
-            [op.join(expected_prefix, 'func', '{p}_acq-A_bold.nii.gz'.format(p=prefix))]
+            [op.join(expected_prefix, 'func',
+                     '{p}_acq-A_bold.nii.gz'.format(p=prefix))]
         for n in [1, 2]
     })
     expected_result.update({
         '{p}_acq-case3_fieldmap.json'.format(p=prefix):
             # populate_intended_for writes lists:
-            [op.join(expected_prefix, 'func', '{p}_acq-B_bold.nii.gz'.format(p=prefix))]
+            [op.join(expected_prefix, 'func',
+                     '{p}_acq-B_bold.nii.gz'.format(p=prefix))]
     })
 
     return session_struct, expected_result, expected_fmap_groups, expected_compatible_fmaps
@@ -882,7 +902,8 @@ def test_find_fmap_groups(tmpdir, simulation_function):
     "simulation_function, match_param", [
         (create_dummy_pepolar_bids_session, 'Shims'),
         (create_dummy_no_shim_settings_bids_session, 'ModalityAcquisitionLabel'),
-        (create_dummy_no_shim_settings_custom_label_bids_session, 'CustomAcquisitionLabel'),
+        (create_dummy_no_shim_settings_custom_label_bids_session,
+         'CustomAcquisitionLabel'),
         (create_dummy_magnitude_phase_bids_session, 'Shims')
     ]
 )
@@ -899,7 +920,8 @@ def test_find_compatible_fmaps_for_run(tmpdir, simulation_function, match_param)
         matching_parameter for assigning fmaps
     """
     folder = op.join(str(tmpdir), 'sub-foo')
-    _, _, expected_fmap_groups, expected_compatible_fmaps = simulation_function(folder)
+    _, _, expected_fmap_groups, expected_compatible_fmaps = simulation_function(
+        folder)
     for modality in ['anat', 'dwi', 'func']:
         for json_file in glob(op.join(folder, modality, '*.json')):
             compatible_fmaps = find_compatible_fmaps_for_run(
@@ -924,7 +946,8 @@ def test_find_compatible_fmaps_for_run(tmpdir, simulation_function, match_param)
         for sim_func, mp in [
             (create_dummy_pepolar_bids_session, 'Shims'),
             (create_dummy_no_shim_settings_bids_session, 'ModalityAcquisitionLabel'),
-            (create_dummy_no_shim_settings_custom_label_bids_session, 'CustomAcquisitionLabel'),
+            (create_dummy_no_shim_settings_custom_label_bids_session,
+             'CustomAcquisitionLabel'),
             (create_dummy_magnitude_phase_bids_session, 'Shims')
         ]
     ]
@@ -954,7 +977,8 @@ def test_find_compatible_fmaps_for_session(
     session_folder = op.join(str(tmpdir), folder)
     _, _, _, expected_compatible_fmaps = simulation_function(session_folder)
 
-    compatible_fmaps = find_compatible_fmaps_for_session(session_folder, matching_parameters=[match_param])
+    compatible_fmaps = find_compatible_fmaps_for_session(
+        session_folder, matching_parameters=[match_param])
 
     assert compatible_fmaps == expected_compatible_fmaps
 
@@ -994,9 +1018,11 @@ def test_select_fmap_from_compatible_groups(tmpdir, folder, expected_prefix, sim
             # beginning of the session)
             if selected_fmap:
                 if criterion == 'First':
-                    assert selected_fmap == sorted(expected_compatible_fmaps[json_file])[0]
+                    assert selected_fmap == sorted(
+                        expected_compatible_fmaps[json_file])[0]
                 elif criterion == 'Closest':
-                    assert selected_fmap == sorted(expected_compatible_fmaps[json_file])[-1]
+                    assert selected_fmap == sorted(
+                        expected_compatible_fmaps[json_file])[-1]
             else:
                 assert not expected_compatible_fmaps[json_file]
 
@@ -1015,7 +1041,8 @@ def test_select_fmap_from_compatible_groups(tmpdir, folder, expected_prefix, sim
         for sim_func, mp in [
             (create_dummy_pepolar_bids_session, 'Shims'),
             (create_dummy_no_shim_settings_bids_session, 'ModalityAcquisitionLabel'),
-            (create_dummy_no_shim_settings_custom_label_bids_session, 'CustomAcquisitionLabel'),
+            (create_dummy_no_shim_settings_custom_label_bids_session,
+             'CustomAcquisitionLabel'),
             (create_dummy_magnitude_phase_bids_session, 'Shims')
         ]
     ]
@@ -1044,7 +1071,8 @@ def test_populate_intended_for(
 
     session_folder = op.join(str(tmpdir), folder)
     session_struct, expected_result, _, _ = simulation_function(session_folder)
-    populate_intended_for(session_folder, matching_parameters=match_param, criterion='First')
+    populate_intended_for(
+        session_folder, matching_parameters=match_param, criterion='First')
 
     # Now, loop through the jsons in the fmap folder and make sure it matches
     # the expected result:
@@ -1059,7 +1087,8 @@ def test_populate_intended_for(
                 # (It is assured by the assert above, but let's make it
                 # explicit)
                 run_prefix = j.split('_acq')[0]
-                assert '{p}_acq-unmatched_bold.nii.gz'.format(p=run_prefix) not in data['IntendedFor']
+                assert '{p}_acq-unmatched_bold.nii.gz'.format(
+                    p=run_prefix) not in data['IntendedFor']
             else:
                 assert 'IntendedFor' not in data.keys()
 
@@ -1079,7 +1108,8 @@ def test_BIDSFile():
     # expected BIDSFile:
     suffix = 'T1w'
     extension = 'nii.gz'
-    expected_bids_file = BIDSFile(OrderedDict(sorted_entities), suffix, extension)
+    expected_bids_file = BIDSFile(
+        OrderedDict(sorted_entities), suffix, extension)
 
     # entities in random order:
     idcs = list(range(len(sorted_entities)))
@@ -1089,7 +1119,8 @@ def test_BIDSFile():
 
     # Test __eq__ method.
     # It should consider equal BIDSFiles with the same entities even in different order:
-    assert BIDSFile(OrderedDict(shuffled_entities), suffix, extension) == expected_bids_file
+    assert BIDSFile(OrderedDict(shuffled_entities), suffix,
+                    extension) == expected_bids_file
 
     # Test __getitem__:
     assert all([expected_bids_file[k] == v for k, v in shuffled_entities])
@@ -1122,7 +1153,8 @@ def test_BIDSFile():
     assert my_bids_file['dir'] == 'AP'
     # -for an existing entity, don't change it by default:
     my_bids_file['echo'] = '2'
-    assert my_bids_file['echo'] == expected_bids_file['echo']  # still the original value
+    # still the original value
+    assert my_bids_file['echo'] == expected_bids_file['echo']
     # -for an existing entity, you can overwrite it with "set":
     my_bids_file.set('echo', '2')
     assert my_bids_file['echo'] == '2'
@@ -1148,10 +1180,17 @@ def test_ME_mag_phase_conversion(tmpdir, subID='MEGRE', heuristic='bids_ME.py'):
     # Check that the expected files have been extracted.
     # This also checks that the "echo" entity comes before "part":
     for part in ['mag', 'phase']:
-        for e in range(1,4):
+        for e in range(1, 4):
             for ext in ['nii.gz', 'json']:
                 assert op.exists(
-                    op.join(outdir, 'sub-%s', 'anat', 'sub-%s_echo-%s_part-%s_MEGRE.%s')
+                    op.join(outdir, 'sub-%s', 'anat',
+                            'sub-%s_echo-%s_part-%s_MEGRE.%s')
                     % (subID, subID, e, part, ext)
                 )
 
+
+def test_sanitize_label():
+    assert sanitize_label("_")
+    assert sanitize_label("12345A")
+    assert sanitize_label("12345_A")
+    assert sanitize_label(12345)
