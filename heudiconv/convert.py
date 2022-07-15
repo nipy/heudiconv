@@ -24,7 +24,7 @@ from .utils import (
     file_md5sum
 )
 from .bids import (
-    convert_sid_bids,
+    sanitize_label,
     populate_bids_templates,
     populate_intended_for,
     save_scans_key,
@@ -69,13 +69,13 @@ def conversion_info(subject, outdir, info, filegroup, ses):
                     seqitem=item,
                     subindex=subindex + 1,
                     session='ses-' + str(ses),
-                    bids_subject_session_prefix=
-                        'sub-%s' % subject + (('_ses-%s' % ses) if ses else ''),
-                    bids_subject_session_dir=
-                        'sub-%s' % subject + (('/ses-%s' % ses) if ses else ''),
+                    bids_subject_session_prefix='sub-%s' % subject +
+                    (('_ses-%s' % ses) if ses else ''),
+                    bids_subject_session_dir='sub-%s' % subject +
+                    (('/ses-%s' % ses) if ses else ''),
                     # referring_physician_name
                     # study_description
-                    ))
+                ))
                 try:
                     files = filegroup[item]
                 except KeyError:
@@ -101,7 +101,9 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
             raise ValueError(
                 "BIDS requires alphanumeric subject ID. Got an empty value")
         if not sid.isalnum():  # alphanumeric only
-            sid, old_sid = convert_sid_bids(sid)
+            sid, old_sid = sanitize_label(sid)
+        if ses and not ses.isalnum():  # alphanumeric only
+            ses, old_ses = sanitize_label(ses)
 
     if not anon_sid:
         anon_sid = sid
@@ -143,7 +145,8 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
     #     and a dedicated unittest
     if (
         op.exists(target_heuristic_filename) and
-        file_md5sum(target_heuristic_filename) != file_md5sum(heuristic.filename)
+        file_md5sum(target_heuristic_filename) != file_md5sum(
+            heuristic.filename)
     ):
         # remake conversion table
         reuse_conversion_table = False
@@ -208,7 +211,8 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                 converter=converter,
                 scaninfo_suffix=getattr(heuristic, 'scaninfo_suffix', '.json'),
                 custom_callable=getattr(heuristic, 'custom_callable', None),
-                populate_intended_for_opts=getattr(heuristic, 'POPULATE_INTENDED_FOR_OPTS', None),
+                populate_intended_for_opts=getattr(
+                    heuristic, 'POPULATE_INTENDED_FOR_OPTS', None),
                 with_prov=with_prov,
                 bids_options=bids_options,
                 outdir=tdir,
@@ -272,7 +276,8 @@ def update_complex_name(metadata, filename):
     elif 'P' in metadata.get('ImageType'):
         mag_or_phase = 'phase'
     else:
-        raise RuntimeError("Data type could not be inferred from the metadata.")
+        raise RuntimeError(
+            "Data type could not be inferred from the metadata.")
 
     # Determine scan suffix
     filetype = '_' + filename.split('_')[-1]
@@ -341,7 +346,8 @@ def update_multiecho_name(metadata, filename, echo_times):
         return filename
 
     if not isinstance(echo_times, list):
-        raise TypeError(f'Argument "echo_times" must be a list, not a {type(echo_times)}')
+        raise TypeError(
+            f'Argument "echo_times" must be a list, not a {type(echo_times)}')
 
     # Get the EchoNumber from json file info.  If not present, use EchoTime.
     if 'EchoNumber' in metadata.keys():
@@ -412,10 +418,12 @@ def update_uncombined_name(metadata, filename, channel_names):
         return filename
 
     if not isinstance(channel_names, list):
-        raise TypeError(f'Argument "channel_names" must be a list, not a {type(channel_names)}')
+        raise TypeError(
+            f'Argument "channel_names" must be a list, not a {type(channel_names)}')
 
     # Determine the channel number
-    channel_number = ''.join([c for c in metadata['CoilString'] if c.isdigit()])
+    channel_number = ''.join(
+        [c for c in metadata['CoilString'] if c.isdigit()])
     if not channel_number:
         channel_number = channel_names.index(metadata['CoilString']) + 1
     channel_number = str(channel_number).zfill(2)
@@ -511,7 +519,7 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
 
         for outtype in outtypes:
             lgr.debug("Processing %d dicoms for output type %s. Overwrite=%s",
-                     len(item_dicoms), outtype, overwrite)
+                      len(item_dicoms), outtype, overwrite)
             lgr.debug("Includes the following dicoms: %s", item_dicoms)
 
             if outtype == 'dicom':
@@ -587,7 +595,8 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
         try:
             sessions = set(
                 re.search(
-                    'sub-(?P<subj>[a-zA-Z0-9]*)([{0}_]ses-(?P<ses>[a-zA-Z0-9]*))?'.format(op.sep),
+                    'sub-(?P<subj>[a-zA-Z0-9]*)([{0}_]ses-(?P<ses>[a-zA-Z0-9]*))?'.format(
+                        op.sep),
                     oname
                 ).group(0)
                 for oname in outnames
@@ -653,10 +662,10 @@ def convert_dicom(item_dicoms, bids_options, prefix,
             outfile = op.join(dicomdir, op.basename(filename))
             if not op.islink(outfile):
                 # TODO: add option to enable hardlink?
-#                if symlink:
-#                    os.symlink(filename, outfile)
-#                else:
-#                    os.link(filename, outfile)
+                #                if symlink:
+                #                    os.symlink(filename, outfile)
+                #                else:
+                #                    os.link(filename, outfile)
                 shutil.copyfile(filename, outfile)
 
 
@@ -687,7 +696,7 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids_options, tmpdir, dcmconf
     from nipype import Node
     from nipype.interfaces.dcm2nii import Dcm2niix
 
-    item_dicoms = list(map(op.abspath, item_dicoms)) # absolute paths
+    item_dicoms = list(map(op.abspath, item_dicoms))  # absolute paths
 
     fromfile = dcmconfig if dcmconfig else None
     if fromfile:
@@ -696,7 +705,8 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids_options, tmpdir, dcmconf
     convertnode = Node(Dcm2niix(from_file=fromfile), name='convert')
     convertnode.base_dir = tmpdir
     convertnode.inputs.source_names = item_dicoms
-    convertnode.inputs.out_filename = op.basename(prefix) + "_heudiconv%03d" % random.randint(0, 999)
+    convertnode.inputs.out_filename = op.basename(
+        prefix) + "_heudiconv%03d" % random.randint(0, 999)
     prefix_dir = op.dirname(prefix)
     # if provided prefix had a path in it -- pass is as output_dir instead of default curdir
     if prefix_dir:
@@ -762,14 +772,16 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
             if bvals_are_zero(res.outputs.bvals):
                 os.remove(res.outputs.bvecs)
                 os.remove(res.outputs.bvals)
-                lgr.debug("%s and %s were removed since not dwi", res.outputs.bvecs, res.outputs.bvals)
+                lgr.debug("%s and %s were removed since not dwi",
+                          res.outputs.bvecs, res.outputs.bvals)
             else:
-                lgr.warning(DW_IMAGE_IN_FMAP_FOLDER_WARNING.format(folder= prefix_dirname))
-                lgr.warning(".bvec and .bval files will be generated. This is NOT BIDS compliant")
+                lgr.warning(DW_IMAGE_IN_FMAP_FOLDER_WARNING.format(
+                    folder=prefix_dirname))
+                lgr.warning(
+                    ".bvec and .bval files will be generated. This is NOT BIDS compliant")
                 outname_bvecs, outname_bvals = prefix + '.bvec', prefix + '.bval'
                 safe_movefile(res.outputs.bvecs, outname_bvecs, overwrite)
                 safe_movefile(res.outputs.bvals, outname_bvals, overwrite)
-
 
     if isinstance(res_files, list):
         res_files = sorted(res_files)
@@ -777,7 +789,7 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
         # dwi etc which might spit out multiple files
 
         suffixes = ([str(i+1) for i in range(len(res_files))]
-                     if (bids_options is not None) else None)
+                    if (bids_options is not None) else None)
 
         if not suffixes:
             lgr.warning("Following series files likely have "
@@ -815,13 +827,16 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
             channel_names.add(metadata.get('CoilString', False))
             image_types.update(metadata.get('ImageType', [False]))
 
-        is_multiecho = len(set(filter(bool, echo_times))) > 1  # Check for varying echo times
-        is_uncombined = len(set(filter(bool, channel_names))) > 1  # Check for uncombined data
-        is_complex = 'M' in image_types and 'P' in image_types  # Determine if data are complex (magnitude + phase)
+        # Check for varying echo times
+        is_multiecho = len(set(filter(bool, echo_times))) > 1
+        is_uncombined = len(set(filter(bool, channel_names))
+                            ) > 1  # Check for uncombined data
+        # Determine if data are complex (magnitude + phase)
+        is_complex = 'M' in image_types and 'P' in image_types
         echo_times = sorted(echo_times)  # also converts to list
         channel_names = sorted(channel_names)  # also converts to list
 
-        ### Loop through the bids_files, set the output name and save files
+        # Loop through the bids_files, set the output name and save files
         for fl, suffix, bids_file, bids_meta in zip(res_files, suffixes, bids_files, bids_metas):
 
             # TODO: monitor conversion duration
@@ -872,12 +887,12 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
             try:
                 safe_movefile(res.outputs.bids, outname_bids, overwrite)
                 bids_outfiles.append(outname_bids)
-            except TypeError as exc:  ##catch lists
+            except TypeError as exc:  # catch lists
                 raise TypeError("Multiple BIDS sidecars detected.")
     return bids_outfiles
 
 
-def  add_taskname_to_infofile(infofiles):
+def add_taskname_to_infofile(infofiles):
     """Add the "TaskName" field to json files corresponding to func images.
 
     Parameters
