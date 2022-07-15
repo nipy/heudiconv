@@ -12,6 +12,7 @@ import csv
 from random import sample
 from glob import glob
 import errno
+import warnings
 
 from .external.pydicom import dcm
 
@@ -113,45 +114,45 @@ def populate_bids_templates(path, defaults={}):
     descriptor = op.join(path, 'dataset_description.json')
     if not op.lexists(descriptor):
         save_json(descriptor,
-              OrderedDict([
-                  ('Name', "TODO: name of the dataset"),
-                  ('BIDSVersion', BIDS_VERSION),
-                  ('License', defaults.get('License',
-                        "TODO: choose a license, e.g. PDDL "
-                        "(http://opendatacommons.org/licenses/pddl/)")),
-                  ('Authors', defaults.get('Authors',
-                        ["TODO:", "First1 Last1", "First2 Last2", "..."])),
-                  ('Acknowledgements', defaults.get('Acknowledgements',
-                        'TODO: whom you want to acknowledge')),
-                  ('HowToAcknowledge',
-                        "TODO: describe how to acknowledge -- either cite a "
-                        "corresponding paper, or just in acknowledgement "
-                        "section"),
-                  ('Funding', ["TODO", "GRANT #1", "GRANT #2"]),
-                  ('ReferencesAndLinks',
-                        ["TODO", "List of papers or websites"]),
-                  ('DatasetDOI', 'TODO: eventually a DOI for the dataset')
-        ]))
+                  OrderedDict([
+                      ('Name', "TODO: name of the dataset"),
+                      ('BIDSVersion', BIDS_VERSION),
+                      ('License', defaults.get('License',
+                                               "TODO: choose a license, e.g. PDDL "
+                                               "(http://opendatacommons.org/licenses/pddl/)")),
+                      ('Authors', defaults.get('Authors',
+                                               ["TODO:", "First1 Last1", "First2 Last2", "..."])),
+                      ('Acknowledgements', defaults.get('Acknowledgements',
+                                                        'TODO: whom you want to acknowledge')),
+                      ('HowToAcknowledge',
+                       "TODO: describe how to acknowledge -- either cite a "
+                       "corresponding paper, or just in acknowledgement "
+                       "section"),
+                      ('Funding', ["TODO", "GRANT #1", "GRANT #2"]),
+                      ('ReferencesAndLinks',
+                       ["TODO", "List of papers or websites"]),
+                      ('DatasetDOI', 'TODO: eventually a DOI for the dataset')
+                  ]))
     sourcedata_README = op.join(path, 'sourcedata', 'README')
     if op.exists(op.dirname(sourcedata_README)):
         create_file_if_missing(sourcedata_README,
-            ("TODO: Provide description about source data, e.g. \n"
-            "Directory below contains DICOMS compressed into tarballs per "
-            "each sequence, replicating directory hierarchy of the BIDS dataset"
-            " itself."))
+                               ("TODO: Provide description about source data, e.g. \n"
+                                "Directory below contains DICOMS compressed into tarballs per "
+                                "each sequence, replicating directory hierarchy of the BIDS dataset"
+                                " itself."))
     create_file_if_missing(op.join(path, 'CHANGES'),
-        "0.0.1  Initial data acquired\n"
-        "TODOs:\n\t- verify and possibly extend information in participants.tsv"
-        " (see for example http://datasets.datalad.org/?dir=/openfmri/ds000208)"
-        "\n\t- fill out dataset_description.json, README, sourcedata/README"
-        " (if present)\n\t- provide _events.tsv file for each _bold.nii.gz with"
-        " onsets of events (see  '8.5 Task events'  of BIDS specification)")
+                           "0.0.1  Initial data acquired\n"
+                           "TODOs:\n\t- verify and possibly extend information in participants.tsv"
+                           " (see for example http://datasets.datalad.org/?dir=/openfmri/ds000208)"
+                           "\n\t- fill out dataset_description.json, README, sourcedata/README"
+                           " (if present)\n\t- provide _events.tsv file for each _bold.nii.gz with"
+                           " onsets of events (see  '8.5 Task events'  of BIDS specification)")
     create_file_if_missing(op.join(path, 'README'),
-        "TODO: Provide description for the dataset -- basic details about the "
-        "study, possibly pointing to pre-registration (if public or embargoed)")
+                           "TODO: Provide description for the dataset -- basic details about the "
+                           "study, possibly pointing to pre-registration (if public or embargoed)")
     create_file_if_missing(op.join(path, 'scans.json'),
-        json_dumps(SCANS_FILE_FIELDS, sort_keys=False)
-    )
+                           json_dumps(SCANS_FILE_FIELDS, sort_keys=False)
+                           )
 
     populate_aggregated_jsons(path)
 
@@ -204,8 +205,10 @@ def populate_aggregated_jsons(path):
             #   file, common for all echoes.  The name will not include _echo-.
             # TODO: RF to use re.match for better readability/robustness
             # So, find out the echo number:
-            fpath_split = fpath.split('_echo-', 1)         # split fpath using '_echo-'
-            fpath_split_2 = fpath_split[1].split('_', 1)   # split the second part of fpath_split using '_'
+            # split fpath using '_echo-'
+            fpath_split = fpath.split('_echo-', 1)
+            # split the second part of fpath_split using '_'
+            fpath_split_2 = fpath_split[1].split('_', 1)
             echoNo = fpath_split_2[0]                      # get echo number
             if echoNo == '1':
                 if len(fpath_split_2) != 2:
@@ -299,7 +302,7 @@ def tuneup_bids_json_files(json_files):
             for i in 1, 2:
                 try:
                     json_['EchoTime%d' % i] = (load_json(json_basename +
-                                          '_magnitude%d.json' % i)['EchoTime'])
+                                                         '_magnitude%d.json' % i)['EchoTime'])
                 except IOError as exc:
                     lgr.error("Failed to open magnitude file: %s", exc)
             # might have been made R/O already, but if not -- it will be set
@@ -317,7 +320,7 @@ def add_participant_record(studydir, subject, age, sex):
     participant_id = 'sub-%s' % subject
 
     if not create_file_if_missing(participants_tsv,
-           '\t'.join(['participant_id', 'age', 'sex', 'group']) + '\n'):
+                                  '\t'.join(['participant_id', 'age', 'sex', 'group']) + '\n'):
         # check if may be subject record already exists
         with open(participants_tsv) as f:
             f.readline()
@@ -330,35 +333,36 @@ def add_participant_record(studydir, subject, age, sex):
         participants_json = op.join(studydir, 'participants.json')
         if not op.lexists(participants_json):
             save_json(participants_json,
-                OrderedDict([
-                    ("participant_id", OrderedDict([
-                        ("Description", "Participant identifier")])),
-                    ("age", OrderedDict([
-                        ("Description", "Age in years (TODO - verify) as in the initial"
-                            " session, might not be correct for other sessions")])),
-                    ("sex", OrderedDict([
-                        ("Description", "self-rated by participant, M for male/F for "
-                            "female (TODO: verify)")])),
-                    ("group", OrderedDict([
-                        ("Description", "(TODO: adjust - by default everyone is in "
-                            "control group)")])),
-                ]),
-                sort_keys=False)
+                      OrderedDict([
+                          ("participant_id", OrderedDict([
+                              ("Description", "Participant identifier")])),
+                          ("age", OrderedDict([
+                              ("Description", "Age in years (TODO - verify) as in the initial"
+                               " session, might not be correct for other sessions")])),
+                          ("sex", OrderedDict([
+                              ("Description", "self-rated by participant, M for male/F for "
+                               "female (TODO: verify)")])),
+                          ("group", OrderedDict([
+                              ("Description", "(TODO: adjust - by default everyone is in "
+                               "control group)")])),
+                      ]),
+                      sort_keys=False)
 
     # Add a new participant
     with open(participants_tsv, 'a') as f:
         f.write(
-          '\t'.join(map(str, [participant_id,
-                              maybe_na(treat_age(age)),
-                              maybe_na(sex),
-                              'control'])) + '\n')
+            '\t'.join(map(str, [participant_id,
+                                maybe_na(treat_age(age)),
+                                maybe_na(sex),
+                                'control'])) + '\n')
 
 
 def find_subj_ses(f_name):
     """Given a path to the bids formatted filename parse out subject/session"""
     # we will allow the match at either directories or within filename
     # assuming that bids layout is "correct"
-    regex = re.compile('sub-(?P<subj>[a-zA-Z0-9]*)([/_]ses-(?P<ses>[a-zA-Z0-9]*))?')
+    regex = re.compile(
+        'sub-(?P<subj>[a-zA-Z0-9]*)([/_]ses-(?P<ses>[a-zA-Z0-9]*))?')
     regex_res = regex.search(f_name)
     res = regex_res.groupdict() if regex_res else {}
     return res.get('subj', None), res.get('ses', None)
@@ -498,7 +502,7 @@ def get_formatted_scans_key_row(dcm_fn):
 
 
 def convert_sid_bids(subject_id):
-    """Strips any non-BIDS compliant characters within subject_id
+    """Shim for stripping any non-BIDS compliant characters within subject_id
 
     Parameters
     ----------
@@ -511,15 +515,42 @@ def convert_sid_bids(subject_id):
     subject_id : string
         Original subject ID
     """
-    cleaner = lambda y: ''.join([x for x in y if x.isalnum()])
-    sid = cleaner(subject_id)
-    if not sid:
+    warnings.warn("convert_sid_bids() is deprecated, please use sanitize_label() instead",
+                  DeprecationWarning)
+    return sanitize_label(subject_id)
+
+
+def sanitize_label(label):
+    """Strips any non-BIDS compliant characters within label
+
+    Parameters
+    ----------
+    label : string
+
+    Returns
+    -------
+    clean_label : string
+        New, sanitized label
+    label : string
+        Original label
+    """
+    def cleaner(y): return ''.join([x for x in str(y) if x.isalnum()])
+    try:
+        clean_label = cleaner(label)
+        if not clean_label:
+            raise ValueError(
+                "Label became empty after cleanup. Please provide manually"
+                "a suitable alphanumeric label."
+            )
+    except:
         raise ValueError(
-            "Subject ID became empty after cleanup.  Please provide manually "
-            "a suitable alphanumeric subject ID")
-    lgr.warning('{0} contained nonalphanumeric character(s), subject '
-                'ID was cleaned to be {1}'.format(subject_id, sid))
-    return sid, subject_id
+            "Could not process label...is it an alphanumeric string?"
+        )
+
+    if clean_label != label:
+        lgr.warning(f"{label} contained non-alphanumeric character(s), label"
+                    "was cleaned to be {clean_label}.")
+    return clean_label, label
 
 
 def get_shim_setting(json_file):
@@ -541,7 +572,7 @@ def get_shim_setting(json_file):
     except KeyError as e:
         lgr.error('File %s does not have "%s". '
                   'Please use a different "matching_parameters" in your heuristic file',
-                   json_file, SHIM_KEY)
+                  json_file, SHIM_KEY)
         raise KeyError
     return shims
 
@@ -582,7 +613,8 @@ def find_fmap_groups(fmap_dir):
 
     # Find the unique prefixes ('splitext' removes the extension):
     prefixes = sorted(
-        set(fmap_regex.sub('', remove_suffix(op.basename(fm), '.json')) for fm in fmap_jsons)
+        set(fmap_regex.sub('', remove_suffix(op.basename(fm), '.json'))
+            for fm in fmap_jsons)
     )
     fmap_groups = OrderedDict()
     for k in prefixes:
@@ -623,9 +655,10 @@ def get_key_info_for_fmap_assignment(json_file, matching_parameter):
         from nibabel import load as nb_load
         nifti_file = glob(remove_suffix(json_file, '.json') + '.nii*')
         assert len(nifti_file) == 1
-        nifti_file = nifti_file[0] 
+        nifti_file = nifti_file[0]
         nifti_header = nb_load(nifti_file).header
-        key_info = [nifti_header.get_best_affine(), nifti_header.get_data_shape()[:3]]
+        key_info = [nifti_header.get_best_affine(
+        ), nifti_header.get_data_shape()[:3]]
     elif matching_parameter == 'ModalityAcquisitionLabel':
         # Check the acq label for the fmap and the modality for others:
         modality = op.basename(op.dirname(json_file))
@@ -642,7 +675,7 @@ def get_key_info_for_fmap_assignment(json_file, matching_parameter):
             key_info = [modality]
     elif matching_parameter == 'CustomAcquisitionLabel':
         modality = op.basename(op.dirname(json_file))
-        if modality  == 'func':
+        if modality == 'func':
             # extract the <task> entity:
             custom_label = BIDSFile.parse(op.basename(json_file))['task']
         else:
@@ -659,6 +692,7 @@ def get_key_info_for_fmap_assignment(json_file, matching_parameter):
         key_info = []
 
     return key_info
+
 
 def find_compatible_fmaps_for_run(json_file, fmap_groups, matching_parameters):
     """
@@ -705,7 +739,8 @@ def find_compatible_fmaps_for_run(json_file, fmap_groups, matching_parameters):
                 compatible = False
             else:
                 # allow for tiny differences between the affines etc
-                compatible = all(np.allclose(x, y) for x, y in zip(json_info[param], fm_info))
+                compatible = all(np.allclose(x, y)
+                                 for x, y in zip(json_info[param], fm_info))
             if not compatible:
                 continue     # don't bother checking more params
         if compatible:
@@ -741,7 +776,8 @@ def find_compatible_fmaps_for_session(path_to_bids_session, matching_parameters)
     # find the different groups of fmaps:
     fmap_dir = op.join(path_to_bids_session, 'fmap')
     if not op.exists(fmap_dir):
-        lgr.warning('We cannot add the IntendedFor field: no fmap/ in %s', path_to_bids_session)
+        lgr.warning(
+            'We cannot add the IntendedFor field: no fmap/ in %s', path_to_bids_session)
         return
     fmap_groups = find_fmap_groups(fmap_dir)
 
@@ -801,21 +837,26 @@ def select_fmap_from_compatible_groups(json_file, compatible_fmap_groups, criter
 
     # get acquisition times from '_scans.tsv':
     try:
-        scans_tsv = glob(op.join(sess_folder,'*_scans.tsv'))[0]
+        scans_tsv = glob(op.join(sess_folder, '*_scans.tsv'))[0]
     except IndexError:
-        raise FileNotFoundError("No '*_scans' file found for session %s" % sess_folder)
+        raise FileNotFoundError(
+            "No '*_scans' file found for session %s" % sess_folder)
     with open(scans_tsv) as f:
         # read the contents, splitting by lines and by tab separators:
-        scans_tsv_content = [line.split('\t') for line in f.read().splitlines()]
+        scans_tsv_content = [line.split('\t')
+                             for line in f.read().splitlines()]
     # get column indices for filename and acq_time from the first line:
-    (fname_idx, time_idx) = (scans_tsv_content[0].index(k) for k in ['filename', 'acq_time'])
-    acq_times = {line[fname_idx]: line[time_idx] for line in scans_tsv_content[1:]}
+    (fname_idx, time_idx) = (scans_tsv_content[0].index(
+        k) for k in ['filename', 'acq_time'])
+    acq_times = {line[fname_idx]: line[time_idx]
+                 for line in scans_tsv_content[1:]}
     # acq_times for the compatible fmaps:
     acq_times_fmaps = {
         k: acq_times[
             # remove session folder and '.json', add '.nii.gz':
-            remove_suffix(remove_prefix(v[0], sess_folder + op.sep), '.json') + '.nii.gz'
-            ]
+            remove_suffix(remove_prefix(
+                v[0], sess_folder + op.sep), '.json') + '.nii.gz'
+        ]
         for k, v in compatible_fmap_groups.items()
     }
 
@@ -829,7 +870,8 @@ def select_fmap_from_compatible_groups(json_file, compatible_fmap_groups, criter
         json_acq_time = datetime.strptime(
             acq_times[
                 # remove session folder and '.json', add '.nii.gz':
-                remove_suffix(remove_prefix(json_file, sess_folder + op.sep), '.json') + '.nii.gz'
+                remove_suffix(remove_prefix(
+                    json_file, sess_folder + op.sep), '.json') + '.nii.gz'
             ],
             "%Y-%m-%dT%H:%M:%S.%f"
         )
@@ -872,7 +914,8 @@ def populate_intended_for(path_to_bids_session, matching_parameters, criterion):
     """
 
     if not isinstance(matching_parameters, list):
-        assert isinstance(matching_parameters, str), "matching_parameters must be a str or a list, got %s" % matching_parameters
+        assert isinstance(
+            matching_parameters, str), "matching_parameters must be a str or a list, got %s" % matching_parameters
         matching_parameters = [matching_parameters]
     for param in matching_parameters:
         if param not in AllowedFmapParameterMatching:
@@ -884,7 +927,8 @@ def populate_intended_for(path_to_bids_session, matching_parameters, criterion):
             "Fmap assignment criterion '%s' not allowed." % criterion
         )
 
-    lgr.info('Adding "IntendedFor" to the fieldmaps in %s.', path_to_bids_session)
+    lgr.info('Adding "IntendedFor" to the fieldmaps in %s.',
+             path_to_bids_session)
 
     # Resolve path (eliminate '..')
     path_to_bids_session = op.abspath(path_to_bids_session)
@@ -898,7 +942,8 @@ def populate_intended_for(path_to_bids_session, matching_parameters, criterion):
 
     fmap_dir = op.join(path_to_bids_session, 'fmap')
     if not op.exists(fmap_dir):
-        lgr.warning('We cannot add the IntendedFor field: no fmap/ in %s', path_to_bids_session)
+        lgr.warning(
+            'We cannot add the IntendedFor field: no fmap/ in %s', path_to_bids_session)
         return
 
     compatible_fmaps = find_compatible_fmaps_for_session(
@@ -926,13 +971,15 @@ def populate_intended_for(path_to_bids_session, matching_parameters, criterion):
         for json_file, selected_fmap_group in selected_fmaps.items():
             if selected_fmap_group and (fmap_group in selected_fmap_group):
                 intended_for.append(
-                    op.relpath(remove_suffix(json_file, '.json') + '.nii.gz', start=subj_folder)
+                    op.relpath(remove_suffix(json_file, '.json') +
+                               '.nii.gz', start=subj_folder)
                 )
         if intended_for:
             intended_for = sorted(str(f) for f in intended_for)
             # Add this intended_for to all fmap files in the fmap_group:
             for fm_json in unique_fmap_groups[fmap_group]:
-                update_json(fm_json, {"IntendedFor": intended_for}, pretty=True)
+                update_json(
+                    fm_json, {"IntendedFor": intended_for}, pretty=True)
 
 
 class BIDSFile(object):
@@ -968,7 +1015,8 @@ class BIDSFile(object):
         # use re.findall to find all lower-case-letters + '-' + alphanumeric + '_' pairs:
         entities_list = re.findall('([a-z]+)-([a-zA-Z0-9]+)[_]*', filename)
         # keep only those in the _known_entities list:
-        entities = {k: v for k, v in entities_list if k in BIDSFile._known_entities}
+        entities = {k: v for k,
+                    v in entities_list if k in BIDSFile._known_entities}
         # get whatever comes after the last key-value pair, and remove any '_' that
         # might come in front:
         ending = filename.split('-'.join(entities_list[-1]))[-1]
@@ -988,7 +1036,8 @@ class BIDSFile(object):
         suffix = '_' + self.suffix if self.suffix else ''
         extension = '.' + self.extension if self.extension else ''
         return '_'.join(
-            ['-'.join([e, self._entities[e]]) for e in self._known_entities if e in self._entities]
+            ['-'.join([e, self._entities[e]])
+             for e in self._known_entities if e in self._entities]
         ) + suffix + extension
 
     def __getitem__(self, entity):
