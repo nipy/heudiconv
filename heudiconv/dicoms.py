@@ -24,7 +24,7 @@ lgr = logging.getLogger(__name__)
 total_files = 0
 
 
-def create_seqinfo(mw, series_files, series_id):
+def create_seqinfo(mw, series_files, series_id, custom_seqinfo=None):
     """Generate sequence info
 
     Parameters
@@ -91,6 +91,9 @@ def create_seqinfo(mw, series_files, series_id):
         date=dcminfo.get('AcquisitionDate'),
         series_uid=dcminfo.get('SeriesInstanceUID'),
         time=dcminfo.get('AcquisitionTime'),
+        custom=
+            custom_seqinfo(wrapper=mw, series_files=series_files)
+            if custom_seqinfo else None,
     )
     return seqinfo
 
@@ -138,7 +141,9 @@ def validate_dicom(fl, dcmfilter):
 
 def group_dicoms_into_seqinfos(files, grouping, file_filter=None,
                                dcmfilter=None, flatten=False,
-                               custom_grouping=None):
+                               custom_grouping=None,
+                               custom_seqinfo=None,
+                               ):
     """Process list of dicoms and return seqinfo and file group
     `seqinfo` contains per-sequence extract of fields from DICOMs which
     will be later provided into heuristics to decide on filenames
@@ -159,9 +164,11 @@ def group_dicoms_into_seqinfos(files, grouping, file_filter=None,
       Creates a flattened `seqinfo` with corresponding DICOM files. True when
       invoked with `dicom_dir_template`.
     custom_grouping: str or callable, optional
-     grouping key defined within heuristic. Can be a string of a
-     DICOM attribute, or a method that handles more complex groupings.
-
+      grouping key defined within heuristic. Can be a string of a
+      DICOM attribute, or a method that handles more complex groupings.
+    custom_seqinfo: callable, optional
+      A callable which will be provided MosaicWrapper giving possibility to
+      extract any custom DICOM metadata of interest.
 
     Returns
     -------
@@ -273,7 +280,8 @@ def group_dicoms_into_seqinfos(files, grouping, file_filter=None,
             else:
                 # nothing to see here, just move on
                 continue
-        seqinfo = create_seqinfo(mw, series_files, series_id)
+
+        seqinfo = create_seqinfo(mw, series_files, series_id, custom_seqinfo)
 
         if per_studyUID:
             key = studyUID

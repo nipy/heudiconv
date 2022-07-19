@@ -48,6 +48,7 @@ seqinfo_fields = [
     'date',                  # 24
     'series_uid',            # 25
     'time',                  # 26
+    'custom',                # 27
 ]
 
 SeqInfo = namedtuple('SeqInfo', seqinfo_fields)

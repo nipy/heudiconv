@@ -175,7 +175,11 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                 file_filter=getattr(heuristic, 'filter_files', None),
                 dcmfilter=getattr(heuristic, 'filter_dicom', None),
                 flatten=True,
-                custom_grouping=getattr(heuristic, 'grouping', None))
+                custom_grouping=getattr(heuristic, 'grouping', None),
+                # callable which will be provided dcminfo and returned
+                # structure extend seqinfo
+                custom_seqinfo=getattr(heuristic, 'custom_seqinfo', None),
+            )
 
         seqinfo_list = list(seqinfo.keys())
         filegroup = {si.series_id: x for si, x in seqinfo.items()}
