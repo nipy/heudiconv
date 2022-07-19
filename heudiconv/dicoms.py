@@ -9,7 +9,8 @@ import os.path as op
 from pathlib import Path
 import sys
 import tarfile
-from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Union, overload
+from typing import TYPE_CHECKING, Any, Dict, Hashable, List, NamedTuple, Optional, Union, overload
+from typing_extensions import Protocol
 from unittest.mock import patch
 import warnings
 
@@ -42,7 +43,16 @@ total_files = 0
 compresslevel = 9
 
 
-def create_seqinfo(mw: dw.Wrapper, series_files: list[str], series_id: str) -> SeqInfo:
+class CustomSeqinfoT(Protocol):
+    def __call__(self, wrapper: dw.Wrapper, series_files: list[str]) -> Hashable: ...
+
+
+def create_seqinfo(
+    mw: dw.Wrapper,
+    series_files: list[str],
+    series_id: str,
+    custom_seqinfo: CustomSeqinfoT | None = None,
+) -> SeqInfo:
     """Generate sequence info
 
     Parameters
@@ -109,6 +119,9 @@ def create_seqinfo(mw: dw.Wrapper, series_files: list[str], series_id: str) -> S
         date=dcminfo.get("AcquisitionDate"),
         series_uid=dcminfo.get("SeriesInstanceUID"),
         time=dcminfo.get("AcquisitionTime"),
+        custom =
+            custom_seqinfo(wrapper=mw, series_files=series_files)
+            if custom_seqinfo else None,
     )
 
 
@@ -199,6 +212,7 @@ def group_dicoms_into_seqinfos(
         dict[SeqInfo, list[str]],
     ]
     | None = None,
+     custom_seqinfo: CustomSeqinfoT | None = None,
 ) -> dict[SeqInfo, list[str]]:
     ...
 
@@ -215,6 +229,7 @@ def group_dicoms_into_seqinfos(
         dict[SeqInfo, list[str]],
     ]
     | None = None,
+    custom_seqinfo: CustomSeqinfoT | None = None,
 ) -> dict[Optional[str], dict[SeqInfo, list[str]]] | dict[SeqInfo, list[str]]:
     """Process list of dicoms and return seqinfo and file group
     `seqinfo` contains per-sequence extract of fields from DICOMs which
@@ -236,9 +251,11 @@ def group_dicoms_into_seqinfos(
       Creates a flattened `seqinfo` with corresponding DICOM files. True when
       invoked with `dicom_dir_template`.
     custom_grouping: str or callable, optional
-     grouping key defined within heuristic. Can be a string of a
-     DICOM attribute, or a method that handles more complex groupings.
-
+      grouping key defined within heuristic. Can be a string of a
+      DICOM attribute, or a method that handles more complex groupings.
+    custom_seqinfo: callable, optional
+      A callable which will be provided MosaicWrapper giving possibility to
+      extract any custom DICOM metadata of interest.
 
     Returns
     -------
@@ -358,7 +375,7 @@ def group_dicoms_into_seqinfos(
             else:
                 # nothing to see here, just move on
                 continue
-        seqinfo = create_seqinfo(mw, series_files, series_id_str)
+        seqinfo = create_seqinfo(mw, series_files, series_id_str, custom_seqinfo)
 
         key: Optional[str]
         if per_studyUID:

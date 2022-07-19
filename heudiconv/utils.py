@@ -24,6 +24,7 @@ from types import ModuleType
 from typing import (
     Any,
     AnyStr,
+    Hashable,
     Mapping,
     NamedTuple,
     Optional,
@@ -69,6 +70,7 @@ class SeqInfo(NamedTuple):
     date: Optional[str]  # 24
     series_uid: Optional[str]  # 25
     time: Optional[str]  # 26
+    custom: Optional[Hashable]  # 27
 
 
 class StudySessionInfo(NamedTuple):
