@@ -220,6 +220,9 @@ def prep_conversion(
                 dcmfilter=getattr(heuristic, "filter_dicom", None),
                 flatten=True,
                 custom_grouping=getattr(heuristic, "grouping", None),
+                # callable which will be provided dcminfo and returned
+                # structure extend seqinfo
+                custom_seqinfo = getattr(heuristic, 'custom_seqinfo', None),
             )
         elif seqinfo is None:
             raise ValueError("Neither 'dicoms' nor 'seqinfo' is given")
