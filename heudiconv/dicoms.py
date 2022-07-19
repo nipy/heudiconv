@@ -9,8 +9,7 @@ import os.path as op
 from pathlib import Path
 import sys
 import tarfile
-from typing import TYPE_CHECKING, Any, Dict, Hashable, List, NamedTuple, Optional, Union, overload
-from typing_extensions import Protocol
+from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Union, Protocol, cast, overload
 from unittest.mock import patch
 import warnings
 
