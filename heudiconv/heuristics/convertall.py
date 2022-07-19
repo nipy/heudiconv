@@ -7,6 +7,14 @@ def create_key(template, outtype=('nii.gz',), annotation_classes=None):
     return template, outtype, annotation_classes
 
 
+def custom_seqinfo(series_files, wrapper, **kw):
+    # Just a dummy demo for what custom_seqinfo could get/do
+    # for already loaded DICOM data, and including storing/returning
+    # the sample series file as was requested
+    # in https://github.com/nipy/heudiconv/pull/333
+    return wrapper.affine, series_files[0]
+
+
 def infotodict(seqinfo):
     """Heuristic evaluator for determining which runs belong where
 
