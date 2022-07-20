@@ -31,7 +31,6 @@ from heudiconv.utils import (
 from heudiconv.bids import (
     maybe_na,
     treat_age,
-<<<<<<< HEAD
     find_fmap_groups,
     populate_intended_for,
     get_shim_setting,
@@ -43,9 +42,7 @@ from heudiconv.bids import (
     AllowedCriteriaForFmapAssignment,
     KeyInfoForForce,
     BIDSFile,
-=======
     sanitize_label,
->>>>>>> add testing for sanitize_label (updated)
 )
 from heudiconv.cli.run import main as runner
 
@@ -91,7 +88,6 @@ def test_treat_age():
     assert treat_age('0000.1') == '0.1'
     assert treat_age(0000.1) == '0.1'
 
-<<<<<<< HEAD
 
 SHIM_LENGTH = 6
 TODAY = datetime.today()
@@ -1159,14 +1155,14 @@ def test_ME_mag_phase_conversion(tmpdir, subID='MEGRE', heuristic='bids_ME.py'):
                     op.join(outdir, 'sub-%s', 'anat', 'sub-%s_echo-%s_part-%s_MEGRE.%s')
                     % (subID, subID, e, part, ext)
                 )
-=======
+
 def test_sanitize_label():
     assert sanitize_label("12345A") == "12345A"
     assert sanitize_label("12345_A") == "12345A"
     
     #non-alphanumerics should raise error
     with pytest.raises(ValueError):
-        assert sanitize_label(12345)
-        #this should also raise an error for an empty value
-        assert sanitize_label("_")
->>>>>>> add testing for sanitize_label (updated)
+        sanitize_label(12345)
+    #this should also raise an error for an empty value
+    with pytest.raises(ValueError):
+        sanitize_label("_")

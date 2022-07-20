@@ -12,6 +12,7 @@ import csv
 from random import sample
 from glob import glob
 import errno
+import warnings
 
 from .external.pydicom import dcm
 
@@ -510,8 +511,8 @@ def convert_sid_bids(subject_id):
     subject_id : string
         Original subject ID
     """
-    lgr.warning('Deprecation warning: convert_sid_bids() is deprecated, '
-                'please use sanitize_label() instead.')
+    warnings.warn("convert_sid_bids() is deprecated, please use sanitize_label() instead",
+        DeprecationWarning)
 
     return sanitize_label(subject_id)
 
@@ -534,12 +535,11 @@ def sanitize_label(label):
     clean_label = cleaner(label)
     if not clean_label:
         raise ValueError(
-<<<<<<< HEAD
             "Subject ID became empty after cleanup.  Please provide manually "
             "a suitable alphanumeric subject ID")
-    lgr.warning('{0} contained nonalphanumeric character(s), subject '
-                'ID was cleaned to be {1}'.format(subject_id, sid))
-    return sid, subject_id
+    lgr.warning('%s contained nonalphanumeric character(s), label '
+                'was cleaned to be %s', label, clean_label))
+    return label, clean_label
 
 
 def get_shim_setting(json_file):
@@ -1044,11 +1044,3 @@ class BIDSFile(object):
     @property
     def extension(self):
         return self._extension
-=======
-            "Label became empty after cleanup.  Please provide manually "
-            "a suitable alphanumeric label.")
-    if clean_label != label:
-        lgr.warning('{0} contained nonalphanumeric character(s), label '
-                    'was cleaned to be {1}'.format(label, clean_label))
-    return clean_label, label
->>>>>>> refactor convert_sid_bids to sanitize_label
