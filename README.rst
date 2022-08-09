@@ -44,3 +44,22 @@ How to cite
 Please use `Zenodo record <https://doi.org/10.5281/zenodo.1012598>`_ for
 your specific version of HeuDiConv.  We also support gathering
 all relevant citations via `DueCredit <http://duecredit.org>`_.
+
+
+How to contribute
+-----------------
+
+HeuDiConv sources are managed with Git on `GitHub <https://github.com/nipy/heudiconv/>`_.
+Please file issues and suggest changes via Pull Requests.
+
+HeuDiConv requires installation of
+`dcm2niix <https://github.com/rordenlab/dcm2niix/>`_ and optionally
+`DataLad <https://datalad.org>`_.
+
+For development you will need a non-shallow clone (so there is a
+recent released tag) of the aforementioned repository. You can then
+install all necessary development requirements using ``pip install -r
+dev-requirements.txt``.  Testing is done using `pytest
+<https://docs.pytest.org/>`_.  Releases are packaged using Intuit
+auto.  Workflow for releases and preparation of Docker images is in
+``.github/workflows/release.yml``.
