@@ -124,6 +124,9 @@ generally to accommodate limitations imposed by different manufacturers/models:
 
 - We replace all ( with { and ) with } to be able e.g. to specify session {date}
 - "WIP " prefix unconditionally added by the scanner is stripped
+
+
+-Michael-Sun Plans on adding a heuristic to deal with ses-X* instances
 """
 
 import os
