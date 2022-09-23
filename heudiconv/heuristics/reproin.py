@@ -783,6 +783,13 @@ def infotoids(seqinfos, outdir):
                     "Should have got a single session marker.  Got following: %s"
                     % ', '.join(map(repr, ses_markers))
                 )
+            if re.match("(X|x)*", ses_markers):
+               # replace X* or x* sessions with prior_sessions+1
+               prior_sessions = sorted(glob(os.path.join(sessions_dir, 'ses-*')))
+               if prior_sessions:
+                session = '%03d' % (len(prior_sessions) + 1)
+               else:
+                session='001'
             session = ses_markers[0]
         else:
             # TODO - I think we are doomed to go through the sequence and split
