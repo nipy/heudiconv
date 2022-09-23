@@ -895,7 +895,7 @@ def  add_taskname_to_infofile(infofiles):
     for infofile in infofiles:
         meta_info = load_json(infofile)
         try:
-            meta_info['TaskName'] = (re.search('(?<=_task-)\w+',
+            meta_info['TaskName'] = (re.search(r'(?<=_task-)\w+',
                                                op.basename(infofile))
                                      .group(0).split('_')[0])
         except AttributeError:
