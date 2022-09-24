@@ -22,7 +22,7 @@ tempdirs = TempDirs()
 # Ensure they are cleaned up upon exit
 atexit.register(tempdirs.cleanup)
 
-_VCS_REGEX = '%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (op.sep, op.sep)
+_VCS_REGEX = r'%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (op.sep, op.sep)
 
 
 @docstring_parameter(_VCS_REGEX)
@@ -161,7 +161,7 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
         for f in files_opt:
             if op.isdir(f):
                 files += sorted(find_files(
-                    '.*', topdir=f, exclude_vcs=True, exclude="/\.datalad/"))
+                    '.*', topdir=f, exclude_vcs=True, exclude=r"/\.datalad/"))
             else:
                 files.append(f)
 

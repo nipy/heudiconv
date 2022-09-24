@@ -259,20 +259,20 @@ def json_dumps_pretty(j, indent=2, sort_keys=True):
         '[\n ]+("?[-+.0-9e]+"?,?) *\n(?= *"?[-+.0-9e]+"?)', r' \1',
         js, flags=re.MULTILINE)
     # uniform no spaces before ]
-    js_ = re.sub(" *\]", "]", js_)
+    js_ = re.sub(r" *\]", "]", js_)
     # uniform spacing before numbers
     # But that thing could screw up dates within strings which would have 2 spaces
     # in a date like Mar  3 2017, so we do negative lookahead to avoid changing
     # in those cases
     #import pdb; pdb.set_trace()
     js_ = re.sub(
-        '(?<!\w{3})'    # negative lookbehind for the month
-        '  *("?[-+.0-9e]+"?)'
-        '(?! [123]\d{3})'  # negative lookahead for a year
-        '(?P<space> ?)[ \n]*',
+        r'(?<!\w{3})'    # negative lookbehind for the month
+        r'  *("?[-+.0-9e]+"?)'
+        r'(?! [123]\d{3})'  # negative lookahead for a year
+        r'(?P<space> ?)[ \n]*',
         r' \1\g<space>', js_)
     # no spaces after [
-    js_ = re.sub('\[ ', '[', js_)
+    js_ = re.sub(r'\[ ', '[', js_)
     # the load from the original dump and reload from tuned up
     # version should result in identical values since no value
     # must be changed, just formatting.

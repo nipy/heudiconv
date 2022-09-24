@@ -17,8 +17,7 @@ jobs:
           - '3.7'
           - '3.8'
           - '3.9'
-          # causes issues, disabled for now
-          # - '3.10'
+          - '3.10'
     steps:
       - name: Check out repository
         uses: actions/checkout@v3

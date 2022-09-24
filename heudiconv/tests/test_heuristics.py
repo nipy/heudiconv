@@ -90,7 +90,10 @@ def test_reproin_largely_smoke(tmpdir, heuristic, invocation):
 
     # but there should be nothing new
     assert not ds.repo.dirty
-    assert head == ds.repo.get_hexsha()
+    # TODO: remove whenever https://github.com/datalad/datalad/issues/6843
+    # is fixed/released
+    buggy_datalad = (ds.pathobj / ".gitmodules").read_text().splitlines().count('[submodule "Halchenko"]') > 1
+    assert head == ds.repo.get_hexsha() or buggy_datalad
 
     # unless we pass 'overwrite' flag
     runner(args + ['--overwrite'])
@@ -98,7 +101,7 @@ def test_reproin_largely_smoke(tmpdir, heuristic, invocation):
     # and at the same commit
     assert ds.is_installed()
     assert not ds.repo.dirty
-    assert head == ds.repo.get_hexsha()
+    assert head == ds.repo.get_hexsha() or buggy_datalad
 
 
 @pytest.mark.parametrize(
@@ -121,7 +124,7 @@ def test_scans_keys_reproin(tmpdir, invocation):
             if i != 0:
                 assert(os.path.exists(pjoin(dirname(scans_keys[0]), row[0])))
                 assert(re.match(
-                    '^[\d]{4}-[\d]{2}-[\d]{2}T[\d]{2}:[\d]{2}:[\d]{2}.[\d]{6}$',
+                    r'^[\d]{4}-[\d]{2}-[\d]{2}T[\d]{2}:[\d]{2}:[\d]{2}.[\d]{6}$',
                     row[1]))
 
 
