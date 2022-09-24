@@ -1,6 +1,3 @@
 -r requirements.txt
 tinydb
 inotify
-# we need master version until it gets released
-# see https://github.com/moloney/dcmstack/issues/75
-git+https://github.com/moloney/dcmstack.git
