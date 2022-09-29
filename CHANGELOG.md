@@ -1,3 +1,29 @@
+# v0.11.4 (Thu Sep 29 2022)
+
+#### 🐛 Bug Fix
+
+- install dcmstack straight from github until it is released [#593](https://github.com/nipy/heudiconv/pull/593) ([@yarikoptic](https://github.com/yarikoptic))
+- DOC: provide rudimentary How to contribute section in README.rst ([@yarikoptic](https://github.com/yarikoptic))
+
+#### ⚠️ Pushed to `master`
+
+- Check out a full clone when testing ([@jwodder](https://github.com/jwodder))
+- Convert Travis workflow to GitHub Actions ([@jwodder](https://github.com/jwodder))
+- BF(docker): replace old -tipsy with -y -all for conda clean as neurodocker does now ([@yarikoptic](https://github.com/yarikoptic))
+- adjusted script for neurodocker although it does not work ([@yarikoptic](https://github.com/yarikoptic))
+
+#### 🏠 Internal
+
+- 0.9 of dcmstack was released, no need for github version [#594](https://github.com/nipy/heudiconv/pull/594) ([@yarikoptic](https://github.com/yarikoptic))
+- Minor face-lifts to ReproIn: align doc and code better to BIDS terms, address deprecation warnings etc [#569](https://github.com/nipy/heudiconv/pull/569) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 2
+
+- John T. Wodder II ([@jwodder](https://github.com/jwodder))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v0.11.3 (Thu May 12 2022)
 
 #### 🏠 Internal
