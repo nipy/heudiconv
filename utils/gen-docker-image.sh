@@ -15,4 +15,4 @@ docker run --rm $image generate docker -b neurodebian:bullseye -p apt \
       pip_install="/src/heudiconv[all]" \
       pip_opts="--editable" \
     --entrypoint "heudiconv" \
-> ../Dockerfile
+> $thisd/../Dockerfile
