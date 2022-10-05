@@ -50,7 +50,7 @@ RUN apt-get update -qq \
     && curl -fsSL -o "$conda_installer" https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh \
     && bash "$conda_installer" -b -p /opt/miniconda-latest \
     && rm -f "$conda_installer" \
-    && conda update -yq -nbase conda \
+    && conda install -yq -nbase conda==4.13.0 \
     # Prefer packages in conda-forge
     && conda config --system --prepend channels conda-forge \
     # Packages in lower-priority channels not considered if a package with the same
