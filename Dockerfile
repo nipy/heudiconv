@@ -35,8 +35,8 @@ RUN apt-get update -qq \
            && rm -rf /var/lib/apt/lists/*
 COPY [".", \
       "/src/heudiconv"]
-ENV CONDA_DIR="/opt/miniconda-py39_4.12.0" \
-    PATH="/opt/miniconda-py39_4.12.0/bin:$PATH"
+ENV CONDA_DIR="/opt/miniconda-py37_4.12.0" \
+    PATH="/opt/miniconda-py37_4.12.0/bin:$PATH"
 RUN apt-get update -qq \
     && apt-get install -y -q --no-install-recommends \
            bzip2 \
@@ -44,11 +44,11 @@ RUN apt-get update -qq \
            curl \
     && rm -rf /var/lib/apt/lists/* \
     # Install dependencies.
-    && export PATH="/opt/miniconda-py39_4.12.0/bin:$PATH" \
+    && export PATH="/opt/miniconda-py37_4.12.0/bin:$PATH" \
     && echo "Downloading Miniconda installer ..." \
     && conda_installer="/tmp/miniconda.sh" \
-    && curl -fsSL -o "$conda_installer" https://repo.continuum.io/miniconda/Miniconda3-py39_4.12.0-Linux-x86_64.sh \
-    && bash "$conda_installer" -b -p /opt/miniconda-py39_4.12.0 \
+    && curl -fsSL -o "$conda_installer" https://repo.continuum.io/miniconda/Miniconda3-py37_4.12.0-Linux-x86_64.sh \
+    && bash "$conda_installer" -b -p /opt/miniconda-py37_4.12.0 \
     && rm -f "$conda_installer" \
     # Prefer packages in conda-forge
     && conda config --system --prepend channels conda-forge \
@@ -135,14 +135,14 @@ RUN printf '{ \
     { \
       "name": "env", \
       "kwds": { \
-        "CONDA_DIR": "/opt/miniconda-py39_4.12.0", \
-        "PATH": "/opt/miniconda-py39_4.12.0/bin:$PATH" \
+        "CONDA_DIR": "/opt/miniconda-py37_4.12.0", \
+        "PATH": "/opt/miniconda-py37_4.12.0/bin:$PATH" \
       } \
     }, \
     { \
       "name": "run", \
       "kwds": { \
-        "command": "apt-get update -qq\\napt-get install -y -q --no-install-recommends \\\\\\n    bzip2 \\\\\\n    ca-certificates \\\\\\n    curl\\nrm -rf /var/lib/apt/lists/*\\n# Install dependencies.\\nexport PATH=\\"/opt/miniconda-py39_4.12.0/bin:$PATH\\"\\necho \\"Downloading Miniconda installer ...\\"\\nconda_installer=\\"/tmp/miniconda.sh\\"\\ncurl -fsSL -o \\"$conda_installer\\" https://repo.continuum.io/miniconda/Miniconda3-py39_4.12.0-Linux-x86_64.sh\\nbash \\"$conda_installer\\" -b -p /opt/miniconda-py39_4.12.0\\nrm -f \\"$conda_installer\\"\\n# Prefer packages in conda-forge\\nconda config --system --prepend channels conda-forge\\n# Packages in lower-priority channels not considered if a package with the same\\n# name exists in a higher priority channel. Can dramatically speed up installations.\\n# Conda recommends this as a default\\n# https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-channels.html\\nconda config --set channel_priority strict\\nconda config --system --set auto_update_conda false\\nconda config --system --set show_channel_urls true\\n# Enable `conda activate`\\nconda init bash\\nconda install -y  --name base \\\\\\n    \\"python=3.7\\" \\\\\\n    \\"traits>=4.6.0\\" \\\\\\n    \\"scipy\\" \\\\\\n    \\"numpy\\" \\\\\\n    \\"nomkl\\" \\\\\\n    \\"pandas\\"\\nbash -c \\"source activate base\\n  python -m pip install --no-cache-dir --editable \\\\\\n      \\"/src/heudiconv[all]\\"\\"\\n# Clean up\\nsync && conda clean --all --yes && sync\\nrm -rf ~/.cache/pip/*" \
+        "command": "apt-get update -qq\\napt-get install -y -q --no-install-recommends \\\\\\n    bzip2 \\\\\\n    ca-certificates \\\\\\n    curl\\nrm -rf /var/lib/apt/lists/*\\n# Install dependencies.\\nexport PATH=\\"/opt/miniconda-py37_4.12.0/bin:$PATH\\"\\necho \\"Downloading Miniconda installer ...\\"\\nconda_installer=\\"/tmp/miniconda.sh\\"\\ncurl -fsSL -o \\"$conda_installer\\" https://repo.continuum.io/miniconda/Miniconda3-py37_4.12.0-Linux-x86_64.sh\\nbash \\"$conda_installer\\" -b -p /opt/miniconda-py37_4.12.0\\nrm -f \\"$conda_installer\\"\\n# Prefer packages in conda-forge\\nconda config --system --prepend channels conda-forge\\n# Packages in lower-priority channels not considered if a package with the same\\n# name exists in a higher priority channel. Can dramatically speed up installations.\\n# Conda recommends this as a default\\n# https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-channels.html\\nconda config --set channel_priority strict\\nconda config --system --set auto_update_conda false\\nconda config --system --set show_channel_urls true\\n# Enable `conda activate`\\nconda init bash\\nconda install -y  --name base \\\\\\n    \\"python=3.7\\" \\\\\\n    \\"traits>=4.6.0\\" \\\\\\n    \\"scipy\\" \\\\\\n    \\"numpy\\" \\\\\\n    \\"nomkl\\" \\\\\\n    \\"pandas\\"\\nbash -c \\"source activate base\\n  python -m pip install --no-cache-dir --editable \\\\\\n      \\"/src/heudiconv[all]\\"\\"\\n# Clean up\\nsync && conda clean --all --yes && sync\\nrm -rf ~/.cache/pip/*" \
       } \
     }, \
     { \
