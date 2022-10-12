@@ -28,7 +28,7 @@ jobs:
         id: auto-version
         run: |
           version="$(~/auto version)"
-          echo "::set-output name=version::$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
