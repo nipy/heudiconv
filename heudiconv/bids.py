@@ -159,12 +159,12 @@ def populate_bids_templates(path, defaults={}):
 
 
 def populate_aggregated_jsons(path):
-    """Aggregate across the entire BIDS dataset .json's into top level .json's
+    """Aggregate across the entire BIDS dataset ``.json``\s into top level ``.json``\s
 
     Top level .json files would contain only the fields which are
-    common to all subject[/session]/type/*_modality.json's.
+    common to all ``subject[/session]/type/*_modality.json``\s.
 
-    ATM aggregating only for *_task*_bold.json files. Only the task- and
+    ATM aggregating only for ``*_task*_bold.json`` files. Only the task- and
     OPTIONAL _acq- field is retained within the aggregated filename.  The other
     BIDS _key-value pairs are "aggregated over".
 
