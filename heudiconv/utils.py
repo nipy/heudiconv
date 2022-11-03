@@ -290,7 +290,7 @@ def update_json(json_file, new_data, pretty=False):
     """
     Adds a given field (and its value) to a json file
 
-    Parameters:
+    Parameters
     -----------
     json_file : str or Path
         path for the corresponding json file
@@ -613,12 +613,12 @@ def remove_suffix(s, suf):
     """
     Remove suffix from the end of the string
 
-    Parameters:
+    Parameters
     ----------
     s : str
     suf : str
 
-    Returns:
+    Returns
     -------
     s : str
         string with "suf" removed from the end (if present)
@@ -632,12 +632,12 @@ def remove_prefix(s, pre):
     """
     Remove prefix from the beginning of the string
 
-    Parameters:
+    Parameters
     ----------
     s : str
     pre : str
 
-    Returns:
+    Returns
     -------
     s : str
         string with "pre" removed from the beginning (if present)
