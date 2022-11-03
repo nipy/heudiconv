@@ -1,3 +1,5 @@
+__docformat__ = "numpy"
+
 import filelock
 import os
 import os.path as op
@@ -453,23 +455,6 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
             dcmconfig=None, populate_intended_for_opts={}):
     """Perform actual conversion (calls to converter etc) given info from
     heuristic's `infotodict`
-
-    Parameters
-    ----------
-    items
-    symlink
-    converter
-    scaninfo_suffix
-    custom_callable
-    with_prov
-    is_bids
-    sourcedir
-    outdir
-    min_meta
-
-    Returns
-    -------
-    None
     """
     prov_files = []
     tempdirs = TempDirs()
@@ -624,10 +609,6 @@ def convert_dicom(item_dicoms, bids_options, prefix,
         Create softlink to DICOMs - if False, create hardlink instead.
     overwrite : bool
         If True, allows overwriting of previous conversion
-
-    Returns
-    -------
-    None
     """
     if bids_options is not None:
         # mimic the same hierarchy location as the prefix
@@ -666,18 +647,18 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids_options, tmpdir, dcmconf
 
     Parameters
     ----------
-    item_dicoms : List
+    item_dicoms : list
         DICOM files to convert
-    prefix : String
+    prefix : str
         Heuristic output path
-    with_prov : Bool
+    with_prov : bool
         Store provenance information
-    bids_options : List or None
+    bids_options : list or None
         If not None then output BIDS sidecar JSONs
         List may contain bids specific options
-    tmpdir : Directory
+    tmpdir : str
         Conversion working directory
-    dcmconfig : File (optional)
+    dcmconfig : str, optional
         JSON file used for additional Dcm2niix configuration
     """
     import nipype
@@ -723,18 +704,19 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids_options, tmpdir, dcmconf
 
 def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outname_bids, overwrite):
     """Copy converted files from tempdir to output directory.
+
     Will rename files if necessary.
 
     Parameters
     ----------
     res : Node
         Nipype conversion Node with results
-    item_dicoms: list of filenames
-        DICOMs converted
+    item_dicoms: list
+        Filenames of converted DICOMs
     bids : list or None
         If not list save to BIDS
         List may contain bids specific options
-    prefix : string
+    prefix : str
 
     Returns
     -------
@@ -877,15 +859,13 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
     return bids_outfiles
 
 
-def  add_taskname_to_infofile(infofiles):
+def add_taskname_to_infofile(infofiles):
     """Add the "TaskName" field to json files corresponding to func images.
 
     Parameters
     ----------
-    infofiles : list with json filenames or single filename
-
-    Returns
-    -------
+    infofiles: list or str
+        json filenames or a single filename.
     """
 
     # in case they pass a string with a path:
@@ -908,15 +888,15 @@ def  add_taskname_to_infofile(infofiles):
 
 def bvals_are_zero(bval_file):
     """Checks if all entries in a bvals file are zero (or 5, for Siemens files).
-    Returns True if that is the case, otherwise returns False
 
     Parameters
     ----------
-    bval_file : file with the bvals
+    bval_file : str
+      file with the bvals
 
     Returns
     -------
-    True if all are zero; False otherwise.
+    True if all are all 0 or 5; False otherwise.
     """
 
     with open(bval_file) as f:

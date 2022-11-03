@@ -199,12 +199,12 @@ def generate_scans_tsv(session_struct):
     Currently, it will have the columns "filename" and "acq_time".
     The acq_time will increase by one minute from run to run.
 
-    Parameters:
+    Parameters
     ----------
     session_struct : dict
         structure for the session, as a dict with modality: files
 
-    Returns:
+    Returns
     -------
     scans_file_content : str
         multi-line string with the content of the file
@@ -231,12 +231,12 @@ def create_dummy_pepolar_bids_session(session_path):
     The fmap files are pepolar
     The json files have ShimSettings
 
-    Parameters:
+    Parameters
     ----------
     session_path : str or os.path
         path to the session (or subject) level folder
 
-    Returns:
+    Returns
     -------
     session_struct : dict
         Structure of the directory that was created
@@ -407,12 +407,12 @@ def create_dummy_no_shim_settings_bids_session(session_path):
     The fmap files are pepolar
     The json files don't have ShimSettings
 
-    Parameters:
+    Parameters
     ----------
     session_path : str or os.path
         path to the session (or subject) level folder
 
-    Returns:
+    Returns
     -------
     session_struct : dict
         Structure of the directory that was created
@@ -553,7 +553,7 @@ def create_dummy_no_shim_settings_custom_label_bids_session(session_path, label_
         - TASK label for <func> modality
         - ACQ label for any other modality (e.g. <dwi>)
 
-    Parameters:
+    Parameters
     ----------
     session_path : str or os.path
         path to the session (or subject) level folder
@@ -562,7 +562,7 @@ def create_dummy_no_shim_settings_custom_label_bids_session(session_path, label_
     label_seed : int, optional
         seed for the random label creation
 
-    Returns:
+    Returns
     -------
     session_struct : dict
         Structure of the directory that was created
@@ -705,12 +705,12 @@ def create_dummy_magnitude_phase_bids_session(session_path):
     We just need to test a very simple case to make sure the mag/phase have
     the same "IntendedFor" field:
 
-    Parameters:
+    Parameters
     ----------
     session_path : str or os.path
         path to the session (or subject) level folder
 
-    Returns:
+    Returns
     -------
     session_struct : dict
         Structure of the directory that was created
@@ -890,7 +890,7 @@ def test_find_compatible_fmaps_for_run(tmpdir, simulation_function, match_param)
     """
     Test find_compatible_fmaps_for_run.
 
-    Parameters:
+    Parameters
     ----------
     tmpdir
     simulation_function : function
@@ -939,7 +939,7 @@ def test_find_compatible_fmaps_for_session(
     """
     Test find_compatible_fmaps_for_session.
 
-    Parameters:
+    Parameters
     ----------
     tmpdir
     folder : str or os.path
@@ -1029,7 +1029,7 @@ def test_populate_intended_for(
 ):
     """
     Test populate_intended_for.
-    Parameters:
+    Parameters
     ----------
     tmpdir
     folder : str or os.path

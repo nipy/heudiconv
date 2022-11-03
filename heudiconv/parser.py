@@ -29,6 +29,7 @@ _VCS_REGEX = r'%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (op.sep, op.sep)
 def find_files(regex, topdir=op.curdir, exclude=None,
                exclude_vcs=True, dirs=False):
     """Generator to find files matching regex
+
     Parameters
     ----------
     regex: basestring
@@ -60,7 +61,8 @@ def find_files(regex, topdir=op.curdir, exclude=None,
 
 
 def get_extracted_dicoms(fl):
-    """Given a list of files, possibly extract some from tarballs
+    """Given a list of files, possibly extract some from tarballs.
+
     For 'classical' heudiconv, if multiple tarballs are provided, they correspond
     to different sessions, so here we would group into sessions and return
     pairs  `sessionid`, `files`  with `sessionid` being None if no "sessions"
@@ -116,13 +118,15 @@ def get_extracted_dicoms(fl):
 
 def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
                        session, sids, grouping='studyUID'):
-    """Given options from cmdline sort files or dicom seqinfos into
-    study_sessions which put together files for a single session of a subject
-    in a study
-    Two major possible workflows:
+    """Sort files or dicom seqinfos into study_sessions.
+
+    study_sessions put together files for a single session of a subject
+    in a study.  Two major possible workflows:
+
     - if dicom_dir_template provided -- doesn't pre-load DICOMs and just
       loads files pointed by each subject and possibly sessions as corresponding
-      to different tarballs
+      to different tarballs.
+
     - if files_opt is provided, sorts all DICOMs it can find under those paths
     """
     study_sessions = {}

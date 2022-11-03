@@ -1,5 +1,7 @@
 """Handle BIDS specific operations"""
 
+__docformat__ = "numpy"
+
 import hashlib
 import os
 import os.path as op
@@ -415,15 +417,14 @@ def save_scans_key(item, bids_files):
 
 
 def add_rows_to_scans_keys_file(fn, newrows):
-    """
-    Add new rows to file fn for scans key filename and generate accompanying json
-    descriptor to make BIDS validator happy.
+    """Add new rows to the _scans file.
 
     Parameters
     ----------
-    fn: filename
-    newrows: extra rows to add
-        dict fn: [acquisition time, referring physician, random string]
+    fn: str
+      filename
+    newrows: dict
+      extra rows to add (acquisition time, referring physician, random string)
     """
     if op.lexists(fn):
         with open(fn, 'r') as csvfile:
@@ -527,11 +528,11 @@ def get_shim_setting(json_file):
     Gets the "ShimSetting" field from a json_file.
     If no "ShimSetting" present, return error
 
-    Parameters:
+    Parameters
     ----------
     json_file : str
 
-    Returns:
+    Returns
     -------
     str with "ShimSetting" value
     """
@@ -552,13 +553,13 @@ def find_fmap_groups(fmap_dir):
     By groups here we mean fmaps that are intended to go together
     (with reversed PE polarity, magnitude/phase, etc.)
 
-    Parameters:
+    Parameters
     ----------
     fmap_dir : str or os.path
         path to the session folder (or to the subject folder, if there are no
         sessions).
 
-    Returns:
+    Returns
     -------
     fmap_groups : dict
         key: prefix common to the group (e.g. no "dir" entity, "_phase"/"_magnitude", ...)
@@ -598,14 +599,14 @@ def get_key_info_for_fmap_assignment(json_file, matching_parameter):
     (Note: It is the responsibility of the calling function to make sure
     the arguments are OK)
 
-    Parameters:
+    Parameters
     ----------
     json_file : str or os.path
         path to the json file
     matching_parameter : str in AllowedFmapParameterMatching
         matching_parameter that will be used to match runs
 
-    Returns:
+    Returns
     -------
     key_info : dict
         part of the json file that will need to match between the fmap and
@@ -666,7 +667,7 @@ def find_compatible_fmaps_for_run(json_file, fmap_groups, matching_parameters):
     (Note: It is the responsibility of the calling function to make sure
     the arguments are OK)
 
-    Parameters:
+    Parameters
     ----------
     json_file : str or os.path
         path to the json file
@@ -676,7 +677,7 @@ def find_compatible_fmaps_for_run(json_file, fmap_groups, matching_parameters):
     matching_parameters : list of str from AllowedFmapParameterMatching
         matching_parameters that will be used to match runs
 
-    Returns:
+    Returns
     -------
     compatible_fmap_groups : dict
         Subset of the fmap_groups which match json_file, according
@@ -720,7 +721,7 @@ def find_compatible_fmaps_for_session(path_to_bids_session, matching_parameters)
     (Note: It is the responsibility of the calling function to make sure
     the arguments are OK)
 
-    Parameters:
+    Parameters
     ----------
     path_to_bids_session : str or os.path
         path to the session folder (or to the subject folder, if there are no
@@ -728,7 +729,7 @@ def find_compatible_fmaps_for_session(path_to_bids_session, matching_parameters)
     matching_parameters : list of str from AllowedFmapParameterMatching
         matching_parameters that will be used to match runs
 
-    Returns:
+    Returns
     -------
     compatible_fmap : dict
         Dict of compatible_fmaps_groups (values) for each non-fmap run (keys)
@@ -768,7 +769,7 @@ def select_fmap_from_compatible_groups(json_file, compatible_fmap_groups, criter
     (Note: It is the responsibility of the calling function to make sure
     the arguments are OK)
 
-    Parameters:
+    Parameters
     ----------
     json_file : str or os.path
         path to the json file
@@ -777,7 +778,7 @@ def select_fmap_from_compatible_groups(json_file, compatible_fmap_groups, criter
     criterion : str in ['First', 'Closest']
         matching_parameters that will be used to decide which fmap to use
 
-    Returns:
+    Returns
     -------
     selected_fmap_key : str or os.path
         key from the compatible_fmap_groups for the selected fmap group
@@ -859,7 +860,7 @@ def populate_intended_for(path_to_bids_session, matching_parameters, criterion):
     Because fmaps come in groups (with reversed PE polarity, or magnitude/
     phase), we work with fmap_groups.
 
-    Parameters:
+    Parameters
     ----------
     path_to_bids_session : str or os.path
         path to the session folder (or to the subject folder, if there are no

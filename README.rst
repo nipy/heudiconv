@@ -54,7 +54,7 @@ Please file issues and suggest changes via Pull Requests.
 
 HeuDiConv requires installation of
 `dcm2niix <https://github.com/rordenlab/dcm2niix/>`_ and optionally
-`DataLad <https://datalad.org>`_.
+`DataLad`_.
 
 For development you will need a non-shallow clone (so there is a
 recent released tag) of the aforementioned repository. You can then

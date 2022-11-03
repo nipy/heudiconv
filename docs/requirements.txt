@@ -1,2 +1,3 @@
 sphinx-argparse
+sphinxcontrib-napoleon
 -r ../dev-requirements.txt
