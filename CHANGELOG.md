@@ -1,3 +1,28 @@
+# v0.11.5 (Thu Nov 03 2022)
+
+#### 🐛 Bug Fix
+
+- Fix certificate issue as indicated in #595 [#597](https://github.com/nipy/heudiconv/pull/597) ([@neurorepro](https://github.com/neurorepro))
+- BF docker build: use python3.9 (not 3.7 which gets upgraded to 3.9) and newer dcm2niix [#596](https://github.com/nipy/heudiconv/pull/596) ([@yarikoptic](https://github.com/yarikoptic))
+- Fixup miniconda spec for neurodocker so it produces dockerfile now [#596](https://github.com/nipy/heudiconv/pull/596) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### 🏠 Internal
+
+- Update GitHub Actions action versions [#601](https://github.com/nipy/heudiconv/pull/601) ([@jwodder](https://github.com/jwodder))
+- Set action step outputs via $GITHUB_OUTPUT [#600](https://github.com/nipy/heudiconv/pull/600) ([@jwodder](https://github.com/jwodder))
+
+#### 📝 Documentation
+
+- DOC: codespell fix a few typos in code comments [#605](https://github.com/nipy/heudiconv/pull/605) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 3
+
+- John T. Wodder II ([@jwodder](https://github.com/jwodder))
+- Michael ([@neurorepro](https://github.com/neurorepro))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v0.11.4 (Thu Sep 29 2022)
 
 #### 🐛 Bug Fix
