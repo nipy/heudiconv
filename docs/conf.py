@@ -22,7 +22,7 @@
 from heudiconv import __version__
 
 project = 'heudiconv'
-copyright = '2019, Heudiconv team'
+copyright = '2014-2022, Heudiconv team'
 author = 'Heudiconv team'
 
 # The short X.Y version
@@ -43,7 +43,6 @@ release = __version__
 extensions = [
     'sphinx.ext.autodoc',
     'sphinxarg.ext',
-    'm2r',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
