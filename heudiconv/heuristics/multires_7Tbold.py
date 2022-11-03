@@ -27,7 +27,7 @@ def extract_moco_params(basename, outypes, dicoms):
     dcm_times = [(d,
                   float(dcm_read(d, stop_before_pixels=True).AcquisitionTime))
                     for d in dicoms]
-    # store MoCo info from image comments sorted by acqusition time
+    # store MoCo info from image comments sorted by acquisition time
     moco = ['\t'.join(
         [str(float(i)) for i in dcm_read(fn, stop_before_pixels=True).ImageComments.split()[1].split(',')])
                 for fn, t in sorted(dcm_times, key=lambda x: x[1])]

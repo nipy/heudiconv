@@ -45,7 +45,7 @@ def test_smoke_convertall(tmpdir):
 @pytest.mark.parametrize('heuristic', ['reproin', 'convertall'])
 @pytest.mark.parametrize(
     'invocation', [
-        "--files %s" % TESTS_DATA_PATH,    # our new way with automated groupping
+        "--files %s" % TESTS_DATA_PATH,    # our new way with automated grouping
         "-d %s/{subject}/* -s 01-fmap_acq-3mm" % TESTS_DATA_PATH # "old" way specifying subject
         # should produce the same results
     ])
@@ -106,7 +106,7 @@ def test_reproin_largely_smoke(tmpdir, heuristic, invocation):
 
 @pytest.mark.parametrize(
     'invocation', [
-        "--files %s" % TESTS_DATA_PATH,    # our new way with automated groupping
+        "--files %s" % TESTS_DATA_PATH,    # our new way with automated grouping
     ])
 def test_scans_keys_reproin(tmpdir, invocation):
     args = "-f reproin -c dcm2niix -o %s -b " % (tmpdir)
