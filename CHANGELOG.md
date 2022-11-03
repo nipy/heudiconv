@@ -1,3 +1,20 @@
+# v0.11.6 (Thu Nov 03 2022)
+
+#### 🏠 Internal
+
+- Delete .dockerignore [#607](https://github.com/nipy/heudiconv/pull/607) ([@jwodder](https://github.com/jwodder))
+
+#### 📝 Documentation
+
+- DOC: Various fixes to make RTD build the docs again [#608](https://github.com/nipy/heudiconv/pull/608) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 2
+
+- John T. Wodder II ([@jwodder](https://github.com/jwodder))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v0.11.5 (Thu Nov 03 2022)
 
 #### 🐛 Bug Fix
