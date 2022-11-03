@@ -42,6 +42,7 @@ from heudiconv.bids import (
     AllowedCriteriaForFmapAssignment,
     KeyInfoForForce,
     BIDSFile,
+    sanitize_label,
 )
 from heudiconv.cli.run import main as runner
 
@@ -1155,3 +1156,13 @@ def test_ME_mag_phase_conversion(tmpdir, subID='MEGRE', heuristic='bids_ME.py'):
                     % (subID, subID, e, part, ext)
                 )
 
+def test_sanitize_label():
+    assert sanitize_label("12345A") == "12345A"
+    assert sanitize_label("12345_A") == "12345A"
+    
+    #non-alphanumerics should raise error
+    with pytest.raises(ValueError):
+        sanitize_label(12345)
+    #this should also raise an error for an empty value
+    with pytest.raises(ValueError):
+        sanitize_label("_")
