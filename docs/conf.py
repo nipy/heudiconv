@@ -26,7 +26,7 @@ copyright = '2014-2022, Heudiconv team'
 author = 'Heudiconv team'
 
 # The short X.Y version
-version = ''
+version = '.'.join(__version__.split('.')[:2])
 # The full version, including alpha/beta/rc tags
 release = __version__
 
