@@ -367,8 +367,8 @@ def compress_dicoms(dicom_list, out_prefix, tempdirs, overwrite):
     dcm_time = get_dicom_series_time(dicom_list)
 
     def _assign_dicom_time(ti):
-        # Reset the date to match the one of the last commit, not from the
-        # filesystem since git doesn't track those at all
+        # Reset the date to match the one from the dicom, not from the
+        # filesystem so we could sort reproducibly
         ti.mtime = dcm_time
         return ti
 
