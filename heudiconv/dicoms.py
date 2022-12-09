@@ -1,4 +1,5 @@
 # dicom operations
+import datetime
 import os
 import os.path as op
 import logging
@@ -314,19 +315,55 @@ def group_dicoms_into_seqinfos(files, grouping, file_filter=None,
     return seqinfos
 
 
-def get_dicom_series_time(dicom_list):
-    """Get time in seconds since epoch from dicom series date and time
-    Primarily to be used for reproducible time stamping
+def get_timestamp_from_series(dicom_list: list[str]) -> int:
+    """try to return a timestamp indicating when the first dicom in dicom_list was created, or if that
+    info isn't present then a reproducible integer. This is used in setting mtimes reproducibly
+
+    Args:
+        dicom_list (list[str]): list of strings pointing to existing dicom files
+
+    Returns:
+        int: either an int representing when the first dicom was created, 
+            in number of seconds since epoch, or if no datetime info is found then a hash of the
+            SeriesInstanceUID (meaningless value, but reproducible)
+
     """
-    import time
     import calendar
 
     dicom = dcm.read_file(dicom_list[0], stop_before_pixels=True, force=True)
-    dcm_date = dicom.SeriesDate  # YYYYMMDD
-    dcm_time = dicom.SeriesTime  # HHMMSS.MICROSEC
-    dicom_time_str = dcm_date + dcm_time.split('.', 1)[0]  # YYYYMMDDHHMMSS
-    # convert to epoch
-    return calendar.timegm(time.strptime(dicom_time_str, '%Y%m%d%H%M%S'))
+    if (dicom_datetime := get_datetime_from_dcm(dicom)):
+        return calendar.timegm(dicom_datetime.timetuple())
+    else:
+        logging.warning("unable to get real timestamp from series. returning arbitrary time based on hash of SeriesInstanceUID")
+        return hash(dicom.SeriesInstanceUID)
+
+
+def get_datetime_from_dcm(dcm_data: dcm.FileDataset) -> datetime.datetime | None:
+    """try to extract datetime from filedataset
+
+    Args:
+        dcm_data (pydicom.FileDataset): dicom with header, e.g., as ready by pydicom.dcmread
+
+    Returns:
+        datetime.datetime | None: one of several datetimes that are related to when the scan occurred. 
+    
+    """
+    if (
+            (
+                (acq_date := dcm_data.get("AcquisitionDate")) 
+                and (acq_time := dcm_data.get("AcquisitionTime"))
+            )
+            or (
+                (acq_date := dcm_data.get("SeriesDate")) 
+                and (acq_time := dcm_data.get("SeriesTime"))
+            )
+        ):
+        acq_datetime = datetime.datetime.strptime(acq_date+acq_time, "%Y%m%d%H%M%S.%f")
+    elif (acq_dt := dcm_data.get("AcquisitionDateTime")):
+        acq_datetime = datetime.datetime.strptime(acq_dt, "%Y%m%d%H%M%S.%f")
+    else:
+        acq_datetime = None
+    return acq_datetime
 
 
 def compress_dicoms(dicom_list, out_prefix, tempdirs, overwrite):
@@ -364,10 +401,10 @@ def compress_dicoms(dicom_list, out_prefix, tempdirs, overwrite):
     # Solution from DataLad although ugly enough:
 
     dicom_list = sorted(dicom_list)
-    dcm_time = get_dicom_series_time(dicom_list)
+    dcm_time = get_timestamp_from_series(dicom_list)
 
-    def _assign_dicom_time(ti):
-        # Reset the date to match the one of the last commit, not from the
+    def _assign_dicom_time(ti: tarfile.TarInfo) -> tarfile.TarInfo:
+        # Try to reset the date to match the one of the last commit, not from the
         # filesystem since git doesn't track those at all
         ti.mtime = dcm_time
         return ti

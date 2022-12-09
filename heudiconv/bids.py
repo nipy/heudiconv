@@ -31,6 +31,7 @@ from .utils import (
     remove_prefix,
 )
 from . import __version__
+from . import dicoms
 
 lgr = logging.getLogger(__name__)
 
@@ -457,7 +458,7 @@ def add_rows_to_scans_keys_file(fn, newrows):
         writer.writerows([header] + data_rows_sorted)
 
 
-def get_formatted_scans_key_row(dcm_fn):
+def get_formatted_scans_key_row(dcm_fn) -> list[str]:
     """
     Parameters
     ----------
@@ -470,15 +471,8 @@ def get_formatted_scans_key_row(dcm_fn):
 
     """
     dcm_data = dcm.read_file(dcm_fn, stop_before_pixels=True, force=True)
-    # we need to store filenames and acquisition times
-    # parse date and time of start of run acquisition and get it into isoformat
-    try:
-        date = dcm_data.AcquisitionDate
-        time = dcm_data.AcquisitionTime
-        acq_time = get_datetime(date, time)
-    except (AttributeError, ValueError) as exc:
-        lgr.warning("Failed to get date/time for the content: %s", str(exc))
-        acq_time = ''
+    # we need to store filenames and acquisition datetimes
+    acq_datetime = dicoms.get_datetime_from_dcm(dcm_data=dcm_data)
     # add random string
     # But let's make it reproducible by using all UIDs
     # (might change across versions?)
@@ -491,7 +485,7 @@ def get_formatted_scans_key_row(dcm_fn):
         perfphys = dcm_data.PerformingPhysicianName
     except AttributeError:
         perfphys = ''
-    row = [acq_time, perfphys, randstr]
+    row = [acq_datetime.isoformat() if acq_datetime else "", perfphys, randstr]
     # empty entries should be 'n/a'
     # https://github.com/dartmouth-pbs/heudiconv/issues/32
     row = ['n/a' if not str(e) else e for e in row]
