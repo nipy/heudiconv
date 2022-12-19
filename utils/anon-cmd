@@ -1,0 +1,42 @@
+#!/bin/bash
+# Generic anonymization script which would anonymize sid based on what it had
+# seen in the past or simply what the translation dict already has.
+
+set -eu
+
+debug() {
+    : echo "DEBUG: $*" >&2
+}
+
+# Translation file location
+# Store under .git by default to guarantee that it is not committed or locked by git-annex etc
+# But it might not fit some usecases where there is no .git
+anon_file_default=$(dirname "$0")/../.git/anon_sid_map.csv
+anon_file="${AC_ANON_FILE:-$anon_file_default}"
+anon_fmt="${AC_ANON_FMT:-%03d}"
+
+sid="$1"
+
+# harmonize since elderly  awk on rolando seems to have no clue about IGNORECASE
+sid=$(echo "$sid" | tr  '[:lower:]' '[:upper:]')
+
+debug "Using $anon_file to map $sid"
+
+if [ ! -e "$anon_file" ]; then
+    touch "$anon_file"  # initiate it
+fi
+
+res=$(grep "^$sid," "$anon_file" | head -n 1)
+if [ -n "$res" ]; then
+    ann="${res##*,}"
+    debug "Found $ann in '$res'"
+else
+    # need to take the latest one
+    largest=$(sed -e 's/.*,//g' "$anon_file" | sort -n | tail -n1)
+    next=$((largest+1))
+    # shellcheck disable=SC2059
+    ann=$(printf "$anon_fmt" $next)
+    debug "Found $largest and $next to get $ann, storing"
+    echo "$sid,$ann" >> "$anon_file"
+fi
+echo "$ann"
