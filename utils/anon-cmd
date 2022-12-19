@@ -32,7 +32,7 @@ if [ -n "$res" ]; then
     debug "Found $ann in '$res'"
 else
     # need to take the latest one
-    largest=$(sed -e 's/.*,//g' "$anon_file" | sort -n | tail -n1)
+    largest=$(sed -e 's/.*,//g' "$anon_file" | sort -n | tail -n1 | sed -e 's,^0*,,g')
     next=$((largest+1))
     # shellcheck disable=SC2059
     ann=$(printf "$anon_fmt" $next)
