@@ -47,7 +47,7 @@ If using bids, the ``notop`` bids option suppresses creation of
 top-level files in the bids directory (e.g.,
 ``dataset_description.json``) to avoid possible race conditions.
 These files may be generated later with ``populate_templates.sh``
-below (except for ``participants.tsv``, which must be create
+below (except for ``participants.tsv``, which must be created
 manually).
 
 .. code:: shell
