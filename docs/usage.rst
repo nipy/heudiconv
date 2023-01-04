@@ -92,7 +92,8 @@ The second script processes a DICOM directory with ``heudiconv`` using the built
 This script creates the top-level bids files (e.g.,
 ``dataset_description.json``)
 
-..code:: shell
+.. code:: shell
+
     #!/bin/bash
     set -eu
 
