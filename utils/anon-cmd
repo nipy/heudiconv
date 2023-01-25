@@ -26,11 +26,23 @@ if [ ! -e "$anon_file" ]; then
     touch "$anon_file"  # initiate it
 fi
 
+# apparently heudiconv passes even those we provided in `-s` CLI option
+# to anonymization script.  So, we will have to match those by our format
+# and then give back if matches. That would forbid plain remapping though if
+# original ids are in the same format, so some folks might want to disable that!
+sid_input_fmted=$(echo "$sid" | sed -e 's,^0*,,g' | xargs printf "$anon_fmt" 2>&1 || :)
+if [ "$sid" = "$sid_input_fmted" ]; then
+	debug  already in the anonymized format
+	echo "$sid"
+	exit 0
+fi
+
 res=$(grep "^$sid," "$anon_file" | head -n 1)
 if [ -n "$res" ]; then
     ann="${res##*,}"
     debug "Found $ann in '$res'"
 else
+    echo "We have all sids mapped already! Will not create a new one for $sid" >&2; exit 1
     # need to take the latest one
     largest=$(sed -e 's/.*,//g' "$anon_file" | sort -n | tail -n1 | sed -e 's,^0*,,g')
     next=$((largest+1))
