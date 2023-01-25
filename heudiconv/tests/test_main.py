@@ -131,6 +131,7 @@ def test_prepare_for_datalad(tmpdir):
 
     # the last one should have been the study
     target_files = {
+        '.bidsignore',
         '.gitattributes',
         '.datalad/config', '.datalad/.gitattributes',
         'dataset_description.json',
