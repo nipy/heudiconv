@@ -505,7 +505,12 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
             elif outtype in ['nii', 'nii.gz']:
                 assert converter == 'dcm2niix', ('Invalid converter '
                                                  '{}'.format(converter))
-
+                due.cite(
+                    Doi('10.1016/j.jneumeth.2016.03.001'),
+                    path='dcm2niix',
+                    description="DICOM to NIfTI + .json sidecar conversion utility",
+                    tags=["implementation"]
+                )
                 outname, scaninfo = (prefix + '.' + outtype,
                                      prefix + scaninfo_suffix)
 
