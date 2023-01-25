@@ -120,7 +120,7 @@
 - try a simple fix for wrongly ordered files in tar file [#535](https://github.com/nipy/heudiconv/pull/535) ([@bpinsard](https://github.com/bpinsard))
 - BF: Fix the order of the 'echo' entity in the filename [#542](https://github.com/nipy/heudiconv/pull/542) ([@pvelasco](https://github.com/pvelasco))
 - ENH: add HeudiconvVersion to sidecar .json files [#529](https://github.com/nipy/heudiconv/pull/529) ([@yarikoptic](https://github.com/yarikoptic))
-- BF (TST): make anonymize_script actually output anything and map determinstically [#511](https://github.com/nipy/heudiconv/pull/511) ([@yarikoptic](https://github.com/yarikoptic))
+- BF (TST): make anonymize_script actually output anything and map deterministically [#511](https://github.com/nipy/heudiconv/pull/511) ([@yarikoptic](https://github.com/yarikoptic))
 - Rename DICOMCONVERT_README.md to README.md [#4](https://github.com/nipy/heudiconv/pull/4) ([@satra](https://github.com/satra))
 
 #### ⚠️ Pushed to `master`
@@ -165,7 +165,7 @@ Various improvements and compatibility/support (dcm2niix, datalad) changes.
 
 - Python 3.5 EOLed, supported (tested) versions now: 3.6 - 3.9
 - In reprorin heuristic, allow for having multiple accessions since now there is
-  `-g all` groupping ([#508][])
+  `-g all` grouping ([#508][])
 - For BIDS, produce a singular `scans.json` at the top level, and not one per
   sub/ses (generates too many identical files) ([#507][])
 
@@ -486,7 +486,7 @@ A usable release to support [DBIC][] use-case
 A somewhat working release on the way to support [DBIC][] use-case
 ## Added
 - more tests
-- groupping of dicoms by series if provided
+- grouping of dicoms by series if provided
 - many more features and fixes
 
 # [0.2] - 2016-10-20
