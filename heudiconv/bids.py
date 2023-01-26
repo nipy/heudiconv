@@ -154,6 +154,9 @@ def populate_bids_templates(path, defaults={}):
     create_file_if_missing(op.join(path, 'scans.json'),
         json_dumps(SCANS_FILE_FIELDS, sort_keys=False)
     )
+    create_file_if_missing(op.join(path, '.bidsignore'), ".duecredit.p")
+    if op.lexists(op.join(path, '.git')):
+        create_file_if_missing(op.join(path, '.gitignore'), ".duecredit.p")
 
     populate_aggregated_jsons(path)
 
