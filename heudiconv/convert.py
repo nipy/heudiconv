@@ -860,7 +860,10 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
 
 
 def add_taskname_to_infofile(infofiles):
-    """Add the "TaskName" field to json files corresponding to func images.
+    """Add the "TaskName" field to json files with _task- entity in the name.
+
+    Note: _task- entity could be present not only in functional data
+    but in many other modalities now.
 
     Parameters
     ----------
@@ -879,7 +882,8 @@ def add_taskname_to_infofile(infofiles):
                                                op.basename(infofile))
                                      .group(0).split('_')[0])
         except AttributeError:
-            lgr.warning("Failed to find task field in {0}.".format(infofile))
+            # leave it to bids-validator to validate/inform about presence
+            # of required entities/fields.
             continue
 
         # write to outfile
