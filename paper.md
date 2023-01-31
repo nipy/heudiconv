@@ -1,11 +1,13 @@
 ---
-title: 'Gala: A Python package for galactic dynamics'
+title: 'HeuDiConv — flexible DICOM convertersion into structured directory layouts '
 tags:
   - Python
-  - astronomy
-  - dynamics
-  - galactic dynamics
-  - milky way
+  - neuroscience
+  - standardization
+  - DICOM
+  - BIDS
+  - open science
+  - FOSS
 authors:
   - name: Adrian M. Price-Whelan
     orcid: 0000-0000-0000-0000
