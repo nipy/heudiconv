@@ -1,5 +1,5 @@
 ---
-title: 'HeuDiConv — flexible DICOM conversion into structured directory layouts '
+title: 'HeuDiConv — flexible DICOM conversion into structured directory layouts'
 tags:
   - Python
   - neuroscience
