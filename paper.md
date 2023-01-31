@@ -1,5 +1,5 @@
 ---
-title: 'HeuDiConv — flexible DICOM convertersion into structured directory layouts '
+title: 'HeuDiConv — flexible DICOM conversion into structured directory layouts '
 tags:
   - Python
   - neuroscience
@@ -9,7 +9,7 @@ tags:
   - open science
   - FOSS
 authors:
-  - name: Adrian M. Price-Whelan
+  - name: TODO
     orcid: 0000-0000-0000-0000
     equal-contrib: true
     affiliation: "1, 2" # (Multiple affiliations must be quoted)
@@ -20,7 +20,7 @@ authors:
     corresponding: true # (This is how to denote the corresponding author)
     affiliation: 3
 affiliations:
- - name: Lyman Spitzer, Jr. Fellow, Princeton University, USA
+ - name: TODO
    index: 1
  - name: Institution Name, Country
    index: 2
@@ -49,16 +49,15 @@ performing numerical orbit integration).
 
 # Statement of need
 
-`Gala` is an Astropy-affiliated Python package for galactic dynamics. Python
-enables wrapping low-level languages (e.g., C) for speed without losing
-flexibility or ease-of-use in the user-interface. The API for `Gala` was
-designed to provide a class-based and user-friendly interface to fast (C or
-Cython-optimized) implementations of common operations such as gravitational
-potential and force evaluation, orbit integration, dynamical transformations,
-and chaos indicators for nonlinear dynamics. `Gala` also relies heavily on and
-interfaces well with the implementations of physical units and astronomical
-coordinate systems in the `Astropy` package [@astropy] (`astropy.units` and
-`astropy.coordinates`).
+Neuroimaging is an empirical field of science heavily relying on efficient data acquisition, harmonization, and processing.
+Neuroimaging data acquired by MRI scanners usually are exported from them in a set of formats, with DICOM (Digital Imaging and Communications in Medicine) being the standard metadata-rich form.
+Data in DICOM format is usually transmitted to PACS (Picture Archiving and Communication Systems) servers.
+Unlike in clinical settings, where data is interfaced directly from PACS in DICOM format, in neuroimaging research tools typically expect data in much simpler NIfTI [@TODOnifti] format.
+NIfTI file format carries only basic metadata and does not instruct how to organize multiple files within a study.
+HeuDiConv was developer to provide flexible tooling for labs to be able efficiently and consistently convert collections of DICOM files into collections of NIfTI (and compressed archives of DICOMs) files in desired file system hierarchies.
+Since the inception of HeuDiConv in 2014, a community-driven standard Brain Imaging Data Structure (BIDS) [@TODO] was established, which formalized such datasets layout and storage of metadata.
+Since then the most frequent use-case for HeuDiConv became conversion of DICOM files into BIDS datasets.
+Standardization into BIDS facilitated not only reuse of already shared datasets but also facilitate data validation, curation, analysis, etc.
 
 `Gala` was designed to be used by both astronomical researchers and by
 students in courses on gravitational dynamics or astronomy. It has already been
@@ -109,9 +108,17 @@ and referenced from text using \autoref{fig:example}.
 Figure sizes can be customized by adding an optional second parameter:
 ![Caption for example figure.](figure.png){ width=20% }
 
+# Conflicts of interest
+
+There are no conflicts to declare.
+
 # Acknowledgements
 
-We acknowledge contributions from Brigitta Sipocz, Syrtis Major, and Semyeong
-Oh, and support from Kathryn Johnston during the genesis of this project.
+We would like to extend our gratitude to
+TODO
+for notable contributions to the codebase, bug reports, recommendations, and promotion of HeuDiConv.
+
+HeuDiConv development was primarily done under the umbrella of the NIH funded ReproNim [1P41EB019936-01A1](https://projectreporter.nih.gov/project_info_details.cfm?aid=8999833&map=y) and [TODO - renewal](TODO) (PI: Kennedy).
+It also received contributions from the ...
 
 # References
