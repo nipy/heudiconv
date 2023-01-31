@@ -26,7 +26,7 @@ affiliations:
    index: 2
  - name: Independent Researcher, Country
    index: 3
-date: 13 August 2017
+date: 2023-01-31
 bibliography: paper.bib
 
 # Optional fields if submitting to a AAS journal too, see this blog post:
