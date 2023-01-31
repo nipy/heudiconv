@@ -1,0 +1,5 @@
+# Binary document
+*.pdf
+
+# Compilation traces
+paper/
