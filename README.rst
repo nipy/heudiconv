@@ -24,6 +24,18 @@
   :target: https://doi.org/10.5281/zenodo.1012598
   :alt: Zenodo (latest)
 
+.. image :: https://repology.org/badge/version-for-repo/debian_unstable/heudiconv.svg?header=Debian%20Unstable
+   :target: https://repology.org/project/heudiconv/versions
+   :alt: Debian Unstable package
+
+.. image:: https://repology.org/badge/version-for-repo/gentoo_ovl_science/python:heudiconv.svg?header=Gentoo%20%28%3A%3Ascience%29
+   :target: https://repology.org/project/python:heudiconv/versions
+   :alt: Gentoo (::science)
+
+.. image:: https://repology.org/badge/version-for-repo/pypi/python:heudiconv.svg
+   :target: https://repology.org/project/python:heudiconv/versions
+   :alt: PyPI package
+
 About
 -----
 
