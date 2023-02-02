@@ -24,7 +24,7 @@
   :target: https://doi.org/10.5281/zenodo.1012598
   :alt: Zenodo (latest)
 
-.. image :: https://repology.org/badge/version-for-repo/debian_unstable/heudiconv.svg?header=Debian%20Unstable
+.. image:: https://repology.org/badge/version-for-repo/debian_unstable/heudiconv.svg?header=Debian%20Unstable
    :target: https://repology.org/project/heudiconv/versions
    :alt: Debian Unstable package
 
