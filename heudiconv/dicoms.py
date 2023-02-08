@@ -104,7 +104,9 @@ def validate_dicom(fl, dcmfilter):
     for sig in ('iop', 'ICE_Dims', 'SequenceName'):
         try:
             del mw.series_signature[sig]
-        except KeyError:
+        except (KeyError, IndexError):
+            # index error can come deep within nibabel/dicom
+            # https://github.com/nipy/heudiconv/issues/633
             pass
     # Workaround for protocol name in private siemens csa header
     if not getattr(mw.dcm_data, 'ProtocolName', '').strip():
