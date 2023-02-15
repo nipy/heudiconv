@@ -20,7 +20,11 @@ jobs:
         working-directory: utils
 
       - name: Build Docker image
-        run: docker build -t nipy/heudiconv:master .
+        run: |
+          docker build \
+            -t nipy/heudiconv:master \
+            -t nipy/heudiconv:unstable \
+            .
 
       - name: Push Docker image
         run: |
