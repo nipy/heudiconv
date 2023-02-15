@@ -56,26 +56,28 @@ HOWTO 101
 
 In a nutshell -- ``heudiconv`` operates using a heuristic which, given metadata from DICOMs, would decide how to name
 resultant (from conversion using `dcm2niix`_) files. Heuristic `convertall <https://github
-.com/nipy/heudiconv/blob/master/heudiconv/heuristics/convertall.py>`_ could also be used to actually have no real
-heuristic and simply establish your own conversion mapping by editing produced mapping files.
-In most use-cases of retrospecive study data conversion you would need to create your custom heuristic following
+.com/nipy/heudiconv/blob/master/heudiconv/heuristics/convertall.py>`_ could actually be used with no real
+heuristic and by simply establish your own conversion mapping through editing produced mapping files.
+In most use-cases of retrospective study data conversion, you would need to create your custom heuristic following
 `existing heuristics as examples <https://github.com/nipy/heudiconv/tree/master/heudiconv/heuristics>`_ and/or
 referring to `"Heuristic" section <https://heudiconv.readthedocs.io/en/latest/heuristics.html>`_ in the documentation.
 **Note** that `ReproIn heuristic <https://github.com/nipy/heudiconv/blob/master/heudiconv/heuristics/reproin.py>`_ is
-generic and powerful enough to be adopted virtually for *any* study: For prospective studies you would just need
-to name your sequences following the `ReproIn convention <https://github.com/nipy/heudiconv/blob/master/heudiconv/heuristics/reproin.py#L26>`_ and for
-retrospective conversions, you often would be able to create a new very versatile heuristic by simply providing
+generic and powerful enough to be adopted virtually for *any* study: For prospective studies, you would just need
+to name your sequences following the `ReproIn convention <https://github.com/nipy/heudiconv/blob/master/heudiconv/heuristics/reproin.py#L26>`_, and for
+retrospective conversions, you often would be able to create a new versatile heuristic by simply providing
 remappings into ReproIn as shown in `this issue (documentation is coming) <https://github.com/ReproNim/reproin/issues/18#issuecomment-834598084>`_.
 
-Having decided on heuristic you could use command line::
+Having decided on a heuristic, you could use the command line::
 
     heudiconv -f HEURISTIC-FILE-OR-NAME -o OUTPUT-PATH --files INPUT-PATHs
 
 with various additional options (see ``heudiconv --help`` or
-`"Usage" in documentation <https://heudiconv.readthedocs.io/en/latest/usage.html>`__) to tune its behavior, to
-convert your data. See e.g. `ReproIn conversion invocation examples <https://github.com/ReproNim/reproin/#conversion>`_.
+`"Usage" in documentation <https://heudiconv.readthedocs.io/en/latest/usage.html>`__) to tune its behavior to
+convert your data.
 
-Please also see `user tutorials <https://heudiconv.readthedocs.io/en/latest/tutorials.html>`_ in documentation.
+For detailed examples and guides, please check out `ReproIn conversion invocation examples <https://github.com/ReproNim/reproin/#conversion>`_
+and the `user tutorials <https://heudiconv.readthedocs.io/en/latest/tutorials.html>`_ in the documentation.
+
 
 How to cite
 -----------
@@ -93,9 +95,9 @@ Please file issues and suggest changes via Pull Requests.
 
 HeuDiConv requires installation of `dcm2niix`_ and optionally `DataLad`_.
 
-For development you will need a non-shallow clone (so there is a
-recent released tag) of the aforementioned repository. You can then
-install all necessary development requirements using ``pip install -r
+For development, you will need a non-shallow clone (so there is a
+recent released tag) of the aforementioned repository. Once you have cloned the repository,
+you can then install all the necessary development requirements using ``pip install -r
 dev-requirements.txt``.  Testing is done using `pytest
 <https://docs.pytest.org/>`_.  Releases are packaged using Intuit
 auto.  Workflow for releases and preparation of Docker images is in
