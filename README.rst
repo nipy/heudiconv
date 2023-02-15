@@ -100,22 +100,3 @@ For a detailed into, see our contributing guide.
 
 Our releases are packaged using Intuit auto, with the corresponding workflow including
 Docker image preparation being found in ``.github/workflows/release.yml``.
-
-
-Dependencies
-------------
-
-If an up-to-date HeuDiConv version is installed via a package manager (e.g. Debian's
-`apt-get`, Gentoo's `emerge`, or PIP), the following should be handled automatically.
-
-Mandatory dependencies:
-* [dcm2niix](https://github.com/rordenlab/dcm2niix)
-* [dcmstack](https://dcmstack.readthedocs.org/en/latest/) >=0.8
-* [etelemetry](https://github.com/sensein/etelemetry-client)
-* [filelock](https://github.com/tox-dev/py-filelock/) >=3.0.12
-* [nibabel](https://nipy.org/nibabel/)
-* [nipype](http://nipy.sourceforge.net/nipype/) >=1.2.3
-* [pydicom](http://www.pydicom.org/)
-
-Optional dependencies:
-* [datalad](https://github.com/datalad/datalad)
