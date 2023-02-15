@@ -21,15 +21,20 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build \
-            -t nipy/heudiconv:master \
-            -t nipy/heudiconv:unstable \
-            .
+          # build only if not release tag, i.e. has some "-" in describe
+          # so we do not duplicate work with release workflow.
+          git describe --match 'v[0-9]*' | grep -q -e - && \
+              docker build \
+                -t nipy/heudiconv:master \
+                -t nipy/heudiconv:unstable \
+                .
 
       - name: Push Docker image
         run: |
-          docker login -u "$DOCKER_LOGIN" --password-stdin <<<"$DOCKER_TOKEN"
-          docker push nipy/heudiconv:master
+          git describe --match 'v[0-9]*' | grep -q -e - && (
+              docker login -u "$DOCKER_LOGIN" --password-stdin <<<"$DOCKER_TOKEN"
+              docker push nipy/heudiconv:master
+          )
         env:
           DOCKER_LOGIN: ${{ secrets.DOCKER_LOGIN }}
           DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
