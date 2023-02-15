@@ -69,13 +69,13 @@ software.
 Development work might require live access to the copy of HeuDiConv which is being developed.
 If a system-wide release of HeuDiConv is already installed, or likely to be, it is best to keep
 development work sandboxed inside a dedicated virtual environment.
-This is best accomplished via:
+This is best accomplished via::
 
-.. code-block:: sh
   cd /path/to/your/clone/of/heudiconv
   mkdir -p venvs/dev
   python -m venv venvs/dev
   source venvs/dev/bin/activate
+  pip install -e .[all]
 
 
 Additional Hints
