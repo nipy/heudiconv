@@ -224,6 +224,7 @@ def get_study_sessions(
             file_filter=getattr(heuristic, "filter_files", None),
             dcmfilter=getattr(heuristic, "filter_dicom", None),
             custom_grouping=getattr(heuristic, "grouping", None),
+            custom_seqinfo=getattr(heuristic, 'custom_seqinfo', None),
         )
 
         if sids:
