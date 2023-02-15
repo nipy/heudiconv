@@ -96,7 +96,7 @@ all relevant citations via `DueCredit <http://duecredit.org>`_.
 How to contribute
 -----------------
 
-For a detailed into, see our contributing guide.
+For a detailed into, see our `contributing guide <CONTRIBUTING.rst>`_.
 
 Our releases are packaged using Intuit auto, with the corresponding workflow including
 Docker image preparation being found in ``.github/workflows/release.yml``.
