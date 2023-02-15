@@ -5,15 +5,17 @@ Contributing to HeuDiConv
 Files organization
 ------------------
 
-- [heudiconv/](./heudiconv) is the main Python module where major development is happening,
-  with major submodules being:
-    - `cli/` - wrappers and argument parsers bringing the HeuDiConv functionality to the command
+* `heudiconv/ <./heudiconv>`_ is the main Python module where major development is happening, with
+  major submodules being:
+
+    * ``cli/`` - wrappers and argument parsers bringing the HeuDiConv functionality to the command
     line.
-    - `external/` - general compatibility layers for external functions HeuDiConv depends on.
-    - `heuristics/` - heuristic evaluators for workflows, pull requests here are particularly
+    * ``external/`` - general compatibility layers for external functions HeuDiConv depends on.
+    * ``heuristics/`` - heuristic evaluators for workflows, pull requests here are particularly
     welcome.
-- [docs/](./docs) - documentation directory.
-- [utils/](./utils) - helper utilities used during development, testing, and distribution of
+
+* `docs/ <./docs>`_ - documentation directory.
+* `utils/ <./utils>`_ - helper utilities used during development, testing, and distribution of
   HeuDiConv.
 
 How to contribute
@@ -27,28 +29,31 @@ If you are unsure what that means, here is a set-up workflow you may wish to fol
 0. Fork the `project repository <https://github.com/nipy/heudiconv>`_ on GitHub, by clicking
    on the “Fork” button near the top of the page — this will create a copy of the repository
    writeable by your GitHub user.
-
 1. Set up a clone of the repository on your local machine and connect it to both the “official”
-   and your copy of the repository on GitHub:
-.. code-block:: sh
-  git clone git://github.com/nipy/heudiconv
-  cd heudiconv
-  git remote rename origin official
-  git remote add origin git://github.com/YOUR_GITHUB_USERNAME/heudiconv
+   and your copy of the repository on GitHub
+
+   .. code-block:: sh
+       git clone git://github.com/nipy/heudiconv
+       cd heudiconv
+       git remote rename origin official
+       git remote add origin git://github.com/YOUR_GITHUB_USERNAME/heudiconv
 
 2. When you wish to start a new contribution, create a new branch:
+
 .. code-block:: sh
-  git checkout -b topic_of_your_contribution
+   git checkout -b topic_of_your_contribution
 
 3. When you are done making the changes you wish to contribute, record them in Git:
+
 .. code-block:: sh
-  git add the/paths/to/files/you/modified can/be/more/than/one
-  git commit
+   git add the/paths/to/files/you/modified can/be/more/than/one
+   git commit
 
 3. Push the changes to your copy of the code on GitHub, following which Git will
    provide you with a link which you can click to initiate a pull request
+
 .. code-block:: sh
-  git push -u origin topic_of_your_contribution
+   git push -u origin topic_of_your_contribution
 
 
 (If any of the above seems overwhelming, you can look up the `Git documentation
