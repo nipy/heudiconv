@@ -86,9 +86,11 @@ rules before submitting a pull request:
 
 * All public functions (i.e. functions whose name does not start with an underscore) should have
   informative docstrings with sample usage presented as doctests when appropriate.
-.. code-block:: sh
-  cd /path/to/your/clone/of/heudiconv
-  pytest -vvs .
+* Docstrings are formatted in `NumPy style <https://numpydoc.readthedocs.io/en/latest/format.html>`_.
+* Lines are no longer than 120 characters.
+* All tests still pass::
 
-* All other tests pass:
+    cd /path/to/your/clone/of/heudiconv
+    pytest -vvs .
+
 * New code should be accompanied by new tests.
