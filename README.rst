@@ -51,6 +51,12 @@ into structured directory layouts.
 - It integrates with `DataLad <https://www.datalad.org/>`_ to place converted and original data under git/git-annex
   version control while automatically annotating files with sensitive information (e.g., non-defaced anatomicals, etc).
 
+Installation
+------------
+
+See our `installation page <https://heudiconv.readthedocs.io/en/latest/installation.html>`_ 
+on heudiconv.readthedocs.io
+
 HOWTO 101
 ---------
 
