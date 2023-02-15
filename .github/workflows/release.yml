@@ -67,8 +67,9 @@ jobs:
         run: |
           docker build \
             -t nipy/heudiconv:master \
+            -t nipy/heudiconv:unstable \
             -t nipy/heudiconv:latest \
-            -t nipy/heudiconv:"$(git describe)" \
+            -t nipy/heudiconv:"$(git describe | sed -e 's,^v,,g')" \
             .
 
       - name: Push Docker images
