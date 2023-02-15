@@ -34,6 +34,7 @@ jobs:
           git describe --match 'v[0-9]*' | grep -q -e - && (
               docker login -u "$DOCKER_LOGIN" --password-stdin <<<"$DOCKER_TOKEN"
               docker push nipy/heudiconv:master
+              docker push nipy/heudiconv:unstable
           )
         env:
           DOCKER_LOGIN: ${{ secrets.DOCKER_LOGIN }}
