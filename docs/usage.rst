@@ -2,7 +2,7 @@
 Usage
 =====
 
-``heudiconv`` processes DICOM files and converts the output into user defined
+``heudiconv`` processes DICOM files and structures the output into user defined
 paths.
 
 CommandLine Arguments
@@ -32,8 +32,9 @@ http://neurostars.org/tags/heudiconv/
 Batch jobs
 ==========
 
-``heudiconv`` can natively handle multi-subject, multi-session conversions,
-although it will process these linearly. To speed this up, multiple ``heudiconv``
+``heudiconv`` can natively handle multi-subject, multi-session conversions
+although it will do these conversions in a linear manner, i.e. one subject and one session at a time.
+To speed up these conversions, multiple ``heudiconv``
 processes can be spawned concurrently, each converting a different subject and/or
 session.
 
