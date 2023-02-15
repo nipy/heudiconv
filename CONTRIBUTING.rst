@@ -63,7 +63,7 @@ We support Python 3 only (>= 3.7).
 
 Dependencies which you will need are `listed in the repository <heudiconv/info.py>`_.
 Note that you will likely have these will already be available on your system if you used a
-package manger (e.g. Debian's ``apt-get``, Gentoo's ``emerge``, or simply PIP) to install the
+package manager (e.g. Debian's ``apt-get``, Gentoo's ``emerge``, or simply PIP) to install the
 software.
 
 Development work might require live access to the copy of HeuDiConv which is being developed.
