@@ -180,7 +180,8 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
             grouping,
             file_filter=getattr(heuristic, 'filter_files', None),
             dcmfilter=getattr(heuristic, 'filter_dicom', None),
-            custom_grouping=getattr(heuristic, 'grouping', None)
+            custom_grouping=getattr(heuristic, 'grouping', None),
+            custom_seqinfo=getattr(heuristic, 'custom_seqinfo', None),
         )
 
         if sids:
