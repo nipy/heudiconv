@@ -29,10 +29,6 @@ affiliations:
 date: 2023-01-31
 bibliography: paper.bib
 
-# Optional fields if submitting to a AAS journal too, see this blog post:
-# https://blog.joss.theoj.org/2018/12/a-new-collaboration-with-aas-publishing
-aas-doi: 10.3847/xxxxx <- update this with the DOI from AAS once you know it.
-aas-journal: Astrophysical Journal <- The name of the AAS journal.
 ---
 
 # Summary
@@ -50,23 +46,17 @@ performing numerical orbit integration).
 # Statement of need
 
 Neuroimaging is an empirical field of science heavily relying on efficient data acquisition, harmonization, and processing.
-Neuroimaging data acquired by MRI scanners usually are exported from them in a set of formats, with DICOM (Digital Imaging and Communications in Medicine) being the standard metadata-rich form.
-Data in DICOM format is usually transmitted to PACS (Picture Archiving and Communication Systems) servers.
-Unlike in clinical settings, where data is interfaced directly from PACS in DICOM format, in neuroimaging research tools typically expect data in much simpler NIfTI [@TODOnifti] format.
-NIfTI file format carries only basic metadata and does not instruct how to organize multiple files within a study.
-HeuDiConv was developer to provide flexible tooling for labs to be able efficiently and consistently convert collections of DICOM files into collections of NIfTI (and compressed archives of DICOMs) files in desired file system hierarchies.
-Since the inception of HeuDiConv in 2014, a community-driven standard Brain Imaging Data Structure (BIDS) [@TODO] was established, which formalized such datasets layout and storage of metadata.
-Since then the most frequent use-case for HeuDiConv became conversion of DICOM files into BIDS datasets.
-Standardization into BIDS facilitated not only reuse of already shared datasets but also facilitate data validation, curation, analysis, etc.
+Neuroimaging data acquired by MRI scanners usually are exported from them in a set of formats, with DICOM (Digital Imaging and Communications in Medicine) being a standard metadata-rich form.
+Data in DICOM format is usually transmitted to PACS (Picture Archiving and Communication Systems) servers for archival and possibly further processing.
+Unlike in clinical settings, where data is interfaced directly from PACS in DICOM format, in neuroimaging research tools typically expect data in much simpler NIfTI [@nifticlib] format.
+Tools such as `dcm2niix` [@Li_2016] can be used to convert individual DICOM files into named NIfTI and even can extract some additional extra metadata into sidecar `.json` files. 
+But NIfTI file format carries only basic metadata and `dcm2niix` does not instruct how to organize multiple files within a study.
 
-`Gala` was designed to be used by both astronomical researchers and by
-students in courses on gravitational dynamics or astronomy. It has already been
-used in a number of scientific publications [@Pearson:2017] and has also been
-used in graduate courses on Galactic dynamics to, e.g., provide interactive
-visualizations of textbook material [@Binney:2008]. The combination of speed,
-design, and support for Astropy functionality in `Gala` will enable exciting
-scientific explorations of forthcoming data releases from the *Gaia* mission
-[@gaia] by students and experts alike.
+HeuDiConv was developed to provide flexible tooling for labs to be able efficiently and consistently convert collections of DICOM files into collections of NIfTI (and compressed archives of DICOMs) files in desired file system hierarchies.
+Since the inception of HeuDiConv in 2014, a community-driven standard Brain Imaging Data Structure (BIDS) [@GAC+16] was established, which formalized such datasets layout and storage of metadata.
+Since then the most frequent use-case for HeuDiConv became conversion of DICOM files into BIDS datasets.
+Standardization into BIDS facilitates not only reuse of already shared datasets but also streamlines data validation, curation, analysis, etc.
+
 
 # Mathematics
 
