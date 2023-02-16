@@ -108,6 +108,19 @@ or::
         ...
         return seqinfos  # ordered dict containing seqinfo objects: list of DICOMs
 
+---------------------------------------------------------------
+``custom_seqinfo(series_files, wrapper)``
+---------------------------------------------------------------
+If present this function will be called on eacg group of dicoms with
+a sample nibabel dicom wrapper to extract additional information
+to be used in ``infotodict``.
+
+Importantly the return value of that function needs to be hashable.
+For instance the following non-hashable types can be converted to an alternative
+hashable type:
+- list > tuple
+- dict > frozendict
+- arrays > bytes (tobytes(), or pickle.dumps), str or tuple of tuples.
 
 -------------------------------
 ``POPULATE_INTENDED_FOR_OPTS``
