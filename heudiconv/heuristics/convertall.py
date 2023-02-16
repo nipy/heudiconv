@@ -21,7 +21,7 @@ def custom_seqinfo(wrapper: dw.Wrapper, series_files: list[str], **kw: Any) -> t
     # for already loaded DICOM data, and including storing/returning
     # the sample series file as was requested
     # in https://github.com/nipy/heudiconv/pull/333
-    return wrapper.affine, series_files[0]
+    return wrapper.affine.tostring(), series_files[0]
 
 
 def infotodict(
