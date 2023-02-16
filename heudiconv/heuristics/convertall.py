@@ -12,7 +12,12 @@ def custom_seqinfo(series_files, wrapper, **kw):
     # for already loaded DICOM data, and including storing/returning
     # the sample series file as was requested
     # in https://github.com/nipy/heudiconv/pull/333
-    return wrapper.affine.tostring(), series_files[0]
+    from nibabel.nicom.dicomwrappers import WrapperError
+    try:
+        affine = wrapper.affine.tostring()
+    except WrapperError:
+        affine = None
+    return affine, series_files[0]
 
 
 def infotodict(seqinfo):
