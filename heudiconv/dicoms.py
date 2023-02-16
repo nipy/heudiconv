@@ -90,6 +90,15 @@ def create_seqinfo(
     global total_files
     total_files += len(series_files)
 
+    custom_seqinfo_data = custom_seqinfo(wrapper=mw, series_files=series_files) \
+        if custom_seqinfo else None
+    try:
+        hash(custom_seqinfo_data)
+    except TypeError:
+        raise RuntimeError("Data returned by the heuristics custom_seqinfo is not hashable. "
+                           "See https://heudiconv.readthedocs.io/en/latest/heuristics.html#custom_seqinfo for more "
+                           "details.")
+
     return SeqInfo(
         total_files_till_now=total_files,
         example_dcm_file=op.basename(series_files[0]),
@@ -119,9 +128,7 @@ def create_seqinfo(
         date=dcminfo.get("AcquisitionDate"),
         series_uid=dcminfo.get("SeriesInstanceUID"),
         time=dcminfo.get("AcquisitionTime"),
-        custom =
-            custom_seqinfo(wrapper=mw, series_files=series_files)
-            if custom_seqinfo else None,
+        custom=custom_seqinfo_data,
     )
 
 
