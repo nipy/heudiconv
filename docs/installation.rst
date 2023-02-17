@@ -30,7 +30,7 @@ within container, i.e. like::
 
     $ docker run --user=$(id -u):$(id -g) -e "UID=$(id -u)" -e "GID=$(id -g)" --rm -t -v $PWD:$PWD nipy/heudiconv:latest [OPTIONS TO FOLLOW]
 
-`ReproIn heuristic project <https://reproin.repronim.org>`_ provides its own Docker images from
+`ReproIn heuristic project <http://reproin.repronim.org>`_ provides its own Docker images from
 Docker Hub `repronim/reproin` which bundle its `reproin` helper.
 
 Singularity
