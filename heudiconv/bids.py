@@ -14,6 +14,7 @@ import csv
 from random import sample
 from glob import glob
 import errno
+import warnings
 
 from .external.pydicom import dcm
 
@@ -500,6 +501,7 @@ def get_formatted_scans_key_row(dcm_fn):
     row = ['n/a' if not str(e) else e for e in row]
     return row
 
+
 def convert_sid_bids(subject_id):
     """Shim for stripping any non-BIDS compliant characters within subject_id
 
@@ -514,11 +516,10 @@ def convert_sid_bids(subject_id):
     subject_id : string
         Original subject ID
     """
-    sid, subject_id = sanitize_label(subject_id)
-    lgr.warning('Deprecation warning: convert_sid_bids() is deprecated, '
-                'please use sanitize_label() instead.')
-    
-    return sid, subject_id
+    warnings.warn('convert_sid_bids() is deprecated, '
+                  'please use sanitize_label() instead.',
+                  DeprecationWarning)
+    return sanitize_label(subject_id)
 
 
 def get_shim_setting(json_file):
@@ -1046,6 +1047,6 @@ def sanitize_label(label):
             "Label became empty after cleanup.  Please provide manually "
             "a suitable alphanumeric label.")
     if clean_label != label:
-        lgr.warning('{0} contained nonalphanumeric character(s), label '
-                    'was cleaned to be {1}'.format(label, clean_label))
+        lgr.warning('%r label contained non-alphanumeric character(s), it '
+                    'was cleaned to be %r', label, clean_label)
     return clean_label, label
