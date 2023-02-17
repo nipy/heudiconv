@@ -1037,11 +1037,8 @@ def sanitize_label(label):
     -------
     clean_label : string
         New, sanitized label
-    label : string
-        Original label
     """
-    cleaner = lambda y: ''.join([x for x in y if x.isalnum()])
-    clean_label = cleaner(label)
+    clean_label = ''.join(x for x in label if x.isalnum())
     if not clean_label:
         raise ValueError(
             "Label became empty after cleanup.  Please provide manually "
@@ -1049,4 +1046,4 @@ def sanitize_label(label):
     if clean_label != label:
         lgr.warning('%r label contained non-alphanumeric character(s), it '
                     'was cleaned to be %r', label, clean_label)
-    return clean_label, label
+    return clean_label
