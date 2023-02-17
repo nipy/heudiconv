@@ -47,7 +47,7 @@ Singularity YODA style using ///repronim/containers
 ReproNim project provides `///repronim/containers <http://datasets.datalad.org/?dir=/repronim/containers>`_
 (git clone present also on `GitHub <https://github.com/ReproNim/containers>`__) `DataLad
 <https://datalad.org>`_ dataset with Singularity containers for many popular neuroimaging tools, e.g. all BIDS-Apps.
-It also contains converted from Docker singularity images for stock heudiconv images (as `nipy-heudiconv
+It contains converted from Docker singularity images for stock heudiconv images (as `nipy-heudiconv
 <https://github.com/ReproNim/containers/tree/master/images/nipy>`__) and reproin images (as `repronim-reproin
 <https://github.com/ReproNim/containers/tree/master/images/repronim>`__). Please see `"A typical workflow"
 <https://github.com/ReproNim/containers#a-typical-workflow>`_ section for a prototypical example of using
