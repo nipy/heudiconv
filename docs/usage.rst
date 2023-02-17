@@ -2,7 +2,7 @@
 Usage
 =====
 
-``heudiconv`` processes DICOM files and structures the output into user defined
+``heudiconv`` processes DICOM files and converts the output into user defined
 paths.
 
 CommandLine Arguments
