@@ -26,7 +26,7 @@ from .utils import (
     file_md5sum
 )
 from .bids import (
-    convert_sid_bids,
+    sanitize_label,
     populate_bids_templates,
     populate_intended_for,
     save_scans_key,
@@ -102,8 +102,9 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
         if not sid:
             raise ValueError(
                 "BIDS requires alphanumeric subject ID. Got an empty value")
-        if not sid.isalnum():  # alphanumeric only
-            sid, old_sid = convert_sid_bids(sid)
+        sid = sanitize_label(sid)
+        if ses:
+            ses = sanitize_label(ses)
 
     if not anon_sid:
         anon_sid = sid
