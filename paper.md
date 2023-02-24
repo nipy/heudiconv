@@ -33,15 +33,13 @@ bibliography: paper.bib
 
 # Summary
 
-The forces on stars, galaxies, and dark matter under external gravitational
-fields lead to the dynamical evolution of structures in the universe. The orbits
-of these bodies are therefore key to understanding the formation, history, and
-future state of galaxies. The field of "galactic dynamics," which aims to model
-the gravitating components of galaxies to study their structure and evolution,
-is now well-established, commonly taught, and frequently used in astronomy.
-Aside from toy problems and demonstrations, the majority of problems require
-efficient numerical tools, many of which require the same base code (e.g., for
-performing numerical orbit integration).
+For the most efficient processing neuroimaging data must be formatted according to data standards used by researchers in the field, and supported by the analytics software.
+HeuDiConv (Heuristic DICOM Converter) allows for flexible and efficient conversion of acquired neuroimaging data from DICOM format (used by the scanners and in clinical settings) to Brain Imaging Data Structure (BIDS) [@GAC+16] which is the community-driven standard in neuroimaging research. 
+HeuDiConv allows for either two stage (discover, manually tune, perform conversion) or fully automated conversion of collections of DICOMs to BIDS, or if desired, some other files layouts.
+HeuDiConv, written in Python, extracts metadata from DICOM files, groups those files into sessions for indepdent conversions, and provides extracted metadata to a provided or custom heuristic, also written in Python, to decide on how the output file needs to be named.
+In case of conversion specifically to BIDS it follows up with additional logic to handle specific data types (e.g., multi-echo sequeneces, SBRef volumes).
+HeuDiConv also integrates with DataLad [@datalad] to prepare DataLad datasets with settings to ensure that data and sensitive metadata (e.g. `_scans.tsv` files) are saved to `git-annex` and the rest to `git`, to provide fake commit dates to avoid leaking of sensitive "patient visit" dates, etc.
+As a result, given that anyone can prepare a custom heuristic based on idiosyncracies of a specific study or entire imaging center, in tandem with implemented automatizations HeuDiConv can become a very flexible and powerful tool in every neuroimaging workflow. 
 
 # Statement of need
 
@@ -57,55 +55,21 @@ Since the inception of HeuDiConv in 2014, a community-driven standard Brain Imag
 Since then the most frequent use-case for HeuDiConv became conversion of DICOM files into BIDS datasets.
 Standardization into BIDS facilitates not only reuse of already shared datasets but also streamlines data validation, curation, analysis, etc.
 
+# Overview of HeuDiConv functionality
 
-# Mathematics
+## Exemplar heuristics
 
-Single dollars ($) are required for inline mathematics e.g. $f(x) = e^{\pi/x}$
+### ReproIn heuristic
 
-Double dollars make self-standing equations:
-
-$$\Theta(x) = \left\{\begin{array}{l}
-0\textrm{ if } x < 0\cr
-1\textrm{ else}
-\end{array}\right.$$
-
-You can also use plain \LaTeX for equations
-\begin{equation}\label{eq:fourier}
-\hat f(\omega) = \int_{-\infty}^{\infty} f(x) e^{i\omega x} dx
-\end{equation}
-and refer to \autoref{eq:fourier} from text.
-
-# Citations
-
-Citations to entries in paper.bib should be in
-[rMarkdown](http://rmarkdown.rstudio.com/authoring_bibliographies_and_citations.html)
-format.
-
-If you want to cite a software repository URL (e.g. something on GitHub without a preferred
-citation) then you can do it with the example BibTeX entry below for @fidgit.
-
-For a quick reference, the following citation commands can be used:
-- `@author:2001`  ->  "Author et al. (2001)"
-- `[@author:2001]` -> "(Author et al., 2001)"
-- `[@author1:2001; @author2:2001]` -> "(Author1 et al., 2001; Author2 et al., 2002)"
-
-# Figures
-
-Figures can be included like this:
-![Caption for example figure.\label{fig:example}](figure.png)
-and referenced from text using \autoref{fig:example}.
-
-Figure sizes can be customized by adding an optional second parameter:
-![Caption for example figure.](figure.png){ width=20% }
-
-# Conflicts of interest
-
-There are no conflicts to declare.
+ReproIn heuristic was initially developed at Dartmouth Brain Imaging Center (DBIC) to maximally automate data conversion to BIDS for *any* neuroimaging study at the center.
+The principle behind ReproIn is minimization of overall time effort by investing only negligible time at the beginning to organize and name of the MRI programs on the scanner in agreement with ReproIn specification.
+As a result, later transmitted as DICOMs data could *in principle* be fully automatically placed into corresponding study datasets and fully automatically converted.
+It is *in principle* fully automat .... KIDS ...!!!
 
 # Acknowledgements
 
 We would like to extend our gratitude to
-TODO
+ADD YOUR NAME HERE
 for notable contributions to the codebase, bug reports, recommendations, and promotion of HeuDiConv.
 
 HeuDiConv development was primarily done under the umbrella of the NIH funded ReproNim [1P41EB019936-01A1](https://projectreporter.nih.gov/project_info_details.cfm?aid=8999833&map=y) and [TODO - renewal](TODO) (PI: Kennedy).
