@@ -68,6 +68,7 @@ It is *in principle* fully automat .... KIDS ...!!!
 
 # Adoption/Usage
 
+- HeuDiConv has [RRID RRID:SCR_017427](https://scicrunch.org/resolver/RRID:SCR_017427) which mentions already [6 mentions in papers](https://scicrunch.org/resolver/SCR_017427/mentions?q=&i=rrid:scr_017427)
 - TODO: plot from etelem.csv (executions per week), add downloads from PyPI
   
 - Over 40 datasets were converted using HeuDiConv with ReproIn heuristic over to BIDS at DBIC.
