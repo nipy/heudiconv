@@ -66,6 +66,17 @@ The principle behind ReproIn is minimization of overall time effort by investing
 As a result, later transmitted as DICOMs data could *in principle* be fully automatically placed into corresponding study datasets and fully automatically converted.
 It is *in principle* fully automat .... KIDS ...!!!
 
+# Adoption/Usage
+
+- TODO: plot from etelem.csv (executions per week), add downloads from PyPI
+  
+- Over 40 datasets were converted using HeuDiConv with ReproIn heuristic over to BIDS at DBIC.
+
+- Used for PET data conversion [@JZC+21:PET], shared as OpenNeuro ds003382 [@openneuro.ds003382.v1.0.0]
+
+- Inspired development of `fw-heudiconv` (FlywheelTools: Software for HeuDiConv-Style BIDS Curation On Flywheel) [@TCB+21:fw-heudiconv] 
+
+
 # Acknowledgements
 
 We would like to extend our gratitude to
