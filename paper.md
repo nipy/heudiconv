@@ -33,27 +33,31 @@ bibliography: paper.bib
 
 # Summary
 
-For the most efficient processing neuroimaging data must be formatted according to data standards used by researchers in the field, and supported by the analytics software.
-HeuDiConv (Heuristic DICOM Converter) allows for flexible and efficient conversion of acquired neuroimaging data from DICOM format (used by the scanners and in clinical settings) to Brain Imaging Data Structure (BIDS) [@GAC+16] which is the community-driven standard in neuroimaging research. 
-HeuDiConv allows for either two stage (discover, manually tune, perform conversion) or fully automated conversion of collections of DICOMs to BIDS, or if desired, some other files layouts.
-HeuDiConv, written in Python, extracts metadata from DICOM files, groups those files into sessions for indepdent conversions, and provides extracted metadata to a provided or custom heuristic, also written in Python, to decide on how the output file needs to be named.
-In case of conversion specifically to BIDS it follows up with additional logic to handle specific data types (e.g., multi-echo sequeneces, SBRef volumes).
-HeuDiConv also integrates with DataLad [@datalad] to prepare DataLad datasets with settings to ensure that data and sensitive metadata (e.g. `_scans.tsv` files) are saved to `git-annex` and the rest to `git`, to provide fake commit dates to avoid leaking of sensitive "patient visit" dates, etc.
-As a result, given that anyone can prepare a custom heuristic based on idiosyncracies of a specific study or entire imaging center, in tandem with implemented automatizations HeuDiConv can become a very flexible and powerful tool in every neuroimaging workflow. 
+In order to support efficient and transparent processing, as provided by cutting-edge Free and/or Open Source (FOSS) tools, neuroimaging data must be formatted according to equally open and accessible standards.
+The Brain Imaging Data Structure (BIDS) [@GAC+16] is an open standard designed for computational accessibility, operator legibility, and a wide and easily extendable scope of modalities — and is consequently used by numerous analysis and processing tools as the preferred input format.
+HeuDiConv (Heuristic DICOM Converter) enables flexible and efficient conversion of spatially reconstructed neuroimaging data from the DICOM format (quasi-ubiquitous in biomedical image acquisition systems, particularly in clinical settings) to BIDS, as well as other file layouts.
+This can be done either via a multi-stage operator input workflow (discovery, manual tuning, conversion) or via a fully automated process that can be seamlessly integrated into a data pipeline.
+HeuDiConv is written in Python, and supports the DICOM specification for input parsing, and the BIDS specification for output construction.
+The support for these standards is extensive, and HeuDiConv can handle complex organization scenarios such as arise for specific data types (e.g. multi-echo sequences, or single-band reference volumes).
+In addition to generating valid BIDS outputs, additional support is offered for custom output layouts.
+This is obtained via a set of example heuristiscs, which can be modified into supplemental heuristics expressed as simple Python functions, thus providing full flexibility and maintaining user accessibility.
+HeuDiConv further integrates with DataLad [@datalad], and can automatically prepare DataLad archives with optional obfuscation of sensitive data and metadata, including obfuscating patient visit timestamps in version control.
+As a result, given its extensibility, large modality support, and integration with advanced data management technologies, HeuDiConv has become a mainstay in numerous neuroimaging workflows, and constitutes a powerful and highly adaptable tool of potential interest to large swathes of the neuroimaging community.
 
-# Statement of need
 
-Neuroimaging is an empirical field of science heavily relying on efficient data acquisition, harmonization, and processing.
-Neuroimaging data acquired by MRI scanners usually are exported from them in a set of formats, with DICOM (Digital Imaging and Communications in Medicine) being a standard metadata-rich form.
-Data in DICOM format is usually transmitted to PACS (Picture Archiving and Communication Systems) servers for archival and possibly further processing.
-Unlike in clinical settings, where data is interfaced directly from PACS in DICOM format, in neuroimaging research tools typically expect data in much simpler NIfTI [@nifticlib] format.
-Tools such as `dcm2niix` [@Li_2016] can be used to convert individual DICOM files into named NIfTI and even can extract some additional extra metadata into sidecar `.json` files. 
-But NIfTI file format carries only basic metadata and `dcm2niix` does not instruct how to organize multiple files within a study.
+# Statement of Need
 
-HeuDiConv was developed to provide flexible tooling for labs to be able efficiently and consistently convert collections of DICOM files into collections of NIfTI (and compressed archives of DICOMs) files in desired file system hierarchies.
-Since the inception of HeuDiConv in 2014, a community-driven standard Brain Imaging Data Structure (BIDS) [@GAC+16] was established, which formalized such datasets layout and storage of metadata.
-Since then the most frequent use-case for HeuDiConv became conversion of DICOM files into BIDS datasets.
-Standardization into BIDS facilitates not only reuse of already shared datasets but also streamlines data validation, curation, analysis, etc.
+Neuroimaging is an empirical research area which relies heavily on efficient data acquisition, harmonization, and processing.
+Neuroimaging data sourced from medical imaging equipment, and in particular magnetic resonance imaging (MRI) scanners, can be exported in numerous formats, among which DICOM (Digital Imaging and Communications in Medicine) is most prominent.
+DICOM data are often transmitted to PACS (Picture Archiving and Communication Systems) servers for archiving or further processing.
+Unlike in clinical settings, where data are interfaced with directly from PACS in the DICOM format, in neuroimaging research, tools typically require data files in the much simpler (and metadata-restricted) NIfTI [@nifticlib] format.
+Tools such as `dcm2niix` [@Li_2016] can be used to convert *individual* DICOM files into named NIfTI files, and can extract metadata fields not covered by the NIfTI header into sidecar `.json` files.
+However, the scope of such tools is limited, as it does not extend to organizing *multiple* files within a study.
+
+HeuDiConv was developed to provide flexible tooling so that labs may rapidly and consistently convert collections of DICOM files into collections of NIfTI files in customizable file system hierarchies.
+Since the inception of HeuDiConv in 2014, the BIDS standard [@GAC+16] was established.
+This standard formalizes data file hierarchies and metadata storage in a fashion which, due to its community-driven nature, is both highly optimized and widely understood by analysis tools.
+Since then, DICOM conversion to NIfTI files contained within a BIDS hierarchy has emerged as the most frequent use-case for HeuDiConv.
 
 # Overview of HeuDiConv functionality
 
@@ -61,9 +65,9 @@ Standardization into BIDS facilitates not only reuse of already shared datasets 
 
 ### ReproIn heuristic
 
-ReproIn heuristic was initially developed at Dartmouth Brain Imaging Center (DBIC) to maximally automate data conversion to BIDS for *any* neuroimaging study at the center.
-The principle behind ReproIn is minimization of overall time effort by investing only negligible time at the beginning to organize and name of the MRI programs on the scanner in agreement with ReproIn specification.
-As a result, later transmitted as DICOMs data could *in principle* be fully automatically placed into corresponding study datasets and fully automatically converted.
+The ReproIn heuristic was initially developed at the Dartmouth Brain Imaging Center (DBIC) to automate data conversion into BIDS for any neuroimaging study performed using the center's facilities.
+The core principle behind ReproIn is the reduction of operator interaction requirements by ensuring that reference MRI sequences on the instrumentation are named in such a way that upon usage in any experimental protocol they will encode the information required for fully automatic conversion and repositing of the resulting data.
+
 It is *in principle* fully automat .... KIDS ...!!!
 
 # Acknowledgements
