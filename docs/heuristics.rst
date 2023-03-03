@@ -111,7 +111,7 @@ or::
 ---------------------------------------------------------------
 ``custom_seqinfo(series_files, wrapper)``
 ---------------------------------------------------------------
-If present this function will be called on eacg group of dicoms with
+If present this function will be called on each group of dicoms with
 a sample nibabel dicom wrapper to extract additional information
 to be used in ``infotodict``.
 
