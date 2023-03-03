@@ -58,5 +58,5 @@ the `YODA Principles <https://github.com/myyoda/poster/blob/master/ohbm2018.pdf>
 the documentation of this collection.
 
 **Note:** With the ``datalad containers-run`` command, the images in this collection work on macOS (OSX)
-as well for ``datalad containers-run`` automagically takes care of running the Singularity containers via Docker.
+as well for ``repronim/containers`` helpers automagically take care of running the Singularity containers via Docker.
 
