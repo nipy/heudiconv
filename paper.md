@@ -41,7 +41,7 @@ HeuDiConv is written in Python, and supports the DICOM specification for input p
 The support for these standards is extensive, and HeuDiConv can handle complex organization scenarios such as arise for specific data types (e.g., multi-echo sequences, or single-band reference volumes).
 In addition to generating valid BIDS outputs, additional support is offered for custom output layouts.
 This is obtained via a set of example heuristiscs, which can be modified into supplemental heuristics expressed as simple Python functions, thus providing full flexibility and maintaining user accessibility.
-HeuDiConv further integrates with DataLad [@datalad], and can automatically prepare DataLad archives with optional obfuscation of sensitive data and metadata, including obfuscating patient visit timestamps in version control.
+HeuDiConv further integrates with DataLad [@datalad], and can automatically prepare DataLad datasets with optional obfuscation of sensitive data and metadata, including obfuscating patient visit timestamps in version control.
 As a result, given its extensibility, large modality support, and integration with advanced data management technologies, HeuDiConv has become a mainstay in numerous neuroimaging workflows, and constitutes a powerful and highly adaptable tool of potential interest to large swathes of the neuroimaging community.
 
 
