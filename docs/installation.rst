@@ -49,7 +49,7 @@ neuroimaging tools, e.g. all the BIDS-Apps. This collection also includes the fo
 images for `HeuDiConv <https://github.com/ReproNim/containers/tree/master/images/nipy>`_ and
 `ReproIn <https://github.com/ReproNim/containers/tree/master/images/repronim>`_ in the Singularity image format. This collection is available as a
 `DataLad <https://datalad.org>`_ dataset at `///repronim/containers <http://datasets.datalad.org/?dir=/repronim/containers>`_
-on `Datalad.org <http://datalad.org>`_ and as `a GitHub repo <https://github.com/ReproNim/containers>`_.
+on `datasets.datalad.org <http://datasets.datalad.org>`_ and as `a GitHub repo <https://github.com/ReproNim/containers>`_.
 The HeuDiConv and ReproIn container images are named ``nipy-heudiconv`` and ``repronim-reproin``, respectively, in this collection.
 To use them, you can install the DataLad dataset and then use the ``datalad containers-run`` command to run.
 For a more detailed example of using images from this collection while fulfilling
