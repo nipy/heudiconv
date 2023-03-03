@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from typing import Any, Optional
 
 from heudiconv.dicoms import dw
 from heudiconv.utils import SeqInfo
+
+lgr = logging.getLogger('heudiconv')
 
 
 def create_key(
@@ -25,6 +28,7 @@ def custom_seqinfo(wrapper: dw.Wrapper, series_files: list[str], **kw: Any) -> t
     try:
         affine = wrapper.affine.tostring()
     except WrapperError:
+        lgr.exception("Errored out while obtaining/converting affine")
         affine = None
     return affine, series_files[0]
 
