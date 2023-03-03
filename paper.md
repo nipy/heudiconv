@@ -55,6 +55,8 @@ Tools such as `dcm2niix` [@Li_2016] can be used to convert *individual* DICOM fi
 However, the scope of such tools is limited, as it does not extend to organizing *multiple* files within a study.
 
 HeuDiConv was developed to provide flexible tooling so that labs may rapidly and consistently convert collections of DICOM files into collections of NIfTI files in customizable file system hierarchies.
+As manual file renaming and metadata reorganization is tedious and error prone, automation is preferable, and this is a consistent focus of HeuDiConv.
+
 Since the inception of HeuDiConv in 2014, the BIDS standard [@GAC+16] was established.
 This standard formalizes data file hierarchies and metadata storage in a fashion which, due to its community-driven nature, is both highly optimized and widely understood by analysis tools.
 Since then, DICOM conversion to NIfTI files contained within a BIDS hierarchy has emerged as the most frequent use-case for HeuDiConv.
