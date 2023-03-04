@@ -68,7 +68,7 @@ Since then, DICOM conversion to NIfTI files contained within a BIDS hierarchy ha
 ### ReproIn heuristic
 
 The ReproIn heuristic was initially developed at the Dartmouth Brain Imaging Center (DBIC) to automate data conversion into BIDS for any neuroimaging study performed using the center's facilities.
-The core principle behind ReproIn is the reduction of operator interaction requirements by ensuring that reference MRI sequences on the instrumentation are named in such a way that upon usage in any experimental protocol they will encode the information required for fully automatic conversion and repositing of the resulting data.
+The core principle behind ReproIn is the reduction of operator interaction requirements by ensuring that reference MRI sequences on the instrumentation are organized and named in such a way that upon usage in any experimental protocol they will encode the information required for fully automatic conversion and repositing of the resulting data.
 
 It is *in principle* fully automat .... KIDS ...!!!
 
