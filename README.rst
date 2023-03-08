@@ -96,15 +96,7 @@ all relevant citations via `DueCredit <http://duecredit.org>`_.
 How to contribute
 -----------------
 
-HeuDiConv sources are managed with Git on `GitHub <https://github.com/nipy/heudiconv/>`_.
-Please file issues and suggest changes via Pull Requests.
+For a detailed into, see our `contributing guide <CONTRIBUTING.rst>`_.
 
-HeuDiConv requires installation of `dcm2niix`_ and optionally `DataLad`_.
-
-For development, you will need a non-shallow clone (so there is a
-recent released tag) of the aforementioned repository. Once you have cloned the repository,
-you can then install all the necessary development requirements using ``pip install -r
-dev-requirements.txt``.  Testing is done using `pytest
-<https://docs.pytest.org/>`_.  Releases are packaged using Intuit
-auto.  Workflow for releases and preparation of Docker images is in
-``.github/workflows/release.yml``.
+Our releases are packaged using Intuit auto, with the corresponding workflow including
+Docker image preparation being found in ``.github/workflows/release.yml``.
