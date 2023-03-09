@@ -268,7 +268,7 @@ def group_dicoms_into_seqinfos(files, grouping, file_filter=None,
         if mw.image_shape is None:
             # this whole thing has no image data (maybe just PSg DICOMs)
             # If this is a Siemens PhoenixZipReport or PhysioLog, keep it:
-            if mw.dcm_data.SeriesDescription == 'PhoenixZIPReport':
+            if mw.dcm_data.get('SeriesDescription') == 'PhoenixZIPReport':
                 # give it a dummy shape, so that we can continue:
                 mw.image_shape = (0, 0, 0)
             else:

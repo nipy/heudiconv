@@ -42,6 +42,7 @@ from heudiconv.bids import (
     AllowedCriteriaForFmapAssignment,
     KeyInfoForForce,
     BIDSFile,
+    sanitize_label,
 )
 from heudiconv.cli.run import main as runner
 
@@ -1155,3 +1156,8 @@ def test_ME_mag_phase_conversion(tmpdir, subID='MEGRE', heuristic='bids_ME.py'):
                     % (subID, subID, e, part, ext)
                 )
 
+
+def test_sanitize_label():
+    assert sanitize_label('az XZ-@09') == 'azXZ09'
+    with pytest.raises(ValueError):
+        sanitize_label(' @ ')

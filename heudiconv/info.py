@@ -14,20 +14,21 @@ CLASSIFIERS = [
     'Programming Language :: Python :: 3.7',
     'Programming Language :: Python :: 3.8',
     'Programming Language :: Python :: 3.9',
-    # needs fixing
-    # 'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
     'Topic :: Scientific/Engineering'
 ]
 
 PYTHON_REQUIRES = ">=3.7"
 
 REQUIRES = [
-    'nibabel',
-    'pydicom',
-    'nipype >=1.2.3',
+    'dcm2niix',
     'dcmstack>=0.8',
     'etelemetry',
     'filelock>=3.0.12',
+    'nibabel',
+    'nipype >=1.2.3',
+    'pydicom',
 ]
 
 TESTS_REQUIRES = [

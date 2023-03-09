@@ -26,7 +26,7 @@ from .utils import (
     file_md5sum
 )
 from .bids import (
-    convert_sid_bids,
+    sanitize_label,
     populate_bids_templates,
     populate_intended_for,
     save_scans_key,
@@ -102,8 +102,9 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
         if not sid:
             raise ValueError(
                 "BIDS requires alphanumeric subject ID. Got an empty value")
-        if not sid.isalnum():  # alphanumeric only
-            sid, old_sid = convert_sid_bids(sid)
+        sid = sanitize_label(sid)
+        if ses:
+            ses = sanitize_label(ses)
 
     if not anon_sid:
         anon_sid = sid
@@ -505,7 +506,12 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
             elif outtype in ['nii', 'nii.gz']:
                 assert converter == 'dcm2niix', ('Invalid converter '
                                                  '{}'.format(converter))
-
+                due.cite(
+                    Doi('10.1016/j.jneumeth.2016.03.001'),
+                    path='dcm2niix',
+                    description="DICOM to NIfTI + .json sidecar conversion utility",
+                    tags=["implementation"]
+                )
                 outname, scaninfo = (prefix + '.' + outtype,
                                      prefix + scaninfo_suffix)
 
@@ -860,7 +866,10 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
 
 
 def add_taskname_to_infofile(infofiles):
-    """Add the "TaskName" field to json files corresponding to func images.
+    """Add the "TaskName" field to json files with _task- entity in the name.
+
+    Note: _task- entity could be present not only in functional data
+    but in many other modalities now.
 
     Parameters
     ----------
@@ -879,7 +888,8 @@ def add_taskname_to_infofile(infofiles):
                                                op.basename(infofile))
                                      .group(0).split('_')[0])
         except AttributeError:
-            lgr.warning("Failed to find task field in {0}.".format(infofile))
+            # leave it to bids-validator to validate/inform about presence
+            # of required entities/fields.
             continue
 
         # write to outfile

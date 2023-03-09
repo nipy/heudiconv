@@ -14,6 +14,7 @@ import csv
 from random import sample
 from glob import glob
 import errno
+import warnings
 
 from .external.pydicom import dcm
 
@@ -155,6 +156,9 @@ def populate_bids_templates(path, defaults={}):
     create_file_if_missing(op.join(path, 'scans.json'),
         json_dumps(SCANS_FILE_FIELDS, sort_keys=False)
     )
+    create_file_if_missing(op.join(path, '.bidsignore'), ".duecredit.p")
+    if op.lexists(op.join(path, '.git')):
+        create_file_if_missing(op.join(path, '.gitignore'), ".duecredit.p")
 
     populate_aggregated_jsons(path)
 
@@ -493,7 +497,7 @@ def get_formatted_scans_key_row(dcm_fn) -> list[str]:
 
 
 def convert_sid_bids(subject_id):
-    """Strips any non-BIDS compliant characters within subject_id
+    """Shim for stripping any non-BIDS compliant characters within subject_id
 
     Parameters
     ----------
@@ -506,15 +510,10 @@ def convert_sid_bids(subject_id):
     subject_id : string
         Original subject ID
     """
-    cleaner = lambda y: ''.join([x for x in y if x.isalnum()])
-    sid = cleaner(subject_id)
-    if not sid:
-        raise ValueError(
-            "Subject ID became empty after cleanup.  Please provide manually "
-            "a suitable alphanumeric subject ID")
-    lgr.warning('{0} contained nonalphanumeric character(s), subject '
-                'ID was cleaned to be {1}'.format(subject_id, sid))
-    return sid, subject_id
+    warnings.warn('convert_sid_bids() is deprecated, '
+                  'please use sanitize_label() instead.',
+                  DeprecationWarning)
+    return sanitize_label(subject_id)
 
 
 def get_shim_setting(json_file):
@@ -1019,3 +1018,26 @@ class BIDSFile(object):
     @property
     def extension(self):
         return self._extension
+
+
+def sanitize_label(label):
+    """Strips any non-BIDS compliant characters within label
+
+    Parameters
+    ----------
+    label : string
+
+    Returns
+    -------
+    clean_label : string
+        New, sanitized label
+    """
+    clean_label = ''.join(x for x in label if x.isalnum())
+    if not clean_label:
+        raise ValueError(
+            "Label became empty after cleanup.  Please provide manually "
+            "a suitable alphanumeric label.")
+    if clean_label != label:
+        lgr.warning('%r label contained non-alphanumeric character(s), it '
+                    'was cleaned to be %r', label, clean_label)
+    return clean_label
