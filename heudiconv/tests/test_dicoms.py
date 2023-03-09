@@ -148,7 +148,7 @@ def test_get_reproducible_int():
 
 @pytest.fixture
 def test_get_reproducible_int_wo_dt(tmp_path):
-    # can this function return an int when we don't have any useable dates?
+    # can this function return an int when we don't have any usable dates?
     typical_dcm = dcm.dcmread(op.join(TESTS_DATA_PATH, 'phantom.dcm'), stop_before_pixels=True)
     del typical_dcm.SeriesDate
     del typical_dcm.AcquisitionDate
