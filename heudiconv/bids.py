@@ -14,6 +14,7 @@ import csv
 from random import sample
 from glob import glob
 import errno
+import typing
 import warnings
 
 from .external.pydicom import dcm
@@ -462,7 +463,7 @@ def add_rows_to_scans_keys_file(fn, newrows):
         writer.writerows([header] + data_rows_sorted)
 
 
-def get_formatted_scans_key_row(dcm_fn) -> list[str]:
+def get_formatted_scans_key_row(dcm_fn) -> typing.List[str]:
     """
     Parameters
     ----------
