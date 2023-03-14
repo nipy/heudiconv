@@ -1,3 +1,15 @@
+# v0.12.2 (Tue Mar 14 2023)
+
+#### 🏠 Internal
+
+- [DATALAD RUNCMD] produce updated dockerfile [#652](https://github.com/nipy/heudiconv/pull/652) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 1
+
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v0.12.1 (Tue Mar 14 2023)
 
 #### 🐛 Bug Fix
