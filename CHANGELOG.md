@@ -1,3 +1,22 @@
+# v0.12.1 (Tue Mar 14 2023)
+
+#### 🐛 Bug Fix
+
+- Re-add explicit instructions to install dcm2niix "manually" and remove it from install_requires [#651](https://github.com/nipy/heudiconv/pull/651) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### 📝 Documentation
+
+- Contributing guide. [#641](https://github.com/nipy/heudiconv/pull/641) ([@TheChymera](https://github.com/TheChymera))
+- Reword and correct punctuation on installation.rst [#643](https://github.com/nipy/heudiconv/pull/643) ([@yarikoptic](https://github.com/yarikoptic) [@candleindark](https://github.com/candleindark))
+
+#### Authors: 3
+
+- Horea Christian ([@TheChymera](https://github.com/TheChymera))
+- Isaac To ([@candleindark](https://github.com/candleindark))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v0.12.0 (Tue Feb 21 2023)
 
 #### 🚀 Enhancement
