@@ -169,7 +169,7 @@ def group_dicoms_into_seqinfos(files, grouping, file_filter=None,
       `seqinfo` is a list of info entries per each sequence (some entry
       there defines a key for `filegrp`)
     filegrp : dict
-      `filegrp` is a dictionary with files groupped per each sequence
+      `filegrp` is a dictionary with files grouped per each sequence
     """
     allowed_groupings = ['studyUID', 'accession_number', 'all', 'custom']
     if grouping not in allowed_groupings:

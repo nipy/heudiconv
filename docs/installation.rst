@@ -13,6 +13,11 @@ If installing through ``PyPI``, eg::
 
     pip install heudiconv[all]
 
+Manual installation of `dcm2niix <https://github.com/rordenlab/dcm2niix#install>`_
+is required. You can also benefit from an installer/downloader helper ``dcm2niix`` package
+on ``PyPI``, so you can simply ``pip install dcm2niix`` if you are installing in user space so
+subsequently it would be able to download and install dcm2niix binary.
+
 On Debian-based systems, we recommend using `NeuroDebian <http://neuro.debian.net>`_,
 which provides the `heudiconv package <http://neuro.debian.net/pkgs/heudiconv.html>`_.
 
