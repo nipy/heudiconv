@@ -22,7 +22,8 @@ CLASSIFIERS = [
 PYTHON_REQUIRES = ">=3.7"
 
 REQUIRES = [
-    'dcm2niix',
+    # not usable in some use cases since might be just a downloader, not binary
+    # 'dcm2niix',
     'dcmstack>=0.8',
     'etelemetry',
     'filelock>=3.0.12',
