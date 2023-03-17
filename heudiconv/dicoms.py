@@ -1,9 +1,12 @@
 # dicom operations
+import datetime
 import os
 import os.path as op
 import logging
 from collections import OrderedDict
 import tarfile
+
+from typing import List, Optional
 
 from .external.pydicom import dcm
 from .utils import (
@@ -314,19 +317,87 @@ def group_dicoms_into_seqinfos(files, grouping, file_filter=None,
     return seqinfos
 
 
-def get_dicom_series_time(dicom_list):
-    """Get time in seconds since epoch from dicom series date and time
-    Primarily to be used for reproducible time stamping
+def get_reproducible_int(dicom_list: List[str]) -> int:
+    """Get integer that can be used to reproducibly sort input DICOMs, which is based on when they were acquired.
+
+    Parameters
+    ----------
+    dicom_list : List[str]
+        Paths to existing DICOM files
+
+    Returns
+    -------
+    int
+        An integer relating to when the DICOM was acquired
+
+    Raises
+    ------
+    AssertionError
+
+    Notes
+    -----
+    
+    1. When date and time for can be read (see :func:`get_datetime_from_dcm`), return
+        that value as time in seconds since epoch (i.e., Jan 1 1970).
+    2. In cases where a date/time/datetime is not available (e.g., anonymization stripped this info), return
+        epoch + AcquisitionNumber (in seconds), which is AcquisitionNumber as an integer
+    3. If 1 and 2 are not possible, then raise AssertionError and provide message about missing information
+
+    Cases are based on only the first element of the dicom_list.
+
     """
-    import time
     import calendar
 
     dicom = dcm.read_file(dicom_list[0], stop_before_pixels=True, force=True)
-    dcm_date = dicom.SeriesDate  # YYYYMMDD
-    dcm_time = dicom.SeriesTime  # HHMMSS.MICROSEC
-    dicom_time_str = dcm_date + dcm_time.split('.', 1)[0]  # YYYYMMDDHHMMSS
-    # convert to epoch
-    return calendar.timegm(time.strptime(dicom_time_str, '%Y%m%d%H%M%S'))
+    dicom_datetime = get_datetime_from_dcm(dicom)
+    if dicom_datetime:
+        return calendar.timegm(dicom_datetime.timetuple())
+    
+    acquisition_number = dicom.get('AcquisitionNumber')
+    if acquisition_number:
+        return int(acquisition_number)
+    
+    raise AssertionError(
+        "No metadata found that can be used to sort DICOMs reproducibly. Was header information erased?"
+        )
+
+
+def get_datetime_from_dcm(dcm_data: dcm.FileDataset) -> Optional[datetime.datetime]:
+    """Extract datetime from filedataset, or return None is no datetime information found.
+
+    Parameters
+    ----------
+    dcm_data : dcm.FileDataset
+        DICOM with header, e.g., as ready by pydicom.dcmread.
+        Objects with __getitem__ and have those keys with values properly formatted may also work
+
+    Returns
+    -------
+    Optional[datetime.datetime]
+        One of several datetimes that are related to when the scan occurred, or None if no datetime can be found
+
+    Notes
+    ------
+    The following fields are checked in order
+
+    1. AcquisitionDate & AcquisitionTime  (0008,0022); (0008,0032)
+    2. AcquisitionDateTime (0008,002A);
+    3. SeriesDate & SeriesTime  (0008,0021); (0008,0031)
+
+    """
+    acq_date = dcm_data.get("AcquisitionDate")
+    acq_time = dcm_data.get("AcquisitionTime")
+    if not (acq_date is None or acq_time is None):
+        return datetime.datetime.strptime(acq_date+acq_time, "%Y%m%d%H%M%S.%f")
+
+    acq_dt = dcm_data.get("AcquisitionDateTime")
+    if not acq_dt is None:
+        return datetime.datetime.strptime(acq_dt, "%Y%m%d%H%M%S.%f")    
+
+    series_date = dcm_data.get("SeriesDate")
+    series_time = dcm_data.get("SeriesTime")
+    if not (series_date is None or series_time is None):
+        return datetime.datetime.strptime(series_date+series_time, "%Y%m%d%H%M%S.%f")
 
 
 def compress_dicoms(dicom_list, out_prefix, tempdirs, overwrite):
@@ -364,9 +435,9 @@ def compress_dicoms(dicom_list, out_prefix, tempdirs, overwrite):
     # Solution from DataLad although ugly enough:
 
     dicom_list = sorted(dicom_list)
-    dcm_time = get_dicom_series_time(dicom_list)
+    dcm_time = get_reproducible_int(dicom_list)
 
-    def _assign_dicom_time(ti):
+    def _assign_dicom_time(ti: tarfile.TarInfo) -> tarfile.TarInfo:
         # Reset the date to match the one from the dicom, not from the
         # filesystem so we could sort reproducibly
         ti.mtime = dcm_time
