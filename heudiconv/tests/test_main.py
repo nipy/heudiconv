@@ -1,16 +1,21 @@
 # TODO: break this up by modules
+import logging
 
 from heudiconv.cli.run import main as runner
-from heudiconv.main import workflow
+from heudiconv.main import (workflow,
+                            process_extra_commands)
 from heudiconv import __version__
 from heudiconv.utils import (create_file_if_missing,
+                             load_json,
                              set_readonly,
                              is_readonly)
 from heudiconv.bids import (populate_bids_templates,
                             add_participant_record,
                             get_formatted_scans_key_row,
                             add_rows_to_scans_keys_file,
-                            find_subj_ses)
+                            find_subj_ses,
+                            SCANS_FILE_FIELDS,
+                            )
 from heudiconv.external.dlad import MIN_VERSION, add_to_datalad
 
 from .utils import TESTS_DATA_PATH
@@ -81,6 +86,8 @@ def test_populate_bids_templates(tmpdir):
     assert "something" not in description_file.read()
     assert "TODO" in description_file.read()
 
+    assert load_json(tmpdir / "scans.json") == SCANS_FILE_FIELDS
+
 
 def test_add_participant_record(tmpdir):
     tf = tmpdir.join('participants.tsv')
@@ -124,9 +131,11 @@ def test_prepare_for_datalad(tmpdir):
 
     # the last one should have been the study
     target_files = {
+        '.bidsignore',
         '.gitattributes',
         '.datalad/config', '.datalad/.gitattributes',
         'dataset_description.json',
+        'scans.json',
         'CHANGES', 'README'}
     assert set(ds.repo.get_indexed_files()) == target_files
     # and all are under git
@@ -155,7 +164,7 @@ def test_prepare_for_datalad(tmpdir):
     assert '.heudiconv/dummy.nii.gz' in ds.repo.get_files()
 
     # Let's now roll back and make it a proper submodule
-    ds.repo._git_custom_command([], ['git', 'reset', '--hard', old_hexsha])
+    ds.repo.call_git(['reset', '--hard', old_hexsha])
     # now we do not add dummy to git
     create_file_if_missing(dummy_path, '')
     add_to_datalad(str(tmpdir), studydir_, None, False)
@@ -217,7 +226,9 @@ def test_add_rows_to_scans_keys_file(tmpdir):
         assert dates == sorted(dates)
 
     _check_rows(fn, rows)
-    assert op.exists(opj(tmpdir.strpath, 'file.json'))
+    # we no longer produce a sidecar .json file there and only generate
+    # it while populating templates for BIDS
+    assert not op.exists(opj(tmpdir.strpath, 'file.json'))
     # add a new one
     extra_rows = {
         'a_new_file.nii.gz': ['2016adsfasd23', '', 'fasadfasdf'],
@@ -283,6 +294,11 @@ def test_cache(tmpdir):
     assert (cachedir / 'S01.auto.txt').exists()
     assert (cachedir / 'S01.edit.txt').exists()
 
+    # check dicominfo has "time" as last column:
+    with open(str(cachedir / 'dicominfo.tsv'), 'r') as f:
+        cols = f.readline().split()
+    assert cols[26] == "time"
+
 
 def test_no_etelemetry():
     # smoke test at large - just verifying that no crash if no etelemetry
@@ -290,3 +306,56 @@ def test_no_etelemetry():
     with patch.dict('sys.modules', {'etelemetry': None}):
         workflow(outdir='/dev/null', command='ls',
                  heuristic='reproin', files=[])
+
+
+# Test two scenarios:
+# -study without sessions
+# -study with sessions
+# The "expected_folder" is the session folder without the tmpdir
+@pytest.mark.parametrize(
+    "session, expected_folder", [
+        ('', 'foo/sub-{sID}'),
+        ('pre', 'foo/sub-{sID}/ses-pre')
+    ]
+)
+def test_populate_intended_for(tmpdir, session, expected_folder, caplog):
+    """
+    Tests for "process_extra_commands" when the command is
+    'populate-intended-for'
+    """
+    # Because the function .utils.populate_intended_for already has its own
+    # tests, here we just test that "process_extra_commands", when 'command'
+    # is 'populate_intended_for' does what we expect (loop through the list of
+    # subjects and calls 'populate_intended_for' using the 'POPULATE_INTENDED_FOR_OPTS'
+    # defined in the heuristic file 'example.py'). We call it using folders
+    # that don't exist, and check that the output is the expected.
+    bids_folder = expected_folder.split('sub-')[0]
+    subjects = ['1', '2']
+    caplog.set_level(logging.INFO)
+    process_extra_commands(bids_folder, 'populate-intended-for', [], '',
+                           'example', session, subjects, None)
+    for s in subjects:
+        expected_info = 'Adding "IntendedFor" to the fieldmaps in ' + expected_folder.format(sID=s)
+        assert any(expected_info in co.message for co in caplog.records)
+
+    # try the same, but without specifying the subjects or the session.
+    # the code in main should find any subject in the output folder and call
+    # populate_intended_for on each of them (or for each of the sessions, if
+    # the data for that subject is organized in sessions):
+    # TODO: Add a 'participants.tsv' file with one of the subjects missing;
+    #  the 'process_extra_commands' call should print out a warning
+    caplog.clear()
+    outdir = opj(str(tmpdir), bids_folder)
+    for subj in subjects:
+        subj_dir = opj(outdir, 'sub-' + subj)
+        print('Creating output dir: %s', subj_dir)
+        os.makedirs(subj_dir)
+        if session:
+            os.makedirs(opj(subj_dir, 'ses-' + session))
+    process_extra_commands(outdir, 'populate-intended-for', [], '',
+                           'example', [], [], None)
+    for s in subjects:
+        expected_info = 'Adding "IntendedFor" to the fieldmaps in ' + opj(str(tmpdir), expected_folder.format(sID=s))
+        assert any(expected_info in co.message for co in caplog.records)
+
+

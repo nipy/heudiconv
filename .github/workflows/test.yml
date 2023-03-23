@@ -1,0 +1,61 @@
+name: Test
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      BOTO_CONFIG: /tmp/nowhere
+      DATALAD_TESTS_SSH: '1'
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - '3.7'
+          - '3.8'
+          - '3.9'
+          - '3.10'
+          - '3.11'
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install git-annex
+        run: |
+          # The ultimate one-liner setup for NeuroDebian repository
+          bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
+          sudo apt-get update -qq
+          sudo apt-get install git-annex-standalone dcm2niix
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip wheel
+          pip install -r dev-requirements.txt
+          pip install requests # below installs pyld but that assumes we have requests already
+          pip install datalad
+          pip install coverage pytest
+
+      - name: Configure Git identity
+        run: |
+          git config --global user.email "test@github.land"
+          git config --global user.name "GitHub Almighty"
+
+      - name: Run tests with coverage
+        run: coverage run `which pytest` -s -v heudiconv
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          fail_ci_if_error: false
+
+# vim:set et sts=2:

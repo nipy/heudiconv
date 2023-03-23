@@ -14,6 +14,7 @@ from collections import namedtuple
 from glob import glob
 from subprocess import check_output
 from datetime import datetime
+from time import sleep
 
 from nipype.utils.filemanip import which
 
@@ -46,7 +47,8 @@ seqinfo_fields = [
     'patient_sex',           # 23
     'date',                  # 24
     'series_uid',            # 25
- ]
+    'time',                  # 26
+]
 
 SeqInfo = namedtuple('SeqInfo', seqinfo_fields)
 
@@ -109,7 +111,13 @@ def docstring_parameter(*sub):
 
 
 def anonymize_sid(sid, anon_sid_cmd):
-
+    """
+    Raises
+    ------
+    ValueError
+      if script returned an empty string (after whitespace stripping),
+      or output with multiple words/lines.
+    """
     cmd = [anon_sid_cmd, sid]
     shell_return = check_output(cmd)
 
@@ -118,7 +126,14 @@ def anonymize_sid(sid, anon_sid_cmd):
     else:
         anon_sid = shell_return
 
-    return anon_sid.strip()
+    anon_sid = anon_sid.strip()
+    if not anon_sid:
+        raise ValueError(f"{anon_sid_cmd!r} {sid!r} returned empty sid")
+    # rudimentary check for sanity: no multiple lines or words (in general
+    # ok, but not ok for BIDS) in the output
+    if len(anon_sid.split()) > 1:
+        raise ValueError(f"{anon_sid_cmd!r} {sid!r} returned multiline output")
+    return anon_sid
 
 
 def create_file_if_missing(filename, content):
@@ -146,39 +161,40 @@ def write_config(outfile, info):
         fp.writelines(PrettyPrinter().pformat(info))
 
 
-def _canonical_dumps(json_obj, **kwargs):
-    """ Dump `json_obj` to string, allowing for Python newline bug
-
-    Runs ``json.dumps(json_obj, \*\*kwargs), then removes trailing whitespaces
-    added when doing indent in some Python versions. See
-    https://bugs.python.org/issue16333. Bug seems to be fixed in 3.4, for now
-    fixing manually not only for aestetics but also to guarantee the same
-    result across versions of Python.
-    """
-    out = json.dumps(json_obj, **kwargs)
-    if 'indent' in kwargs:
-        out = out.replace(' \n', '\n')
-    return out
-
-
-def load_json(filename):
+def load_json(filename, retry=0):
     """Load data from a json file
 
     Parameters
     ----------
     filename : str
         Filename to load data from.
+    retry: int, optional
+        Number of times to retry opening/loading the file in case of
+        failure.  Code will sleep for 0.1 seconds between retries.
+        Could be used in code which is not sensitive to order effects
+        (e.g. like populating bids templates where the last one to
+        do it, would make sure it would be the correct/final state).
 
     Returns
     -------
     data : dict
     """
-    try:
-        with open(filename, 'r') as fp:
-            data = json.load(fp)
-    except JSONDecodeError:
-        lgr.error("{fname} is not a valid json file".format(fname=filename))
-        raise
+    assert retry >= 0
+    for i in range(retry + 1):  # >= 10 sec wait
+        try:
+            try:
+                with open(filename, 'r') as fp:
+                    data = json.load(fp)
+                    break
+            except JSONDecodeError:
+                lgr.error("{fname} is not a valid json file".format(fname=filename))
+                raise
+        except (JSONDecodeError, FileNotFoundError) as exc:
+            if i >= retry:
+                raise
+            lgr.warning("Caught %s. Will retry again", exc)
+            sleep(0.1)
+            continue
 
     return data
     
@@ -219,10 +235,16 @@ def save_json(filename, data, indent=2, sort_keys=True, pretty=False):
                 % (str(exc), filename)
             )
     if not pretty:
-        j = _canonical_dumps(data, **dumps_kw)
+        j = json_dumps(data, **dumps_kw)
     assert j is not None  # one way or another it should have been set to a str
     with open(filename, 'w') as fp:
         fp.write(j)
+
+
+def json_dumps(json_obj, indent=2, sort_keys=True):
+    """Unified (default indent and sort_keys) invocation of json.dumps
+    """
+    return json.dumps(json_obj, indent=indent, sort_keys=sort_keys)
 
 
 def json_dumps_pretty(j, indent=2, sort_keys=True):
@@ -231,26 +253,26 @@ def json_dumps_pretty(j, indent=2, sort_keys=True):
 
     If resultant structure differs from original -- throws exception
     """
-    js = _canonical_dumps(j, indent=indent, sort_keys=sort_keys)
+    js = json_dumps(j, indent=indent, sort_keys=sort_keys)
     # trim away \n and spaces between entries of numbers
     js_ = re.sub(
         '[\n ]+("?[-+.0-9e]+"?,?) *\n(?= *"?[-+.0-9e]+"?)', r' \1',
         js, flags=re.MULTILINE)
     # uniform no spaces before ]
-    js_ = re.sub(" *\]", "]", js_)
+    js_ = re.sub(r" *\]", "]", js_)
     # uniform spacing before numbers
     # But that thing could screw up dates within strings which would have 2 spaces
     # in a date like Mar  3 2017, so we do negative lookahead to avoid changing
     # in those cases
     #import pdb; pdb.set_trace()
     js_ = re.sub(
-        '(?<!\w{3})'    # negative lookbehind for the month
-        '  *("?[-+.0-9e]+"?)'
-        '(?! [123]\d{3})'  # negative lookahead for a year
-        '(?P<space> ?)[ \n]*',
+        r'(?<!\w{3})'    # negative lookbehind for the month
+        r'  *("?[-+.0-9e]+"?)'
+        r'(?! [123]\d{3})'  # negative lookahead for a year
+        r'(?P<space> ?)[ \n]*',
         r' \1\g<space>', js_)
     # no spaces after [
-    js_ = re.sub('\[ ', '[', js_)
+    js_ = re.sub(r'\[ ', '[', js_)
     # the load from the original dump and reload from tuned up
     # version should result in identical values since no value
     # must be changed, just formatting.
@@ -262,6 +284,34 @@ def json_dumps_pretty(j, indent=2, sort_keys=True):
        "Report to the heudiconv developers"
 
     return js_
+
+
+def update_json(json_file, new_data, pretty=False):
+    """
+    Adds a given field (and its value) to a json file
+
+    Parameters
+    -----------
+    json_file : str or Path
+        path for the corresponding json file
+    new_data : dict
+        pair of "key": "value" to add to the json file
+    pretty : bool
+        argument to be passed to save_json
+    """
+    for key, value in new_data.items():
+        lgr.debug(
+            'File "{f}": Setting {k} to {v}'.format(
+                f=json_file,
+                k=key,
+                v=value,
+            )
+        )
+
+    with open(json_file) as f:
+        data = json.load(f)
+    data.update(new_data)
+    save_json(json_file, data, pretty=pretty)
 
 
 def treat_infofile(filename):
@@ -354,18 +404,35 @@ def get_known_heuristics_with_descriptions():
 
 
 def safe_copyfile(src, dest, overwrite=False):
-    """Copy file but blow if destination name already exists
+    """Copy file but blow if destination name already exists"""
+    return _safe_op_file(src, dest, "copyfile", overwrite=overwrite)
+
+
+def safe_movefile(src, dest, overwrite=False):
+    """Move file but blow if destination name already exists"""
+    return _safe_op_file(src, dest, "move", overwrite=overwrite)
+
+
+def _safe_op_file(src, dest, operation, overwrite=False):
+    """Copy or move file but blow if destination name already exists
+
+    Parameters
+    ----------
+    operation: str, {copyfile, move}
     """
     if op.isdir(dest):
         dest = op.join(dest, op.basename(src))
+    if op.realpath(src) == op.realpath(dest):
+        lgr.debug("Source %s = destination %s", src, dest)
+        return
     if op.lexists(dest):
         if not overwrite:
             raise RuntimeError(
-                "was asked to copy %s but destination already exists: %s"
-                % (src, dest)
+                "was asked to %s %s but destination already exists: %s"
+                % (operation, src, dest)
             )
         os.unlink(dest)
-    shutil.copyfile(src, dest)
+    getattr(shutil, operation)(src, dest)
 
 
 # Globals to check filewriting permissions
@@ -477,7 +544,11 @@ def create_tree(path, tree, archives_leading_dir=True):
             executable = False
             name = file_
         full_name = op.join(path, name)
-        if isinstance(load, (tuple, list, dict)):
+        if name.endswith('.json') and isinstance(load, dict):
+            # (For a json file, we expect the content to be a dictionary, so
+            #  don't continue creating a tree, but just write dict to file)
+            save_json(full_name, load)
+        elif isinstance(load, (tuple, list, dict)):
             # if name.endswith('.tar.gz') or name.endswith('.tar') or name.endswith('.zip'):
             #     create_tree_archive(path, name, load, archives_leading_dir=archives_leading_dir)
             # else:
@@ -536,3 +607,41 @@ def get_datetime(date, time, *, microseconds=True):
     if not microseconds:
         datetime_str = datetime_str.split('.', 1)[0]
     return datetime_str
+
+
+def remove_suffix(s, suf):
+    """
+    Remove suffix from the end of the string
+
+    Parameters
+    ----------
+    s : str
+    suf : str
+
+    Returns
+    -------
+    s : str
+        string with "suf" removed from the end (if present)
+    """
+    if suf and s.endswith(suf):
+        return s[:-len(suf)]
+    return s
+
+
+def remove_prefix(s, pre):
+    """
+    Remove prefix from the beginning of the string
+
+    Parameters
+    ----------
+    s : str
+    pre : str
+
+    Returns
+    -------
+    s : str
+        string with "pre" removed from the beginning (if present)
+    """
+    if pre and s.startswith(pre):
+        return s[len(pre):]
+    return s

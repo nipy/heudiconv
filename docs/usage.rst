@@ -32,8 +32,9 @@ http://neurostars.org/tags/heudiconv/
 Batch jobs
 ==========
 
-``heudiconv`` can natively handle multi-subject, multi-session conversions,
-although it will process these linearly. To speed this up, multiple ``heudiconv``
+``heudiconv`` can natively handle multi-subject, multi-session conversions
+although it will do these conversions in a linear manner, i.e. one subject and one session at a time.
+To speed up these conversions, multiple ``heudiconv``
 processes can be spawned concurrently, each converting a different subject and/or
 session.
 
@@ -47,7 +48,7 @@ If using bids, the ``notop`` bids option suppresses creation of
 top-level files in the bids directory (e.g.,
 ``dataset_description.json``) to avoid possible race conditions.
 These files may be generated later with ``populate_templates.sh``
-below (except for ``participants.tsv``, which must be create
+below (except for ``participants.tsv``, which must be created
 manually).
 
 .. code:: shell
@@ -82,7 +83,7 @@ The second script processes a DICOM directory with ``heudiconv`` using the built
     DCMDIR=${DCMDIRS[${SLURM_ARRAY_TASK_ID}]}
     echo Submitted directory: ${DCMDIR}
 
-    IMG="/singularity-images/heudiconv-0.8.0-dev.sif"
+    IMG="/singularity-images/heudiconv-latest-dev.sif"
     CMD="singularity run -B ${DCMDIR}:/dicoms:ro -B ${OUTDIR}:/output -e ${IMG} --files /dicoms/ -o /output -f reproin -c dcm2niix -b notop --minmeta -l ."
 
     printf "Command:\n${CMD}\n"
@@ -92,12 +93,13 @@ The second script processes a DICOM directory with ``heudiconv`` using the built
 This script creates the top-level bids files (e.g.,
 ``dataset_description.json``)
 
-..code:: shell
+.. code:: shell
+
     #!/bin/bash
     set -eu
 
     OUTDIR=${1}
-    IMG="/singularity-images/heudiconv-0.8.0-dev.sif"
+    IMG="/singularity-images/heudiconv-latest-dev.sif"
     CMD="singularity run -B ${OUTDIR}:/output -e ${IMG} --files /output -f reproin --command populate-templates"
 
     printf "Command:\n${CMD}\n"

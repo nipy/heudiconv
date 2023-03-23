@@ -7,8 +7,13 @@ from six.moves import StringIO
 
 from glob import glob
 from os.path import join as pjoin, dirname
+from pathlib import Path
 import csv
 import re
+
+from .. import __version__
+from ..bids import HEUDICONV_VERSION_JSON_KEY
+from ..utils import load_json
 
 import pytest
 from .utils import TESTS_DATA_PATH
@@ -40,7 +45,7 @@ def test_smoke_convertall(tmpdir):
 @pytest.mark.parametrize('heuristic', ['reproin', 'convertall'])
 @pytest.mark.parametrize(
     'invocation', [
-        "--files %s" % TESTS_DATA_PATH,    # our new way with automated groupping
+        "--files %s" % TESTS_DATA_PATH,    # our new way with automated grouping
         "-d %s/{subject}/* -s 01-fmap_acq-3mm" % TESTS_DATA_PATH # "old" way specifying subject
         # should produce the same results
     ])
@@ -64,7 +69,7 @@ def test_reproin_largely_smoke(tmpdir, heuristic, invocation):
             runner(args + ['--subjects', 'sub1', 'sub2'])
 
         if heuristic != 'reproin':
-            # if subject is not overriden, raise error
+            # if subject is not overridden, raise error
             with pytest.raises(NotImplementedError):
                 runner(args)
             return
@@ -85,7 +90,10 @@ def test_reproin_largely_smoke(tmpdir, heuristic, invocation):
 
     # but there should be nothing new
     assert not ds.repo.dirty
-    assert head == ds.repo.get_hexsha()
+    # TODO: remove whenever https://github.com/datalad/datalad/issues/6843
+    # is fixed/released
+    buggy_datalad = (ds.pathobj / ".gitmodules").read_text().splitlines().count('[submodule "Halchenko"]') > 1
+    assert head == ds.repo.get_hexsha() or buggy_datalad
 
     # unless we pass 'overwrite' flag
     runner(args + ['--overwrite'])
@@ -93,12 +101,12 @@ def test_reproin_largely_smoke(tmpdir, heuristic, invocation):
     # and at the same commit
     assert ds.is_installed()
     assert not ds.repo.dirty
-    assert head == ds.repo.get_hexsha()
+    assert head == ds.repo.get_hexsha() or buggy_datalad
 
 
 @pytest.mark.parametrize(
     'invocation', [
-        "--files %s" % TESTS_DATA_PATH,    # our new way with automated groupping
+        "--files %s" % TESTS_DATA_PATH,    # our new way with automated grouping
     ])
 def test_scans_keys_reproin(tmpdir, invocation):
     args = "-f reproin -c dcm2niix -o %s -b " % (tmpdir)
@@ -116,7 +124,7 @@ def test_scans_keys_reproin(tmpdir, invocation):
             if i != 0:
                 assert(os.path.exists(pjoin(dirname(scans_keys[0]), row[0])))
                 assert(re.match(
-                    '^[\d]{4}-[\d]{2}-[\d]{2}T[\d]{2}:[\d]{2}:[\d]{2}.[\d]{6}$',
+                    r'^[\d]{4}-[\d]{2}-[\d]{2}T[\d]{2}:[\d]{2}:[\d]{2}.[\d]{6}$',
                     row[1]))
 
 
@@ -140,16 +148,22 @@ def test_scout_conversion(tmpdir):
     ).split(' ') + ['-o', tmppath]
     runner(args)
 
-    assert not op.exists(pjoin(
-        tmppath,
-        'Halchenko/Yarik/950_bids_test4/sub-phantom1sid1/ses-localizer/anat'))
+    dspath = Path(tmppath) / 'Halchenko/Yarik/950_bids_test4'
+    sespath = dspath / 'sub-phantom1sid1/ses-localizer'
 
-    assert op.exists(pjoin(
-        tmppath,
-        'Halchenko/Yarik/950_bids_test4/sourcedata/sub-phantom1sid1/'
-        'ses-localizer/anat/sub-phantom1sid1_ses-localizer_scout.dicom.tgz'
-    )
-    )
+    assert not (sespath / 'anat').exists()
+    assert (
+        dspath /
+        'sourcedata/sub-phantom1sid1/ses-localizer/'
+        'anat/sub-phantom1sid1_ses-localizer_scout.dicom.tgz'
+    ).exists()
+
+    # Let's do some basic checks on produced files
+    j = load_json(sespath / 'fmap/sub-phantom1sid1_ses-localizer_acq-3mm_phasediff.json')
+    # We store HeuDiConv version in each produced .json file
+    # TODO: test that we are not somehow overwriting that version in existing
+    # files which we have not produced in a particular run.
+    assert j[HEUDICONV_VERSION_JSON_KEY] == __version__
 
 
 @pytest.mark.parametrize(
@@ -176,3 +190,20 @@ def test_notop(tmpdir, bidsoptions):
             assert not op.exists(pjoin(tmppath, 'Halchenko/Yarik/950_bids_test4', fname))
         else:
             assert op.exists(pjoin(tmppath, 'Halchenko/Yarik/950_bids_test4', fname))
+
+
+def test_phoenix_doc_conversion(tmpdir):
+    tmppath = tmpdir.strpath
+    subID = 'Phoenix'
+    args = (
+        "-c dcm2niix -o %s -b -f bids_PhoenixReport --files %s -s %s"
+        % (tmpdir, pjoin(TESTS_DATA_PATH, 'Phoenix'), subID)
+    ).split(' ')
+    runner(args)
+
+    # check that the Phoenix document has been extracted (as gzipped dicom) in
+    # the sourcedata/misc folder:
+    assert op.exists(pjoin(tmppath, 'sourcedata', 'sub-%s', 'misc', 'sub-%s_phoenix.dicom.tgz') % (subID, subID))
+    # check that no "sub-<subID>/misc" folder has been created in the BIDS
+    # structure:
+    assert not op.exists(pjoin(tmppath, 'sub-%s', 'misc') % subID)

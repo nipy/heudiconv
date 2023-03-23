@@ -1,0 +1,43 @@
+name: Build Docker image
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+
+      - name: Generate Dockerfile
+        run: bash gen-docker-image.sh
+        working-directory: utils
+
+      - name: Build Docker image
+        run: |
+          # build only if not release tag, i.e. has some "-" in describe
+          # so we do not duplicate work with release workflow.
+          git describe --match 'v[0-9]*' | grep -q -e - && \
+              docker build \
+                -t nipy/heudiconv:master \
+                -t nipy/heudiconv:unstable \
+                .
+
+      - name: Push Docker image
+        run: |
+          git describe --match 'v[0-9]*' | grep -q -e - && (
+              docker login -u "$DOCKER_LOGIN" --password-stdin <<<"$DOCKER_TOKEN"
+              docker push nipy/heudiconv:master
+              docker push nipy/heudiconv:unstable
+          )
+        env:
+          DOCKER_LOGIN: ${{ secrets.DOCKER_LOGIN }}
+          DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+
+# vim:set sts=2:

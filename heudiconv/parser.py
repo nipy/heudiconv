@@ -1,3 +1,4 @@
+import atexit
 import logging
 import os
 import os.path as op
@@ -14,16 +15,22 @@ from .dicoms import group_dicoms_into_seqinfos
 from .utils import (
     docstring_parameter,
     StudySessionInfo,
+    TempDirs,
 )
 
 lgr = logging.getLogger(__name__)
+tempdirs = TempDirs()
+# Ensure they are cleaned up upon exit
+atexit.register(tempdirs.cleanup)
 
-_VCS_REGEX = '%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (op.sep, op.sep)
+_VCS_REGEX = r'%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (op.sep, op.sep)
+
 
 @docstring_parameter(_VCS_REGEX)
 def find_files(regex, topdir=op.curdir, exclude=None,
                exclude_vcs=True, dirs=False):
     """Generator to find files matching regex
+
     Parameters
     ----------
     regex: basestring
@@ -32,12 +39,16 @@ def find_files(regex, topdir=op.curdir, exclude=None,
     exclude_vcs:
       If True, excludes commonly known VCS subdirectories.  If string, used
       as regex to exclude those files (regex: `{}`)
-    topdir: basestring, optional
+    topdir: basestring or list, optional
       Directory where to search
     dirs: bool, optional
       Either to match directories as well as files
     """
-
+    if isinstance(topdir, (list, tuple)):
+        for topdir_ in topdir:
+            yield from find_files(
+                regex, topdir=topdir_, exclude=exclude, exclude_vcs=exclude_vcs, dirs=dirs)
+        return
     for dirpath, dirnames, filenames in os.walk(topdir):
         names = (dirnames + filenames) if dirs else filenames
         paths = (op.join(dirpath, name) for name in names)
@@ -51,7 +62,8 @@ def find_files(regex, topdir=op.curdir, exclude=None,
 
 
 def get_extracted_dicoms(fl):
-    """Given a list of files, possibly extract some from tarballs
+    """Given a list of files, possibly extract some from tarballs.
+
     For 'classical' heudiconv, if multiple tarballs are provided, they correspond
     to different sessions, so here we would group into sessions and return
     pairs  `sessionid`, `files`  with `sessionid` being None if no "sessions"
@@ -62,12 +74,12 @@ def get_extracted_dicoms(fl):
     #     raise ValueError("some but not all input files are tar files")
 
     # tarfiles already know what they contain, and often the filenames
-    # are unique, or at least in a unqiue subdir per session
+    # are unique, or at least in a unique subdir per session
     # strategy: extract everything in a temp dir and assemble a list
     # of all files in all tarballs
 
     # cannot use TempDirs since will trigger cleanup with __del__
-    tmpdir = mkdtemp(prefix='heudiconvDCM')
+    tmpdir = tempdirs('heudiconvDCM')
 
     sessions = defaultdict(list)
     session = 0
@@ -127,13 +139,15 @@ def get_extracted_dicoms(fl):
 
 def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
                        session, sids, grouping='studyUID'):
-    """Given options from cmdline sort files or dicom seqinfos into
-    study_sessions which put together files for a single session of a subject
-    in a study
-    Two major possible workflows:
+    """Sort files or dicom seqinfos into study_sessions.
+
+    study_sessions put together files for a single session of a subject
+    in a study.  Two major possible workflows:
+
     - if dicom_dir_template provided -- doesn't pre-load DICOMs and just
       loads files pointed by each subject and possibly sessions as corresponding
-      to different tarballs
+      to different tarballs.
+
     - if files_opt is provided, sorts all DICOMs it can find under those paths
     """
     study_sessions = {}
@@ -172,7 +186,7 @@ def get_study_sessions(dicom_dir_template, files_opt, heuristic, outdir,
         for f in files_opt:
             if op.isdir(f):
                 files += sorted(find_files(
-                    '.*', topdir=f, exclude_vcs=True, exclude="/\.datalad/"))
+                    '.*', topdir=f, exclude_vcs=True, exclude=r"/\.datalad/"))
             else:
                 files.append(f)
 

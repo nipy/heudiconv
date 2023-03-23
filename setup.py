@@ -21,6 +21,17 @@ def main():
     with open(info_file) as infofile:
         exec(infofile.read(), globals(), ldict)
 
+    try:
+        import versioningit
+    except ImportError:
+        # versioningit isn't installed; assume we're building a Debian package
+        # from an sdist on an older Debian that doesn't support pybuild
+        vglobals = {}
+        with open(op.join(op.dirname(__file__), "heudiconv", "_version.py")) as fp:
+            exec(fp.read(), vglobals)
+        kwargs = {"version": vglobals["__version__"]}
+    else:
+        kwargs = {}
 
     def findsome(subdir, extensions):
         """Find files under subdir having specified extensions
@@ -41,7 +52,6 @@ def main():
         name=ldict['__packagename__'],
         author=ldict['__author__'],
         #author_email="team@???",
-        version=ldict['__version__'],
         description=ldict['__description__'],
         long_description=ldict['__longdesc__'],
         license=ldict['__license__'],
@@ -57,9 +67,12 @@ def main():
         package_data={
             'heudiconv.tests': [
                         op.join('data', '*.dcm'),
-                        op.join('data', '*', '*.dcm')
+                        op.join('data', '*', '*.dcm'),
+                        op.join('data', '*', '*', '*.dcm'),
+                        op.join('data', 'sample_nifti*'),
             ],
-        }
+        },
+        **kwargs,
     )
 
 
