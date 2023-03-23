@@ -5,18 +5,20 @@ import os.path as op
 import mock
 
 from heudiconv.utils import (
-    get_known_heuristics_with_descriptions,
-    get_heuristic_description,
-    load_heuristic,
-    json_dumps_pretty,
-    load_json,
     create_tree,
+    get_datetime,
+    get_dicts_intersection,
+    get_heuristic_description,
+    get_known_heuristics_with_descriptions,
+    json_dumps_pretty,
+    JSONDecodeError,
+    load_heuristic,
+    load_json,
+    remove_prefix,
+    remove_suffix,
     save_json,
     update_json,
-    get_datetime,
-    remove_suffix,
-    remove_prefix,
-    JSONDecodeError)
+)
 
 import pytest
 from .utils import HEURISTICS_PATH
@@ -170,3 +172,10 @@ def test_remove_prefix():
     assert remove_prefix(s, '') == s
     assert remove_prefix(s, 'foo') == s
     assert remove_prefix(s, 'jason') == '.bourne'
+
+
+def test_get_dicts_intersection():
+    assert get_dicts_intersection([]) == {}
+    assert get_dicts_intersection([{"a": 1}]) == {"a": 1}
+    assert get_dicts_intersection([{"a": 1}, {"b": 2}]) == {}
+    assert get_dicts_intersection([{"a": 1}, {"a": 1, "b": 2}]) == {"a": 1}
