@@ -84,3 +84,7 @@ def test_get_extracted_fails_when_mixing_archive_and_unarchived(
         get_dicoms_list: typing.List[str]):
     with pytest.raises(ValueError):
         get_extracted_dicoms(get_dicoms_gztar + get_dicoms_list)
+
+
+def test_get_extracted_from_empty_list():
+    assert not len(get_extracted_dicoms([]))
