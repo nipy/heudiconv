@@ -83,7 +83,7 @@ def process_extra_commands(outdir, command, files, dicom_dir_template,
         heuristic_ls = getattr(heuristic, 'ls', None)
         for f in files:
             study_sessions = get_study_sessions(
-                dicom_dir_template, [f], heuristic, outdir,
+                [f], dicom_dir_template, heuristic, outdir,
                 session, subjs, grouping=grouping)
             print(f)
             for study_session, sequences in study_sessions.items():
@@ -324,7 +324,7 @@ def workflow(*, dicom_dir_template=None, files=None, subjs=None,
 
     heuristic = load_heuristic(heuristic)
 
-    study_sessions = get_study_sessions(dicom_dir_template, files,
+    study_sessions = get_study_sessions(files, dicom_dir_template,
                                         heuristic, outdir, session,
                                         subjs, grouping=grouping)
 
