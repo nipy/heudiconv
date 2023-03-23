@@ -2,6 +2,8 @@ import json
 import os
 import os.path as op
 
+import mock
+
 from heudiconv.utils import (
     get_known_heuristics_with_descriptions,
     get_heuristic_description,
@@ -10,7 +12,10 @@ from heudiconv.utils import (
     load_json,
     create_tree,
     save_json,
+    update_json,
     get_datetime,
+    remove_suffix,
+    remove_prefix,
     JSONDecodeError)
 
 import pytest
@@ -77,6 +82,13 @@ def test_load_json(tmpdir, caplog):
     with pytest.raises(JSONDecodeError):
         load_json(str(invalid_json_file))
 
+    # and even if we ask to retry a few times -- should be the same
+    with pytest.raises(JSONDecodeError):
+        load_json(str(invalid_json_file), retry=3)
+
+    with pytest.raises(FileNotFoundError):
+        load_json("absent123not.there", retry=3)
+
     assert ifname in caplog.text
 
     # test valid json
@@ -84,8 +96,51 @@ def test_load_json(tmpdir, caplog):
     vfname = "valid.json"
     valid_json_file = str(tmpdir / vfname)
     save_json(valid_json_file, vcontent)
-    
+
     assert load_json(valid_json_file) == vcontent
+
+    calls = [0]
+    json_load = json.load
+
+    def json_load_patched(fp):
+        calls[0] += 1
+        if calls[0] == 1:
+            # just reuse bad file
+            load_json(str(invalid_json_file))
+        elif calls[0] == 2:
+            raise FileNotFoundError()
+        else:
+            return json_load(fp)
+
+    with mock.patch.object(json, 'load', json_load_patched):
+        assert load_json(valid_json_file, retry=3) == vcontent
+
+
+
+def test_update_json(tmpdir):
+    """
+    Test utils.update_json()
+    """
+    dummy_json_file = str(tmpdir / 'dummy.json')
+    some_content = {"name": "Jason", "age": 30, "city": "New York"}
+    save_json(dummy_json_file, some_content, pretty=True)
+
+    added_content = {"LastName": "Bourne",
+                     "Movies": [
+                         "The Bourne Identity",
+                         "The Bourne Supremacy",
+                         "The Bourne Ultimatum",
+                         "The Bourne Legacy",
+                         "Jason Bourne"
+                     ]
+                     }
+    update_json(dummy_json_file, added_content)
+
+    # check that it was added:
+    with open(dummy_json_file) as f:
+        data = json.load(f)
+    some_content.update(added_content)
+    assert data == some_content
 
 
 def test_get_datetime():
@@ -95,3 +150,23 @@ def test_get_datetime():
     assert get_datetime('20200512', '162130') == '2020-05-12T16:21:30'
     assert get_datetime('20200512', '162130.5') == '2020-05-12T16:21:30.500000'
     assert get_datetime('20200512', '162130.5', microseconds=False) == '2020-05-12T16:21:30'
+
+
+def test_remove_suffix():
+    """
+    Test utils.remove_suffix()
+    """
+    s = 'jason.bourne'
+    assert remove_suffix(s, '') == s
+    assert remove_suffix(s, 'foo') == s
+    assert remove_suffix(s, '.bourne') == 'jason'
+
+
+def test_remove_prefix():
+    """
+    Test utils.remove_prefix()
+    """
+    s = 'jason.bourne'
+    assert remove_prefix(s, '') == s
+    assert remove_prefix(s, 'foo') == s
+    assert remove_prefix(s, 'jason') == '.bourne'

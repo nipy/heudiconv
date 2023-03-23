@@ -1,6 +1,15 @@
 import os
 
 
+# Dictionary to specify options for the `populate_intended_for`.
+# Valid options are defined in 'bids.py' (for 'matching_parameters':
+# ['Shims', 'ImagingVolume',]; for 'criterion': ['First', 'Closest']
+POPULATE_INTENDED_FOR_OPTS = {
+    'matching_parameters': 'ImagingVolume',
+    'criterion': 'Closest'
+}
+
+
 def create_key(template, outtype=('nii.gz',), annotation_classes=None):
     if template is None or not template:
         raise ValueError('Template must be a valid format string')

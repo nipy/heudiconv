@@ -91,7 +91,7 @@ def clean_args(hargs, iterarg, iteridx):
     is_iterarg = False
     itercount = 0
 
-    indicies = []
+    indices = []
     cmdargs = hargs[:]
 
     for i, arg in enumerate(hargs):
@@ -100,13 +100,13 @@ def clean_args(hargs, iterarg, iteridx):
             is_iterarg = False
         if is_iterarg:
             if iteridx != itercount:
-                indicies.append(i)
+                indices.append(i)
             itercount += 1
         if arg in iterarg:
             is_iterarg = True
         if arg in queue_args:
-            indicies.extend([i, i+1])
+            indices.extend([i, i+1])
 
-    for j in sorted(indicies, reverse=True):
+    for j in sorted(indices, reverse=True):
         del cmdargs[j]
     return cmdargs

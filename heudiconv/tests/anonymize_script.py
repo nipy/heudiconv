@@ -1,13 +1,13 @@
-#! /usr/bin/env python 
+#! /usr/bin/env python3
 
 import sys
 import re
-import ctypes
+import hashlib
 
 
 def bids_id_(sid):
     parsed_id = re.compile(r"^(?:sub-|)(.+)$").search(sid).group(1)
-    return str(ctypes.c_size_t(hash(parsed_id)).value)
+    return hashlib.md5(parsed_id.encode()).hexdigest()[:8]
 
 
 def main():
@@ -16,4 +16,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    print(main())

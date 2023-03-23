@@ -10,7 +10,7 @@ import pytest
 @pytest.mark.skipif(bool(which("sbatch")), reason="skip a real slurm call")
 @pytest.mark.parametrize(
     'invocation', [
-        "--files %s/01-fmap_acq-3mm" % TESTS_DATA_PATH,    # our new way with automated groupping
+        "--files %s/01-fmap_acq-3mm" % TESTS_DATA_PATH,    # our new way with automated grouping
         "-d %s/{subject}/* -s 01-fmap_acq-3mm" % TESTS_DATA_PATH # "old" way specifying subject
     ])
 def test_queue_no_slurm(tmpdir, invocation):

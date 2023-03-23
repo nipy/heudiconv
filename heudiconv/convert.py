@@ -1,11 +1,14 @@
+__docformat__ = "numpy"
+
 import filelock
 import os
 import os.path as op
 import logging
-from math import nan
 import shutil
-import sys
+import random
 import re
+
+from .due import due, Doi
 
 from .utils import (
     read_config,
@@ -14,6 +17,7 @@ from .utils import (
     write_config,
     TempDirs,
     safe_copyfile,
+    safe_movefile,
     treat_infofile,
     set_readonly,
     clear_temp_dicoms,
@@ -22,12 +26,14 @@ from .utils import (
     file_md5sum
 )
 from .bids import (
-    convert_sid_bids,
+    sanitize_label,
     populate_bids_templates,
+    populate_intended_for,
     save_scans_key,
     tuneup_bids_json_files,
     add_participant_record,
-    BIDSError
+    BIDSError,
+    BIDS_VERSION,
 )
 from .dicoms import (
     group_dicoms_into_seqinfos,
@@ -36,6 +42,7 @@ from .dicoms import (
 )
 
 LOCKFILE = 'heudiconv.lock'
+DW_IMAGE_IN_FMAP_FOLDER_WARNING = 'Diffusion-weighted image saved in non dwi folder ({folder})'
 lgr = logging.getLogger(__name__)
 
 
@@ -46,7 +53,7 @@ def conversion_info(subject, outdir, info, filegroup, ses):
             continue
         template, outtype = key[0], key[1]
         # So no annotation_classes of any kind!  so if not used -- what was the
-        # intension???? XXX
+        # intention???? XXX
         outpath = outdir
         for idx, itemgroup in enumerate(items):
             if not isinstance(itemgroup, list):
@@ -95,8 +102,9 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
         if not sid:
             raise ValueError(
                 "BIDS requires alphanumeric subject ID. Got an empty value")
-        if not sid.isalnum():  # alphanumeric only
-            sid, old_sid = convert_sid_bids(sid)
+        sid = sanitize_label(sid)
+        if ses:
+            ses = sanitize_label(ses)
 
     if not anon_sid:
         anon_sid = sid
@@ -126,7 +134,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
     # ref: https://github.com/nipy/heudiconv/issues/84#issuecomment-330048609
     # for more automagical wishes
     target_heuristic_filename = op.join(idir, 'heuristic.py')
-    # faciliates change - TODO: remove in 1.0
+    # facilitates change - TODO: remove in 1.0
     old_heuristic_filename = op.join(idir, op.basename(heuristic.filename))
     if op.exists(old_heuristic_filename):
         assure_no_file_exists(target_heuristic_filename)
@@ -203,6 +211,7 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                 converter=converter,
                 scaninfo_suffix=getattr(heuristic, 'scaninfo_suffix', '.json'),
                 custom_callable=getattr(heuristic, 'custom_callable', None),
+                populate_intended_for_opts=getattr(heuristic, 'POPULATE_INTENDED_FOR_OPTS', None),
                 with_prov=with_prov,
                 bids_options=bids_options,
                 outdir=tdir,
@@ -233,9 +242,9 @@ def prep_conversion(sid, dicoms, outdir, heuristic, converter, anon_sid,
                                     getattr(heuristic, 'DEFAULT_FIELDS', {}))
 
 
-def update_complex_name(metadata, filename, suffix):
+def update_complex_name(metadata, filename):
     """
-    Insert `_rec-<magnitude|phase>` entity into filename if data are from a
+    Insert `_part-<mag|phase>` entity into filename if data are from a
     sequence with magnitude/phase part.
 
     Parameters
@@ -244,17 +253,17 @@ def update_complex_name(metadata, filename, suffix):
         Scan metadata dictionary from BIDS sidecar file.
     filename : str
         Incoming filename
-    suffix : str
-        An index used for cases where a single scan produces multiple files,
-        but the differences between those files are unknown.
 
     Returns
     -------
     filename : str
-        Updated filename with rec entity added in appropriate position.
+        Updated filename with part entity added in appropriate position.
     """
     # Some scans separate magnitude/phase differently
-    unsupported_types = ['_bold', '_phase',
+    # A small note: _phase is deprecated, but this may add part-mag to
+    # magnitude data while leaving phase data with a separate suffix,
+    # depending on how one sets up their heuristic.
+    unsupported_types = ['_phase',
                          '_magnitude', '_magnitude1', '_magnitude2',
                          '_phasediff', '_phase1', '_phase2']
     if any(ut in filename for ut in unsupported_types):
@@ -262,29 +271,43 @@ def update_complex_name(metadata, filename, suffix):
 
     # Check to see if it is magnitude or phase part:
     if 'M' in metadata.get('ImageType'):
-        mag_or_phase = 'magnitude'
+        mag_or_phase = 'mag'
     elif 'P' in metadata.get('ImageType'):
         mag_or_phase = 'phase'
     else:
-        mag_or_phase = suffix
+        raise RuntimeError("Data type could not be inferred from the metadata.")
 
     # Determine scan suffix
     filetype = '_' + filename.split('_')[-1]
 
-    # Insert rec label
-    if not ('_rec-%s' % mag_or_phase) in filename:
-        # If "_rec-" is specified, prepend the 'mag_or_phase' value.
-        if '_rec-' in filename:
+    # Insert part label
+    if not ('_part-%s' % mag_or_phase) in filename:
+        # If "_part-" is specified, prepend the 'mag_or_phase' value.
+        if '_part-' in filename:
             raise BIDSError(
-                "Reconstruction label for images will be automatically set, "
+                "Part label for images will be automatically set, "
                 "remove from heuristic"
             )
 
         # Insert it **before** the following string(s), whichever appears first.
-        for label in ['_dir', '_run', '_mod', '_echo', '_recording', '_proc', '_space', filetype]:
+        # https://bids-specification.readthedocs.io/en/stable/99-appendices/09-entities.html
+        entities_after_part = [
+            "_proc",
+            "_hemi",
+            "_space",
+            "_split",
+            "_recording",
+            "_chunk",
+            "_res",
+            "_den",
+            "_label",
+            "_desc",
+            filetype,
+        ]
+        for label in entities_after_part:
             if (label == filetype) or (label in filename):
                 filename = filename.replace(
-                    label, "_rec-%s%s" % (mag_or_phase, label)
+                    label, "_part-%s%s" % (mag_or_phase, label)
                 )
                 break
 
@@ -311,7 +334,8 @@ def update_multiecho_name(metadata, filename, echo_times):
     filename : str
         Updated filename with echo entity added, if appropriate.
     """
-    # Field maps separate echoes differently
+    # Field maps separate echoes differently, so do not attempt to update any filenames with these
+    # suffixes
     unsupported_types = [
         '_magnitude', '_magnitude1', '_magnitude2',
         '_phasediff', '_phase1', '_phase2', '_fieldmap'
@@ -319,17 +343,43 @@ def update_multiecho_name(metadata, filename, echo_times):
     if any(ut in filename for ut in unsupported_types):
         return filename
 
-    # Get the EchoNumber from json file info.  If not present, use EchoTime
+    if not isinstance(echo_times, list):
+        raise TypeError(f'Argument "echo_times" must be a list, not a {type(echo_times)}')
+
+    # Get the EchoNumber from json file info.  If not present, use EchoTime.
     if 'EchoNumber' in metadata.keys():
         echo_number = metadata['EchoNumber']
-    else:
+    elif 'EchoTime' in metadata.keys():
         echo_number = echo_times.index(metadata['EchoTime']) + 1
+    else:
+        raise KeyError(
+            'Either "EchoNumber" or "EchoTime" must be in metadata keys. '
+            f'Keys detected: {metadata.keys()}'
+        )
 
     # Determine scan suffix
     filetype = '_' + filename.split('_')[-1]
 
     # Insert it **before** the following string(s), whichever appears first.
-    for label in ['_recording', '_proc', '_space', filetype]:
+    # https://bids-specification.readthedocs.io/en/stable/99-appendices/09-entities.html
+    entities_after_echo = [
+        "_flip",
+        "_inv",
+        "_mt",
+        "_part",
+        "_proc",
+        "_hemi",
+        "_space",
+        "_split",
+        "_recording",
+        "_chunk",
+        "_res",
+        "_den",
+        "_label",
+        "_desc",
+        filetype,
+    ]
+    for label in entities_after_echo:
         if (label == filetype) or (label in filename):
             filename = filename.replace(
                 label, "_echo-%s%s" % (echo_number, label)
@@ -364,6 +414,9 @@ def update_uncombined_name(metadata, filename, channel_names):
     if any(ut in filename for ut in unsupported_types):
         return filename
 
+    if not isinstance(channel_names, list):
+        raise TypeError(f'Argument "channel_names" must be a list, not a {type(channel_names)}')
+
     # Determine the channel number
     channel_number = ''.join([c for c in metadata['CoilString'] if c.isdigit()])
     if not channel_number:
@@ -375,7 +428,21 @@ def update_uncombined_name(metadata, filename, channel_names):
 
     # Insert it **before** the following string(s), whichever appears first.
     # Choosing to put channel near the end since it's not in the specification yet.
-    for label in ['_recording', '_proc', '_space', filetype]:
+    # See https://bids-specification.readthedocs.io/en/stable/99-appendices/09-entities.html
+    entities_after_ch = [
+        "_proc",
+        "_hemi",
+        "_space",
+        "_split",
+        "_recording",
+        "_chunk",
+        "_res",
+        "_den",
+        "_label",
+        "_desc",
+        filetype,
+    ]
+    for label in entities_after_ch:
         if (label == filetype) or (label in filename):
             filename = filename.replace(
                 label, "_ch-%s%s" % (channel_number, label)
@@ -386,29 +453,26 @@ def update_uncombined_name(metadata, filename, channel_names):
 
 def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
             bids_options, outdir, min_meta, overwrite, symlink=True, prov_file=None,
-            dcmconfig=None):
+            dcmconfig=None, populate_intended_for_opts={}):
     """Perform actual conversion (calls to converter etc) given info from
     heuristic's `infotodict`
-
-    Parameters
-    ----------
-    items
-    symlink
-    converter
-    scaninfo_suffix
-    custom_callable
-    with_prov
-    is_bids
-    sourcedir
-    outdir
-    min_meta
-
-    Returns
-    -------
-    None
     """
     prov_files = []
     tempdirs = TempDirs()
+
+    if bids_options is not None:
+        due.cite(
+            # doi matches the BIDS_VERSION
+            Doi("10.5281/zenodo.4085321"),
+            description="Brain Imaging Data Structure (BIDS) Specification",
+            path="bids",
+            version=BIDS_VERSION,
+            tags=["implementation"])
+        due.cite(
+            Doi("10.1038/sdata.2016.44"),
+            description="Brain Imaging Data Structure (BIDS), Original paper",
+            path="bids",
+            tags=["documentation"])
 
     for item_idx, item in enumerate(items):
 
@@ -442,7 +506,12 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
             elif outtype in ['nii', 'nii.gz']:
                 assert converter == 'dcm2niix', ('Invalid converter '
                                                  '{}'.format(converter))
-
+                due.cite(
+                    Doi('10.1016/j.jneumeth.2016.03.001'),
+                    path='dcm2niix',
+                    description="DICOM to NIfTI + .json sidecar conversion utility",
+                    tags=["implementation"]
+                )
                 outname, scaninfo = (prefix + '.' + outtype,
                                      prefix + scaninfo_suffix)
 
@@ -499,6 +568,30 @@ def convert(items, converter, scaninfo_suffix, custom_callable, with_prov,
         if custom_callable is not None:
             custom_callable(*item)
 
+    # Populate "IntendedFor" for fmap files if requested in heuristic
+    if populate_intended_for_opts is not None:
+        # Because fmap files can only be used to correct for distortions in images
+        # collected within the same scanning session, find unique subject/session
+        # combinations from the outname in each item:
+        outnames = [item[0] for item in items]
+        # - grab "sub-<sID>[/ses-<ses>]", and keep only unique ones:
+        try:
+            sessions = set(
+                re.search(
+                    'sub-(?P<subj>[a-zA-Z0-9]*)([{0}_]ses-(?P<ses>[a-zA-Z0-9]*))?'.format(op.sep),
+                    oname
+                ).group(0)
+                for oname in outnames
+            )
+        except AttributeError:
+            # "sub-<sID>[/ses-<ses>]" is not present, so this is not BIDS compliant
+            # and it doesn't make sense to add "IntendedFor":
+            sessions = set()
+
+        for ses in sessions:
+            session_path = op.join(outdir, ses)
+            populate_intended_for(session_path, **populate_intended_for_opts)
+
 
 def convert_dicom(item_dicoms, bids_options, prefix,
                   outdir, tempdirs, symlink, overwrite):
@@ -522,10 +615,6 @@ def convert_dicom(item_dicoms, bids_options, prefix,
         Create softlink to DICOMs - if False, create hardlink instead.
     overwrite : bool
         If True, allows overwriting of previous conversion
-
-    Returns
-    -------
-    None
     """
     if bids_options is not None:
         # mimic the same hierarchy location as the prefix
@@ -564,18 +653,18 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids_options, tmpdir, dcmconf
 
     Parameters
     ----------
-    item_dicoms : List
+    item_dicoms : list
         DICOM files to convert
-    prefix : String
+    prefix : str
         Heuristic output path
-    with_prov : Bool
+    with_prov : bool
         Store provenance information
-    bids_options : List or None
+    bids_options : list or None
         If not None then output BIDS sidecar JSONs
         List may contain bids specific options
-    tmpdir : Directory
+    tmpdir : str
         Conversion working directory
-    dcmconfig : File (optional)
+    dcmconfig : str, optional
         JSON file used for additional Dcm2niix configuration
     """
     import nipype
@@ -594,7 +683,11 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids_options, tmpdir, dcmconf
     convertnode = Node(Dcm2niix(from_file=fromfile), name='convert')
     convertnode.base_dir = tmpdir
     convertnode.inputs.source_names = item_dicoms
-    convertnode.inputs.out_filename = prefix
+    convertnode.inputs.out_filename = op.basename(prefix) + "_heudiconv%03d" % random.randint(0, 999)
+    prefix_dir = op.dirname(prefix)
+    # if provided prefix had a path in it -- pass is as output_dir instead of default curdir
+    if prefix_dir:
+        convertnode.inputs.output_dir = prefix_dir
 
     if nipype.__version__.split('.')[0] == '0':
         # deprecated since 1.0, might be needed(?) before
@@ -607,7 +700,7 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids_options, tmpdir, dcmconf
     # prov information
     prov_file = prefix + '_prov.ttl' if with_prov else None
     if prov_file:
-        safe_copyfile(op.join(convertnode.base_dir,
+        safe_movefile(op.join(convertnode.base_dir,
                               convertnode.name,
                               'provenance.ttl'),
                       prov_file)
@@ -617,18 +710,19 @@ def nipype_convert(item_dicoms, prefix, with_prov, bids_options, tmpdir, dcmconf
 
 def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outname_bids, overwrite):
     """Copy converted files from tempdir to output directory.
+
     Will rename files if necessary.
 
     Parameters
     ----------
     res : Node
         Nipype conversion Node with results
-    item_dicoms: list of filenames
-        DICOMs converted
+    item_dicoms: list
+        Filenames of converted DICOMs
     bids : list or None
         If not list save to BIDS
         List may contain bids specific options
-    prefix : string
+    prefix : str
 
     Returns
     -------
@@ -648,9 +742,22 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
         return
 
     if isdefined(res.outputs.bvecs) and isdefined(res.outputs.bvals):
-        outname_bvecs, outname_bvals = prefix + '.bvec', prefix + '.bval'
-        safe_copyfile(res.outputs.bvecs, outname_bvecs, overwrite)
-        safe_copyfile(res.outputs.bvals, outname_bvals, overwrite)
+        if prefix_dirname.endswith('dwi'):
+            outname_bvecs, outname_bvals = prefix + '.bvec', prefix + '.bval'
+            safe_movefile(res.outputs.bvecs, outname_bvecs, overwrite)
+            safe_movefile(res.outputs.bvals, outname_bvals, overwrite)
+        else:
+            if bvals_are_zero(res.outputs.bvals):
+                os.remove(res.outputs.bvecs)
+                os.remove(res.outputs.bvals)
+                lgr.debug("%s and %s were removed since not dwi", res.outputs.bvecs, res.outputs.bvals)
+            else:
+                lgr.warning(DW_IMAGE_IN_FMAP_FOLDER_WARNING.format(folder= prefix_dirname))
+                lgr.warning(".bvec and .bval files will be generated. This is NOT BIDS compliant")
+                outname_bvecs, outname_bvals = prefix + '.bvec', prefix + '.bval'
+                safe_movefile(res.outputs.bvecs, outname_bvecs, overwrite)
+                safe_movefile(res.outputs.bvals, outname_bvals, overwrite)
+
 
     if isinstance(res_files, list):
         res_files = sorted(res_files)
@@ -690,12 +797,17 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
         for metadata in bids_metas:
             if not metadata:
                 continue
-            echo_times.add(metadata.get('EchoTime', nan))
-            channel_names.add(metadata.get('CoilString', nan))
-            image_types.update(metadata.get('ImageType', [nan]))
+
+            # If the field is not available, fill that entry in the set with a False.
+            echo_times.add(metadata.get('EchoTime', False))
+            channel_names.add(metadata.get('CoilString', False))
+            image_types.update(metadata.get('ImageType', [False]))
+
         is_multiecho = len(set(filter(bool, echo_times))) > 1  # Check for varying echo times
         is_uncombined = len(set(filter(bool, channel_names))) > 1  # Check for uncombined data
         is_complex = 'M' in image_types and 'P' in image_types  # Determine if data are complex (magnitude + phase)
+        echo_times = sorted(echo_times)  # also converts to list
+        channel_names = sorted(channel_names)  # also converts to list
 
         ### Loop through the bids_files, set the output name and save files
         for fl, suffix, bids_file, bids_meta in zip(res_files, suffixes, bids_files, bids_metas):
@@ -715,7 +827,7 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
 
                 if is_complex:
                     this_prefix_basename = update_complex_name(
-                        bids_meta, this_prefix_basename, suffix
+                        bids_meta, this_prefix_basename
                     )
 
                 if is_uncombined:
@@ -734,34 +846,35 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
             outfile = outname + '.' + outtype
 
             # Write the files needed:
-            safe_copyfile(fl, outfile, overwrite)
+            safe_movefile(fl, outfile, overwrite)
             if bids_file:
                 outname_bids_file = "%s.json" % (outname)
-                safe_copyfile(bids_file, outname_bids_file, overwrite)
+                safe_movefile(bids_file, outname_bids_file, overwrite)
                 bids_outfiles.append(outname_bids_file)
 
     # res_files is not a list
     else:
         outname = "{}.{}".format(prefix, outtype)
-        safe_copyfile(res_files, outname, overwrite)
+        safe_movefile(res_files, outname, overwrite)
         if isdefined(res.outputs.bids):
             try:
-                safe_copyfile(res.outputs.bids, outname_bids, overwrite)
+                safe_movefile(res.outputs.bids, outname_bids, overwrite)
                 bids_outfiles.append(outname_bids)
             except TypeError as exc:  ##catch lists
                 raise TypeError("Multiple BIDS sidecars detected.")
     return bids_outfiles
 
 
-def  add_taskname_to_infofile(infofiles):
-    """Add the "TaskName" field to json files corresponding to func images.
+def add_taskname_to_infofile(infofiles):
+    """Add the "TaskName" field to json files with _task- entity in the name.
+
+    Note: _task- entity could be present not only in functional data
+    but in many other modalities now.
 
     Parameters
     ----------
-    infofiles : list with json filenames or single filename
-
-    Returns
-    -------
+    infofiles: list or str
+        json filenames or a single filename.
     """
 
     # in case they pass a string with a path:
@@ -771,12 +884,33 @@ def  add_taskname_to_infofile(infofiles):
     for infofile in infofiles:
         meta_info = load_json(infofile)
         try:
-            meta_info['TaskName'] = (re.search('(?<=_task-)\w+',
+            meta_info['TaskName'] = (re.search(r'(?<=_task-)\w+',
                                                op.basename(infofile))
                                      .group(0).split('_')[0])
         except AttributeError:
-            lgr.warning("Failed to find task field in {0}.".format(infofile))
+            # leave it to bids-validator to validate/inform about presence
+            # of required entities/fields.
             continue
 
         # write to outfile
         save_json(infofile, meta_info)
+
+
+def bvals_are_zero(bval_file):
+    """Checks if all entries in a bvals file are zero (or 5, for Siemens files).
+
+    Parameters
+    ----------
+    bval_file : str
+      file with the bvals
+
+    Returns
+    -------
+    True if all are all 0 or 5; False otherwise.
+    """
+
+    with open(bval_file) as f:
+        bvals = f.read().split()
+
+    bvals_unique = set(float(b) for b in bvals)
+    return bvals_unique == {0.} or bvals_unique == {5.}
