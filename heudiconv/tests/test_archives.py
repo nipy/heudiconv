@@ -1,3 +1,4 @@
+from glob import glob
 import os
 import os.path as op
 from pathlib import Path
@@ -34,8 +35,8 @@ def get_dicoms_zip(tmpdir: Path) -> typing.List[str]:
 
 
 @pytest.fixture
-def get_dicoms_folder() -> typing.List[str]:
-    return [op.join(TESTS_DATA_PATH,  "01-anat-scout")]
+def get_dicoms_list() -> typing.List[str]:
+    return glob(op.join(TESTS_DATA_PATH, "01-anat-scout", "*"))
 
 
 def test_get_extracted_dicoms_single_session_is_none(get_dicoms_gztar: typing.List[str]):
@@ -63,12 +64,23 @@ def test_get_extracted_dicoms_from_zip(get_dicoms_zip: typing.List[str]):
         assert all(file.endswith("0001.dcm") for file in files)
 
 
-def test_get_extracted_dicoms_from_folder(get_dicoms_folder: typing.List[str]):
-    for _, files in get_extracted_dicoms(get_dicoms_folder):
-        # check that the only file is the one called "0001.dcm"
-        assert all(file.endswith("0001.dcm") for file in files)
+def test_get_extracted_dicoms_from_file_list(get_dicoms_list: typing.List[str]):
+    for _, files in get_extracted_dicoms(get_dicoms_list):
+        assert all(op.isfile(file) for file in files)
 
 
 def test_get_extracted_have_correct_permissions(get_dicoms_gztar: typing.List[str]):
     for _, files in get_extracted_dicoms(get_dicoms_gztar):
         assert all(stat.S_IMODE(os.stat(file).st_mode) == 448 for file in files)
+
+
+def test_get_extracted_are_absolute(get_dicoms_gztar: typing.List[str]):
+    for _, files in get_extracted_dicoms(get_dicoms_gztar):
+        assert all(op.isabs(file) for file in files)
+
+
+def test_get_extracted_fails_when_mixing_archive_and_unarchived(
+        get_dicoms_gztar: typing.List[str],
+        get_dicoms_list: typing.List[str]):
+    with pytest.raises(ValueError):
+        get_extracted_dicoms(get_dicoms_gztar + get_dicoms_list)

@@ -10,7 +10,6 @@ from collections import defaultdict
 import shutil
 import typing
 from itertools import chain
-from pathlib import Path
 
 from .dicoms import group_dicoms_into_seqinfos
 from .utils import (
@@ -63,85 +62,87 @@ def find_files(regex, topdir=op.curdir, exclude=None,
             yield path
 
 
-def _get_files_in_dir(src: str) -> typing.List[str]:
-    return [str(f.resolve()) for f in Path(src).rglob("*") if f.is_file()]
-
-
 def get_extracted_dicoms(
-        fl: typing.Collection[str]
+        fl: typing.Iterable[str]
         ) -> typing.ItemsView[typing.Optional[int], typing.List[str]]:
     """Given a collection of files and/or directories, possibly extract 
     some from tarballs.
 
     Parameters
     ----------
-    fl : Collection[str]
-        A collection (e.g., list or tuple) of files that will be extracted.
+    fl : Iterable[str]
+        An iterable (e.g., list or tuple) of files to process.
 
     Returns
     -------
-    ItemsView[int, list[str]]
-        A tuple of integer keys and list of strs representing absolute paths
-        of extracted files.
+    ItemsView[int | None, list[str]]
+        A tuple of keys (either integer or None) and list of strs representing
+          the absolute paths of files. 
 
     Notes
     -----
-    For 'classical' heudiconv, if multiple tarballs are provided, they 
+    For 'classical' heudiconv, if multiple archives are provided, they 
     correspond to different sessions, so here we would group into sessions 
-    and return pairs  `sessionid`, `files`  with `sessionid` being None if no 
+    and return pairs `sessionid`, `files`  with `sessionid` being None if no 
     "sessions" detected for that file or there was just a single tarball in the
     list.
 
-    When contents of fl are directories whose names do not have a suffix
-    that is recognized as a common archive format (e.g., .tgz), then the
-    corresponding item will contain a list of the files in that directory.
-
-    When contents of fl appeart to be an unpackable archive, the contents are
-    extracted into utils.TempDirs(f'heudiconvDCM-{ses}') and the mode of all 
+    When contents of fl appear to be an unpackable archive, the contents are
+    extracted into utils.TempDirs(f'heudiconvDCM') and the mode of all 
     extracted files is set to 700.
+
+    When contents of fl are a list of files, they are treated as a single
+    session.
     """
-    # TODO: bring check back?
-    # if any(not tarfile.is_tarfile(i) for i in fl):
-    #     raise ValueError("some but not all input files are tar files")
+    input_list_of_unpacked = any(fl) and all(
+        not t.endswith(_UNPACK_FORMATS) for t in fl
+        )
+    
+    if not (
+        input_list_of_unpacked or
+        all(t.endswith(_UNPACK_FORMATS) for t in fl)
+        ):
+        raise ValueError("Some but not all input files are archives.")
+    
     sessions: typing.DefaultDict[
         typing.Optional[int], 
         typing.List[str]
         ] = defaultdict(list)
-    if not isinstance(fl, (list, tuple)):
+    
+    if not isinstance(fl, list):
         fl = list(fl)
 
-    # keep track of session manually to ensure that the variable is bound
-    # when it is used after the loop (e.g., consider situation with
-    # fl being empty)
-    session = 0
-    # needs sorting to keep the generated "session" label deterministic
-    for _, t in enumerate(sorted(fl)):
-        # Each file extracted must be associated with the proper session,
-        # but the high-level shutil does not have a way to list the files
-        # contained within each archive. So, files are temporarily
-        # extracted into unique tempdirs
-        # cannot use TempDirs since will trigger cleanup with __del__
-        tmpdir = tempdirs(prefix="heudiconvDCM")
-        
-        if t.endswith(_UNPACK_FORMATS):
+    if input_list_of_unpacked:
+        sessions[None] = fl
+    else:
+        # keep track of session manually to ensure that the variable is bound
+        # when it is used after the loop (e.g., consider situation with
+        # fl being empty)
+        session = 0
+        # needs sorting to keep the generated "session" label deterministic
+        for _, t in enumerate(sorted(fl)):
+            # Each file extracted must be associated with the proper session,
+            # but the high-level shutil does not have a way to list the files
+            # contained within each archive. So, files are temporarily
+            # extracted into unique tempdirs
+            # cannot use TempDirs since will trigger cleanup with __del__
+            tmpdir = tempdirs(prefix="heudiconvDCM")
+            
             shutil.unpack_archive(t, extract_dir=tmpdir)
-            tf_content = _get_files_in_dir(tmpdir)
+            tf_content = list(find_files(regex=".*", topdir=tmpdir))
             # check content and sanitize permission bits
             for f in tf_content:
                 os.chmod(f, mode=0o700)
-        else:
-            tf_content = _get_files_in_dir(t)
+            # store full paths to each file, so we don't need to drag along
+            # tmpdir as some basedir
+            sessions[session] = tf_content
+            session += 1
 
-        # store full paths to each file, so we don't need to drag along
-        # tmpdir as some basedir
-        sessions[session] = tf_content
-        session += 1
-
-    if session == 1:
-        # we had only 1 session, so not really multiple sessions according
-        # to classical 'heudiconv' assumptions, thus just move them all into
-        # None
-        sessions[None] += sessions.pop(0)
+        if session == 1:
+            # we had only 1 session (and at least 1), so not really multiple
+            # sessions according to classical 'heudiconv' assumptions, thus 
+            # just move them all into None
+            sessions[None] += sessions.pop(0)
 
     return sessions.items()
 
