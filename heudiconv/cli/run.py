@@ -1,9 +1,11 @@
 #!/usr/bin/env python
+from __future__ import annotations
 
 from argparse import ArgumentParser
 import logging
 import os
 import sys
+from typing import Optional
 
 from .. import __version__
 from ..main import workflow
@@ -11,7 +13,7 @@ from ..main import workflow
 lgr = logging.getLogger(__name__)
 
 
-def main(argv=None):
+def main(argv: Optional[list[str]] = None) -> None:
     logging.basicConfig(
         format="%(levelname)s: %(message)s",
         level=getattr(logging, os.environ.get("HEUDICONV_LOG_LEVEL", "INFO")),
@@ -28,7 +30,7 @@ def main(argv=None):
     workflow(**kwargs)
 
 
-def get_parser():
+def get_parser() -> ArgumentParser:
     docstr = """Example:
              heudiconv -d 'rawdata/{subject}' -o . -f heuristic.py -s s1 s2 s3"""
     parser = ArgumentParser(description=docstr)
