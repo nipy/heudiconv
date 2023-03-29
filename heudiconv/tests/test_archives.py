@@ -41,9 +41,10 @@ def test_get_extracted_dicoms_single_session_is_none(get_dicoms_gztar: typing.Li
 
 
 def test_get_extracted_dicoms_multple_session_integers(get_dicoms_gztar: typing.List[str]):
-    sessions = []
-    for session, _ in get_extracted_dicoms(get_dicoms_gztar + get_dicoms_gztar):
-        sessions.append(session)
+    sessions = [
+        session
+        for session, _ in get_extracted_dicoms(get_dicoms_gztar + get_dicoms_gztar)
+    ]
 
     assert sessions == [0, 1]
 
