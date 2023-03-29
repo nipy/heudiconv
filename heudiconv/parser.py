@@ -70,7 +70,7 @@ def get_extracted_dicoms(
 
     Parameters
     ----------
-    fl : Iterable[str]
+    fl
         An iterable (e.g., list or tuple) of files to process.
 
     Returns
