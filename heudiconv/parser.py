@@ -101,7 +101,7 @@ def get_extracted_dicoms(
     if not (
         input_list_of_unpacked or
         all(t.endswith(_UNPACK_FORMATS) for t in fl)
-        ):
+    ):
         raise ValueError("Some but not all input files are archives.")
     
     sessions: typing.DefaultDict[
