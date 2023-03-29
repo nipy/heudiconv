@@ -9,7 +9,6 @@ from collections import defaultdict
 
 import shutil
 import typing
-from itertools import chain
 
 from .dicoms import group_dicoms_into_seqinfos
 from .utils import (
@@ -25,7 +24,7 @@ atexit.register(tempdirs.cleanup)
 
 _VCS_REGEX = r'%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (op.sep, op.sep)
 
-_UNPACK_FORMATS = sum((x[1] for x in shutil.get_unpack_formats()), [])
+_UNPACK_FORMATS = tuple(sum((x[1] for x in shutil.get_unpack_formats()), []))
 
 @docstring_parameter(_VCS_REGEX)
 def find_files(regex, topdir=op.curdir, exclude=None,
@@ -91,19 +90,13 @@ def get_extracted_dicoms(
     extracted into utils.TempDirs(f'heudiconvDCM') and the mode of all 
     extracted files is set to 700.
 
-    When contents of fl are a list of files, they are treated as a single
-    session.
+    When contents of fl are a list of unarchived files, they are treated as
+    a single session.
+
+    When contents of fl are a list of unarchived and archived files, the 
+    unarchived files are grouped into a single session (key: None), and the
+    archived files are each grouped into separate sessions.
     """
-    input_list_of_unpacked = any(fl) and all(
-        not t.endswith(_UNPACK_FORMATS) for t in fl
-        )
-    
-    if not (
-        input_list_of_unpacked or
-        all(t.endswith(_UNPACK_FORMATS) for t in fl)
-    ):
-        raise ValueError("Some but not all input files are archives.")
-    
     sessions: typing.DefaultDict[
         typing.Optional[int], 
         typing.List[str]
@@ -112,37 +105,39 @@ def get_extracted_dicoms(
     if not isinstance(fl, list):
         fl = list(fl)
 
-    if input_list_of_unpacked:
-        sessions[None] = fl
-    else:
-        # keep track of session manually to ensure that the variable is bound
-        # when it is used after the loop (e.g., consider situation with
-        # fl being empty)
-        session = 0
-        # needs sorting to keep the generated "session" label deterministic
-        for _, t in enumerate(sorted(fl)):
-            # Each file extracted must be associated with the proper session,
-            # but the high-level shutil does not have a way to list the files
-            # contained within each archive. So, files are temporarily
-            # extracted into unique tempdirs
-            # cannot use TempDirs since will trigger cleanup with __del__
-            tmpdir = tempdirs(prefix="heudiconvDCM")
-            
-            shutil.unpack_archive(t, extract_dir=tmpdir)
-            tf_content = list(find_files(regex=".*", topdir=tmpdir))
-            # check content and sanitize permission bits
-            for f in tf_content:
-                os.chmod(f, mode=0o700)
-            # store full paths to each file, so we don't need to drag along
-            # tmpdir as some basedir
-            sessions[session] = tf_content
-            session += 1
+    # keep track of session manually to ensure that the variable is bound
+    # when it is used after the loop (e.g., consider situation with
+    # fl being empty)
+    session = 0
+    # needs sorting to keep the generated "session" label deterministic
+    for _, t in enumerate(sorted(fl)):
 
-        if session == 1:
-            # we had only 1 session (and at least 1), so not really multiple
-            # sessions according to classical 'heudiconv' assumptions, thus 
-            # just move them all into None
-            sessions[None] += sessions.pop(0)
+        if not t.endswith(_UNPACK_FORMATS):
+            sessions[None].append(t)
+            continue
+
+        # Each file extracted must be associated with the proper session,
+        # but the high-level shutil does not have a way to list the files
+        # contained within each archive. So, files are temporarily
+        # extracted into unique tempdirs
+        # cannot use TempDirs since will trigger cleanup with __del__
+        tmpdir = tempdirs(prefix="heudiconvDCM")
+        
+        shutil.unpack_archive(t, extract_dir=tmpdir)
+        tf_content = list(find_files(regex=".*", topdir=tmpdir))
+        # check content and sanitize permission bits
+        for f in tf_content:
+            os.chmod(f, mode=0o700)
+        # store full paths to each file, so we don't need to drag along
+        # tmpdir as some basedir
+        sessions[session] = tf_content
+        session += 1
+
+    if session == 1:
+        # we had only 1 session (and at least 1), so not really multiple
+        # sessions according to classical 'heudiconv' assumptions, thus 
+        # just move them all into None
+        sessions[None] += sessions.pop(0)
 
     return sessions.items()
 
