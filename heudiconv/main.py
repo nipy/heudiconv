@@ -415,10 +415,10 @@ def workflow(
     # processed_studydirs = set()
 
     locator_manual, session_manual = locator, session
-    for (locator, session, sid), files_or_seqinfo in study_sessions.items():
+    for (locator, session_, sid), files_or_seqinfo in study_sessions.items():
         # Allow for session to be overloaded from command line
         if session_manual is not None:
-            session = session_manual
+            session_ = session_manual
         if locator_manual is not None:
             locator = locator_manual
         if not len(files_or_seqinfo):
@@ -437,9 +437,11 @@ def workflow(
             lgr.warning("Skipping unknown locator dataset")
             continue
 
-        anon_sid = anonymize_sid(sid, anon_cmd) if anon_cmd else None
-        if anon_cmd:
+        if anon_cmd and sid is not None:
+            anon_sid = anonymize_sid(sid, anon_cmd)
             lgr.info("Anonymized {} to {}".format(sid, anon_sid))
+        else:
+            anon_sid = None
 
         study_outdir = op.join(outdir, locator or "")
         anon_outdir = conv_outdir or outdir
@@ -453,7 +455,7 @@ def workflow(
                 anon_study_outdir,
                 anon_outdir,
                 dlad_sid,
-                session,
+                session_,
                 seqinfo,
                 dicoms,
                 bids_options,
@@ -461,7 +463,7 @@ def workflow(
 
         lgr.info(
             "PROCESSING STARTS: {0}".format(
-                str(dict(subject=sid, outdir=study_outdir, session=session))
+                str(dict(subject=sid, outdir=study_outdir, session=session_))
             )
         )
 
@@ -474,7 +476,7 @@ def workflow(
             anon_sid=anon_sid,
             anon_outdir=anon_study_outdir,
             with_prov=with_prov,
-            ses=session,
+            ses=session_,
             bids_options=bids_options,
             seqinfo=seqinfo,
             min_meta=minmeta,
@@ -485,7 +487,7 @@ def workflow(
 
         lgr.info(
             "PROCESSING DONE: {0}".format(
-                str(dict(subject=sid, outdir=study_outdir, session=session))
+                str(dict(subject=sid, outdir=study_outdir, session=session_))
             )
         )
 

@@ -21,7 +21,18 @@ import sys
 import tempfile
 from time import sleep
 from types import ModuleType
-from typing import Any, AnyStr, Dict, List, Optional, Tuple, TypeVar, Union, overload
+from typing import (
+    Any,
+    AnyStr,
+    Dict,
+    List,
+    NamedTuple,
+    Optional,
+    Tuple,
+    TypeVar,
+    Union,
+    overload,
+)
 
 lgr = logging.getLogger(__name__)
 
@@ -62,20 +73,19 @@ SeqInfo = namedtuple(
     ],
 )
 
-StudySessionInfo = namedtuple(
-    "StudySessionInfo",
-    [
-        "locator",  # possible prefix identifying the study, e.g.
-        # PI/dataset or just a dataset or empty (default)
-        # Note that ATM there should be no multiple DICOMs with the
-        # same StudyInstanceUID which would collide, i.e point to
-        # the same subject/session. So 'locator' is pretty much an
-        # assignment from StudyInstanceUID into some place within
-        # hierarchy
-        "session",  # could be None
-        "subject",  # should be some ID defined either in cmdline or deduced
-    ],
-)
+
+class StudySessionInfo(NamedTuple):
+    # possible prefix identifying the study, e.g.  PI/dataset or just a dataset
+    # or empty (default) Note that ATM there should be no multiple DICOMs with
+    # the same StudyInstanceUID which would collide, i.e point to the same
+    # subject/session. So 'locator' is pretty much an assignment from
+    # StudyInstanceUID into some place within hierarchy
+    locator: Optional[str]
+
+    session: Optional[str | int]
+
+    # should be some ID defined either in cmdline or deduced
+    subject: Optional[str]
 
 
 class TempDirs:
