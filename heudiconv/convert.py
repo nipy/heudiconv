@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 __docformat__ = "numpy"
 
 import logging
