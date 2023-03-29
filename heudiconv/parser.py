@@ -25,7 +25,7 @@ atexit.register(tempdirs.cleanup)
 
 _VCS_REGEX = r'%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (op.sep, op.sep)
 
-_UNPACK_FORMATS = tuple(chain.from_iterable([x[1] for x in shutil.get_unpack_formats()]))
+_UNPACK_FORMATS = sum((x[1] for x in shutil.get_unpack_formats()), [])
 
 @docstring_parameter(_VCS_REGEX)
 def find_files(regex, topdir=op.curdir, exclude=None,
