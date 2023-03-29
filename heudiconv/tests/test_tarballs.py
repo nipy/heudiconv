@@ -6,7 +6,6 @@ import time
 from mock import patch
 from os.path import join as opj
 from os.path import dirname
-from six.moves import StringIO
 from glob import glob
 
 from heudiconv.dicoms import compress_dicoms

@@ -24,9 +24,9 @@ import os
 import pytest
 import sys
 
+from io import StringIO
 from mock import patch
 from os.path import join as opj
-from six.moves import StringIO
 import stat
 import os.path as op
 
