@@ -12,26 +12,22 @@ from .utils import TESTS_DATA_PATH
 from ..parser import get_extracted_dicoms
 
 
-@pytest.fixture
-def get_dicoms_gztar(tmpdir: Path) -> typing.List[str]:
+def get_dicoms_archive(format: str, tmpdir: Path) -> typing.List[str]:
     tmp_file = tmpdir / "dicom"
     archive = shutil.make_archive(
         str(tmp_file),
-        format="gztar", 
+        format=format, 
         root_dir=TESTS_DATA_PATH, 
         base_dir="01-anat-scout")
     return [archive]
 
+@pytest.fixture
+def get_dicoms_gztar(tmpdir: Path) -> typing.List[str]:
+    return get_dicoms_archive("gztar", tmpdir)
 
 @pytest.fixture
 def get_dicoms_zip(tmpdir: Path) -> typing.List[str]:
-    tmp_file = tmpdir / "dicom"
-    archive = shutil.make_archive(
-        str(tmp_file),
-        format="zip", 
-        root_dir=TESTS_DATA_PATH, 
-        base_dir="01-anat-scout")
-    return [archive]
+    return get_dicoms_archive("zip", tmpdir)
 
 
 @pytest.fixture
