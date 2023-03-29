@@ -1,7 +1,11 @@
+from __future__ import annotations
+
 from glob import glob
 import logging
 import os.path as op
 import sys
+from types import TracebackType
+from typing import Any, Optional
 
 from . import __packagename__, __version__
 from .bids import populate_bids_templates, populate_intended_for, tuneup_bids_json_files
@@ -17,13 +21,13 @@ lgr = logging.getLogger(__name__)
 INIT_MSG = "Running {packname} version {version} latest {latest}".format
 
 
-def is_interactive():
+def is_interactive() -> bool:
     """Return True if all in/outs are tty"""
     # TODO: check on windows if hasattr check would work correctly and add value:
     return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
 
 
-def setup_exceptionhook():
+def setup_exceptionhook() -> None:
     """
     Overloads default sys.excepthook with our exceptionhook handler.
 
@@ -31,7 +35,11 @@ def setup_exceptionhook():
     if not interactive, then invokes default handler.
     """
 
-    def _pdb_excepthook(exc_type, exc_value, tb):
+    def _pdb_excepthook(
+        exc_type: type[BaseException],
+        exc_value: BaseException,
+        tb: Optional[TracebackType],
+    ) -> None:
         if is_interactive():
             import pdb
             import traceback
@@ -46,8 +54,15 @@ def setup_exceptionhook():
 
 
 def process_extra_commands(
-    outdir, command, files, dicom_dir_template, heuristic, session, subjs, grouping
-):
+    outdir: str,
+    command: str,
+    files: list[str],
+    dicom_dir_template: Optional[str],
+    heuristic: Optional[str],
+    session: Optional[str],
+    subjs: Optional[list[str]],
+    grouping: str,
+) -> None:
     """
     Perform custom command instead of regular operations. Supported commands:
     ['treat-json', 'ls', 'populate-templates', 'populate-intended-for']
@@ -77,23 +92,23 @@ def process_extra_commands(
         How to group dicoms.
     """
     if command == "treat-jsons":
-        for f in files:
-            treat_infofile(f)
+        for fname in files:
+            treat_infofile(fname)
     elif command == "ls":
         ensure_heuristic_arg(heuristic)
         heuristic = load_heuristic(heuristic)
         heuristic_ls = getattr(heuristic, "ls", None)
-        for f in files:
+        for fname in files:
             study_sessions = get_study_sessions(
                 dicom_dir_template,
-                [f],
+                [fname],
                 heuristic,
                 outdir,
                 session,
                 subjs,
                 grouping=grouping,
             )
-            print(f)
+            print(fname)
             for study_session, sequences in study_sessions.items():
                 suf = ""
                 if heuristic_ls:
@@ -102,8 +117,8 @@ def process_extra_commands(
     elif command == "populate-templates":
         ensure_heuristic_arg(heuristic)
         heuristic = load_heuristic(heuristic)
-        for f in files:
-            populate_bids_templates(f, getattr(heuristic, "DEFAULT_FIELDS", {}))
+        for fname in files:
+            populate_bids_templates(fname, getattr(heuristic, "DEFAULT_FIELDS", {}))
     elif command == "sanitize-jsons":
         tuneup_bids_json_files(files)
     elif command == "heuristics":
@@ -117,7 +132,7 @@ def process_extra_commands(
 
         print(get_heuristic_description(heuristic, full=True))
     elif command == "populate-intended-for":
-        kwargs = {}
+        kwargs: dict[str, Any] = {}
         if heuristic:
             heuristic = load_heuristic(heuristic)
             kwargs = getattr(heuristic, "POPULATE_INTENDED_FOR_OPTS", {})
@@ -165,10 +180,9 @@ def process_extra_commands(
                 populate_intended_for(session_path, **kwargs)
     else:
         raise ValueError("Unknown command %s" % command)
-    return
 
 
-def ensure_heuristic_arg(heuristic=None):
+def ensure_heuristic_arg(heuristic: Optional[str] = None) -> None:
     """
     Check that the heuristic argument was provided.
     """
@@ -190,29 +204,29 @@ def ensure_heuristic_arg(heuristic=None):
 )
 def workflow(
     *,
-    dicom_dir_template=None,
-    files=None,
-    subjs=None,
-    converter="dcm2niix",
-    outdir=".",
-    locator=None,
-    conv_outdir=None,
-    anon_cmd=None,
-    heuristic=None,
-    with_prov=False,
-    session=None,
-    bids_options=None,
-    overwrite=False,
-    datalad=False,
-    debug=False,
-    command=None,
-    grouping="studyUID",
-    minmeta=False,
-    random_seed=None,
-    dcmconfig=None,
-    queue=None,
-    queue_args=None
-):
+    dicom_dir_template: Optional[str] = None,
+    files: Optional[list[str]] = None,
+    subjs: Optional[list[str]] = None,
+    converter: Optional[str] = "dcm2niix",
+    outdir: str = ".",
+    locator: Optional[str] = None,
+    conv_outdir: Optional[str] = None,
+    anon_cmd: Optional[str] = None,
+    heuristic: Optional[str] = None,
+    with_prov: bool = False,
+    session: Optional[str] = None,
+    bids_options: Optional[str] = None,
+    overwrite: bool = False,
+    datalad: bool = False,
+    debug: bool = False,
+    command: Optional[str] = None,
+    grouping: str = "studyUID",
+    minmeta: bool = False,
+    random_seed: Optional[int] = None,
+    dcmconfig: Optional[str] = None,
+    queue: Optional[str] = None,
+    queue_args: Optional[str] = None,
+) -> None:
     """Run the HeuDiConv conversion workflow.
 
     Parameters
@@ -347,6 +361,8 @@ def workflow(
     )
 
     if command:
+        if files is None:
+            raise ValueError("'command' given but 'files' is None")
         process_extra_commands(
             outdir,
             command,
@@ -366,9 +382,14 @@ def workflow(
 
     if queue:
         lgr.info("Queuing %s conversion", queue)
-        iterarg, iterables = (
-            ("files", len(files)) if files else ("subjects", len(subjs))
-        )
+        if files:
+            iterarg = "files"
+            iterables = len(files)
+        elif subjs:
+            iterarg = "subjects"
+            iterables = len(subjs)
+        else:
+            raise ValueError("'queue' given but both 'files' and 'subjects' are false")
         queue_conversion(queue, iterarg, iterables, queue_args)
         return
 
