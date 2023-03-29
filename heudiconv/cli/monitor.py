@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+from __future__ import annotations
+
+import argparse
 from collections import OrderedDict
 import json
 import logging
@@ -9,6 +12,7 @@ import re
 import shlex
 import subprocess
 import time
+from typing import Any, Optional
 
 import inotify.adapters
 from inotify.constants import IN_CREATE, IN_ISDIR, IN_MODIFY
@@ -30,8 +34,8 @@ ch.setFormatter(formatter)
 _LOGGER.addHandler(ch)
 
 
-def run_heudiconv(args):
-    info_dict = dict()
+def run_heudiconv(args: list[str]) -> tuple[str, dict[str, Any]]:
+    info_dict: dict[str, Any] = dict()
     proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     cmd = " ".join(map(shlex.quote, args))
     return_code = proc.wait()
@@ -49,25 +53,30 @@ def run_heudiconv(args):
     return stdout, info_dict
 
 
-def process(paths2process, db, wait=WAIT_TIME, logdir="log"):
+def process(
+    paths2process: dict[str, float],
+    db: Optional[TinyDB],
+    wait: int | float = WAIT_TIME,
+    logdir: str = "log",
+) -> None:
     # if paths2process and
     # time.time() - os.path.getmtime(paths2process[0]) > WAIT_TIME:
-    processed = []
+    processed: list[str] = []
     for path, mod_time in paths2process.items():
         if time.time() - mod_time > wait:
             # process_me = paths2process.popleft().decode('utf-8')
             process_me = path
-            process_dict = {
+            process_dict: dict[str, Any] = {
                 "input_path": process_me,
                 "accession_number": op.basename(process_me),
             }
             print("Time to process {0}".format(process_me))
             stdout, run_dict = run_heudiconv(["ls", "-l", process_me])
             process_dict.update(run_dict)
-            db.insert(process_dict)
+            if db is not None:
+                db.insert(process_dict)
             # save log
-            logdir = Path(logdir)
-            log = logdir / (process_dict["accession_number"] + ".log")
+            log = Path(logdir, process_dict["accession_number"] + ".log")
             log.write_text(stdout)
             # if we processed it, or it failed,
             # we need to remove it to avoid running it again
@@ -77,19 +86,19 @@ def process(paths2process, db, wait=WAIT_TIME, logdir="log"):
 
 
 def monitor(
-    topdir="/tmp/new_dir",
-    check_ptrn="/20../../..",
-    db=None,
-    wait=WAIT_TIME,
-    logdir="log",
-):
+    topdir: str = "/tmp/new_dir",
+    check_ptrn: str = "/20../../..",
+    db: Optional[TinyDB] = None,
+    wait: int | float = WAIT_TIME,
+    logdir: str = "log",
+) -> None:
     # make logdir if not existent
     try:
         os.makedirs(logdir)
     except OSError:
         pass
     # paths2process = deque()
-    paths2process = OrderedDict()
+    paths2process: dict[str, float] = OrderedDict()
     # watch only today's folder
     path_re = re.compile("(%s%s)/?$" % (topdir, check_ptrn))
     i = inotify.adapters.InotifyTree(topdir.encode())  # , mask=MASK)
@@ -124,9 +133,7 @@ def monitor(
         process(paths2process, db, wait=wait, logdir=logdir)
 
 
-def parse_args():
-    import argparse
-
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="monitor.py",
         description=(
