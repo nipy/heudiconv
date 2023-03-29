@@ -2,6 +2,7 @@
 import logging
 import os
 import os.path as op
+from pathlib import Path
 import re
 import subprocess
 import time
@@ -11,7 +12,6 @@ from collections import deque, OrderedDict
 from datetime import date
 import inotify.adapters
 from inotify.constants import IN_MODIFY, IN_CREATE, IN_ISDIR
-from py.path import local as localpath
 from tinydb import TinyDB
 
 _DEFAULT_LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -67,9 +67,9 @@ def process(paths2process, db, wait=WAIT_TIME, logdir='log'):
             process_dict.update(run_dict)
             db.insert(process_dict)
             # save log
-            logdir = localpath(logdir)
-            log = logdir.join(process_dict['accession_number'] + '.log')
-            log.write(stdout)
+            logdir = Path(logdir)
+            log = logdir / (process_dict['accession_number'] + '.log')
+            log.write_text(stdout)
             # if we processed it, or it failed,
             # we need to remove it to avoid running it again
             processed.append(path)
