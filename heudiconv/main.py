@@ -96,13 +96,14 @@ def process_extra_commands(
             treat_infofile(fname)
     elif command == "ls":
         ensure_heuristic_arg(heuristic)
-        heuristic = load_heuristic(heuristic)
-        heuristic_ls = getattr(heuristic, "ls", None)
+        assert heuristic is not None
+        heuristic_mod = load_heuristic(heuristic)
+        heuristic_ls = getattr(heuristic_mod, "ls", None)
         for fname in files:
             study_sessions = get_study_sessions(
                 dicom_dir_template,
                 [fname],
-                heuristic,
+                heuristic_mod,
                 outdir,
                 session,
                 subjs,
@@ -116,9 +117,10 @@ def process_extra_commands(
                 print("\t%s %d sequences%s" % (str(study_session), len(sequences), suf))
     elif command == "populate-templates":
         ensure_heuristic_arg(heuristic)
-        heuristic = load_heuristic(heuristic)
+        assert heuristic is not None
+        heuristic_mod = load_heuristic(heuristic)
         for fname in files:
-            populate_bids_templates(fname, getattr(heuristic, "DEFAULT_FIELDS", {}))
+            populate_bids_templates(fname, getattr(heuristic_mod, "DEFAULT_FIELDS", {}))
     elif command == "sanitize-jsons":
         tuneup_bids_json_files(files)
     elif command == "heuristics":
@@ -128,14 +130,15 @@ def process_extra_commands(
             print("- %s: %s" % name_desc)
     elif command == "heuristic-info":
         ensure_heuristic_arg(heuristic)
+        assert heuristic is not None
         from .utils import get_heuristic_description
 
         print(get_heuristic_description(heuristic, full=True))
     elif command == "populate-intended-for":
         kwargs: dict[str, Any] = {}
         if heuristic:
-            heuristic = load_heuristic(heuristic)
-            kwargs = getattr(heuristic, "POPULATE_INTENDED_FOR_OPTS", {})
+            heuristic_mod = load_heuristic(heuristic)
+            kwargs = getattr(heuristic_mod, "POPULATE_INTENDED_FOR_OPTS", {})
         if not subjs:
             subjs = [
                 # search outdir for 'sub-*'; if it is a directory (not a regular file), remove
@@ -393,10 +396,16 @@ def workflow(
         queue_conversion(queue, iterarg, iterables, queue_args)
         return
 
-    heuristic = load_heuristic(heuristic)
+    heuristic_mod = load_heuristic(heuristic)
 
     study_sessions = get_study_sessions(
-        dicom_dir_template, files, heuristic, outdir, session, subjs, grouping=grouping
+        dicom_dir_template,
+        files,
+        heuristic_mod,
+        outdir,
+        session,
+        subjs,
+        grouping=grouping,
     )
 
     # extract tarballs, and replace their entries with expanded lists of files
@@ -460,7 +469,7 @@ def workflow(
             sid,
             dicoms,
             study_outdir,
-            heuristic,
+            heuristic_mod,
             converter=converter,
             anon_sid=anon_sid,
             anon_outdir=anon_study_outdir,

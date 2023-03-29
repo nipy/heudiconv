@@ -1,5 +1,8 @@
 """Utility objects and functions"""
+from __future__ import annotations
+
 from collections import namedtuple
+from collections.abc import Callable
 import copy
 from datetime import datetime
 from glob import glob
@@ -17,40 +20,47 @@ from subprocess import check_output
 import sys
 import tempfile
 from time import sleep
+from types import ModuleType
+from typing import Any, AnyStr, Dict, List, Optional, Tuple, TypeVar, Union, overload
 
 lgr = logging.getLogger(__name__)
 
-seqinfo_fields = [
-    "total_files_till_now",  # 0
-    "example_dcm_file",  # 1
-    "series_id",  # 2
-    "dcm_dir_name",  # 3
-    "series_files",  # 4
-    "unspecified",  # 5
-    "dim1",
-    "dim2",
-    "dim3",
-    "dim4",  # 6, 7, 8, 9
-    "TR",
-    "TE",  # 10, 11
-    "protocol_name",  # 12
-    "is_motion_corrected",  # 13
-    "is_derived",  # 14
-    "patient_id",  # 15
-    "study_description",  # 16
-    "referring_physician_name",  # 17
-    "series_description",  # 18
-    "sequence_name",  # 19
-    "image_type",  # 20
-    "accession_number",  # 21
-    "patient_age",  # 22
-    "patient_sex",  # 23
-    "date",  # 24
-    "series_uid",  # 25
-    "time",  # 26
-]
+T = TypeVar("T")
+V = TypeVar("V")
 
-SeqInfo = namedtuple("SeqInfo", seqinfo_fields)
+
+SeqInfo = namedtuple(
+    "SeqInfo",
+    [
+        "total_files_till_now",  # 0
+        "example_dcm_file",  # 1
+        "series_id",  # 2
+        "dcm_dir_name",  # 3
+        "series_files",  # 4
+        "unspecified",  # 5
+        "dim1",
+        "dim2",
+        "dim3",
+        "dim4",  # 6, 7, 8, 9
+        "TR",
+        "TE",  # 10, 11
+        "protocol_name",  # 12
+        "is_motion_corrected",  # 13
+        "is_derived",  # 14
+        "patient_id",  # 15
+        "study_description",  # 16
+        "referring_physician_name",  # 17
+        "series_description",  # 18
+        "sequence_name",  # 19
+        "image_type",  # 20
+        "accession_number",  # 21
+        "patient_age",  # 22
+        "patient_sex",  # 23
+        "date",  # 24
+        "series_uid",  # 25
+        "time",  # 26
+    ],
+)
 
 StudySessionInfo = namedtuple(
     "StudySessionInfo",
@@ -68,26 +78,28 @@ StudySessionInfo = namedtuple(
 )
 
 
-class TempDirs(object):
+class TempDirs:
     """A helper to centralize handling and cleanup of dirs"""
 
-    def __init__(self):
-        self.dirs = []
-        self.exists = op.exists
-        self.lgr = logging.getLogger("tempdirs")
+    def __init__(self) -> None:
+        self.dirs: list[str] = []
+        self.lgr: logging.Logger = logging.getLogger("tempdirs")
 
-    def __call__(self, prefix=None):
+    def __call__(self, prefix: Optional[str] = None) -> str:
         tmpdir = tempfile.mkdtemp(prefix=prefix)
         self.dirs.append(tmpdir)
         return tmpdir
 
-    def __del__(self):
+    def __del__(self) -> None:
         try:
             self.cleanup()
         except AttributeError:
             pass
 
-    def cleanup(self):
+    def exists(self, path: str) -> bool:
+        return op.exists(path)
+
+    def cleanup(self) -> None:
         self.lgr.debug("Removing %d temporary directories", len(self.dirs))
         for t in self.dirs[:]:
             self.lgr.debug("Removing %s", t)
@@ -95,24 +107,25 @@ class TempDirs(object):
                 self.rmtree(t)
         self.dirs = []
 
-    def rmtree(self, tmpdir):
+    def rmtree(self, tmpdir: str) -> None:
         if self.exists(tmpdir):
             shutil.rmtree(tmpdir)
         if tmpdir in self.dirs:
             self.dirs.remove(tmpdir)
 
 
-def docstring_parameter(*sub):
+def docstring_parameter(*sub: str) -> Callable[[T], T]:
     """Borrowed from https://stackoverflow.com/a/10308363/6145776"""
 
-    def dec(obj):
+    def dec(obj: T) -> T:
+        assert obj.__doc__ is not None
         obj.__doc__ = obj.__doc__.format(*sub)
         return obj
 
     return dec
 
 
-def anonymize_sid(sid, anon_sid_cmd):
+def anonymize_sid(sid: AnyStr, anon_sid_cmd: str) -> AnyStr:
     """
     Raises
     ------
@@ -120,7 +133,7 @@ def anonymize_sid(sid, anon_sid_cmd):
       if script returned an empty string (after whitespace stripping),
       or output with multiple words/lines.
     """
-    cmd = [anon_sid_cmd, sid]
+    cmd: list[str | bytes] = [anon_sid_cmd, sid]
     shell_return = check_output(cmd)
 
     if isinstance(shell_return, bytes) and isinstance(sid, str):
@@ -138,7 +151,7 @@ def anonymize_sid(sid, anon_sid_cmd):
     return anon_sid
 
 
-def create_file_if_missing(filename, content):
+def create_file_if_missing(filename: str, content: str) -> bool:
     """Create file if missing, so we do not
     override any possibly introduced changes"""
     if op.lexists(filename):
@@ -151,20 +164,20 @@ def create_file_if_missing(filename, content):
     return True
 
 
-def read_config(infile):
-    with open(infile, "rt") as fp:
+def read_config(infile: str) -> Any:
+    with open(infile, "r") as fp:
         info = eval(fp.read())
     return info
 
 
-def write_config(outfile, info):
+def write_config(outfile: str, info: Any) -> None:
     from pprint import PrettyPrinter
 
-    with open(outfile, "wt") as fp:
+    with open(outfile, "w") as fp:
         fp.writelines(PrettyPrinter().pformat(info))
 
 
-def load_json(filename, retry=0):
+def load_json(filename: str, retry: int = 0) -> Any:
     """Load data from a json file
 
     Parameters
@@ -202,13 +215,19 @@ def load_json(filename, retry=0):
     return data
 
 
-def assure_no_file_exists(path):
+def assure_no_file_exists(path: str | Path) -> None:
     """Check if file or symlink (git-annex?) exists, and if so -- remove"""
     if os.path.lexists(path):
         os.unlink(path)
 
 
-def save_json(filename, data, indent=2, sort_keys=True, pretty=False):
+def save_json(
+    filename: str | Path,
+    data: Any,
+    indent: int = 2,
+    sort_keys: bool = True,
+    pretty: bool = False,
+) -> None:
     """Save data to a json file
 
     Parameters
@@ -223,11 +242,10 @@ def save_json(filename, data, indent=2, sort_keys=True, pretty=False):
 
     """
     assure_no_file_exists(filename)
-    dumps_kw = dict(sort_keys=sort_keys, indent=indent)
-    j = None
+    j: Optional[str] = None
     if pretty:
         try:
-            j = json_dumps_pretty(data, **dumps_kw)
+            j = json_dumps_pretty(data, sort_keys=sort_keys, indent=indent)
         except AssertionError as exc:
             pretty = False
             lgr.warning(
@@ -237,18 +255,18 @@ def save_json(filename, data, indent=2, sort_keys=True, pretty=False):
                 "that file (%s) with HeuDiConv developers" % (str(exc), filename)
             )
     if not pretty:
-        j = json_dumps(data, **dumps_kw)
+        j = json_dumps(data, sort_keys=sort_keys, indent=indent)
     assert j is not None  # one way or another it should have been set to a str
     with open(filename, "w") as fp:
         fp.write(j)
 
 
-def json_dumps(json_obj, indent=2, sort_keys=True):
+def json_dumps(json_obj: Any, indent: int = 2, sort_keys: bool = True) -> str:
     """Unified (default indent and sort_keys) invocation of json.dumps"""
     return json.dumps(json_obj, indent=indent, sort_keys=sort_keys)
 
 
-def json_dumps_pretty(j, indent=2, sort_keys=True):
+def json_dumps_pretty(j: Any, indent: int = 2, sort_keys: bool = True) -> str:
     """Given a json structure, pretty print it by colliding numeric arrays
     into a line.
 
@@ -293,7 +311,9 @@ def json_dumps_pretty(j, indent=2, sort_keys=True):
     return js_
 
 
-def update_json(json_file, new_data, pretty=False):
+def update_json(
+    json_file: str | Path, new_data: dict[str, Any], pretty: bool = False
+) -> None:
     """
     Adds a given field (and its value) to a json file
 
@@ -321,7 +341,7 @@ def update_json(json_file, new_data, pretty=False):
     save_json(json_file, data, pretty=pretty)
 
 
-def treat_infofile(filename):
+def treat_infofile(filename: str) -> None:
     """Tune up generated .json file (slim down, pretty-print for humans)."""
     j = load_json(filename)
     j_slim = slim_down_info(j)
@@ -329,7 +349,7 @@ def treat_infofile(filename):
     set_readonly(filename)
 
 
-def slim_down_info(j):
+def slim_down_info(j: Any) -> Any:
     """Given an aggregated info structure, removes excessive details
 
     Such as CSA fields, and SourceImageSequence which on Siemens files could be
@@ -337,7 +357,7 @@ def slim_down_info(j):
     If needed, could be recovered from stored DICOMs
     """
     j = copy.deepcopy(j)  # we will do in-place modification on a copy
-    dicts = []
+    dicts: list[dict[str, Any]] = []
     # poor man programming for now
     if "const" in j.get("global", {}):
         dicts.append(j["global"]["const"])
@@ -350,7 +370,7 @@ def slim_down_info(j):
     return j
 
 
-def get_known_heuristic_names():
+def get_known_heuristic_names() -> list[str]:
     """Return a list of heuristic names present under heudiconv/heuristics"""
     import heudiconv.heuristics
 
@@ -364,7 +384,7 @@ def get_known_heuristic_names():
     )
 
 
-def load_heuristic(heuristic):
+def load_heuristic(heuristic: str) -> ModuleType:
     """Load heuristic from the file, return the module"""
     if os.path.sep in heuristic or os.path.lexists(heuristic):
         heuristic_file = op.realpath(heuristic)
@@ -373,7 +393,7 @@ def load_heuristic(heuristic):
             old_syspath = sys.path[:]
             sys.path.insert(0, path)
             mod = __import__(fname.split(".")[0])
-            mod.filename = heuristic_file
+            mod.filename = heuristic_file  # type: ignore[attr-defined]
         finally:
             sys.path = old_syspath
     else:
@@ -381,13 +401,15 @@ def load_heuristic(heuristic):
 
         try:
             mod = import_module("heudiconv.heuristics.%s" % heuristic)
-            mod.filename = mod.__file__.rstrip("co")  # remove c or o from pyc/pyo
+            assert mod.__file__ is not None
+            # remove c or o from pyc/pyo
+            mod.filename = mod.__file__.rstrip("co")  # type: ignore[attr-defined]
         except Exception as exc:
             raise ImportError("Failed to import heuristic %s: %s" % (heuristic, exc))
     return mod
 
 
-def get_heuristic_description(name, full=False):
+def get_heuristic_description(name: str, full: bool = False) -> str:
     try:
         mod = load_heuristic(name)
         desc = (getattr(mod, "__doc__", "") or "").strip()
@@ -396,7 +418,7 @@ def get_heuristic_description(name, full=False):
         return "Failed to load: %s" % exc
 
 
-def get_known_heuristics_with_descriptions():
+def get_known_heuristics_with_descriptions() -> dict[str, str]:
     from collections import OrderedDict
 
     heuristics = OrderedDict()
@@ -405,17 +427,17 @@ def get_known_heuristics_with_descriptions():
     return heuristics
 
 
-def safe_copyfile(src, dest, overwrite=False):
+def safe_copyfile(src: str, dest: str, overwrite: bool = False) -> None:
     """Copy file but blow if destination name already exists"""
-    return _safe_op_file(src, dest, "copyfile", overwrite=overwrite)
+    _safe_op_file(src, dest, "copyfile", overwrite=overwrite)
 
 
-def safe_movefile(src, dest, overwrite=False):
+def safe_movefile(src: str, dest: str, overwrite: bool = False) -> None:
     """Move file but blow if destination name already exists"""
-    return _safe_op_file(src, dest, "move", overwrite=overwrite)
+    _safe_op_file(src, dest, "move", overwrite=overwrite)
 
 
-def _safe_op_file(src, dest, operation, overwrite=False):
+def _safe_op_file(src: str, dest: str, operation: str, overwrite: bool = False) -> None:
     """Copy or move file but blow if destination name already exists
 
     Parameters
@@ -443,7 +465,7 @@ ALL_CAN_READ = stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
 assert ALL_CAN_READ >> 1 == ALL_CAN_WRITE  # Assumption in the code
 
 
-def set_readonly(path, read_only=True):
+def set_readonly(path: str, read_only: bool = True) -> int:
     """Make file read only or writeable while preserving "access levels"
 
     So if file was not readable by others, it should remain not readable by
@@ -474,7 +496,7 @@ def set_readonly(path, read_only=True):
     return new_perms
 
 
-def is_readonly(path):
+def is_readonly(path: str) -> bool:
     """Return True if it is a fully read-only file (dereferences the symlink)"""
     # get current permissions
     perms = stat.S_IMODE(os.lstat(os.path.realpath(path)).st_mode)
@@ -482,7 +504,7 @@ def is_readonly(path):
     return not bool(perms & ALL_CAN_WRITE)
 
 
-def clear_temp_dicoms(item_dicoms):
+def clear_temp_dicoms(item_dicoms: list[str]) -> None:
     """Ensures DICOM temporary directories are safely cleared"""
     try:
         tmp = Path(op.commonprefix(item_dicoms)).parents[1]
@@ -491,26 +513,26 @@ def clear_temp_dicoms(item_dicoms):
     if (
         str(tmp.parent) == tempfile.gettempdir()
         and str(tmp.stem).startswith("heudiconvDCM")
-        and op.exists(str(tmp))
+        and op.exists(tmp)
     ):
         # clean up directory holding dicoms
-        shutil.rmtree(str(tmp))
+        shutil.rmtree(tmp)
 
 
-def file_md5sum(filename):
+def file_md5sum(filename: str) -> str:
     with open(filename, "rb") as f:
         return hashlib.md5(f.read()).hexdigest()
 
 
 # Borrowed from DataLad (MIT license), with "archives" functionality commented
 # out
-class File(object):
+class File:
     """Helper for a file entry in the create_tree/@with_tree
 
     It allows to define additional settings for entries
     """
 
-    def __init__(self, name, executable=False):
+    def __init__(self, name: str, executable: bool = False) -> None:
         """
 
         Parameters
@@ -523,11 +545,20 @@ class File(object):
         self.name = name
         self.executable = executable
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
 
-def create_tree(path, tree, archives_leading_dir=True):
+TreeSpec = Union[
+    Tuple[Tuple[Union[str, File], "Load"], ...],
+    List[Tuple[Union[str, File], "Load"]],
+    Dict[Union[str, File], "Load"],
+]
+
+Load = Union[str, "TreeSpec"]
+
+
+def create_tree(path: str, tree: TreeSpec, archives_leading_dir: bool = True) -> None:
     """Given a list of tuples (name, load) or a dict create such a tree
 
     if load is a tuple or a dict itself -- that would create either a subtree
@@ -539,7 +570,7 @@ def create_tree(path, tree, archives_leading_dir=True):
         os.makedirs(path)
 
     if isinstance(tree, dict):
-        tree = tree.items()
+        tree = list(tree.items())
 
     for file_, load in tree:
         if isinstance(file_, File):
@@ -565,7 +596,21 @@ def create_tree(path, tree, archives_leading_dir=True):
             os.chmod(full_name, os.stat(full_name).st_mode | stat.S_IEXEC)
 
 
-def get_typed_attr(obj, attr, _type, default=None):
+@overload
+def get_typed_attr(obj: Any, attr: str, _type: type[T], default: V) -> T | V:
+    ...
+
+
+@overload
+def get_typed_attr(
+    obj: Any, attr: str, _type: type[T], default: None = None
+) -> T | None:
+    ...
+
+
+def get_typed_attr(
+    obj: Any, attr: str, _type: type[T], default: Optional[V] = None
+) -> T | V | None:
     """
     Typecasts an object's named attribute. If the attribute cannot be
     converted, the default value is returned instead.
@@ -578,13 +623,13 @@ def get_typed_attr(obj, attr, _type, default=None):
     default: value, optional
     """
     try:
-        val = _type(getattr(obj, attr, default))
+        val = _type(getattr(obj, attr, default))  # type: ignore[call-arg]
     except (TypeError, ValueError):
         return default
     return val
 
 
-def get_datetime(date, time, *, microseconds=True):
+def get_datetime(date: str, time: str, *, microseconds: bool = True) -> str:
     """
     Combine date and time from dicom to isoformat.
 
@@ -614,7 +659,7 @@ def get_datetime(date, time, *, microseconds=True):
     return datetime_str
 
 
-def remove_suffix(s, suf):
+def remove_suffix(s: str, suf: str) -> str:
     """
     Remove suffix from the end of the string
 
@@ -633,7 +678,7 @@ def remove_suffix(s, suf):
     return s
 
 
-def remove_prefix(s, pre):
+def remove_prefix(s: str, pre: str) -> str:
     """
     Remove prefix from the beginning of the string
 

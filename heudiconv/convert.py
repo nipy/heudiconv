@@ -26,6 +26,7 @@ from .dicoms import (
 )
 from .due import Doi, due
 from .utils import (
+    SeqInfo,
     TempDirs,
     assure_no_file_exists,
     clear_temp_dicoms,
@@ -35,7 +36,6 @@ from .utils import (
     safe_copyfile,
     safe_movefile,
     save_json,
-    seqinfo_fields,
     set_readonly,
     treat_infofile,
     write_config,
@@ -201,7 +201,7 @@ def prep_conversion(
         # allow to overwrite even if was present under git-annex already
         assure_no_file_exists(dicominfo_file)
         with open(dicominfo_file, "wt") as fp:
-            fp.write("\t".join([val for val in seqinfo_fields]) + "\n")
+            fp.write("\t".join(SeqInfo._fields) + "\n")
             for seq in seqinfo_list:
                 fp.write("\t".join([str(val) for val in seq]) + "\n")
         lgr.debug("Calling out to %s.infodict", heuristic)
