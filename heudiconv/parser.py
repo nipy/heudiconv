@@ -8,7 +8,7 @@ import re
 from collections import defaultdict
 
 import shutil
-import typing
+from typing import DefaultDict, ItemsView, Iterable, List, Optional
 
 from .dicoms import group_dicoms_into_seqinfos
 from .utils import (
@@ -62,21 +62,20 @@ def find_files(regex, topdir=op.curdir, exclude=None,
 
 
 def get_extracted_dicoms(
-        fl: typing.Iterable[str]
-        ) -> typing.ItemsView[typing.Optional[int], typing.List[str]]:
-    """Given a collection of files and/or directories, possibly extract 
-    some from tarballs.
+        fl: Iterable[str]
+    ) -> ItemsView[Optional[int], List[str]]:
+    """Given a collection of files and/or directories, list out and possibly 
+    extract the contents from archives.
 
     Parameters
     ----------
     fl
-        An iterable (e.g., list or tuple) of files to process.
+        Files (possibly archived) to process.
 
     Returns
     -------
     ItemsView[int | None, list[str]]
-        A tuple of keys (either integer or None) and list of strs representing
-          the absolute paths of files. 
+        The absolute paths of (possibly newly extracted) files. 
 
     Notes
     -----
@@ -94,17 +93,13 @@ def get_extracted_dicoms(
     a single session.
 
     When contents of fl are a list of unarchived and archived files, the 
-    unarchived files are grouped into a single session (key: None), and the
-    archived files are each grouped into separate sessions.
+    unarchived files are grouped into a single session (key: None). If there is
+    only one archived file, the contents of that file are grouped with
+    the unarchived file. If there are multiple archived files, they are grouped
+    into separate sessions.
     """
-    sessions: typing.DefaultDict[
-        typing.Optional[int], 
-        typing.List[str]
-        ] = defaultdict(list)
+    sessions: DefaultDict[Optional[int], List[str]] = defaultdict(list)
     
-    if not isinstance(fl, list):
-        fl = list(fl)
-
     # keep track of session manually to ensure that the variable is bound
     # when it is used after the loop (e.g., consider situation with
     # fl being empty)
@@ -123,14 +118,18 @@ def get_extracted_dicoms(
         # cannot use TempDirs since will trigger cleanup with __del__
         tmpdir = tempdirs(prefix="heudiconvDCM")
         
+        # check content and sanitize permission bits before extraction
+        os.chmod(tmpdir, mode=0o700)
         shutil.unpack_archive(t, extract_dir=tmpdir)
-        tf_content = list(find_files(regex=".*", topdir=tmpdir))
-        # check content and sanitize permission bits
-        for f in tf_content:
+
+        archive_content = list(find_files(regex=".*", topdir=tmpdir))
+
+        # may be too cautious (tmpdir is already 700). 
+        for f in archive_content:
             os.chmod(f, mode=0o700)
         # store full paths to each file, so we don't need to drag along
         # tmpdir as some basedir
-        sessions[session] = tf_content
+        sessions[session] = archive_content
         session += 1
 
     if session == 1:

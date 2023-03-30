@@ -3,7 +3,7 @@ import os
 import os.path as op
 from pathlib import Path
 import stat
-import typing
+from typing import List
 
 
 import pytest
@@ -12,35 +12,37 @@ from .utils import TESTS_DATA_PATH
 from ..parser import get_extracted_dicoms
 
 
-def get_dicoms_archive(format: str, tmpdir: Path) -> typing.List[str]:
+def _get_dicoms_archive(tmpdir: Path, format: str) -> List[str]:
     tmp_file = tmpdir / "dicom"
     archive = shutil.make_archive(
         str(tmp_file),
-        format=format, 
+        format=format,
         root_dir=TESTS_DATA_PATH, 
         base_dir="01-anat-scout")
     return [archive]
 
-@pytest.fixture
-def get_dicoms_gztar(tmpdir: Path) -> typing.List[str]:
-    return get_dicoms_archive("gztar", tmpdir)
 
 @pytest.fixture
-def get_dicoms_zip(tmpdir: Path) -> typing.List[str]:
-    return get_dicoms_archive("zip", tmpdir)
+def get_dicoms_archive(tmpdir: Path, request: pytest.FixtureRequest) -> List[str]:
+    return _get_dicoms_archive(tmpdir, format=request.param)
 
 
 @pytest.fixture
-def get_dicoms_list() -> typing.List[str]:
+def get_dicoms_gztar(tmpdir: Path) -> List[str]:
+    return _get_dicoms_archive(tmpdir, "gztar")
+
+
+@pytest.fixture
+def get_dicoms_list() -> List[str]:
     return glob(op.join(TESTS_DATA_PATH, "01-anat-scout", "*"))
 
 
-def test_get_extracted_dicoms_single_session_is_none(get_dicoms_gztar: typing.List[str]):
+def test_get_extracted_dicoms_single_session_is_none(get_dicoms_gztar: List[str]):
     for session_, _ in get_extracted_dicoms(get_dicoms_gztar):
         assert session_ is None
 
 
-def test_get_extracted_dicoms_multple_session_integers(get_dicoms_gztar: typing.List[str]):
+def test_get_extracted_dicoms_multple_session_integers(get_dicoms_gztar: List[str]):
     sessions = [
         session
         for session, _ in get_extracted_dicoms(get_dicoms_gztar + get_dicoms_gztar)
@@ -49,38 +51,30 @@ def test_get_extracted_dicoms_multple_session_integers(get_dicoms_gztar: typing.
     assert sessions == [0, 1]
 
 
-def test_get_extracted_dicoms_from_tgz(get_dicoms_gztar: typing.List[str]):
-    for _, files in get_extracted_dicoms(get_dicoms_gztar):
+@pytest.mark.parametrize("get_dicoms_archive", ("tar", "gztar", "zip", "bztar", "xztar"), indirect=True)
+def test_get_extracted_dicoms_from_archives(get_dicoms_archive: List[str]):
+    for _, files in get_extracted_dicoms(get_dicoms_archive):
+
         # check that the only file is the one called "0001.dcm"
-        assert all(file.endswith("0001.dcm") for file in files)
+        endswith = all(file.endswith("0001.dcm") for file in files)
+
+        # check that permissions were set
+        mode = all(stat.S_IMODE(os.stat(file).st_mode) == 448 for file in files)
+
+        # check for absolute paths
+        absolute = all(op.isabs(file) for file in files)
+
+        assert endswith and mode and absolute
 
 
-def test_get_extracted_dicoms_from_zip(get_dicoms_zip: typing.List[str]):
-    for _, files in get_extracted_dicoms(get_dicoms_zip):
-        # check that the only file is the one called "0001.dcm"
-        assert all(file.endswith("0001.dcm") for file in files)
-
-
-def test_get_extracted_dicoms_from_file_list(get_dicoms_list: typing.List[str]):
+def test_get_extracted_dicoms_from_file_list(get_dicoms_list: List[str]):
     for _, files in get_extracted_dicoms(get_dicoms_list):
         assert all(op.isfile(file) for file in files)
 
 
-def test_get_extracted_have_correct_permissions(get_dicoms_gztar: typing.List[str]):
-    for _, files in get_extracted_dicoms(get_dicoms_gztar):
-        assert all(stat.S_IMODE(os.stat(file).st_mode) == 448 for file in files)
-
-
-def test_get_extracted_are_absolute(get_dicoms_gztar: typing.List[str]):
-    for _, files in get_extracted_dicoms(get_dicoms_gztar):
-        assert all(op.isabs(file) for file in files)
-
-
-def test_get_extracted_fails_when_mixing_archive_and_unarchived(
-        get_dicoms_gztar: typing.List[str],
-        get_dicoms_list: typing.List[str]):
-    with pytest.raises(ValueError):
-        get_extracted_dicoms(get_dicoms_gztar + get_dicoms_list)
+def test_get_extracted_dicoms_from_mixed_list(get_dicoms_list: List[str], get_dicoms_gztar: List[str]):
+    for _, files in get_extracted_dicoms(get_dicoms_list + get_dicoms_gztar):
+        assert all(op.isfile(file) for file in files)
 
 
 def test_get_extracted_from_empty_list():
