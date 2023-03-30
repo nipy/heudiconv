@@ -64,7 +64,7 @@ def test_get_extracted_dicoms_from_archives(get_dicoms_archive: List[str]):
         # check for absolute paths
         absolute = all(op.isabs(file) for file in files)
 
-        assert endswith and mode and absolute
+        assert all([endswith, mode, absolute])
 
 
 def test_get_extracted_dicoms_from_file_list(get_dicoms_list: List[str]):
