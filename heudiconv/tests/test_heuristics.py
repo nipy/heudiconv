@@ -1,9 +1,9 @@
 from heudiconv.cli.run import main as runner
 
+from io import StringIO
 import os
 import os.path as op
 from mock import patch
-from six.moves import StringIO
 
 from glob import glob
 from os.path import join as pjoin, dirname
