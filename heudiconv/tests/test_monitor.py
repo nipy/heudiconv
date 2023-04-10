@@ -1,7 +1,7 @@
 from collections import namedtuple
 import os.path as op
+from unittest.mock import patch
 
-from mock import patch
 import pytest
 
 try:
