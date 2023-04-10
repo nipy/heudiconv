@@ -410,6 +410,7 @@ def get_datetime_from_dcm(dcm_data: dcm.FileDataset) -> Optional[datetime.dateti
     series_time = dcm_data.get("SeriesTime")
     if not (series_date is None or series_time is None):
         return datetime.datetime.strptime(series_date + series_time, "%Y%m%d%H%M%S.%f")
+    return None
 
 
 def compress_dicoms(dicom_list, out_prefix, tempdirs, overwrite):

@@ -96,27 +96,28 @@ def maybe_na(val: Any) -> str:
     are also treated as 'n/a'
     """
     if val is not None:
-        val = str(val)
-        val = val.strip()
-    return "n/a" if (not val or val in ("N/A", "NA")) else val
+        valstr = str(val).strip()
+        return "n/a" if (not valstr or valstr in ("N/A", "NA")) else valstr
+    else:
+        return "n/a"
 
 
 def treat_age(age: Any) -> str:
     """Age might encounter 'Y' suffix or be a float"""
-    age = str(age)
-    if age.endswith("M"):
-        age = age.rstrip("M")
-        age = float(age) / 12
-        age = ("%.2f" if age != int(age) else "%d") % age
+    agestr = str(age)
+    if agestr.endswith("M"):
+        agestr = agestr.rstrip("M")
+        ageflt = float(agestr) / 12
+        agestr = ("%.2f" if ageflt != int(ageflt) else "%d") % ageflt
     else:
-        age = age.rstrip("Y")
-    if age:
+        agestr = agestr.rstrip("Y")
+    if agestr:
         # strip all leading 0s but allow to scan a newborn (age 0Y)
-        age = "0" if not age.lstrip("0") else age.lstrip("0")
-        if age.startswith("."):
+        agestr = "0" if not agestr.lstrip("0") else agestr.lstrip("0")
+        if agestr.startswith("."):
             # we had float point value, let's prepend 0
-            age = "0" + age
-    return age
+            agestr = "0" + agestr
+    return agestr
 
 
 def populate_bids_templates(
@@ -477,7 +478,8 @@ def save_scans_key(item, bids_files: list[str]) -> None:
     # and if there is a conflict, we would just blow since this function
     # should be invoked only on a result of a single item conversion as far
     # as I see it, so should have the same subject/session
-    subj, ses = None, None
+    subj: Optional[str] = None
+    ses: Optional[str] = None
     for bids_file in bids_files:
         # get filenames
         f_name = "/".join(bids_file.split("/")[-2:])
