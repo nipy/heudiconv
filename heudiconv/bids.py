@@ -165,10 +165,10 @@ def populate_bids_templates(path, defaults={}):
 
 
 def populate_aggregated_jsons(path):
-    """Aggregate across the entire BIDS dataset ``.json``\s into top level ``.json``\s
+    """Aggregate across the entire BIDS dataset ``.json``\\s into top level ``.json``\\s
 
     Top level .json files would contain only the fields which are
-    common to all ``subject[/session]/type/*_modality.json``\s.
+    common to all ``subject[/session]/type/*_modality.json``\\s.
 
     ATM aggregating only for ``*_task*_bold.json`` files. Only the task- and
     OPTIONAL _acq- field is retained within the aggregated filename.  The other
@@ -184,16 +184,16 @@ def populate_aggregated_jsons(path):
     # way too many -- let's just collect all which are the same!
     # FIELDS_TO_TRACK = {'RepetitionTime', 'FlipAngle', 'EchoTime',
     #                    'Manufacturer', 'SliceTiming', ''}
-    for fpath in find_files('.*_task-.*\_bold\.json',
+    for fpath in find_files(r'.*_task-.*\_bold\.json',
                             topdir=glob(op.join(path, 'sub-*')),
                             exclude_vcs=True,
-                            exclude="/\.(datalad|heudiconv)/"):
+                            exclude=r"/\.(datalad|heudiconv)/"):
         #
         # According to BIDS spec I think both _task AND _acq (may be more?
         # _rec, _dir, ...?) should be retained?
         # TODO: if we are to fix it, then old ones (without _acq) should be
         # removed first
-        task = re.sub('.*_(task-[^_\.]*(_acq-[^_\.]*)?)_.*', r'\1', fpath)
+        task = re.sub(r'.*_(task-[^_\.]*(_acq-[^_\.]*)?)_.*', r'\1', fpath)
         json_ = load_json(fpath, retry=100)
         if task not in tasks:
             tasks[task] = json_

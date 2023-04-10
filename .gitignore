@@ -1,11 +1,12 @@
+*.egg-info/
 *.pyc
 .cache/
 .coverage
-*.egg-info/
 .idea/
-venvs/
+.tox/
+.vscode/
 _build/
+_version.py
 build/
 dist/
-.vscode/
-_version.py
+venvs/
