@@ -3,6 +3,7 @@ from glob import glob
 import json
 import os.path as op
 
+import pydicom as dcm
 import pytest
 
 from heudiconv.cli.run import main as runner
@@ -15,7 +16,6 @@ from heudiconv.dicoms import (
     group_dicoms_into_seqinfos,
     parse_private_csa_header,
 )
-from heudiconv.external.pydicom import dcm
 
 from .utils import TESTS_DATA_PATH, assert_cwd_unchanged
 

@@ -20,7 +20,7 @@ def filter_dicom(dcmdata):
 def extract_moco_params(basename, _outypes, dicoms):
     if "_rec-dico" not in basename:
         return
-    from dicom import read_file as dcm_read
+    from pydicom import read_file as dcm_read
 
     # get acquisition time for all dicoms
     dcm_times = [
