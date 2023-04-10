@@ -149,10 +149,19 @@ def test_b0dwi_for_fmap(tmpdir, caplog):
     caplog.set_level(logging.WARNING)
     tmppath = tmpdir.strpath
     subID = "b0dwiForFmap"
-    args = (
-        "-c dcm2niix -o %s -b -f test_b0dwi_for_fmap --files %s -s %s"
-        % (tmpdir, op.join(TESTS_DATA_PATH, "b0dwiForFmap"), subID)
-    ).split(" ")
+    args = [
+        "-c",
+        "dcm2niix",
+        "-o",
+        str(tmpdir),
+        "-b",
+        "-f",
+        "test_b0dwi_for_fmap",
+        "--files",
+        op.join(TESTS_DATA_PATH, "b0dwiForFmap"),
+        "-s",
+        subID,
+    ]
     runner(args)
 
     # assert that it raised a warning that the fmap directory will contain

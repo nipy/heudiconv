@@ -6,6 +6,7 @@ import os
 import os.path as op
 from pathlib import Path
 import re
+import shlex
 import subprocess
 import time
 
@@ -29,17 +30,16 @@ ch.setFormatter(formatter)
 _LOGGER.addHandler(ch)
 
 
-def run_heudiconv(cmd):
+def run_heudiconv(args):
     info_dict = dict()
-    proc = subprocess.Popen(
-        cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT
-    )
+    proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    cmd = " ".join(map(shlex.quote, args))
     return_code = proc.wait()
     if return_code == 0:
-        _LOGGER.info("Done running {0}".format(cmd))
+        _LOGGER.info("Done running %s", cmd)
         info_dict["success"] = 1
     else:
-        _LOGGER.error("{0} failed".format(cmd))
+        _LOGGER.error("%s failed", cmd)
         info_dict["success"] = 0
     # get info on what we run
     stdout = proc.communicate()[0].decode("utf-8")
@@ -50,7 +50,6 @@ def run_heudiconv(cmd):
 
 
 def process(paths2process, db, wait=WAIT_TIME, logdir="log"):
-    cmd = "ls -l {0}"
     # if paths2process and
     # time.time() - os.path.getmtime(paths2process[0]) > WAIT_TIME:
     processed = []
@@ -58,13 +57,12 @@ def process(paths2process, db, wait=WAIT_TIME, logdir="log"):
         if time.time() - mod_time > wait:
             # process_me = paths2process.popleft().decode('utf-8')
             process_me = path
-            cmd_ = cmd.format(process_me)
             process_dict = {
                 "input_path": process_me,
                 "accession_number": op.basename(process_me),
             }
             print("Time to process {0}".format(process_me))
-            stdout, run_dict = run_heudiconv(cmd_)
+            stdout, run_dict = run_heudiconv(["ls", "-l", process_me])
             process_dict.update(run_dict)
             db.insert(process_dict)
             # save log

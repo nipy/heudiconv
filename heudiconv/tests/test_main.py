@@ -282,9 +282,16 @@ def test_make_readonly(tmpdir):
 
 def test_cache(tmpdir):
     tmppath = tmpdir.strpath
-    args = ("-f convertall --files %s/axasc35.dcm -s S01" % (TESTS_DATA_PATH)).split(
-        " "
-    ) + ["-o", tmppath]
+    args = [
+        "-f",
+        "convertall",
+        "--files",
+        f"{TESTS_DATA_PATH}/axasc35.dcm",
+        "-s",
+        "S01",
+        "-o",
+        tmppath,
+    ]
     runner(args)
 
     cachedir = tmpdir / ".heudiconv" / "S01" / "info"
