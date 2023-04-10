@@ -7,10 +7,11 @@ _bvals json files, while it does for dwi images
 """
 
 
-def create_key(template, outtype=('nii.gz',), annotation_classes=None):
+def create_key(template, outtype=("nii.gz",), annotation_classes=None):
     if template is None or not template:
-        raise ValueError('Template must be a valid format string')
+        raise ValueError("Template must be a valid format string")
     return template, outtype, annotation_classes
+
 
 def infotodict(seqinfo):
     """Heuristic evaluator for determining which runs belong where
@@ -22,12 +23,12 @@ def infotodict(seqinfo):
     seqitem: run number during scanning
     subindex: sub index within group
     """
-    fmap = create_key('sub-{subject}/fmap/sub-{subject}_acq-b0dwi_epi')
-    dwi = create_key('sub-{subject}/dwi/sub-{subject}_acq-b0dwi_dwi')
+    fmap = create_key("sub-{subject}/fmap/sub-{subject}_acq-b0dwi_epi")
+    dwi = create_key("sub-{subject}/dwi/sub-{subject}_acq-b0dwi_dwi")
 
     info = {fmap: [], dwi: []}
     for s in seqinfo:
-        if 'DIFFUSION' in s.image_type:
+        if "DIFFUSION" in s.image_type:
             info[fmap].append(s.series_id)
             info[dwi].append(s.series_id)
     return info

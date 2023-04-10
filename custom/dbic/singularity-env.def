@@ -37,7 +37,7 @@ MirrorURL: http://ftp.us.debian.org/debian/
 %post
     echo "Configuring the environment"
     apt-get update
-    apt-get -y install eatmydata 
+    apt-get -y install eatmydata
     eatmydata apt-get -y install vim wget strace time ncdu gnupg curl procps
     wget -q -O/tmp/nd-configurerepo https://raw.githubusercontent.com/neurodebian/neurodebian/4d26c8f30433145009aa3f74516da12f560a5a13/tools/nd-configurerepo
     bash /tmp/nd-configurerepo

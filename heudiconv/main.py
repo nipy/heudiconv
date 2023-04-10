@@ -1,15 +1,15 @@
+from glob import glob
 import logging
 import os.path as op
 import sys
-from glob import glob
 
-from . import __version__, __packagename__
-from .bids import populate_bids_templates, tuneup_bids_json_files, populate_intended_for
+from . import __packagename__, __version__
+from .bids import populate_bids_templates, populate_intended_for, tuneup_bids_json_files
 from .convert import prep_conversion
-from .due import due, Doi
+from .due import Doi, due
 from .parser import get_study_sessions
 from .queue import queue_conversion
-from .utils import anonymize_sid, load_heuristic, treat_infofile, SeqInfo
+from .utils import SeqInfo, anonymize_sid, load_heuristic, treat_infofile
 
 lgr = logging.getLogger(__name__)
 
@@ -30,22 +30,24 @@ def setup_exceptionhook():
     If interactive, our exceptionhook handler will invoke pdb.post_mortem;
     if not interactive, then invokes default handler.
     """
-    def _pdb_excepthook(type, value, tb):
+
+    def _pdb_excepthook(exc_type, exc_value, tb):
         if is_interactive():
-            import traceback
             import pdb
-            traceback.print_exception(type, value, tb)
+            import traceback
+
+            traceback.print_exception(exc_type, exc_value, tb)
             # print()
             pdb.post_mortem(tb)
         else:
-            lgr.warning(
-              "We cannot setup exception hook since not in interactive mode")
+            lgr.warning("We cannot setup exception hook since not in interactive mode")
 
     sys.excepthook = _pdb_excepthook
 
 
-def process_extra_commands(outdir, command, files, dicom_dir_template,
-                           heuristic, session, subjs, grouping):
+def process_extra_commands(
+    outdir, command, files, dicom_dir_template, heuristic, session, subjs, grouping
+):
     """
     Perform custom command instead of regular operations. Supported commands:
     ['treat-json', 'ls', 'populate-templates', 'populate-intended-for']
@@ -74,79 +76,90 @@ def process_extra_commands(outdir, command, files, dicom_dir_template,
     grouping : {'studyUID', 'accession_number', 'all', 'custom'}
         How to group dicoms.
     """
-    if command == 'treat-jsons':
+    if command == "treat-jsons":
         for f in files:
             treat_infofile(f)
-    elif command == 'ls':
+    elif command == "ls":
         ensure_heuristic_arg(heuristic)
         heuristic = load_heuristic(heuristic)
-        heuristic_ls = getattr(heuristic, 'ls', None)
+        heuristic_ls = getattr(heuristic, "ls", None)
         for f in files:
             study_sessions = get_study_sessions(
-                dicom_dir_template, [f], heuristic, outdir,
-                session, subjs, grouping=grouping)
+                dicom_dir_template,
+                [f],
+                heuristic,
+                outdir,
+                session,
+                subjs,
+                grouping=grouping,
+            )
             print(f)
             for study_session, sequences in study_sessions.items():
-                suf = ''
+                suf = ""
                 if heuristic_ls:
                     suf += heuristic_ls(study_session, sequences)
-                print(
-                    "\t%s %d sequences%s"
-                    % (str(study_session), len(sequences), suf)
-                )
-    elif command == 'populate-templates':
+                print("\t%s %d sequences%s" % (str(study_session), len(sequences), suf))
+    elif command == "populate-templates":
         ensure_heuristic_arg(heuristic)
         heuristic = load_heuristic(heuristic)
         for f in files:
-            populate_bids_templates(f, getattr(heuristic, 'DEFAULT_FIELDS', {}))
-    elif command == 'sanitize-jsons':
+            populate_bids_templates(f, getattr(heuristic, "DEFAULT_FIELDS", {}))
+    elif command == "sanitize-jsons":
         tuneup_bids_json_files(files)
-    elif command == 'heuristics':
+    elif command == "heuristics":
         from .utils import get_known_heuristics_with_descriptions
+
         for name_desc in get_known_heuristics_with_descriptions().items():
             print("- %s: %s" % name_desc)
-    elif command == 'heuristic-info':
+    elif command == "heuristic-info":
         ensure_heuristic_arg(heuristic)
         from .utils import get_heuristic_description
+
         print(get_heuristic_description(heuristic, full=True))
-    elif command == 'populate-intended-for':
+    elif command == "populate-intended-for":
         kwargs = {}
         if heuristic:
             heuristic = load_heuristic(heuristic)
-            kwargs = getattr(heuristic, 'POPULATE_INTENDED_FOR_OPTS', {})
+            kwargs = getattr(heuristic, "POPULATE_INTENDED_FOR_OPTS", {})
         if not subjs:
             subjs = [
                 # search outdir for 'sub-*'; if it is a directory (not a regular file), remove
                 # the initial 'sub-':
-                op.basename(s)[len('sub-'):] for s in glob(op.join(outdir, 'sub-*')) if op.isdir(s)
+                op.basename(s)[len("sub-") :]
+                for s in glob(op.join(outdir, "sub-*"))
+                if op.isdir(s)
             ]
             # read the subjects from the participants.tsv file to compare:
-            participants_tsv = op.join(outdir, 'participants.tsv')
+            participants_tsv = op.join(outdir, "participants.tsv")
             if op.lexists(participants_tsv):
-                with open(participants_tsv, 'r') as f:
+                with open(participants_tsv, "r") as f:
                     # read header line and find index for 'participant_id':
-                    participant_id_index = f.readline().split('\t').index('participant_id')
+                    participant_id_index = (
+                        f.readline().split("\t").index("participant_id")
+                    )
                     # read all participants, removing the initial 'sub-':
                     known_subjects = [
-                        l.split('\t')[participant_id_index][len('sub-'):] for l in f.readlines()
+                        ln.split("\t")[participant_id_index][len("sub-") :]
+                        for ln in f.readlines()
                     ]
                 if not set(subjs) == set(known_subjects):
                     # issue a warning, but continue with the 'subjs' list (the subjects for
                     # which there is data):
                     lgr.warning(
                         "'participants.tsv' contents are not identical to subjects found "
-                        "in the BIDS dataset %s", outdir
+                        "in the BIDS dataset %s",
+                        outdir,
                     )
 
         for subj in subjs:
-            subject_path = op.join(outdir, 'sub-' + subj)
+            subject_path = op.join(outdir, "sub-" + subj)
             if session:
-                session_paths = [op.join(subject_path, 'ses-' + session)]
+                session_paths = [op.join(subject_path, "ses-" + session)]
             else:
                 # check to see if the data for this subject is organized by sessions; if not
                 # just use the subject_path
                 session_paths = [
-                    s for s in glob(op.join(subject_path, 'ses-*')) if op.isdir(s)
+                    s for s in glob(op.join(subject_path, "ses-*")) if op.isdir(s)
                 ] or [subject_path]
             for session_path in session_paths:
                 populate_intended_for(session_path, **kwargs)
@@ -160,23 +173,46 @@ def ensure_heuristic_arg(heuristic=None):
     Check that the heuristic argument was provided.
     """
     from .utils import get_known_heuristic_names
+
     if not heuristic:
-        raise ValueError("Specify heuristic using -f. Known are: %s"
-                         % ', '.join(get_known_heuristic_names()))
+        raise ValueError(
+            "Specify heuristic using -f. Known are: %s"
+            % ", ".join(get_known_heuristic_names())
+        )
 
 
 @due.dcite(
-    Doi('10.5281/zenodo.1012598'),
-    path='heudiconv',
-    description='Flexible DICOM converter for organizing brain imaging data',
+    Doi("10.5281/zenodo.1012598"),
+    path="heudiconv",
+    description="Flexible DICOM converter for organizing brain imaging data",
     version=__version__,
-    cite_module=True)
-def workflow(*, dicom_dir_template=None, files=None, subjs=None,
-             converter='dcm2niix', outdir='.', locator=None, conv_outdir=None,
-             anon_cmd=None, heuristic=None, with_prov=False, session=None,
-             bids_options=None, overwrite=False, datalad=False, debug=False,
-             command=None, grouping='studyUID', minmeta=False,
-             random_seed=None, dcmconfig=None, queue=None, queue_args=None):
+    cite_module=True,
+)
+def workflow(
+    *,
+    dicom_dir_template=None,
+    files=None,
+    subjs=None,
+    converter="dcm2niix",
+    outdir=".",
+    locator=None,
+    conv_outdir=None,
+    anon_cmd=None,
+    heuristic=None,
+    with_prov=False,
+    session=None,
+    bids_options=None,
+    overwrite=False,
+    datalad=False,
+    debug=False,
+    command=None,
+    grouping="studyUID",
+    minmeta=False,
+    random_seed=None,
+    dcmconfig=None,
+    queue=None,
+    queue_args=None
+):
     """Run the HeuDiConv conversion workflow.
 
     Parameters
@@ -272,8 +308,10 @@ def workflow(*, dicom_dir_template=None, files=None, subjs=None,
     # To be done asap so anything random is deterministic
     if random_seed is not None:
         import random
+
         random.seed(random_seed)
         import numpy
+
         numpy.random.seed(random_seed)
     # Ensure only supported bids options are passed
     if debug:
@@ -281,9 +319,7 @@ def workflow(*, dicom_dir_template=None, files=None, subjs=None,
     # Should be possible but only with a single subject -- will be used to
     # override subject deduced from the DICOMs
     if files and subjs and len(subjs) > 1:
-        raise ValueError(
-            "Unable to processes multiple `--subjects` with files"
-        )
+        raise ValueError("Unable to processes multiple `--subjects` with files")
 
     if debug:
         setup_exceptionhook()
@@ -297,17 +333,30 @@ def workflow(*, dicom_dir_template=None, files=None, subjs=None,
     latest = None
     try:
         import etelemetry
+
         latest = etelemetry.get_project("nipy/heudiconv")
     except Exception as e:
         lgr.warning("Could not check for version updates: %s", str(e))
 
-    lgr.info(INIT_MSG(packname=__packagename__,
-                      version=__version__,
-                      latest=(latest or {}).get("version", "Unknown")))
+    lgr.info(
+        INIT_MSG(
+            packname=__packagename__,
+            version=__version__,
+            latest=(latest or {}).get("version", "Unknown"),
+        )
+    )
 
     if command:
-        process_extra_commands(outdir, command, files, dicom_dir_template,
-                               heuristic, session, subjs, grouping)
+        process_extra_commands(
+            outdir,
+            command,
+            files,
+            dicom_dir_template,
+            heuristic,
+            session,
+            subjs,
+            grouping,
+        )
         return
     #
     # Load heuristic -- better do it asap to make sure it loads correctly
@@ -317,16 +366,17 @@ def workflow(*, dicom_dir_template=None, files=None, subjs=None,
 
     if queue:
         lgr.info("Queuing %s conversion", queue)
-        iterarg, iterables = ("files", len(files)) if files else \
-                             ("subjects", len(subjs))
+        iterarg, iterables = (
+            ("files", len(files)) if files else ("subjects", len(subjs))
+        )
         queue_conversion(queue, iterarg, iterables, queue_args)
         return
 
     heuristic = load_heuristic(heuristic)
 
-    study_sessions = get_study_sessions(dicom_dir_template, files,
-                                        heuristic, outdir, session,
-                                        subjs, grouping=grouping)
+    study_sessions = get_study_sessions(
+        dicom_dir_template, files, heuristic, outdir, session, subjs, grouping=grouping
+    )
 
     # extract tarballs, and replace their entries with expanded lists of files
     # TODO: we might need to sort so sessions are ordered???
@@ -336,7 +386,6 @@ def workflow(*, dicom_dir_template=None, files=None, subjs=None,
 
     locator_manual, session_manual = locator, session
     for (locator, session, sid), files_or_seqinfo in study_sessions.items():
-
         # Allow for session to be overloaded from command line
         if session_manual is not None:
             session = session_manual
@@ -347,56 +396,72 @@ def workflow(*, dicom_dir_template=None, files=None, subjs=None,
         # that is how life is ATM :-/ since we don't do sorting if subj
         # template is provided
         if isinstance(files_or_seqinfo, dict):
-            assert(isinstance(list(files_or_seqinfo.keys())[0], SeqInfo))
+            assert isinstance(list(files_or_seqinfo.keys())[0], SeqInfo)
             dicoms = None
             seqinfo = files_or_seqinfo
         else:
             dicoms = files_or_seqinfo
             seqinfo = None
 
-        if locator == 'unknown':
+        if locator == "unknown":
             lgr.warning("Skipping unknown locator dataset")
             continue
 
         anon_sid = anonymize_sid(sid, anon_cmd) if anon_cmd else None
         if anon_cmd:
-            lgr.info('Anonymized {} to {}'.format(sid, anon_sid))
+            lgr.info("Anonymized {} to {}".format(sid, anon_sid))
 
-        study_outdir = op.join(outdir, locator or '')
+        study_outdir = op.join(outdir, locator or "")
         anon_outdir = conv_outdir or outdir
-        anon_study_outdir = op.join(anon_outdir, locator or '')
+        anon_study_outdir = op.join(anon_outdir, locator or "")
 
         if datalad:
             from .external.dlad import prepare_datalad
+
             dlad_sid = sid if not anon_sid else anon_sid
-            dl_msg = prepare_datalad(anon_study_outdir, anon_outdir, dlad_sid,
-                                     session, seqinfo, dicoms,
-                                     bids_options)
+            dl_msg = prepare_datalad(
+                anon_study_outdir,
+                anon_outdir,
+                dlad_sid,
+                session,
+                seqinfo,
+                dicoms,
+                bids_options,
+            )
 
-        lgr.info("PROCESSING STARTS: {0}".format(
-            str(dict(subject=sid, outdir=study_outdir, session=session))))
+        lgr.info(
+            "PROCESSING STARTS: {0}".format(
+                str(dict(subject=sid, outdir=study_outdir, session=session))
+            )
+        )
 
-        prep_conversion(sid,
-                        dicoms,
-                        study_outdir,
-                        heuristic,
-                        converter=converter,
-                        anon_sid=anon_sid,
-                        anon_outdir=anon_study_outdir,
-                        with_prov=with_prov,
-                        ses=session,
-                        bids_options=bids_options,
-                        seqinfo=seqinfo,
-                        min_meta=minmeta,
-                        overwrite=overwrite,
-                        dcmconfig=dcmconfig,
-                        grouping=grouping,)
+        prep_conversion(
+            sid,
+            dicoms,
+            study_outdir,
+            heuristic,
+            converter=converter,
+            anon_sid=anon_sid,
+            anon_outdir=anon_study_outdir,
+            with_prov=with_prov,
+            ses=session,
+            bids_options=bids_options,
+            seqinfo=seqinfo,
+            min_meta=minmeta,
+            overwrite=overwrite,
+            dcmconfig=dcmconfig,
+            grouping=grouping,
+        )
 
-        lgr.info("PROCESSING DONE: {0}".format(
-            str(dict(subject=sid, outdir=study_outdir, session=session))))
+        lgr.info(
+            "PROCESSING DONE: {0}".format(
+                str(dict(subject=sid, outdir=study_outdir, session=session))
+            )
+        )
 
         if datalad:
             from .external.dlad import add_to_datalad
+
             msg = "Converted subject %s" % dl_msg
             # TODO:  whenever propagate to supers work -- do just
             # ds.save(msg=msg)

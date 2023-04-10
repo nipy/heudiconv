@@ -64,4 +64,3 @@ the documentation of this collection.
 
 **Note:** With the ``datalad containers-run`` command, the images in this collection work on macOS (OSX)
 as well for ``repronim/containers`` helpers automagically take care of running the Singularity containers via Docker.
-

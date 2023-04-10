@@ -1,4 +1,4 @@
-<!-- DO NOT DELETE THIS! 
+<!-- DO NOT DELETE THIS!
 This template is used to facilitate issue resolution.
 All text in <!-> tags will not be displayed.
 -->
@@ -20,5 +20,5 @@ Choose one:
 - [ ] Container
 <!-- If selected, please provide container name and tag"-->
 
-- Heudiconv version: 
+- Heudiconv version:
 <!-- To check: run heudiconv with just the --version flag -->

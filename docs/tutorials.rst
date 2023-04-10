@@ -22,5 +22,5 @@ other users' tutorials covering their experience with ``heudiconv``.
   of a ReproNim Webinar on ``heudiconv``.
 
 .. caution::
-    Some of these tutorials may not be up to date with 
+    Some of these tutorials may not be up to date with
     the latest releases of ``heudiconv``.
