@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import csv
 from glob import glob
 from io import StringIO
@@ -28,12 +30,12 @@ except ImportError:  # pragma: no cover
 
 
 # this will fail if not in project's root directory
-def test_smoke_convertall(tmpdir):
+def test_smoke_convertall(tmp_path: Path) -> None:
     args = [
         "-c",
         "dcm2niix",
         "-o",
-        str(tmpdir),
+        str(tmp_path),
         "-b",
         "--datalad",
         "-s",
@@ -61,9 +63,18 @@ def test_smoke_convertall(tmpdir):
     ],
 )
 @pytest.mark.skipif(Dataset is None, reason="no datalad")
-def test_reproin_largely_smoke(tmpdir, heuristic, invocation):
+def test_reproin_largely_smoke(tmp_path: Path, heuristic: str, invocation: str) -> None:
     is_bids = True if heuristic == "reproin" else False
-    args = ["--random-seed", "1", "-f", heuristic, "-c", "dcm2niix", "-o", str(tmpdir)]
+    args = [
+        "--random-seed",
+        "1",
+        "-f",
+        heuristic,
+        "-c",
+        "dcm2niix",
+        "-o",
+        str(tmp_path),
+    ]
     if is_bids:
         args.append("-b")
     args.append("--datalad")
@@ -83,7 +94,7 @@ def test_reproin_largely_smoke(tmpdir, heuristic, invocation):
             return
 
     runner(args)
-    ds = Dataset(str(tmpdir))
+    ds = Dataset(tmp_path)
     assert ds.is_installed()
     assert not ds.repo.dirty
     head = ds.repo.get_hexsha()
@@ -120,12 +131,12 @@ def test_reproin_largely_smoke(tmpdir, heuristic, invocation):
         ["--files", TESTS_DATA_PATH],  # our new way with automated grouping
     ],
 )
-def test_scans_keys_reproin(tmpdir, invocation):
-    args = ["-f", "reproin", "-c", "dcm2niix", "-o", str(tmpdir), "-b"]
+def test_scans_keys_reproin(tmp_path: Path, invocation: list[str]) -> None:
+    args = ["-f", "reproin", "-c", "dcm2niix", "-o", str(tmp_path), "-b"]
     args += invocation
     runner(args)
     # for now check it exists
-    scans_keys = glob(pjoin(tmpdir.strpath, "*/*/*/*/*/*.tsv"))
+    scans_keys = glob(pjoin(tmp_path, "*/*/*/*/*/*.tsv"))
     assert len(scans_keys) == 1
     with open(scans_keys[0]) as f:
         reader = csv.reader(f, delimiter="\t")
@@ -141,7 +152,7 @@ def test_scans_keys_reproin(tmpdir, invocation):
 
 
 @patch("sys.stdout", new_callable=StringIO)
-def test_ls(stdout):
+def test_ls(stdout: StringIO) -> None:
     args = ["-f", "reproin", "--command", "ls", "--files", TESTS_DATA_PATH]
     runner(args)
     out = stdout.getvalue()
@@ -149,12 +160,11 @@ def test_ls(stdout):
     assert "Halchenko/Yarik/950_bids_test4" in out
 
 
-def test_scout_conversion(tmpdir):
-    tmppath = tmpdir.strpath
-    args = ["-b", "-f", "reproin", "--files", TESTS_DATA_PATH, "-o", tmppath]
+def test_scout_conversion(tmp_path: Path) -> None:
+    args = ["-b", "-f", "reproin", "--files", TESTS_DATA_PATH, "-o", str(tmp_path)]
     runner(args)
 
-    dspath = Path(tmppath) / "Halchenko/Yarik/950_bids_test4"
+    dspath = tmp_path / "Halchenko/Yarik/950_bids_test4"
     sespath = dspath / "sub-phantom1sid1/ses-localizer"
 
     assert not (sespath / "anat").exists()
@@ -180,20 +190,19 @@ def test_scout_conversion(tmpdir):
         [],
     ],
 )
-def test_notop(tmpdir, bidsoptions):
-    tmppath = tmpdir.strpath
+def test_notop(tmp_path: Path, bidsoptions: list[str]) -> None:
     args = [
         "-f",
         "reproin",
         "--files",
         TESTS_DATA_PATH,
         "-o",
-        tmppath,
+        str(tmp_path),
         "-b",
     ] + bidsoptions
     runner(args)
 
-    assert op.exists(pjoin(tmppath, "Halchenko/Yarik/950_bids_test4"))
+    assert op.exists(pjoin(tmp_path, "Halchenko/Yarik/950_bids_test4"))
     for fname in [
         "CHANGES",
         "dataset_description.json",
@@ -203,20 +212,19 @@ def test_notop(tmpdir, bidsoptions):
     ]:
         if "notop" in bidsoptions:
             assert not op.exists(
-                pjoin(tmppath, "Halchenko/Yarik/950_bids_test4", fname)
+                pjoin(tmp_path, "Halchenko/Yarik/950_bids_test4", fname)
             )
         else:
-            assert op.exists(pjoin(tmppath, "Halchenko/Yarik/950_bids_test4", fname))
+            assert op.exists(pjoin(tmp_path, "Halchenko/Yarik/950_bids_test4", fname))
 
 
-def test_phoenix_doc_conversion(tmpdir):
-    tmppath = tmpdir.strpath
+def test_phoenix_doc_conversion(tmp_path: Path) -> None:
     subID = "Phoenix"
     args = [
         "-c",
         "dcm2niix",
         "-o",
-        str(tmpdir),
+        str(tmp_path),
         "-b",
         "-f",
         "bids_PhoenixReport",
@@ -230,9 +238,9 @@ def test_phoenix_doc_conversion(tmpdir):
     # check that the Phoenix document has been extracted (as gzipped dicom) in
     # the sourcedata/misc folder:
     assert op.exists(
-        pjoin(tmppath, "sourcedata", "sub-%s", "misc", "sub-%s_phoenix.dicom.tgz")
+        pjoin(tmp_path, "sourcedata", "sub-%s", "misc", "sub-%s_phoenix.dicom.tgz")
         % (subID, subID)
     )
     # check that no "sub-<subID>/misc" folder has been created in the BIDS
     # structure:
-    assert not op.exists(pjoin(tmppath, "sub-%s", "misc") % subID)
+    assert not op.exists(pjoin(tmp_path, "sub-%s", "misc") % subID)

@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import json
 import os
 import os.path as op
+from pathlib import Path
+from typing import IO, Any
 from unittest.mock import patch
 
 import pytest
@@ -23,7 +27,7 @@ from heudiconv.utils import (
 from .utils import HEURISTICS_PATH
 
 
-def test_get_known_heuristics_with_descriptions():
+def test_get_known_heuristics_with_descriptions() -> None:
     d = get_known_heuristics_with_descriptions()
     assert {"reproin", "convertall"}.issubset(d)
     # ATM we include all, not only those two
@@ -32,7 +36,7 @@ def test_get_known_heuristics_with_descriptions():
     assert len(d["reproin"].split(os.sep)) == 1  # but just one line
 
 
-def test_get_heuristic_description():
+def test_get_heuristic_description() -> None:
     desc = get_heuristic_description("reproin", full=True)
     assert len(desc) > 1000
     # and we describe such details as
@@ -42,7 +46,7 @@ def test_get_heuristic_description():
     assert "ReproNim" in desc
 
 
-def test_load_heuristic():
+def test_load_heuristic() -> None:
     by_name = load_heuristic("reproin")
     from_file = load_heuristic(op.join(HEURISTICS_PATH, "reproin.py"))
 
@@ -56,7 +60,7 @@ def test_load_heuristic():
         load_heuristic(op.join(HEURISTICS_PATH, "unknownsomething.py"))
 
 
-def test_json_dumps_pretty():
+def test_json_dumps_pretty() -> None:
     pretty = json_dumps_pretty
     assert (
         pretty({"SeriesDescription": "Trace:Nov 13 2017 14-36-14 EST"})
@@ -82,11 +86,11 @@ def test_json_dumps_pretty():
     assert pretty({"WipMemBlock": tstr}) == '{\n  "WipMemBlock": "%s"\n}' % tstr
 
 
-def test_load_json(tmpdir, caplog):
+def test_load_json(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     # test invalid json
     ifname = "invalid.json"
-    invalid_json_file = str(tmpdir / ifname)
-    create_tree(str(tmpdir), {ifname: "I'm Jason Bourne"})
+    invalid_json_file = str(tmp_path / ifname)
+    create_tree(str(tmp_path), {ifname: "I'm Jason Bourne"})
 
     with pytest.raises(JSONDecodeError):
         load_json(str(invalid_json_file))
@@ -103,7 +107,7 @@ def test_load_json(tmpdir, caplog):
     # test valid json
     vcontent = {"secret": "spy"}
     vfname = "valid.json"
-    valid_json_file = str(tmpdir / vfname)
+    valid_json_file = str(tmp_path / vfname)
     save_json(valid_json_file, vcontent)
 
     assert load_json(valid_json_file) == vcontent
@@ -111,7 +115,7 @@ def test_load_json(tmpdir, caplog):
     calls = [0]
     json_load = json.load
 
-    def json_load_patched(fp):
+    def json_load_patched(fp: IO[str]) -> Any:
         calls[0] += 1
         if calls[0] == 1:
             # just reuse bad file
@@ -125,11 +129,11 @@ def test_load_json(tmpdir, caplog):
         assert load_json(valid_json_file, retry=3) == vcontent
 
 
-def test_update_json(tmpdir):
+def test_update_json(tmp_path: Path) -> None:
     """
     Test utils.update_json()
     """
-    dummy_json_file = str(tmpdir / "dummy.json")
+    dummy_json_file = str(tmp_path / "dummy.json")
     some_content = {"name": "Jason", "age": 30, "city": "New York"}
     save_json(dummy_json_file, some_content, pretty=True)
 
@@ -152,7 +156,7 @@ def test_update_json(tmpdir):
     assert data == some_content
 
 
-def test_get_datetime():
+def test_get_datetime() -> None:
     """
     Test utils.get_datetime()
     """
@@ -164,7 +168,7 @@ def test_get_datetime():
     )
 
 
-def test_remove_suffix():
+def test_remove_suffix() -> None:
     """
     Test utils.remove_suffix()
     """
@@ -174,7 +178,7 @@ def test_remove_suffix():
     assert remove_suffix(s, ".bourne") == "jason"
 
 
-def test_remove_prefix():
+def test_remove_prefix() -> None:
     """
     Test utils.remove_prefix()
     """

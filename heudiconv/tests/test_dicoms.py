@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 from glob import glob
 import json
@@ -18,7 +20,7 @@ from heudiconv.dicoms import (
     parse_private_csa_header,
 )
 
-from .utils import TESTS_DATA_PATH, assert_cwd_unchanged
+from .utils import TESTS_DATA_PATH
 
 # Public: Private DICOM tags
 DICOM_FIELDS_TO_TEST = {"ProtocolName": "tProtocolName"}
@@ -39,15 +41,16 @@ def test_private_csa_header(tmp_path: Path) -> None:
         )
 
 
-@assert_cwd_unchanged(ok_to_chdir=True)  # so we cd back after tmpdir.chdir
-def test_embed_dicom_and_nifti_metadata(tmpdir):
+def test_embed_dicom_and_nifti_metadata(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Test dcmstack's additional fields"""
-    tmpdir.chdir()
+    monkeypatch.chdir(tmp_path)
     # set up testing files
     dcmfiles = [op.join(TESTS_DATA_PATH, "axasc35.dcm")]
     infofile = "infofile.json"
 
-    out_prefix = str(tmpdir / "nifti")
+    out_prefix = str(tmp_path / "nifti")
     # 1) nifti does not exist -- no longer supported
     with pytest.raises(NotImplementedError):
         embed_dicom_and_nifti_metadata(dcmfiles, out_prefix + ".nii.gz", infofile, None)
@@ -58,7 +61,7 @@ def test_embed_dicom_and_nifti_metadata(tmpdir):
         prefix=out_prefix,
         with_prov=False,
         bids_options=None,
-        tmpdir=str(tmpdir),
+        tmpdir=str(tmp_path),
     )
     niftifile = nipype_out.outputs.converted_files
 
@@ -79,7 +82,7 @@ def test_embed_dicom_and_nifti_metadata(tmpdir):
     assert out3 == out2
 
 
-def test_group_dicoms_into_seqinfos():
+def test_group_dicoms_into_seqinfos() -> None:
     """Tests for group_dicoms_into_seqinfos"""
 
     # 1) Check that it works for PhoenixDocuments:
@@ -97,7 +100,7 @@ def test_group_dicoms_into_seqinfos():
     ]
 
 
-def test_get_datetime_from_dcm_from_acq_date_time():
+def test_get_datetime_from_dcm_from_acq_date_time() -> None:
     typical_dcm = dcm.dcmread(
         op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
     )
@@ -110,7 +113,7 @@ def test_get_datetime_from_dcm_from_acq_date_time():
     )
 
 
-def test_get_datetime_from_dcm_from_acq_datetime():
+def test_get_datetime_from_dcm_from_acq_datetime() -> None:
     # if AcquisitionDate and AcquisitionTime not there, can we rely on AcquisitionDateTime?
     XA30_enhanced_dcm = dcm.dcmread(
         op.join(
@@ -125,7 +128,7 @@ def test_get_datetime_from_dcm_from_acq_datetime():
     )
 
 
-def test_get_datetime_from_dcm_from_only_series_date_time():
+def test_get_datetime_from_dcm_from_only_series_date_time() -> None:
     # if acquisition date/time/datetime not available, can we rely on SeriesDate & SeriesTime?
     XA30_enhanced_dcm = dcm.dcmread(
         op.join(
@@ -142,7 +145,7 @@ def test_get_datetime_from_dcm_from_only_series_date_time():
     )
 
 
-def test_get_datetime_from_dcm_wo_dt():
+def test_get_datetime_from_dcm_wo_dt() -> None:
     # if there's no known source (e.g., after anonymization), are we still able to proceed?
     XA30_enhanced_dcm = dcm.dcmread(
         op.join(
@@ -157,14 +160,16 @@ def test_get_datetime_from_dcm_wo_dt():
     assert get_datetime_from_dcm(XA30_enhanced_dcm) is None
 
 
-def test_get_reproducible_int():
+def test_get_reproducible_int() -> None:
     dcmfile = op.join(TESTS_DATA_PATH, "phantom.dcm")
 
     assert type(get_reproducible_int([dcmfile])) is int
 
 
-@pytest.fixture
-def test_get_reproducible_int_wo_dt(tmp_path):
+@pytest.mark.skip(
+    reason="This test was mistakenly marked as a fixture, and removing the fixture decorator led to the test failing.  Don't know how to fix."
+)
+def test_get_reproducible_int_wo_dt(tmp_path: Path) -> None:
     # can this function return an int when we don't have any usable dates?
     typical_dcm = dcm.dcmread(
         op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
@@ -173,11 +178,13 @@ def test_get_reproducible_int_wo_dt(tmp_path):
     del typical_dcm.AcquisitionDate
     dcm.dcmwrite(tmp_path, typical_dcm)
 
-    assert type(get_reproducible_int([tmp_path])) is int
+    assert type(get_reproducible_int([str(tmp_path)])) is int
 
 
-@pytest.fixture
-def test_get_reproducible_int_raises_assertion_wo_dt(tmp_path):
+@pytest.mark.skip(
+    reason="This test was mistakenly marked as a fixture, and removing the fixture decorator led to the test failing.  Don't know how to fix."
+)
+def test_get_reproducible_int_raises_assertion_wo_dt(tmp_path: Path) -> None:
     # if there's no known source (e.g., after anonymization), is AssertionError Raised?
     XA30_enhanced_dcm = dcm.dcmread(
         op.join(
@@ -191,4 +198,4 @@ def test_get_reproducible_int_raises_assertion_wo_dt(tmp_path):
     del XA30_enhanced_dcm.SeriesTime
     dcm.dcmwrite(tmp_path, dataset=XA30_enhanced_dcm)
     with pytest.raises(AssertionError):
-        get_reproducible_int([tmp_path])
+        get_reproducible_int([str(tmp_path)])

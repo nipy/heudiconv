@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import csv
 from io import StringIO
 import logging
 import os
 import os.path as op
 from os.path import join as opj
+from pathlib import Path
 import stat
 from unittest.mock import patch
 
@@ -27,63 +30,70 @@ from .utils import TESTS_DATA_PATH
 
 
 @patch("sys.stdout", new_callable=StringIO)
-def test_main_help(stdout):
+def test_main_help(stdout: StringIO) -> None:
     with pytest.raises(SystemExit):
         runner(["--help"])
     assert stdout.getvalue().startswith("usage: ")
 
 
 @patch("sys.stdout", new_callable=StringIO)
-def test_main_version(std):
+def test_main_version(std: StringIO) -> None:
     with pytest.raises(SystemExit):
         runner(["--version"])
     assert std.getvalue().rstrip() == __version__
 
 
-def test_create_file_if_missing(tmpdir):
-    tf = tmpdir.join("README.txt")
+def test_create_file_if_missing(tmp_path: Path) -> None:
+    tf = tmp_path / "README.txt"
     assert not tf.exists()
     create_file_if_missing(str(tf), "content")
     assert tf.exists()
-    assert tf.read() == "content"
+    assert tf.read_text() == "content"
     create_file_if_missing(str(tf), "content2")
     # nothing gets changed
-    assert tf.read() == "content"
+    assert tf.read_text() == "content"
 
 
-def test_populate_bids_templates(tmpdir):
-    populate_bids_templates(str(tmpdir), defaults={"Acknowledgements": "something"})
+def test_populate_bids_templates(tmp_path: Path) -> None:
+    populate_bids_templates(str(tmp_path), defaults={"Acknowledgements": "something"})
     for f in "README", "dataset_description.json", "CHANGES":
         # Just test that we have created them and they all have stuff TODO
-        assert "TODO" in tmpdir.join(f).read()
-    description_file = tmpdir.join("dataset_description.json")
-    assert "something" in description_file.read()
+        assert "TODO" in (tmp_path / f).read_text()
+    description_file = tmp_path / "dataset_description.json"
+    assert "something" in description_file.read_text()
 
     # it should also be available as a command
-    os.unlink(str(description_file))
+    description_file.unlink()
 
     # it must fail if no heuristic was provided
     with pytest.raises(ValueError) as cme:
-        runner(["--command", "populate-templates", "--files", str(tmpdir)])
+        runner(["--command", "populate-templates", "--files", str(tmp_path)])
     assert str(cme.value).startswith("Specify heuristic using -f. Known are:")
     assert "convertall," in str(cme.value)
     assert not description_file.exists()
 
     runner(
-        ["--command", "populate-templates", "-f", "convertall", "--files", str(tmpdir)]
+        [
+            "--command",
+            "populate-templates",
+            "-f",
+            "convertall",
+            "--files",
+            str(tmp_path),
+        ]
     )
-    assert "something" not in description_file.read()
-    assert "TODO" in description_file.read()
+    assert "something" not in description_file.read_text()
+    assert "TODO" in description_file.read_text()
 
-    assert load_json(tmpdir / "scans.json") == SCANS_FILE_FIELDS
+    assert load_json(tmp_path / "scans.json") == SCANS_FILE_FIELDS
 
 
-def test_add_participant_record(tmpdir):
-    tf = tmpdir.join("participants.tsv")
+def test_add_participant_record(tmp_path: Path) -> None:
+    tf = tmp_path / "participants.tsv"
     assert not tf.exists()
-    add_participant_record(str(tmpdir), "sub01", "023Y", "M")
+    add_participant_record(str(tmp_path), "sub01", "023Y", "M")
     # should create the file and place corrected record
-    sub01 = tf.read()
+    sub01 = tf.read_text()
     assert (
         sub01
         == """\
@@ -91,11 +101,11 @@ participant_id	age	sex	group
 sub-sub01	23	M	control
 """
     )
-    add_participant_record(str(tmpdir), "sub01", "023Y", "F")
-    assert tf.read() == sub01  # nothing was added even though differs in values
-    add_participant_record(str(tmpdir), "sub02", "2", "F")
+    add_participant_record(str(tmp_path), "sub01", "023Y", "F")
+    assert tf.read_text() == sub01  # nothing was added even though differs in values
+    add_participant_record(str(tmp_path), "sub02", "2", "F")
     assert (
-        tf.read()
+        tf.read_text()
         == """\
 participant_id	age	sex	group
 sub-sub01	23	M	control
@@ -104,18 +114,18 @@ sub-sub02	2	F	control
     )
 
 
-def test_prepare_for_datalad(tmpdir):
+def test_prepare_for_datalad(tmp_path: Path) -> None:
     pytest.importorskip("datalad", minversion=MIN_VERSION)
-    studydir = tmpdir.join("PI").join("study")
+    studydir = tmp_path / "PI" / "study"
     studydir_ = str(studydir)
     os.makedirs(studydir_)
     populate_bids_templates(studydir_)
 
-    add_to_datalad(str(tmpdir), studydir_, None, False)
+    add_to_datalad(str(tmp_path), studydir_, None, False)
 
     from datalad.api import Dataset
 
-    superds = Dataset(str(tmpdir))
+    superds = Dataset(tmp_path)
 
     assert superds.is_installed()
     assert not superds.repo.dirty
@@ -145,7 +155,7 @@ def test_prepare_for_datalad(tmpdir):
     # Above call to add_to_datalad does not create .heudiconv subds since
     # directory does not exist (yet).
     # Let's first check that it is safe to call it again
-    add_to_datalad(str(tmpdir), studydir_, None, False)
+    add_to_datalad(str(tmp_path), studydir_, None, False)
     assert not ds.repo.dirty
 
     old_hexsha = ds.repo.get_hexsha()
@@ -157,7 +167,7 @@ def test_prepare_for_datalad(tmpdir):
     create_file_if_missing(dummy_path, "")
     ds.save(dummy_path, message="added a dummy file")
     # next call must not fail, should just issue a warning
-    add_to_datalad(str(tmpdir), studydir_, None, False)
+    add_to_datalad(str(tmp_path), studydir_, None, False)
     ds.repo.is_under_annex(dummy_path)
     assert not ds.repo.dirty
     assert ".heudiconv/dummy.nii.gz" in ds.repo.get_files()
@@ -166,13 +176,13 @@ def test_prepare_for_datalad(tmpdir):
     ds.repo.call_git(["reset", "--hard", old_hexsha])
     # now we do not add dummy to git
     create_file_if_missing(dummy_path, "")
-    add_to_datalad(str(tmpdir), studydir_, None, False)
+    add_to_datalad(str(tmp_path), studydir_, None, False)
     assert ".heudiconv" in ds.subdatasets(result_xfm="relpaths")
     assert not ds.repo.dirty
     assert ".heudiconv/dummy.nii.gz" not in ds.repo.get_files()
 
 
-def test_get_formatted_scans_key_row():
+def test_get_formatted_scans_key_row() -> None:
     dcm_fn = (
         "%s/01-fmap_acq-3mm/1.3.12.2.1107.5.2.43.66112.2016101409263663466202201.dcm"
         % TESTS_DATA_PATH
@@ -201,15 +211,15 @@ def test_get_formatted_scans_key_row():
 
 
 # TODO: finish this
-def test_add_rows_to_scans_keys_file(tmpdir):
-    fn = opj(tmpdir.strpath, "file.tsv")
+def test_add_rows_to_scans_keys_file(tmp_path: Path) -> None:
+    fn = opj(tmp_path, "file.tsv")
     rows = {
         "my_file.nii.gz": ["2016adsfasd", "", "fasadfasdf"],
         "another_file.nii.gz": ["2018xxxxx", "", "fasadfasdf"],
     }
     add_rows_to_scans_keys_file(fn, rows)
 
-    def _check_rows(fn, rows):
+    def _check_rows(fn: str, rows: dict[str, list[str]]) -> None:
         with open(fn, "r") as csvfile:
             reader = csv.reader(csvfile, delimiter="\t")
             rows_loaded = []
@@ -227,7 +237,7 @@ def test_add_rows_to_scans_keys_file(tmpdir):
     _check_rows(fn, rows)
     # we no longer produce a sidecar .json file there and only generate
     # it while populating templates for BIDS
-    assert not op.exists(opj(tmpdir.strpath, "file.json"))
+    assert not op.exists(opj(tmp_path, "file.json"))
     # add a new one
     extra_rows = {
         "a_new_file.nii.gz": ["2016adsfasd23", "", "fasadfasdf"],
@@ -238,7 +248,7 @@ def test_add_rows_to_scans_keys_file(tmpdir):
     _check_rows(fn, extra_rows)
 
 
-def test__find_subj_ses():
+def test__find_subj_ses() -> None:
     assert find_subj_ses(
         "950_bids_test4/sub-phantom1sid1/fmap/"
         "sub-phantom1sid1_acq-3mm_phasediff.json"
@@ -257,10 +267,10 @@ def test__find_subj_ses():
     )
 
 
-def test_make_readonly(tmpdir):
+def test_make_readonly(tmp_path: Path) -> None:
     # we could test it all without torturing a poor file, but for going all
     # the way, let's do it on a file
-    path = tmpdir.join("f")
+    path = tmp_path / "f"
     pathname = str(path)
     with open(pathname, "w"):
         pass
@@ -280,8 +290,7 @@ def test_make_readonly(tmpdir):
         assert not is_readonly(pathname)
 
 
-def test_cache(tmpdir):
-    tmppath = tmpdir.strpath
+def test_cache(tmp_path: Path) -> None:
     args = [
         "-f",
         "convertall",
@@ -290,11 +299,11 @@ def test_cache(tmpdir):
         "-s",
         "S01",
         "-o",
-        tmppath,
+        str(tmp_path),
     ]
     runner(args)
 
-    cachedir = tmpdir / ".heudiconv" / "S01" / "info"
+    cachedir = tmp_path / ".heudiconv" / "S01" / "info"
     assert cachedir.exists()
 
     # check individual files
@@ -305,12 +314,12 @@ def test_cache(tmpdir):
     assert (cachedir / "S01.edit.txt").exists()
 
     # check dicominfo has "time" as last column:
-    with open(str(cachedir / "dicominfo.tsv"), "r") as f:
+    with open(cachedir / "dicominfo.tsv", "r") as f:
         cols = f.readline().split()
     assert cols[26] == "time"
 
 
-def test_no_etelemetry():
+def test_no_etelemetry() -> None:
     # smoke test at large - just verifying that no crash if no etelemetry
     # must not fail if etelemetry no found
     with patch.dict("sys.modules", {"etelemetry": None}):
@@ -325,7 +334,9 @@ def test_no_etelemetry():
     "session, expected_folder",
     [("", "foo/sub-{sID}"), ("pre", "foo/sub-{sID}/ses-pre")],
 )
-def test_populate_intended_for(tmpdir, session, expected_folder, caplog):
+def test_populate_intended_for(
+    tmp_path: Path, session: str, expected_folder: str, caplog: pytest.LogCaptureFixture
+) -> None:
     """
     Tests for "process_extra_commands" when the command is
     'populate-intended-for'
@@ -340,7 +351,14 @@ def test_populate_intended_for(tmpdir, session, expected_folder, caplog):
     subjects = ["1", "2"]
     caplog.set_level(logging.INFO)
     process_extra_commands(
-        bids_folder, "populate-intended-for", [], "", "example", session, subjects, None
+        bids_folder,
+        "populate-intended-for",
+        [],
+        "",
+        "example",
+        session,
+        subjects,
+        "all",
     )
     for s in subjects:
         expected_info = (
@@ -355,7 +373,7 @@ def test_populate_intended_for(tmpdir, session, expected_folder, caplog):
     # TODO: Add a 'participants.tsv' file with one of the subjects missing;
     #  the 'process_extra_commands' call should print out a warning
     caplog.clear()
-    outdir = opj(str(tmpdir), bids_folder)
+    outdir = opj(tmp_path, bids_folder)
     for subj in subjects:
         subj_dir = opj(outdir, "sub-" + subj)
         print("Creating output dir: %s", subj_dir)
@@ -363,10 +381,10 @@ def test_populate_intended_for(tmpdir, session, expected_folder, caplog):
         if session:
             os.makedirs(opj(subj_dir, "ses-" + session))
     process_extra_commands(
-        outdir, "populate-intended-for", [], "", "example", [], [], None
+        outdir, "populate-intended-for", [], "", "example", None, [], "all"
     )
     for s in subjects:
         expected_info = 'Adding "IntendedFor" to the fieldmaps in ' + opj(
-            str(tmpdir), expected_folder.format(sID=s)
+            tmp_path, expected_folder.format(sID=s)
         )
         assert any(expected_info in co.message for co in caplog.records)

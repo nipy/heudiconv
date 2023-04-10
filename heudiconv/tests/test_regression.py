@@ -1,13 +1,18 @@
 """Testing conversion with conversion saved on datalad"""
+from __future__ import annotations
+
 from glob import glob
 import os
 import os.path as op
+from pathlib import Path
 import re
+from typing import Optional
 
 import pydicom as dcm
 import pytest
 
 from heudiconv.cli.run import main as runner
+from heudiconv.parser import find_files
 from heudiconv.utils import load_json
 
 # testing utilities
@@ -24,21 +29,28 @@ except ImportError:
 @pytest.mark.parametrize("subject", ["sid000143"])
 @pytest.mark.parametrize("heuristic", ["reproin.py"])
 @pytest.mark.parametrize("anon_cmd", [None, "anonymize_script.py"])
-def test_conversion(tmpdir, subject, heuristic, anon_cmd):
-    tmpdir.chdir()
+def test_conversion(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    subject: str,
+    heuristic: str,
+    anon_cmd: Optional[str],
+) -> None:
+    monkeypatch.chdir(tmp_path)
     try:
         datadir = fetch_data(
-            tmpdir.strpath,
+            tmp_path,
             "dbic/QA",  # path from datalad database root
             getpath=op.join("sourcedata", f"sub-{subject}"),
         )
     except IncompleteResultsError as exc:
         pytest.skip("Failed to fetch test data: %s" % str(exc))
-    outdir = tmpdir.mkdir("out").strpath
+    outdir = tmp_path / "out"
+    outdir.mkdir()
 
     args = gen_heudiconv_args(
         datadir,
-        outdir,
+        str(outdir),
         subject,
         heuristic,
         anon_cmd,
@@ -48,9 +60,9 @@ def test_conversion(tmpdir, subject, heuristic, anon_cmd):
 
     # Get the possibly anonymized subject id and verify that it was
     # anonymized or not:
-    subject_maybe_anon = glob(f"{outdir}/sub-*")
-    assert len(subject_maybe_anon) == 1  # just one should be there
-    subject_maybe_anon = op.basename(subject_maybe_anon[0])[4:]
+    subjects_maybe_anon = glob(f"{outdir}/sub-*")
+    assert len(subjects_maybe_anon) == 1  # just one should be there
+    subject_maybe_anon = op.basename(subjects_maybe_anon[0])[4:]
 
     if anon_cmd:
         assert subject_maybe_anon != subject
@@ -59,7 +71,10 @@ def test_conversion(tmpdir, subject, heuristic, anon_cmd):
 
     # verify functionals were converted
     outfiles = sorted(
-        [f[len(outdir) :] for f in glob(f"{outdir}/sub-{subject_maybe_anon}/func/*")]
+        [
+            f[len(str(outdir)) :]
+            for f in glob(f"{outdir}/sub-{subject_maybe_anon}/func/*")
+        ]
     )
     assert outfiles
     datafiles = sorted(
@@ -83,15 +98,21 @@ def test_conversion(tmpdir, subject, heuristic, anon_cmd):
 
 
 @pytest.mark.skipif(not have_datalad, reason="no datalad")
-def test_multiecho(tmpdir, subject="MEEPI", heuristic="bids_ME.py"):
-    tmpdir.chdir()
+def test_multiecho(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    subject: str = "MEEPI",
+    heuristic: str = "bids_ME.py",
+) -> None:
+    monkeypatch.chdir(tmp_path)
     try:
-        datadir = fetch_data(tmpdir.strpath, "dicoms/velasco/MEEPI")
+        datadir = fetch_data(tmp_path, "dicoms/velasco/MEEPI")
     except IncompleteResultsError as exc:
         pytest.skip("Failed to fetch test data: %s" % str(exc))
 
-    outdir = tmpdir.mkdir("out").strpath
-    args = gen_heudiconv_args(datadir, outdir, subject, heuristic)
+    outdir = tmp_path / "out"
+    outdir.mkdir()
+    args = gen_heudiconv_args(datadir, str(outdir), subject, heuristic)
     runner(args)  # run conversion
 
     # check if we have echo functionals
@@ -114,7 +135,7 @@ def test_multiecho(tmpdir, subject="MEEPI", heuristic="bids_ME.py"):
 
 
 @pytest.mark.parametrize("subject", ["merged"])
-def test_grouping(tmpdir, subject):
+def test_grouping(tmp_path: Path, subject: str) -> None:
     dicoms = [op.join(TESTS_DATA_PATH, fl) for fl in ["axasc35.dcm", "phantom.dcm"]]
     # ensure DICOMs are different studies
     studyuids = {
@@ -122,14 +143,16 @@ def test_grouping(tmpdir, subject):
     }
     assert len(studyuids) == len(dicoms)
     # symlink to common location
-    outdir = tmpdir.mkdir("out")
-    datadir = tmpdir.mkdir(subject)
+    outdir = tmp_path / "out"
+    outdir.mkdir()
+    datadir = tmp_path / subject
+    datadir.mkdir()
     for fl in dicoms:
-        os.symlink(fl, (datadir / op.basename(fl)).strpath)
+        os.symlink(fl, datadir / op.basename(fl))
 
     template = op.join("{subject}/*.dcm")
     hargs = gen_heudiconv_args(
-        tmpdir.strpath, outdir.strpath, subject, "convertall.py", template=template
+        str(tmp_path), str(outdir), subject, "convertall.py", template=template
     )
 
     with pytest.raises(AssertionError):
@@ -138,9 +161,21 @@ def test_grouping(tmpdir, subject):
     # group all found DICOMs under subject, despite conflicts
     hargs += ["-g", "all"]
     runner(hargs)
-    assert len([fl for fl in outdir.visit(fil="run0*")]) == 4
+    assert (
+        len(
+            list(
+                find_files(
+                    rf"(^|{re.escape(os.sep)})run0",
+                    str(outdir),
+                    exclude_vcs=False,
+                    dirs=True,
+                )
+            )
+        )
+        == 4
+    )
     tsv = outdir / "participants.tsv"
-    assert tsv.check()
+    assert tsv.exists()
     lines = tsv.open().readlines()
     assert len(lines) == 2
     assert lines[1].split("\t")[0] == "sub-{}".format(subject)

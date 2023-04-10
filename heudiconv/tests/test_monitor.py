@@ -1,5 +1,8 @@
-from collections import namedtuple
+from __future__ import annotations
+
 import os.path as op
+from pathlib import Path
+from typing import NamedTuple, Optional
 from unittest.mock import patch
 
 import pytest
@@ -13,7 +16,12 @@ from subprocess import CalledProcessError
 try:
     from heudiconv.cli.monitor import MASK_NEWDIR, monitor, process, run_heudiconv
 
-    Header = namedtuple("header", ["wd", "mask", "cookie", "len"])
+    class Header(NamedTuple):
+        wd: int
+        mask: int
+        cookie: int
+        len: int
+
     header = Header(5, MASK_NEWDIR, 5, 5)
     watch_path = b"WATCHME"
     filename = b"FILE"
@@ -33,7 +41,7 @@ except AttributeError:
     pytestmark = pytest.mark.skip(reason="Unable to import inotify")
 
 
-class MockInotifyTree(object):
+class MockInotifyTree:
     def __init__(self, events):
         self.events = iter(events)
 
@@ -45,7 +53,7 @@ class MockInotifyTree(object):
         return self
 
 
-class MockTime(object):
+class MockTime:
     def __init__(self, time):
         self.time = time
 
@@ -56,7 +64,7 @@ class MockTime(object):
 @pytest.mark.skip(reason="TODO")
 @patch("inotify.adapters.InotifyTree", MockInotifyTree(my_events))
 @patch("time.time", MockTime(42))
-def test_monitor(capsys):
+def test_monitor(capsys: pytest.CaptureFixture[str]) -> None:
     monitor(watch_path.decode(), check_ptrn="")
     out, err = capsys.readouterr()
     desired_output = "{0}/{1} {2}\n".format(watch_path.decode(), filename.decode(), 42)
@@ -69,15 +77,21 @@ def test_monitor(capsys):
 @pytest.mark.skip(reason="TODO")
 @patch("time.time", MockTime(42))
 @pytest.mark.parametrize(
-    "side_effect,success", [(None, 1), (CalledProcessError("mycmd", 1), 0)]
+    "side_effect,success", [(None, 1), (CalledProcessError(1, "mycmd"), 0)]
 )
-def test_process(tmpdir, capsys, side_effect, success):
-    db_fn = tmpdir.join("database.json")
-    log_dir = tmpdir.mkdir("log")
-    db = TinyDB(db_fn.strpath)
+def test_process(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    side_effect: Optional[BaseException],
+    success: int,
+) -> None:
+    db_fn = tmp_path / "database.json"
+    log_dir = tmp_path / "log"
+    log_dir.mkdir()
+    db = TinyDB(str(db_fn))
     process_me = "/my/path/A12345"
     accession_number = op.basename(process_me)
-    paths2process = {process_me: 42}
+    paths2process = {process_me: 42.0}
     with patch("subprocess.Popen") as mocked_popen:
         stdout = b"INFO: PROCESSING STARTS: {'just': 'a test'}"
         mocked_popen_instance = mocked_popen.return_value
@@ -86,21 +100,21 @@ def test_process(tmpdir, capsys, side_effect, success):
         # set return value for wait
         mocked_popen_instance.wait.return_value = 1 - success
         # mock also communicate to get the supposed stdout
-        process(paths2process, db, wait=-30, logdir=log_dir.strpath)
+        process(paths2process, db, wait=-30, logdir=str(log_dir))
         out, err = capsys.readouterr()
-        log_fn = log_dir.join(accession_number + ".log")
+        log_fn = log_dir / (accession_number + ".log")
 
         mocked_popen.assert_called_once()
-        assert log_fn.check()
-        assert log_fn.read() == stdout.decode("utf-8")
-        assert db_fn.check()
+        assert log_fn.exists()
+        assert log_fn.read_text() == stdout.decode("utf-8")
+        assert db_fn.exists()
         # dictionary should be empty
         assert not paths2process
         assert out == "Time to process {0}\n".format(process_me)
 
         # check what we have in the database
-        Path = Query()
-        query = db.get(Path.input_path == process_me)
+        path = Query()
+        query = db.get(path.input_path == process_me)
         assert len(db) == 1
         assert query
         assert query["success"] == success
@@ -109,10 +123,10 @@ def test_process(tmpdir, capsys, side_effect, success):
 
 
 @pytest.mark.skip(reason="TODO")
-def test_run_heudiconv():
+def test_run_heudiconv() -> None:
     # echo should succeed always
     mydict = {"key1": "value1", "key2": "value2", "success": 1}
-    cmd = "echo INFO: PROCESSING STARTS: {0}".format(str(mydict))
-    stdout, info_dict = run_heudiconv(cmd)
+    args = ["echo", "INFO:", "PROCESSING", "STARTS:", str(mydict)]
+    stdout, info_dict = run_heudiconv(args)
     assert info_dict == mydict
-    assert "echo " + stdout.strip() == cmd
+    assert stdout.strip() == " ".join(args[1:])

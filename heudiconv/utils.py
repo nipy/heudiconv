@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections import namedtuple
 from collections.abc import Callable
+from collections.abc import Mapping as MappingABC
 import copy
 from datetime import datetime
 from glob import glob
@@ -24,10 +25,10 @@ from types import ModuleType
 from typing import (
     Any,
     AnyStr,
-    Dict,
-    List,
+    Mapping,
     NamedTuple,
     Optional,
+    Sequence,
     Tuple,
     TypeVar,
     Union,
@@ -187,12 +188,12 @@ def write_config(outfile: str, info: Any) -> None:
         fp.writelines(PrettyPrinter().pformat(info))
 
 
-def load_json(filename: str, retry: int = 0) -> Any:
+def load_json(filename: str | Path, retry: int = 0) -> Any:
     """Load data from a json file
 
     Parameters
     ----------
-    filename : str
+    filename : str or Path
         Filename to load data from.
     retry: int, optional
         Number of times to retry opening/loading the file in case of
@@ -242,7 +243,7 @@ def save_json(
 
     Parameters
     ----------
-    filename : str
+    filename : str or Path
         Filename to save data in.
     data : dict
         Dictionary to save in json file.
@@ -560,12 +561,11 @@ class File:
 
 
 TreeSpec = Union[
-    Tuple[Tuple[Union[str, File], "Load"], ...],
-    List[Tuple[Union[str, File], "Load"]],
-    Dict[Union[str, File], "Load"],
+    Sequence[Tuple[Union[str, File], "Load"]],
+    Mapping[str, "Load"],
 ]
 
-Load = Union[str, "TreeSpec"]
+Load = Union[str, "TreeSpec", dict]
 
 
 def create_tree(path: str, tree: TreeSpec, archives_leading_dir: bool = True) -> None:
@@ -579,7 +579,7 @@ def create_tree(path: str, tree: TreeSpec, archives_leading_dir: bool = True) ->
     if not op.exists(path):
         os.makedirs(path)
 
-    if isinstance(tree, dict):
+    if isinstance(tree, MappingABC):
         tree = list(tree.items())
 
     for file_, load in tree:
@@ -600,6 +600,7 @@ def create_tree(path: str, tree: TreeSpec, archives_leading_dir: bool = True) ->
             # else:
             create_tree(full_name, load, archives_leading_dir=archives_leading_dir)
         else:
+            assert isinstance(load, str)
             with open(full_name, "w") as f:
                 f.write(load)
         if executable:
