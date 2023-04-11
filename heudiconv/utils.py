@@ -57,12 +57,12 @@ class SeqInfo(NamedTuple):
     is_motion_corrected: bool  # 13
     is_derived: bool  # 14
     patient_id: Any  # 15
-    study_description: Any  # 16
+    study_description: str  # 16
     referring_physician_name: str  # 17
     series_description: str  # 18
     sequence_name: str  # 19
     image_type: tuple[str, ...]  # 20
-    accession_number: Any  # 21
+    accession_number: str  # 21
     patient_age: Any  # 22
     patient_sex: Any  # 23
     date: Any  # 24

@@ -105,7 +105,7 @@ def create_seqinfo(
 
 
 def validate_dicom(
-    fl: str, dcmfilter: Optional[Callable[[Any], Any]]
+    fl: str, dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]]
 ) -> Optional[tuple[dw.Wrapper, tuple[int, str], Optional[str]]]:
     """
     Parse DICOM attributes. Returns None if not valid.
@@ -165,10 +165,12 @@ def group_dicoms_into_seqinfos(
     files: list[str],
     grouping: str,
     file_filter: Optional[Callable[[str], Any]] = None,
-    dcmfilter: Optional[Callable[[Any], Any]] = None,
+    dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]] = None,
     flatten: Literal[False] = False,
     custom_grouping: str
-    | Callable[[list[str], Optional[Callable[[Any], Any]], type[SeqInfo]], Any]
+    | Callable[
+        [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]], Any
+    ]
     | None = None,
 ) -> dict[Optional[str], dict[SeqInfo, list[str]]]:
     ...
@@ -179,11 +181,13 @@ def group_dicoms_into_seqinfos(
     files: list[str],
     grouping: str,
     file_filter: Optional[Callable[[str], Any]] = None,
-    dcmfilter: Optional[Callable[[Any], Any]] = None,
+    dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]] = None,
     *,
     flatten: Literal[True],
     custom_grouping: str
-    | Callable[[list[str], Optional[Callable[[Any], Any]], type[SeqInfo]], Any]
+    | Callable[
+        [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]], Any
+    ]
     | None = None,
 ) -> dict[SeqInfo, list[str]]:
     ...
@@ -193,10 +197,12 @@ def group_dicoms_into_seqinfos(
     files: list[str],
     grouping: str,
     file_filter: Optional[Callable[[str], Any]] = None,
-    dcmfilter: Optional[Callable[[Any], Any]] = None,
+    dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]] = None,
     flatten: Literal[False, True] = False,
     custom_grouping: str
-    | Callable[[list[str], Optional[Callable[[Any], Any]], type[SeqInfo]], Any]
+    | Callable[
+        [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]], Any
+    ]
     | None = None,
 ) -> dict[Optional[str], dict[SeqInfo, list[str]]] | dict[SeqInfo, list[str]]:
     """Process list of dicoms and return seqinfo and file group

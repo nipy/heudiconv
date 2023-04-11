@@ -1,8 +1,10 @@
 #
 # Tests for reproin.py
 #
-from collections import OrderedDict
+from __future__ import annotations
+
 import re
+from typing import NamedTuple
 from unittest.mock import patch
 
 from . import reproin
@@ -18,57 +20,60 @@ from .reproin import (
 )
 
 
-def test_get_dups_marked():
-    no_dups = {("some",): [1]}
+def test_get_dups_marked() -> None:
+    no_dups: dict[tuple[str, tuple[str, ...], None], list[int]] = {
+        ("some", ("foo",), None): [1]
+    }
     assert get_dups_marked(no_dups) == no_dups
 
-    info = OrderedDict(
-        [(("bu", "du"), [1, 2]), (("smth",), [3]), (("smth2",), ["a", "b", "c"])]
-    )
+    info: dict[tuple[str, tuple[str, ...], None], list[int | str]] = {
+        ("bu", ("du",), None): [1, 2],
+        ("smth", (), None): [3],
+        ("smth2", ("apple", "banana"), None): ["a", "b", "c"],
+    }
 
     assert (
         get_dups_marked(info)
         == get_dups_marked(info, True)
         == {
-            ("bu__dup-01", "du"): [1],
-            ("bu", "du"): [2],
-            ("smth",): [3],
-            ("smth2__dup-01",): ["a"],
-            ("smth2__dup-02",): ["b"],
-            ("smth2",): ["c"],
+            ("bu__dup-01", ("du",), None): [1],
+            ("bu", ("du",), None): [2],
+            ("smth", (), None): [3],
+            ("smth2__dup-01", ("apple", "banana"), None): ["a"],
+            ("smth2__dup-02", ("apple", "banana"), None): ["b"],
+            ("smth2", ("apple", "banana"), None): ["c"],
         }
     )
 
     assert get_dups_marked(info, per_series=False) == {
-        ("bu__dup-01", "du"): [1],
-        ("bu", "du"): [2],
-        ("smth",): [3],
-        ("smth2__dup-02",): ["a"],
-        ("smth2__dup-03",): ["b"],
-        ("smth2",): ["c"],
+        ("bu__dup-01", ("du",), None): [1],
+        ("bu", ("du",), None): [2],
+        ("smth", (), None): [3],
+        ("smth2__dup-02", ("apple", "banana"), None): ["a"],
+        ("smth2__dup-03", ("apple", "banana"), None): ["b"],
+        ("smth2", ("apple", "banana"), None): ["c"],
     }
 
 
-def test_filter_files():
+def test_filter_files() -> None:
     # Filtering is currently disabled -- any sequence directory is Ok
     assert filter_files("/home/mvdoc/dbic/09-run_func_meh/0123432432.dcm")
     assert filter_files("/home/mvdoc/dbic/run_func_meh/012343143.dcm")
 
 
-def test_md5sum():
+def test_md5sum() -> None:
     assert md5sum("cryptonomicon") == "1cd52edfa41af887e14ae71d1db96ad1"
     assert md5sum("mysecretmessage") == "07989808231a0c6f522f9d8e34695794"
 
 
-def test_fix_canceled_runs():
-    from collections import namedtuple
+def test_fix_canceled_runs() -> None:
+    class FakeSeqInfo(NamedTuple):
+        accession_number: str
+        series_id: str
+        protocol_name: str
+        series_description: str
 
-    FakeSeqInfo = namedtuple(
-        "FakeSeqInfo",
-        ["accession_number", "series_id", "protocol_name", "series_description"],
-    )
-
-    seqinfo = []
+    seqinfo: list[FakeSeqInfo] = []
     runname = "func_run+"
     for i in range(1, 6):
         seqinfo.append(
@@ -78,7 +83,7 @@ def test_fix_canceled_runs():
     fake_accession2run = {"accession1": ["^01-", "^03-"]}
 
     with patch.object(reproin, "fix_accession2run", fake_accession2run):
-        seqinfo_ = fix_canceled_runs(seqinfo)
+        seqinfo_ = fix_canceled_runs(seqinfo)  # type: ignore[arg-type]
 
     for i, s in enumerate(seqinfo_, 1):
         output = runname
@@ -91,12 +96,13 @@ def test_fix_canceled_runs():
         assert s.series_id == "{0:02d}-".format(i) + runname
 
 
-def test_fix_dbic_protocol():
-    from collections import namedtuple
+def test_fix_dbic_protocol() -> None:
+    class FakeSeqInfo(NamedTuple):
+        accession_number: str
+        study_description: str
+        field1: str
+        field2: str
 
-    FakeSeqInfo = namedtuple(
-        "FakeSeqInfo", ["accession_number", "study_description", "field1", "field2"]
-    )
     accession_number = "A003"
     seq1 = FakeSeqInfo(
         accession_number,
@@ -120,10 +126,10 @@ def test_fix_dbic_protocol():
     with patch.object(reproin, "protocols2fix", protocols2fix), patch.object(
         reproin, "series_spec_fields", ["field1"]
     ):
-        seqinfos_ = fix_dbic_protocol(seqinfos)
-    assert seqinfos[1] == seqinfos_[1]
+        seqinfos_ = fix_dbic_protocol(seqinfos)  # type: ignore[arg-type]
+    assert seqinfos[1] == seqinfos_[1]  # type: ignore[comparison-overlap]
     # field2 shouldn't have changed since I didn't pass it
-    assert seqinfos_[0] == FakeSeqInfo(
+    assert seqinfos_[0] == FakeSeqInfo(  # type: ignore[comparison-overlap]
         accession_number, "mystudy", "02-anat-scout_MPR_sag", seq1.field2
     )
 
@@ -131,10 +137,10 @@ def test_fix_dbic_protocol():
     with patch.object(reproin, "protocols2fix", protocols2fix), patch.object(
         reproin, "series_spec_fields", ["field1", "field2"]
     ):
-        seqinfos_ = fix_dbic_protocol(seqinfos)
-    assert seqinfos[1] == seqinfos_[1]
+        seqinfos_ = fix_dbic_protocol(seqinfos)  # type: ignore[arg-type]
+    assert seqinfos[1] == seqinfos_[1]  # type: ignore[comparison-overlap]
     # now everything should have changed
-    assert seqinfos_[0] == FakeSeqInfo(
+    assert seqinfos_[0] == FakeSeqInfo(  # type: ignore[comparison-overlap]
         accession_number,
         "mystudy",
         "02-anat-scout_MPR_sag",
@@ -142,13 +148,13 @@ def test_fix_dbic_protocol():
     )
 
 
-def test_sanitize_str():
+def test_sanitize_str() -> None:
     assert sanitize_str("super@duper.faster") == "superduperfaster"
     assert sanitize_str("perfect") == "perfect"
     assert sanitize_str("never:use:colon:!") == "neverusecolon"
 
 
-def test_fixupsubjectid():
+def test_fixupsubjectid() -> None:
     assert fixup_subjectid("abra") == "abra"
     assert fixup_subjectid("sub") == "sub"
     assert fixup_subjectid("sid") == "sid"
@@ -159,7 +165,7 @@ def test_fixupsubjectid():
     assert fixup_subjectid("SID30") == "sid000030"
 
 
-def test_parse_series_spec():
+def test_parse_series_spec() -> None:
     pdpn = parse_series_spec
 
     assert pdpn("nondbic_func-bold") == {}

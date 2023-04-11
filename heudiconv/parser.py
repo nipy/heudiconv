@@ -13,7 +13,7 @@ from types import ModuleType
 from typing import Any, Optional
 
 from .dicoms import group_dicoms_into_seqinfos
-from .utils import StudySessionInfo, TempDirs, docstring_parameter
+from .utils import SeqInfo, StudySessionInfo, TempDirs, docstring_parameter
 
 lgr = logging.getLogger(__name__)
 tempdirs = TempDirs()
@@ -254,7 +254,7 @@ def get_study_sessions(
             )
 
             def infotoids(
-                seqinfos: Iterable[str], outdir: str  # noqa: U100
+                seqinfos: Iterable[SeqInfo], outdir: str  # noqa: U100
             ) -> dict[str, Optional[str]]:
                 return {"locator": None, "session": None, "subject": None}
 

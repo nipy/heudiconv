@@ -126,20 +126,24 @@ generally to accommodate limitations imposed by different manufacturers/models:
 - "WIP " prefix unconditionally added by the scanner is stripped
 """
 
-from collections import OrderedDict
+from __future__ import annotations
+
+from collections.abc import Iterable
 from glob import glob
 import hashlib
 import logging
-import os
+import os.path
 import re
+from typing import Any, Optional, TypeVar
+
+import pydicom as dcm
 
 from heudiconv.due import Doi, due
+from heudiconv.utils import SeqInfo, StudySessionInfo
 
 lgr = logging.getLogger("heudiconv")
 
-# pythons before 3.7 didn't have re.Pattern, it was some protected
-# _sre.SRE_Pattern, so let's just sample a class of the compiled regex
-re_Pattern = re.compile(".").__class__
+T = TypeVar("T")
 
 # Terminology to harmonise and use to name variables etc
 # experiment
@@ -156,7 +160,7 @@ series_spec_fields = ("protocol_name", "series_description")
 # dictionary from accession-number to runs that need to be marked as bad
 # NOTE: even if filename has number that is 0-padded, internally no padding
 # is done
-fix_accession2run = {
+fix_accession2run: dict[str, list[str]] = {
     # e.g.:
     # 'A000035': ['^8-', '^9-'],
 }
@@ -167,7 +171,7 @@ fix_accession2run = {
 # to list the "study hash".
 # Values are list of tuples in the form (regex_pattern, substitution).
 # If the  key is an empty string`''''`, it would apply to any study.
-protocols2fix = {
+protocols2fix: dict[str | re.Pattern[str], list[tuple[str, str]]] = {
     # e.g., QA:
     # '43b67d9139e8c7274578b7451ab21123':
     #     [
@@ -194,7 +198,7 @@ protocols2fix = {
 }
 
 # list containing StudyInstanceUID to skip -- hopefully doesn't happen too often
-dicoms2skip = [
+dicoms2skip: list[str] = [
     # e.g.
     # '1.3.12.2.1107.5.2.43.66112.30000016110117002435700000001',
 ]
@@ -216,20 +220,16 @@ POPULATE_INTENDED_FOR_OPTS = {
 KNOWN_DATATYPES = {"anat", "func", "dwi", "behav", "fmap"}
 
 
-def _delete_chars(from_str, deletechars):
-    """Delete characters from string allowing for Python 2 / 3 difference"""
-    try:
-        return from_str.translate(None, deletechars)
-    except TypeError:
-        return from_str.translate(str.maketrans("", "", deletechars))
+def _delete_chars(from_str: str, deletechars: str) -> str:
+    return from_str.translate(str.maketrans("", "", deletechars))
 
 
-def filter_dicom(dcmdata):
+def filter_dicom(dcmdata: dcm.dataset.Dataset) -> bool:
     """Return True if a DICOM dataset should be filtered out, else False"""
     return True if dcmdata.StudyInstanceUID in dicoms2skip else False
 
 
-def filter_files(_fn):
+def filter_files(_fn: str) -> bool:
     """Return True if a file should be kept, else False.
 
     ATM reproin does not do any filtering. Override if you need to add some
@@ -238,8 +238,12 @@ def filter_files(_fn):
 
 
 def create_key(
-    subdir, file_suffix, outtype=("nii.gz", "dicom"), annotation_classes=None, prefix=""
-):
+    subdir: Optional[str],
+    file_suffix: str,
+    outtype: tuple[str, ...] = ("nii.gz", "dicom"),
+    annotation_classes: None = None,
+    prefix: str = "",
+) -> tuple[str, tuple[str, ...], None]:
     if not subdir:
         raise ValueError("subdir must be a valid format string")
     # may be even add "performing physician" if defined??
@@ -252,26 +256,27 @@ def create_key(
     return template, outtype, annotation_classes
 
 
-def md5sum(string):
-    """Computes md5sum of as string"""
+def md5sum(string: Optional[str]) -> str:
+    """Computes md5sum of a string"""
     if not string:
         return ""  # not None so None was not compared to strings
     m = hashlib.md5(string.encode())
     return m.hexdigest()
 
 
-def get_study_description(seqinfo):
+def get_study_description(seqinfo: list[SeqInfo]) -> str:
     # Centralized so we could fix/override
     v = get_unique(seqinfo, "study_description")
+    assert isinstance(v, str)
     return v
 
 
-def get_study_hash(seqinfo):
+def get_study_hash(seqinfo: list[SeqInfo]) -> str:
     # XXX: ad hoc hack
     return md5sum(get_study_description(seqinfo))
 
 
-def fix_canceled_runs(seqinfo):
+def fix_canceled_runs(seqinfo: list[SeqInfo]) -> list[SeqInfo]:
     """Function that adds cancelme_ to known bad runs which were forgotten"""
     if not fix_accession2run:
         return seqinfo  # nothing to do
@@ -296,7 +301,7 @@ def fix_canceled_runs(seqinfo):
     return seqinfo
 
 
-def fix_dbic_protocol(seqinfo):
+def fix_dbic_protocol(seqinfo: list[SeqInfo]) -> list[SeqInfo]:
     """Ad-hoc fixup for existing protocols.
 
     It will operate in 3 stages on `protocols2fix` records.
@@ -321,7 +326,7 @@ def fix_dbic_protocol(seqinfo):
     # Then go through all regexps returning regex "search" result
     # on study_description
     for sub, substitutions in protocols2fix.items():
-        if isinstance(sub, re_Pattern) and sub.search(study_description):
+        if isinstance(sub, re.Pattern) and sub.search(study_description):
             _apply_substitutions(
                 seqinfo, substitutions, "%r regex matching" % sub.pattern
             )
@@ -332,7 +337,9 @@ def fix_dbic_protocol(seqinfo):
     return seqinfo
 
 
-def _apply_substitutions(seqinfo, substitutions, subs_scope):
+def _apply_substitutions(
+    seqinfo: list[SeqInfo], substitutions: list[tuple[str, str]], subs_scope: str
+) -> None:
     lgr.info("Considering %s substitutions", subs_scope)
     for i, s in enumerate(seqinfo):
         fixed_kwargs = dict()
@@ -349,7 +356,7 @@ def _apply_substitutions(seqinfo, substitutions, subs_scope):
         seqinfo[i] = s._replace(**fixed_kwargs)
 
 
-def fix_seqinfo(seqinfo):
+def fix_seqinfo(seqinfo: list[SeqInfo]) -> list[SeqInfo]:
     """Just a helper on top of both fixers"""
     # add cancelme to known bad runs
     seqinfo = fix_canceled_runs(seqinfo)
@@ -357,7 +364,7 @@ def fix_seqinfo(seqinfo):
     return seqinfo
 
 
-def ls(_study_session, seqinfo):
+def ls(_study_session: StudySessionInfo, seqinfo: list[SeqInfo]) -> str:
     """Additional ls output for a seqinfo"""
     # assert len(sequences) <= 1  # expecting only a single study here
     # seqinfo = sequences.keys()[0]
@@ -365,14 +372,16 @@ def ls(_study_session, seqinfo):
 
 
 # XXX we killed session indicator!  what should we do now?!!!
-# WE DON:T NEED IT -- it will be provided into conversion_info as `session`
+# WE DON'T NEED IT -- it will be provided into conversion_info as `session`
 # So we just need subdir and file_suffix!
 @due.dcite(
     Doi("10.5281/zenodo.1207117"),
     path="heudiconv.heuristics.reproin",
     description="ReproIn heudiconv heuristic for turnkey conversion into BIDS",
 )
-def infotodict(seqinfo):
+def infotodict(
+    seqinfo: list[SeqInfo],
+) -> dict[tuple[str, tuple[str, ...], None], list[str]]:
     """Heuristic evaluator for determining which runs belong where
 
     allowed template fields - follow python string module:
@@ -386,11 +395,12 @@ def infotodict(seqinfo):
     seqinfo = fix_seqinfo(seqinfo)
     lgr.info("Processing %d seqinfo entries", len(seqinfo))
 
-    info = OrderedDict()
-    skipped, skipped_unknown = [], []
+    info: dict[tuple[str, tuple[str, ...], None], list[str]] = {}
+    skipped: list[str] = []
+    skipped_unknown: list[str] = []
     current_run = 0
-    run_label = None  # run-
-    dcm_image_iod_spec = None
+    run_label: Optional[str] = None  # run-
+    dcm_image_iod_spec: Optional[str] = None
     skip_derived = False
     for s in seqinfo:
         # XXX: skip derived sequences, we don't store them to avoid polluting
@@ -567,11 +577,7 @@ def infotodict(seqinfo):
                 raise ValueError(
                     "Don't know how to deal with run specification %s" % repr(run)
                 )
-            if isinstance(current_run, str) and current_run.isdigit():
-                current_run = int(current_run)
-            run_label = "run-" + (
-                "%02d" % current_run if isinstance(current_run, int) else current_run
-            )
+            run_label = "run-%02d" % current_run
         else:
             # if there is no _run -- no run label added
             run_label = None
@@ -585,7 +591,7 @@ def infotodict(seqinfo):
                 "want to add _rec-moco but there is _rec- already"
             )
 
-        def from_series_info(name):
+        def from_series_info(name: str) -> Optional[str]:
             """A little helper to provide _name-value if series_info knows it
 
             Returns None otherwise
@@ -612,7 +618,7 @@ def infotodict(seqinfo):
             datatype_suffix,
         ]
         # filter those which are None, and join with _
-        suffix = "_".join(filter(bool, filename_suffix_parts))
+        suffix = "_".join(filter(bool, filename_suffix_parts))  # type: ignore[arg-type]
 
         # # .series_description in case of
         # sdesc = s.study_description
@@ -630,6 +636,7 @@ def infotodict(seqinfo):
 
         # For scouts -- we want only dicoms
         # https://github.com/nipy/heudiconv/issues/145
+        outtype: tuple[str, ...]
         if "_Scout" in s.series_description or (
             datatype == "anat"
             and datatype_suffix
@@ -654,14 +661,12 @@ def infotodict(seqinfo):
         )
 
     info = get_dups_marked(info)  # mark duplicate ones with __dup-0x suffix
-
-    info = dict(
-        info
-    )  # convert to dict since outside functionality depends on it being a basic dict
     return info
 
 
-def get_dups_marked(info, per_series=True):
+def get_dups_marked(
+    info: dict[tuple[str, tuple[str, ...], None], list[T]], per_series: bool = True
+) -> dict[tuple[str, tuple[str, ...], None], list[T]]:
     """
 
     Parameters
@@ -710,8 +715,8 @@ def get_dups_marked(info, per_series=True):
     return info
 
 
-def get_unique(seqinfos, attr):
-    """Given a list of seqinfos, which must have come from a single study
+def get_unique(seqinfos: list[SeqInfo], attr: str) -> Any:
+    """Given a list of seqinfos, which must have come from a single study,
     get specific attr, which must be unique across all of the entries
 
     If not -- fail!
@@ -725,22 +730,13 @@ def get_unique(seqinfos, attr):
 # TODO: might need to do grouping per each session and return here multiple
 # hits, or may be we could just somehow demarkate that it will be multisession
 # one and so then later value parsed (again) in infotodict would be used???
-def infotoids(seqinfos, outdir):
-    # In python 3.7.5 we would obtain odict_keys() object which would be
-    # immutable, and we would not be able to perform any substitutions if
-    # needed.  So let's make it into a regular list
-    if isinstance(seqinfos, dict) or hasattr(seqinfos, "keys"):
-        # just some checks for a paranoid Yarik
-        raise TypeError(
-            "Expected list-like structure here, not associative array. Got %s"
-            % type(seqinfos)
-        )
-    seqinfos = list(seqinfos)
+def infotoids(seqinfos: Iterable[SeqInfo], outdir: str) -> dict[str, Optional[str]]:
+    seqinfo_lst = list(seqinfos)
     # decide on subjid and session based on patient_id
     lgr.info("Processing sequence infos to deduce study/session")
-    study_description = get_study_description(seqinfos)
+    study_description = get_study_description(seqinfo_lst)
     study_description_hash = md5sum(study_description)
-    subject = fixup_subjectid(get_unique(seqinfos, "patient_id"))
+    subject = fixup_subjectid(get_unique(seqinfo_lst, "patient_id"))
     # TODO:  fix up subject id if missing some 0s
     if study_description:
         # Generally it is a ^ but if entered manually, ppl place space in it
@@ -760,13 +756,13 @@ def infotoids(seqinfos, outdir):
     # and possible ses+ in the sequence names, so we would provide a sequence
     # So might need to go through  parse_series_spec(s.protocol_name)
     # to figure out presence of sessions.
-    ses_markers = []
+    ses_markers: list[str] = []
 
     # there might be fixups needed so we could deduce session etc
     # this copy is not replacing original one, so the same fix_seqinfo
     # might be called later
-    seqinfos = fix_seqinfo(seqinfos)
-    for s in seqinfos:
+    seqinfo_lst = fix_seqinfo(seqinfo_lst)
+    for s in seqinfo_lst:
         if s.is_derived:
             continue
         session_ = parse_series_spec(s.protocol_name).get("session", None)
@@ -774,9 +770,9 @@ def infotoids(seqinfos, outdir):
             # there was a marker for something we could provide from our seqinfo
             # e.g. {date}
             session_ = session_.format(**s._asdict())
-        ses_markers.append(session_)
-    ses_markers = list(filter(bool, ses_markers))  # only present ones
-    session = None
+        if session_:
+            ses_markers.append(session_)
+    session: Optional[str] = None
     if ses_markers:
         # we have a session or possibly more than one even
         # let's figure out which case we have
@@ -841,12 +837,12 @@ def infotoids(seqinfos, outdir):
     }
 
 
-def sanitize_str(value):
+def sanitize_str(value: str) -> str:
     """Remove illegal characters for BIDS from task/acq/etc.."""
     return _delete_chars(value, "#!@$%^&.,:;_-")
 
 
-def parse_series_spec(series_spec):
+def parse_series_spec(series_spec: str) -> dict[str, str]:
     """Parse protocol name according to our convention with minimal set of fixups"""
     # Since Yarik didn't know better place to put it in, but could migrate outside
     # at some point. TODO
@@ -868,7 +864,7 @@ def parse_series_spec(series_spec):
     # Remove possible suffix we don't care about after __
     series_spec = series_spec.split("__", 1)[0]
 
-    bids = None  # we don't know yet for sure
+    bids = False  # we don't know yet for sure
     # We need to figure out if it is a valid bids
     split = series_spec.split("_")
     prefix = split[0]
@@ -883,10 +879,11 @@ def parse_series_spec(series_spec):
         bids = True  # for sure
         split = split[1:]
 
-    def split2(s):
+    def split2(s: str) -> tuple[str, Optional[str]]:
         # split on - if present, if not -- 2nd one returned None
         if "-" in s:
-            return s.split("-", 1)
+            a, _, b = s.partition("-")
+            return a, b
         return s, None
 
     # Let's analyze first element which should tell us sequence type
@@ -945,7 +942,7 @@ def parse_series_spec(series_spec):
     return regd
 
 
-def fixup_subjectid(subjectid):
+def fixup_subjectid(subjectid: str) -> str:
     """Just in case someone managed to miss a zero or added an extra one"""
     # make it lowercase
     subjectid = subjectid.lower()

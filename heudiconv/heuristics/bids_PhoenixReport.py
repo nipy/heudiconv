@@ -4,14 +4,26 @@ It only cares about converting a series with have PhoenixZIPReport in their
 series_description and outputs **only to sourcedata**.
 """
 
+from __future__ import annotations
 
-def create_key(template, outtype=("nii.gz",), annotation_classes=None):
+from typing import Optional
+
+from heudiconv.utils import SeqInfo
+
+
+def create_key(
+    template: Optional[str],
+    outtype: tuple[str, ...] = ("nii.gz",),
+    annotation_classes: None = None,
+) -> tuple[str, tuple[str, ...], None]:
     if template is None or not template:
         raise ValueError("Template must be a valid format string")
-    return template, outtype, annotation_classes
+    return (template, outtype, annotation_classes)
 
 
-def infotodict(seqinfo):
+def infotodict(
+    seqinfo: list[SeqInfo],
+) -> dict[tuple[str, tuple[str, ...], None], list[dict[str, str]]]:
     """Heuristic evaluator for determining which runs belong where
 
     allowed template fields - follow python string module:
@@ -39,7 +51,11 @@ def infotodict(seqinfo):
         "sub-{subject}/misc/sub-{subject}_phoenix", outtype=("dicom",)
     )
 
-    info = {sbref: [], scout: [], phoenix_doc: []}
+    info: dict[tuple[str, tuple[str, ...], None], list[dict[str, str]]] = {
+        sbref: [],
+        scout: [],
+        phoenix_doc: [],
+    }
     for s in seqinfo:
         if (
             "PhoenixZIPReport" in s.series_description
