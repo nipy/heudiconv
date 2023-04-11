@@ -12,7 +12,6 @@ import pytest
 from heudiconv.cli.run import main as runner
 from heudiconv.convert import nipype_convert
 from heudiconv.dicoms import (
-    OrderedDict,
     embed_dicom_and_nifti_metadata,
     get_datetime_from_dcm,
     get_reproducible_int,
@@ -92,7 +91,7 @@ def test_group_dicoms_into_seqinfos() -> None:
 
     seqinfo = group_dicoms_into_seqinfos(dcmfiles, "studyUID", flatten=True)
 
-    assert type(seqinfo) is OrderedDict
+    assert type(seqinfo) is dict
     assert len(seqinfo) == len(dcmfiles)
     assert [s.series_description for s in seqinfo] == [
         "AAHead_Scout_32ch-head-coil",

@@ -18,8 +18,8 @@ def test_reproducibility(tmp_path: Path) -> None:
     tempdirs = TempDirs()
 
     tarball = compress_dicoms(dicom_list, prefix, tempdirs, True)
+    assert tarball is not None
     md5 = file_md5sum(tarball)
-    assert tarball
     # must not override, ensure overwrite is set to False
     assert compress_dicoms(dicom_list, prefix, tempdirs, False) is None
 
@@ -27,6 +27,6 @@ def test_reproducibility(tmp_path: Path) -> None:
 
     time.sleep(1.1)  # need to guarantee change of time
     tarball_ = compress_dicoms(dicom_list, prefix, tempdirs, True)
-    md5_ = file_md5sum(tarball_)
     assert tarball == tarball_
+    md5_ = file_md5sum(tarball_)
     assert md5 == md5_
