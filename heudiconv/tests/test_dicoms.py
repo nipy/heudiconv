@@ -2,6 +2,7 @@ import datetime
 from glob import glob
 import json
 import os.path as op
+from pathlib import Path
 
 import pytest
 
@@ -23,7 +24,7 @@ from .utils import TESTS_DATA_PATH, assert_cwd_unchanged
 DICOM_FIELDS_TO_TEST = {"ProtocolName": "tProtocolName"}
 
 
-def test_private_csa_header():
+def test_private_csa_header(tmp_path: Path) -> None:
     dcm_file = op.join(TESTS_DATA_PATH, "axasc35.dcm")
     dcm_data = dcm.read_file(dcm_file, stop_before_pixels=True)
     for pub, priv in DICOM_FIELDS_TO_TEST.items():
@@ -33,7 +34,9 @@ def test_private_csa_header():
         # ensure private tag is found
         assert parse_private_csa_header(dcm_data, pub, priv) != ""
         # and quickly run heudiconv with no conversion
-        runner(["--files", dcm_file, "-c" "none", "-f", "reproin"])
+        runner(
+            ["--files", dcm_file, "-c", "none", "-f", "reproin", "-o", str(tmp_path)]
+        )
 
 
 @assert_cwd_unchanged(ok_to_chdir=True)  # so we cd back after tmpdir.chdir
