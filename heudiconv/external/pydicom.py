@@ -2,6 +2,8 @@
 
 from __future__ import absolute_import
 
+__all__ = ["dcm"]
+
 # 1.0.0 of pydicom renamed module from dicom to pydicom
 try:
     # pydicom >= 1.0

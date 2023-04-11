@@ -54,7 +54,7 @@ into structured directory layouts.
 Installation
 ------------
 
-See our `installation page <https://heudiconv.readthedocs.io/en/latest/installation.html>`_ 
+See our `installation page <https://heudiconv.readthedocs.io/en/latest/installation.html>`_
 on heudiconv.readthedocs.io .
 
 HOWTO 101

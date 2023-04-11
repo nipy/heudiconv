@@ -1,25 +1,18 @@
-import os
-import pytest
-import sys
-import time
-
-from mock import patch
-from os.path import join as opj
-from os.path import dirname
 from glob import glob
+import os
+from os.path import dirname
+from os.path import join as opj
+import time
 
 from heudiconv.dicoms import compress_dicoms
 from heudiconv.utils import TempDirs, file_md5sum
 
-tests_datadir = opj(dirname(__file__), 'data')
+tests_datadir = opj(dirname(__file__), "data")
 
 
 def test_reproducibility(tmpdir):
     prefix = str(tmpdir.join("precious"))
-    args = [glob(opj(tests_datadir, '01-fmap_acq-3mm', '*')),
-            prefix,
-            TempDirs(),
-            True]
+    args = [glob(opj(tests_datadir, "01-fmap_acq-3mm", "*")), prefix, TempDirs(), True]
     tarball = compress_dicoms(*args)
     md5 = file_md5sum(tarball)
     assert tarball
