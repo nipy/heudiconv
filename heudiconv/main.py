@@ -57,7 +57,6 @@ def process_extra_commands(
     outdir: str,
     command: str,
     files: list[str],
-    dicom_dir_template: Optional[str],
     heuristic: Optional[str],
     session: Optional[str],
     subjs: Optional[list[str]],
@@ -75,13 +74,6 @@ def process_extra_commands(
         Heudiconv command to run
     files : list of str
         List of files
-    dicom_dir_template : str
-        Location of dicomdir that can be indexed with subject id
-        {subject} and session {session}. Tarballs (can be compressed)
-        are supported in addition to directory. All matching tarballs
-        for a subject are extracted and their content processed in a
-        single pass. If multiple tarballs are found, each is assumed to
-        be a separate session and the 'session' argument is ignored.
     heuristic : str
         Path to heuristic file or name of builtin heuristic.
     session : str
@@ -101,7 +93,7 @@ def process_extra_commands(
         heuristic_ls = getattr(heuristic_mod, "ls", None)
         for fname in files:
             study_sessions = get_study_sessions(
-                dicom_dir_template,
+                None,
                 [fname],
                 heuristic_mod,
                 outdir,
@@ -111,9 +103,10 @@ def process_extra_commands(
             )
             print(fname)
             for study_session, sequences in study_sessions.items():
+                assert isinstance(sequences, dict)
                 suf = ""
                 if heuristic_ls:
-                    suf += heuristic_ls(study_session, sequences)
+                    suf += heuristic_ls(study_session, list(sequences.keys()))
                 print("\t%s %d sequences%s" % (str(study_session), len(sequences), suf))
     elif command == "populate-templates":
         ensure_heuristic_arg(heuristic)
@@ -366,11 +359,11 @@ def workflow(
     if command:
         if files is None:
             raise ValueError("'command' given but 'files' is None")
+        assert dicom_dir_template is None
         process_extra_commands(
             outdir,
             command,
             files,
-            dicom_dir_template,
             heuristic,
             session,
             subjs,

@@ -10,7 +10,7 @@ import os.path as op
 import re
 import shutil
 from types import ModuleType
-from typing import Any, Optional
+from typing import Optional
 
 from .dicoms import group_dicoms_into_seqinfos
 from .utils import SeqInfo, StudySessionInfo, TempDirs, docstring_parameter
@@ -156,7 +156,7 @@ def get_study_sessions(
     session: Optional[str],
     sids: Optional[list[str]],
     grouping: str = "studyUID",
-) -> dict[StudySessionInfo, Any]:
+) -> dict[StudySessionInfo, list[str] | dict[SeqInfo, list[str]]]:
     """Sort files or dicom seqinfos into study_sessions.
 
     study_sessions put together files for a single session of a subject
@@ -168,7 +168,7 @@ def get_study_sessions(
 
     - if files_opt is provided, sorts all DICOMs it can find under those paths
     """
-    study_sessions: dict[StudySessionInfo, Any] = {}
+    study_sessions: dict[StudySessionInfo, list[str] | dict[SeqInfo, list[str]]] = {}
     if dicom_dir_template:
         dicom_dir_template = op.abspath(dicom_dir_template)
 

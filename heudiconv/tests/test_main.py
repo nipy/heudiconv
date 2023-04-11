@@ -354,7 +354,6 @@ def test_populate_intended_for(
         bids_folder,
         "populate-intended-for",
         [],
-        "",
         "example",
         session,
         subjects,
@@ -381,7 +380,7 @@ def test_populate_intended_for(
         if session:
             os.makedirs(opj(subj_dir, "ses-" + session))
     process_extra_commands(
-        outdir, "populate-intended-for", [], "", "example", None, [], "all"
+        outdir, "populate-intended-for", [], "example", None, [], "all"
     )
     for s in subjects:
         expected_info = 'Adding "IntendedFor" to the fieldmaps in ' + opj(
