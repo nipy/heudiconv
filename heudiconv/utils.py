@@ -1,7 +1,6 @@
 """Utility objects and functions"""
 from __future__ import annotations
 
-from collections import namedtuple
 from collections.abc import Callable
 from collections.abc import Mapping as MappingABC
 import copy
@@ -41,38 +40,34 @@ T = TypeVar("T")
 V = TypeVar("V")
 
 
-SeqInfo = namedtuple(
-    "SeqInfo",
-    [
-        "total_files_till_now",  # 0
-        "example_dcm_file",  # 1
-        "series_id",  # 2
-        "dcm_dir_name",  # 3
-        "series_files",  # 4
-        "unspecified",  # 5
-        "dim1",
-        "dim2",
-        "dim3",
-        "dim4",  # 6, 7, 8, 9
-        "TR",
-        "TE",  # 10, 11
-        "protocol_name",  # 12
-        "is_motion_corrected",  # 13
-        "is_derived",  # 14
-        "patient_id",  # 15
-        "study_description",  # 16
-        "referring_physician_name",  # 17
-        "series_description",  # 18
-        "sequence_name",  # 19
-        "image_type",  # 20
-        "accession_number",  # 21
-        "patient_age",  # 22
-        "patient_sex",  # 23
-        "date",  # 24
-        "series_uid",  # 25
-        "time",  # 26
-    ],
-)
+class SeqInfo(NamedTuple):
+    total_files_till_now: int  # 0
+    example_dcm_file: str  # 1
+    series_id: str  # 2
+    dcm_dir_name: str  # 3
+    series_files: int  # 4
+    unspecified: str  # 5
+    dim1: int  # 6
+    dim2: int  # 7
+    dim3: int  # 8
+    dim4: int  # 9
+    TR: float  # 10
+    TE: float  # 11
+    protocol_name: str  # 12
+    is_motion_corrected: bool  # 13
+    is_derived: bool  # 14
+    patient_id: Any  # 15
+    study_description: Any  # 16
+    referring_physician_name: str  # 17
+    series_description: str  # 18
+    sequence_name: str  # 19
+    image_type: tuple[str, ...]  # 20
+    accession_number: Any  # 21
+    patient_age: Any  # 22
+    patient_sex: Any  # 23
+    date: Any  # 24
+    series_uid: Any  # 25
+    time: Any  # 26
 
 
 class StudySessionInfo(NamedTuple):
