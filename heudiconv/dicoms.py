@@ -8,7 +8,8 @@ import tarfile
 from typing import List, Optional
 import warnings
 
-from .external.pydicom import dcm
+import pydicom as dcm
+
 from .utils import SeqInfo, get_typed_attr, load_json, set_readonly
 
 with warnings.catch_warnings():
@@ -505,9 +506,9 @@ def embed_dicom_and_nifti_metadata(dcmfiles, niftifile, infofile, bids_info):
     import json
     import os.path
 
+    import dcmstack as ds
     import nibabel as nb
 
-    from heudiconv.external.dcmstack import ds
     from heudiconv.utils import save_json
 
     stack = ds.parse_and_stack(dcmfiles, force=True).values()

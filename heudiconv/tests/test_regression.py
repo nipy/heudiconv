@@ -4,10 +4,10 @@ import os
 import os.path as op
 import re
 
+import pydicom as dcm
 import pytest
 
 from heudiconv.cli.run import main as runner
-from heudiconv.external.pydicom import dcm
 from heudiconv.utils import load_json
 
 # testing utilities

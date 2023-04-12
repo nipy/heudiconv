@@ -29,7 +29,7 @@ REQUIRES = [
     "filelock>=3.0.12",
     "nibabel",
     "nipype >=1.2.3",
-    "pydicom",
+    "pydicom >= 1.0.0",
 ]
 
 TESTS_REQUIRES = [

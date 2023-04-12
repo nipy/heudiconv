@@ -16,9 +16,9 @@ import typing
 import warnings
 
 import numpy as np
+import pydicom as dcm
 
 from . import __version__, dicoms
-from .external.pydicom import dcm
 from .parser import find_files
 from .utils import (
     create_file_if_missing,
