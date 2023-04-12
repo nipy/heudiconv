@@ -8,8 +8,8 @@ from os.path import dirname
 from os.path import join as pjoin
 from pathlib import Path
 import re
+from unittest.mock import patch
 
-from mock import patch
 import pytest
 
 from heudiconv.cli.run import main as runner

@@ -34,7 +34,6 @@ REQUIRES = [
 
 TESTS_REQUIRES = [
     "pytest",
-    "mock",
     "tinydb",
     "inotify",
 ]

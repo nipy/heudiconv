@@ -5,8 +5,8 @@ import os
 import os.path as op
 from os.path import join as opj
 import stat
+from unittest.mock import patch
 
-from mock import patch
 import pytest
 
 from heudiconv import __version__

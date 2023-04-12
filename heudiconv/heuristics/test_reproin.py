@@ -3,8 +3,7 @@
 #
 from collections import OrderedDict
 import re
-
-from mock import patch
+from unittest.mock import patch
 
 from . import reproin
 from .reproin import (

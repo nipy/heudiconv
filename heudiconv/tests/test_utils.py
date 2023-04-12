@@ -1,8 +1,8 @@
 import json
 import os
 import os.path as op
+from unittest.mock import patch
 
-import mock
 import pytest
 
 from heudiconv.utils import (
@@ -121,7 +121,7 @@ def test_load_json(tmpdir, caplog):
         else:
             return json_load(fp)
 
-    with mock.patch.object(json, "load", json_load_patched):
+    with patch.object(json, "load", json_load_patched):
         assert load_json(valid_json_file, retry=3) == vcontent
 
 

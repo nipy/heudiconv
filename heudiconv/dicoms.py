@@ -6,6 +6,7 @@ import os
 import os.path as op
 import tarfile
 from typing import List, Optional
+from unittest.mock import patch
 import warnings
 
 import pydicom as dcm
@@ -454,30 +455,25 @@ def compress_dicoms(dicom_list, out_prefix, tempdirs, overwrite):
         ti.mtime = dcm_time
         return ti
 
-    # poor man mocking since can't rely on having mock
-    try:
-        import time
-
-        _old_time = time.time
-        time.time = lambda: dcm_time
-        if op.lexists(outtar):
-            os.unlink(outtar)
-        with tarfile.open(outtar, "w:gz", dereference=True) as tar:
-            for filename in dicom_list:
-                outfile = op.join(tmpdir, op.basename(filename))
-                if not op.islink(outfile):
-                    os.symlink(op.realpath(filename), outfile)
-                # place into archive stripping any lead directories and
-                # adding the one corresponding to prefix
-                tar.add(
-                    outfile,
-                    arcname=op.join(op.basename(out_prefix), op.basename(outfile)),
-                    recursive=False,
-                    filter=_assign_dicom_time,
-                )
-    finally:
-        time.time = _old_time
-        tempdirs.rmtree(tmpdir)
+    with patch("time.time", lambda: dcm_time):
+        try:
+            if op.lexists(outtar):
+                os.unlink(outtar)
+            with tarfile.open(outtar, "w:gz", dereference=True) as tar:
+                for filename in dicom_list:
+                    outfile = op.join(tmpdir, op.basename(filename))
+                    if not op.islink(outfile):
+                        os.symlink(op.realpath(filename), outfile)
+                    # place into archive stripping any lead directories and
+                    # adding the one corresponding to prefix
+                    tar.add(
+                        outfile,
+                        arcname=op.join(op.basename(out_prefix), op.basename(outfile)),
+                        recursive=False,
+                        filter=_assign_dicom_time,
+                    )
+        finally:
+            tempdirs.rmtree(tmpdir)
 
     return outtar
 
