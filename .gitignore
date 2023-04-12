@@ -9,4 +9,5 @@ _build/
 _version.py
 build/
 dist/
+sample_nifti.json
 venvs/
