@@ -121,7 +121,7 @@ def test_prepare_for_datalad(tmp_path: Path) -> None:
     os.makedirs(studydir_)
     populate_bids_templates(studydir_)
 
-    add_to_datalad(str(tmp_path), studydir_, None, False)
+    add_to_datalad(str(tmp_path), studydir_, None, None)
 
     from datalad.api import Dataset
 
@@ -155,7 +155,7 @@ def test_prepare_for_datalad(tmp_path: Path) -> None:
     # Above call to add_to_datalad does not create .heudiconv subds since
     # directory does not exist (yet).
     # Let's first check that it is safe to call it again
-    add_to_datalad(str(tmp_path), studydir_, None, False)
+    add_to_datalad(str(tmp_path), studydir_, None, None)
     assert not ds.repo.dirty
 
     old_hexsha = ds.repo.get_hexsha()
@@ -167,7 +167,7 @@ def test_prepare_for_datalad(tmp_path: Path) -> None:
     create_file_if_missing(dummy_path, "")
     ds.save(dummy_path, message="added a dummy file")
     # next call must not fail, should just issue a warning
-    add_to_datalad(str(tmp_path), studydir_, None, False)
+    add_to_datalad(str(tmp_path), studydir_, None, None)
     ds.repo.is_under_annex(dummy_path)
     assert not ds.repo.dirty
     assert ".heudiconv/dummy.nii.gz" in ds.repo.get_files()
@@ -176,7 +176,7 @@ def test_prepare_for_datalad(tmp_path: Path) -> None:
     ds.repo.call_git(["reset", "--hard", old_hexsha])
     # now we do not add dummy to git
     create_file_if_missing(dummy_path, "")
-    add_to_datalad(str(tmp_path), studydir_, None, False)
+    add_to_datalad(str(tmp_path), studydir_, None, None)
     assert ".heudiconv" in ds.subdatasets(result_xfm="relpaths")
     assert not ds.repo.dirty
     assert ".heudiconv/dummy.nii.gz" not in ds.repo.get_files()

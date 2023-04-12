@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from pathlib import Path
+
 import pytest
 
 from ..dlad import mark_sensitive
@@ -6,10 +10,10 @@ from ...utils import create_tree
 dl = pytest.importorskip("datalad.api")
 
 
-def test_mark_sensitive(tmpdir):
-    ds = dl.Dataset(str(tmpdir)).create(force=True)
+def test_mark_sensitive(tmp_path: Path) -> None:
+    ds = dl.Dataset(tmp_path).create(force=True)
     create_tree(
-        str(tmpdir),
+        str(tmp_path),
         {
             "f1": "d1",
             "f2": "d2",
