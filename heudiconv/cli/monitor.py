@@ -164,7 +164,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main():
+def main() -> None:
     parsed = parse_args()
     print("Got {0}".format(parsed))
     # open database

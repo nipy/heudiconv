@@ -3,10 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 
+from nipype.utils.filemanip import which
 import pytest
 
 from heudiconv.cli.run import main as runner
-from heudiconv.queue import clean_args, which
+from heudiconv.queue import clean_args
 
 from .utils import TESTS_DATA_PATH
 

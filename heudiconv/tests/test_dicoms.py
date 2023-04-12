@@ -31,7 +31,7 @@ def test_private_csa_header(tmp_path: Path) -> None:
     for pub, priv in DICOM_FIELDS_TO_TEST.items():
         # ensure missing public tag
         with pytest.raises(AttributeError):
-            dcm.pub
+            dcm.pub  # type: ignore[attr-defined]
         # ensure private tag is found
         assert parse_private_csa_header(dcm_data, pub, priv) != ""
         # and quickly run heudiconv with no conversion

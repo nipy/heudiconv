@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from json.decoder import JSONDecodeError
 import os
 import os.path as op
 from pathlib import Path
@@ -10,7 +11,6 @@ from unittest.mock import patch
 import pytest
 
 from heudiconv.utils import (
-    JSONDecodeError,
     create_tree,
     get_datetime,
     get_heuristic_description,
