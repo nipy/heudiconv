@@ -10,17 +10,16 @@ from .utils import TESTS_DATA_PATH
 
 @pytest.mark.skipif(bool(which("sbatch")), reason="skip a real slurm call")
 @pytest.mark.parametrize(
-    "invocation",
+    "hargs",
     [
-        "--files %s/01-fmap_acq-3mm"
-        % TESTS_DATA_PATH,  # our new way with automated grouping
-        "-d %s/{subject}/* -s 01-fmap_acq-3mm"
-        % TESTS_DATA_PATH,  # "old" way specifying subject
+        # our new way with automated grouping
+        ["--files", f"{TESTS_DATA_PATH}/01-fmap_acq-3mm"],
+        # "old" way specifying subject
+        ["-d", f"{TESTS_DATA_PATH}/{{subject}}/*", "-s", "01-fmap_acq-3mm"],
     ],
 )
-def test_queue_no_slurm(tmpdir, invocation):
+def test_queue_no_slurm(tmpdir, hargs):
     tmpdir.chdir()
-    hargs = invocation.split(" ")
     hargs.extend(["-f", "reproin", "-b", "--minmeta", "--queue", "SLURM"])
 
     # simulate command-line call

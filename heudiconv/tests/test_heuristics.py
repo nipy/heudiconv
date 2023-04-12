@@ -29,10 +29,18 @@ except ImportError:  # pragma: no cover
 
 # this will fail if not in project's root directory
 def test_smoke_convertall(tmpdir):
-    args = (
-        "-c dcm2niix -o %s -b --datalad "
-        "-s fmap_acq-3mm -d %s/{subject}/*" % (tmpdir, TESTS_DATA_PATH)
-    ).split(" ")
+    args = [
+        "-c",
+        "dcm2niix",
+        "-o",
+        str(tmpdir),
+        "-b",
+        "--datalad",
+        "-s",
+        "fmap_acq-3mm",
+        "-d",
+        f"{TESTS_DATA_PATH}/{{subject}}/*",
+    ]
 
     # complain if no heurisitic
     with pytest.raises(RuntimeError):
@@ -46,23 +54,23 @@ def test_smoke_convertall(tmpdir):
 @pytest.mark.parametrize(
     "invocation",
     [
-        "--files %s" % TESTS_DATA_PATH,  # our new way with automated grouping
-        "-d %s/{subject}/* -s 01-fmap_acq-3mm"
-        % TESTS_DATA_PATH  # "old" way specifying subject
+        ["--files", TESTS_DATA_PATH],  # our new way with automated grouping
+        ["-d", f"{TESTS_DATA_PATH}/{{subject}}/*", "-s", "01-fmap_acq-3mm"],
+        # "old" way specifying subject
         # should produce the same results
     ],
 )
 @pytest.mark.skipif(Dataset is None, reason="no datalad")
 def test_reproin_largely_smoke(tmpdir, heuristic, invocation):
     is_bids = True if heuristic == "reproin" else False
-    arg = "--random-seed 1 -f %s -c dcm2niix -o %s" % (heuristic, tmpdir)
+    args = ["--random-seed", "1", "-f", heuristic, "-c", "dcm2niix", "-o", str(tmpdir)]
     if is_bids:
-        arg += " -b"
-    arg += " --datalad "
-    args = (arg + invocation).split(" ")
+        args.append("-b")
+    args.append("--datalad")
+    args.extend(invocation)
 
     # Test some safeguards
-    if invocation == "--files %s" % TESTS_DATA_PATH:
+    if invocation[0] == "--files":
         # Multiple subjects must not be specified -- only a single one could
         # be overridden from the command line
         with pytest.raises(ValueError):
@@ -109,13 +117,13 @@ def test_reproin_largely_smoke(tmpdir, heuristic, invocation):
 @pytest.mark.parametrize(
     "invocation",
     [
-        "--files %s" % TESTS_DATA_PATH,  # our new way with automated grouping
+        ["--files", TESTS_DATA_PATH],  # our new way with automated grouping
     ],
 )
 def test_scans_keys_reproin(tmpdir, invocation):
-    args = "-f reproin -c dcm2niix -o %s -b " % (tmpdir)
+    args = ["-f", "reproin", "-c", "dcm2niix", "-o", str(tmpdir), "-b"]
     args += invocation
-    runner(args.split())
+    runner(args)
     # for now check it exists
     scans_keys = glob(pjoin(tmpdir.strpath, "*/*/*/*/*/*.tsv"))
     assert len(scans_keys) == 1
@@ -134,7 +142,7 @@ def test_scans_keys_reproin(tmpdir, invocation):
 
 @patch("sys.stdout", new_callable=StringIO)
 def test_ls(stdout):
-    args = ("-f reproin --command ls --files %s" % (TESTS_DATA_PATH)).split(" ")
+    args = ["-f", "reproin", "--command", "ls", "--files", TESTS_DATA_PATH]
     runner(args)
     out = stdout.getvalue()
     assert "StudySessionInfo(locator=" in out
@@ -143,7 +151,7 @@ def test_ls(stdout):
 
 def test_scout_conversion(tmpdir):
     tmppath = tmpdir.strpath
-    args = ("-b -f reproin --files %s" % (TESTS_DATA_PATH)).split(" ") + ["-o", tmppath]
+    args = ["-b", "-f", "reproin", "--files", TESTS_DATA_PATH, "-o", tmppath]
     runner(args)
 
     dspath = Path(tmppath) / "Halchenko/Yarik/950_bids_test4"
@@ -174,12 +182,15 @@ def test_scout_conversion(tmpdir):
 )
 def test_notop(tmpdir, bidsoptions):
     tmppath = tmpdir.strpath
-    args = (
-        ("-f reproin --files %s" % (TESTS_DATA_PATH)).split(" ")
-        + ["-o", tmppath]
-        + ["-b"]
-        + bidsoptions
-    )
+    args = [
+        "-f",
+        "reproin",
+        "--files",
+        TESTS_DATA_PATH,
+        "-o",
+        tmppath,
+        "-b",
+    ] + bidsoptions
     runner(args)
 
     assert op.exists(pjoin(tmppath, "Halchenko/Yarik/950_bids_test4"))
@@ -201,10 +212,19 @@ def test_notop(tmpdir, bidsoptions):
 def test_phoenix_doc_conversion(tmpdir):
     tmppath = tmpdir.strpath
     subID = "Phoenix"
-    args = (
-        "-c dcm2niix -o %s -b -f bids_PhoenixReport --files %s -s %s"
-        % (tmpdir, pjoin(TESTS_DATA_PATH, "Phoenix"), subID)
-    ).split(" ")
+    args = [
+        "-c",
+        "dcm2niix",
+        "-o",
+        str(tmpdir),
+        "-b",
+        "-f",
+        "bids_PhoenixReport",
+        "--files",
+        pjoin(TESTS_DATA_PATH, "Phoenix"),
+        "-s",
+        subID,
+    ]
     runner(args)
 
     # check that the Phoenix document has been extracted (as gzipped dicom) in
