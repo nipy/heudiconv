@@ -20,18 +20,18 @@ def filter_dicom(dcmdata):
 def extract_moco_params(basename, _outypes, dicoms):
     if "_rec-dico" not in basename:
         return
-    from pydicom import read_file as dcm_read
+    from pydicom import dcmread
 
     # get acquisition time for all dicoms
     dcm_times = [
-        (d, float(dcm_read(d, stop_before_pixels=True).AcquisitionTime)) for d in dicoms
+        (d, float(dcmread(d, stop_before_pixels=True).AcquisitionTime)) for d in dicoms
     ]
     # store MoCo info from image comments sorted by acquisition time
     moco = [
         "\t".join(
             [
                 str(float(i))
-                for i in dcm_read(fn, stop_before_pixels=True)
+                for i in dcmread(fn, stop_before_pixels=True)
                 .ImageComments.split()[1]
                 .split(",")
             ]

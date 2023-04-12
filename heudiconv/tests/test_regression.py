@@ -118,7 +118,7 @@ def test_grouping(tmpdir, subject):
     dicoms = [op.join(TESTS_DATA_PATH, fl) for fl in ["axasc35.dcm", "phantom.dcm"]]
     # ensure DICOMs are different studies
     studyuids = {
-        dcm.read_file(fl, stop_before_pixels=True).StudyInstanceUID for fl in dicoms
+        dcm.dcmread(fl, stop_before_pixels=True).StudyInstanceUID for fl in dicoms
     }
     assert len(studyuids) == len(dicoms)
     # symlink to common location

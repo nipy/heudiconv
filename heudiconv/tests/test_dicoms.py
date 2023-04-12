@@ -26,7 +26,7 @@ DICOM_FIELDS_TO_TEST = {"ProtocolName": "tProtocolName"}
 
 def test_private_csa_header(tmp_path: Path) -> None:
     dcm_file = op.join(TESTS_DATA_PATH, "axasc35.dcm")
-    dcm_data = dcm.read_file(dcm_file, stop_before_pixels=True)
+    dcm_data = dcm.dcmread(dcm_file, stop_before_pixels=True)
     for pub, priv in DICOM_FIELDS_TO_TEST.items():
         # ensure missing public tag
         with pytest.raises(AttributeError):

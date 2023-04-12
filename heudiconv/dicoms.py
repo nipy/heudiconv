@@ -360,7 +360,7 @@ def get_reproducible_int(dicom_list: List[str]) -> int:
     """
     import calendar
 
-    dicom = dcm.read_file(dicom_list[0], stop_before_pixels=True, force=True)
+    dicom = dcm.dcmread(dicom_list[0], stop_before_pixels=True, force=True)
     dicom_datetime = get_datetime_from_dcm(dicom)
     if dicom_datetime:
         return calendar.timegm(dicom_datetime.timetuple())
