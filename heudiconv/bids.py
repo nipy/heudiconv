@@ -561,7 +561,7 @@ def get_formatted_scans_key_row(dcm_fn) -> typing.List[str]:
         [ISO acquisition time, performing physician name, random string]
 
     """
-    dcm_data = dcm.read_file(dcm_fn, stop_before_pixels=True, force=True)
+    dcm_data = dcm.dcmread(dcm_fn, stop_before_pixels=True, force=True)
     # we need to store filenames and acquisition datetimes
     acq_datetime = dicoms.get_datetime_from_dcm(dcm_data=dcm_data)
     # add random string
