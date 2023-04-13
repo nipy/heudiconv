@@ -12,6 +12,10 @@ lgr = logging.getLogger(__name__)
 
 
 def main(argv=None):
+    logging.basicConfig(
+        format="%(levelname)s: %(message)s",
+        level=getattr(logging, os.environ.get("HEUDICONV_LOG_LEVEL", "INFO")),
+    )
     parser = get_parser()
     args = parser.parse_args(argv)
     # exit if nothing to be done
