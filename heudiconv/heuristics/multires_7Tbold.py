@@ -29,7 +29,9 @@ def filter_dicom(dcmdata: dcm.dataset.Dataset) -> bool:
     return False
 
 
-def extract_moco_params(basename: str, _outypes, dicoms) -> None:
+def extract_moco_params(
+    basename: str, _outypes: tuple[str, ...], dicoms: list[str]
+) -> None:
     if "_rec-dico" not in basename:
         return
     from pydicom import dcmread

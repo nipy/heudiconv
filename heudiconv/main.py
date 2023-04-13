@@ -74,11 +74,11 @@ def process_extra_commands(
         Heudiconv command to run
     files : list of str
         List of files
-    heuristic : str
+    heuristic : str or None
         Path to heuristic file or name of builtin heuristic.
-    session : str
+    session : str or None
         Session identifier
-    subjs : list of str
+    subjs : None or list of str
         List of subject identifiers
     grouping : {'studyUID', 'accession_number', 'all', 'custom'}
         How to group dicoms.
@@ -203,7 +203,7 @@ def workflow(
     dicom_dir_template: Optional[str] = None,
     files: Optional[list[str]] = None,
     subjs: Optional[list[str]] = None,
-    converter: Optional[str] = "dcm2niix",
+    converter: str = "dcm2niix",
     outdir: str = ".",
     locator: Optional[str] = None,
     conv_outdir: Optional[str] = None,
@@ -242,10 +242,10 @@ def workflow(
         List of subjects - required for dicom template. If not
         provided, DICOMS would first be "sorted" and subject IDs
         deduced by the heuristic. Default is None.
-    converter : {'dcm2niix', None}, optional
-        Tool to use for DICOM conversion. Setting to None disables
+    converter : {'dcm2niix', 'none'}, optional
+        Tool to use for DICOM conversion. Setting to 'none' disables
         the actual conversion step -- useful for testing heuristics.
-        Default is None.
+        Default is 'dcm2niix'.
     outdir : str, optional
         Output directory for conversion setup (for further
         customization and future reference. This directory will refer

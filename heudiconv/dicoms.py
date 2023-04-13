@@ -628,7 +628,7 @@ def embed_dicom_and_nifti_metadata(
 
 
 def embed_metadata_from_dicoms(
-    bids_options: Optional[Any],
+    bids_options: Optional[str],
     item_dicoms: list[str],
     outname: str,
     outname_bids: str,

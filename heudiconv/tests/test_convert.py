@@ -259,8 +259,8 @@ def test_populate_intended_for(
         populate_intended_for_opts=getattr(
             heuristic_mod, "POPULATE_INTENDED_FOR_OPTS", None
         ),
-        with_prov=None,
-        bids_options=[],
+        with_prov=False,
+        bids_options="",
         outdir=outdir,
         min_meta=True,
         overwrite=False,

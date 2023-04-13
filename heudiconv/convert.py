@@ -2,14 +2,19 @@ from __future__ import annotations
 
 __docformat__ = "numpy"
 
+from collections.abc import Callable
 import logging
 import os
 import os.path as op
 import random
 import re
 import shutil
+import sys
+from types import ModuleType
+from typing import TYPE_CHECKING, Any, Optional
 
 import filelock
+from nipype import Node
 
 from .bids import (
     BIDS_VERSION,
@@ -43,6 +48,17 @@ from .utils import (
     write_config,
 )
 
+if TYPE_CHECKING:
+    if sys.version_info >= (3, 8):
+        from typing import TypedDict
+    else:
+        from type_extensions import TypedDict
+
+    class PopulateIntendedForOpts(TypedDict, total=False):
+        matching_parameters: str | list[str]
+        criterion: str
+
+
 LOCKFILE = "heudiconv.lock"
 DW_IMAGE_IN_FMAP_FOLDER_WARNING = (
     "Diffusion-weighted image saved in non dwi folder ({folder})"
@@ -50,8 +66,14 @@ DW_IMAGE_IN_FMAP_FOLDER_WARNING = (
 lgr = logging.getLogger(__name__)
 
 
-def conversion_info(subject, outdir, info, filegroup, ses):
-    convert_info = []
+def conversion_info(
+    subject: str,
+    outdir: str,
+    info: dict[tuple[str, tuple[str, ...], None], list],
+    filegroup: dict[str, list[str]],
+    ses: Optional[str],
+) -> list[tuple[str, tuple[str, ...], list[str]]]:
+    convert_info: list[tuple[str, tuple[str, ...], list[str]]] = []
     for key, items in info.items():
         if not items:
             continue
@@ -94,22 +116,22 @@ def conversion_info(subject, outdir, info, filegroup, ses):
 
 
 def prep_conversion(
-    sid,
-    dicoms,
-    outdir,
-    heuristic,
-    converter,
-    anon_sid,
-    anon_outdir,
-    with_prov,
-    ses,
-    bids_options,
-    seqinfo,
-    min_meta,
-    overwrite,
-    dcmconfig,
-    grouping,
-):
+    sid: Optional[str],
+    dicoms: Optional[list[str]],
+    outdir: str,
+    heuristic: ModuleType,
+    converter: str,
+    anon_sid: Optional[str],
+    anon_outdir: Optional[str],
+    with_prov: bool,
+    ses: str | int | None,
+    bids_options: Optional[str],
+    seqinfo: Optional[dict[SeqInfo, list[str]]],
+    min_meta: bool,
+    overwrite: bool,
+    dcmconfig: Optional[str],
+    grouping: str,
+) -> None:
     if dicoms:
         lgr.info("Processing %d dicoms", len(dicoms))
     elif seqinfo:
@@ -127,6 +149,8 @@ def prep_conversion(
             ses = sanitize_label(ses)
 
     if not anon_sid:
+        if sid is None:
+            raise ValueError("Neither 'sid' nor 'anon_sid' is true")
         anon_sid = sid
     if not anon_outdir:
         anon_outdir = outdir
@@ -174,6 +198,7 @@ def prep_conversion(
             "has changed"
         )
 
+    info: dict[tuple[str, tuple[str, ...], None], list]
     if reuse_conversion_table:
         lgr.info("Reloading existing filegroup.json " "because %s exists", edit_file)
         info = read_config(edit_file)
@@ -196,6 +221,8 @@ def prep_conversion(
                 flatten=True,
                 custom_grouping=getattr(heuristic, "grouping", None),
             )
+        elif seqinfo is None:
+            raise ValueError("Neither 'dicoms' nor 'seqinfo' is given")
 
         seqinfo_list = list(seqinfo.keys())
         filegroup = {si.series_id: x for si, x in seqinfo.items()}
@@ -254,7 +281,7 @@ def prep_conversion(
                 "to a value in seconds. If this process hangs, it may "
                 "require a manual deletion of the {0}.".format(lockfile)
             )
-        timeout = os.getenv("HEUDICONV_LOCKFILE_TIMEOUT", -1)
+        timeout = float(os.getenv("HEUDICONV_LOCKFILE_TIMEOUT", -1))
         with filelock.SoftFileLock(lockfile, timeout=timeout):
             if seqinfo:
                 keys = list(seqinfo)
@@ -266,7 +293,7 @@ def prep_conversion(
             )
 
 
-def update_complex_name(metadata, filename):
+def update_complex_name(metadata, filename: str) -> str:
     """
     Insert `_part-<mag|phase>` entity into filename if data are from a
     sequence with magnitude/phase part.
@@ -300,9 +327,10 @@ def update_complex_name(metadata, filename):
         return filename
 
     # Check to see if it is magnitude or phase part:
-    if "M" in metadata.get("ImageType"):
+    img_type = metadata.get("ImageType", "")
+    if "M" in img_type:
         mag_or_phase = "mag"
-    elif "P" in metadata.get("ImageType"):
+    elif "P" in img_type:
         mag_or_phase = "phase"
     else:
         raise RuntimeError("Data type could not be inferred from the metadata.")
@@ -342,7 +370,7 @@ def update_complex_name(metadata, filename):
     return filename
 
 
-def update_multiecho_name(metadata, filename, echo_times):
+def update_multiecho_name(metadata, filename: str, echo_times) -> str:
     """
     Insert `_echo-<num>` entity into filename if data are from a multi-echo
     sequence.
@@ -422,7 +450,7 @@ def update_multiecho_name(metadata, filename, echo_times):
     return filename
 
 
-def update_uncombined_name(metadata, filename, channel_names):
+def update_uncombined_name(metadata, filename: str, channel_names) -> str:
     """
     Insert `_ch-<num>` entity into filename if data are from a sequence
     with "save uncombined".
@@ -443,7 +471,7 @@ def update_uncombined_name(metadata, filename, channel_names):
         Updated filename with ch entity added, if appropriate.
     """
     # In case any scan types separate channels differently
-    unsupported_types = []
+    unsupported_types: list[str] = []
     if any(ut in filename for ut in unsupported_types):
         return filename
 
@@ -455,8 +483,8 @@ def update_uncombined_name(metadata, filename, channel_names):
     # Determine the channel number
     channel_number = "".join([c for c in metadata["CoilString"] if c.isdigit()])
     if not channel_number:
-        channel_number = channel_names.index(metadata["CoilString"]) + 1
-    channel_number = str(channel_number).zfill(2)
+        channel_number = str(channel_names.index(metadata["CoilString"]) + 1)
+    channel_number = channel_number.zfill(2)
 
     # Determine scan suffix
     filetype = "_" + filename.split("_")[-1]
@@ -485,24 +513,24 @@ def update_uncombined_name(metadata, filename, channel_names):
 
 
 def convert(
-    items,
-    converter,
-    scaninfo_suffix,
-    custom_callable,
-    with_prov,
-    bids_options,
-    outdir,
-    min_meta,
-    overwrite,
-    symlink=True,
-    prov_file=None,
-    dcmconfig=None,
-    populate_intended_for_opts=None,
-):
+    items: list[tuple[str, tuple[str, ...], list[str]]],
+    converter: str,
+    scaninfo_suffix: str,
+    custom_callable: Optional[Callable[[str, tuple[str, ...], list[str]], Any]],
+    with_prov: bool,
+    bids_options: Optional[str],
+    outdir: str,
+    min_meta: bool,
+    overwrite: bool,
+    symlink: bool = True,
+    prov_file: Optional[str] = None,
+    dcmconfig: Optional[str] = None,
+    populate_intended_for_opts: Optional[PopulateIntendedForOpts] = None,
+) -> None:
     """Perform actual conversion (calls to converter etc) given info from
     heuristic's `infotodict`
     """
-    prov_files = []
+    prov_files: list[str] = []
     tempdirs = TempDirs()
 
     if bids_options is not None:
@@ -522,10 +550,7 @@ def convert(
         )
 
     for item in items:
-        prefix, outtypes, item_dicoms = item[:3]
-        if not isinstance(outtypes, (list, tuple)):
-            outtypes = (outtypes,)
-
+        prefix, outtypes, item_dicoms = item
         prefix_dirname = op.dirname(prefix)
         outname_bids = prefix + ".json"
         bids_outfiles = []
@@ -533,7 +558,7 @@ def convert(
         outname = ""
         scaninfo = ""
         lgr.info(
-            "Converting %s (%d DICOMs) -> %s . " "Converter: %s . Output types: %s",
+            "Converting %s (%d DICOMs) -> %s . Converter: %s . Output types: %s",
             prefix,
             len(item_dicoms),
             prefix_dirname,
@@ -568,9 +593,7 @@ def convert(
                     overwrite,
                 )
             elif outtype in ["nii", "nii.gz"]:
-                assert converter == "dcm2niix", "Invalid converter " "{}".format(
-                    converter
-                )
+                assert converter == "dcm2niix", f"Invalid converter {converter}"
                 due.cite(
                     Doi("10.1016/j.jneumeth.2016.03.001"),
                     path="dcm2niix",
@@ -655,20 +678,21 @@ def convert(
         # combinations from the outname in each item:
         outnames = [item[0] for item in items]
         # - grab "sub-<sID>[/ses-<ses>]", and keep only unique ones:
-        try:
-            sessions = set(
-                re.search(
-                    "sub-(?P<subj>[a-zA-Z0-9]*)([{0}_]ses-(?P<ses>[a-zA-Z0-9]*))?".format(
-                        op.sep
-                    ),
-                    oname,
-                ).group(0)
-                for oname in outnames
+        sessions: set[str] = set()
+        for oname in outnames:
+            m = re.search(
+                "sub-(?P<subj>[a-zA-Z0-9]*)([{0}_]ses-(?P<ses>[a-zA-Z0-9]*))?".format(
+                    op.sep
+                ),
+                oname,
             )
-        except AttributeError:
-            # "sub-<sID>[/ses-<ses>]" is not present, so this is not BIDS compliant
-            # and it doesn't make sense to add "IntendedFor":
-            sessions = set()
+            if m:
+                sessions.add(m.group(0))
+            else:
+                # "sub-<sID>[/ses-<ses>]" is not present, so this is not BIDS
+                # compliant and it doesn't make sense to add "IntendedFor":
+                sessions.clear()
+                break
 
         for ses in sessions:
             session_path = op.join(outdir, ses)
@@ -676,16 +700,22 @@ def convert(
 
 
 def convert_dicom(
-    item_dicoms, bids_options, prefix, outdir, tempdirs, _symlink, overwrite
-):
+    item_dicoms: list[str],
+    bids_options: Optional[str],
+    prefix: str,
+    outdir: str,
+    tempdirs: TempDirs,
+    _symlink: bool,
+    overwrite: bool,
+) -> None:
     """Save DICOMs as output (default is by symbolic link)
 
     Parameters
     ----------
     item_dicoms : list of filenames
         DICOMs to save
-    bids_options : list or None
-        If not None then save to BIDS format. List may be empty
+    bids_options : str or None
+        If not None then save to BIDS format. String may be empty
         or contain bids specific options
     prefix : string
         Conversion outname
@@ -731,8 +761,13 @@ def convert_dicom(
 
 
 def nipype_convert(
-    item_dicoms, prefix, with_prov, bids_options, tmpdir, dcmconfig=None
-):
+    item_dicoms: list[str],
+    prefix: str,
+    with_prov: bool,
+    bids_options: Optional[str],
+    tmpdir: str,
+    dcmconfig: Optional[str] = None,
+) -> tuple[Node, Optional[str]]:
     """
     Converts DICOMs grouped from heuristic using Nipype's Dcm2niix interface.
 
@@ -744,9 +779,9 @@ def nipype_convert(
         Heuristic output path
     with_prov : bool
         Store provenance information
-    bids_options : list or None
+    bids_options : str or None
         If not None then output BIDS sidecar JSONs
-        List may contain bids specific options
+        String may contain bids specific options
     tmpdir : str
         Conversion working directory
     dcmconfig : str, optional
@@ -758,10 +793,10 @@ def nipype_convert(
         from nipype import config
 
         config.enable_provenance()
-    from nipype import Node
     from nipype.interfaces.dcm2nii import Dcm2niix
 
-    item_dicoms = list(map(op.abspath, item_dicoms))  # absolute paths
+    # <https://github.com/python/mypy/issues/9864>
+    item_dicoms = list(map(op.abspath, item_dicoms))  # type: ignore[arg-type]
 
     fromfile = dcmconfig if dcmconfig else None
     if fromfile:
@@ -797,8 +832,14 @@ def nipype_convert(
 
 
 def save_converted_files(
-    res, item_dicoms, bids_options, outtype, prefix, outname_bids, overwrite
-):
+    res: Node,
+    item_dicoms: list[str],
+    bids_options: Optional[str],
+    outtype: str,
+    prefix: str,
+    outname_bids: str,
+    overwrite: bool,
+) -> list[str]:
     """Copy converted files from tempdir to output directory.
 
     Will rename files if necessary.
@@ -824,12 +865,12 @@ def save_converted_files(
 
     prefix_dirname, prefix_basename = op.split(prefix)
 
-    bids_outfiles = []
+    bids_outfiles: list[str] = []
     res_files = res.outputs.converted_files
 
     if not len(res_files):
         lgr.debug("DICOMs {} were not converted".format(item_dicoms))
-        return
+        return []
 
     if isdefined(res.outputs.bvecs) and isdefined(res.outputs.bvals):
         if prefix_dirname.endswith("dwi"):
@@ -917,8 +958,8 @@ def save_converted_files(
         is_complex = (
             "M" in image_types and "P" in image_types
         )  # Determine if data are complex (magnitude + phase)
-        echo_times = sorted(echo_times)  # also converts to list
-        channel_names = sorted(channel_names)  # also converts to list
+        echo_times_lst = sorted(echo_times)  # also converts to list
+        channel_names_lst = sorted(channel_names)  # also converts to list
 
         ### Loop through the bids_files, set the output name and save files
         for fl, suffix, bids_file, bids_meta in zip(
@@ -934,7 +975,7 @@ def save_converted_files(
             if bids_file:
                 if is_multiecho:
                     this_prefix_basename = update_multiecho_name(
-                        bids_meta, this_prefix_basename, echo_times
+                        bids_meta, this_prefix_basename, echo_times_lst
                     )
 
                 if is_complex:
@@ -944,7 +985,7 @@ def save_converted_files(
 
                 if is_uncombined:
                     this_prefix_basename = update_uncombined_name(
-                        bids_meta, this_prefix_basename, channel_names
+                        bids_meta, this_prefix_basename, channel_names_lst
                     )
 
             # Fallback option:
@@ -977,7 +1018,7 @@ def save_converted_files(
     return bids_outfiles
 
 
-def add_taskname_to_infofile(infofiles):
+def add_taskname_to_infofile(infofiles: str | list[str]) -> None:
     """Add the "TaskName" field to json files with _task- entity in the name.
 
     Note: _task- entity could be present not only in functional data
@@ -990,18 +1031,15 @@ def add_taskname_to_infofile(infofiles):
     """
 
     # in case they pass a string with a path:
-    if not isinstance(infofiles, list):
+    if isinstance(infofiles, str):
         infofiles = [infofiles]
 
     for infofile in infofiles:
         meta_info = load_json(infofile)
-        try:
-            meta_info["TaskName"] = (
-                re.search(r"(?<=_task-)\w+", op.basename(infofile))
-                .group(0)
-                .split("_")[0]
-            )
-        except AttributeError:
+        m = re.search(r"(?<=_task-)\w+", op.basename(infofile))
+        if m:
+            meta_info["TaskName"] = m.group(0).split("_")[0]
+        else:
             # leave it to bids-validator to validate/inform about presence
             # of required entities/fields.
             continue
@@ -1010,7 +1048,7 @@ def add_taskname_to_infofile(infofiles):
         save_json(infofile, meta_info)
 
 
-def bvals_are_zero(bval_file):
+def bvals_are_zero(bval_file: str) -> bool:
     """Checks if all entries in a bvals file are zero (or 5, for Siemens files).
 
     Parameters

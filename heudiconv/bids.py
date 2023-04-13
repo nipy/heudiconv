@@ -13,6 +13,7 @@ import hashlib
 import logging
 import os
 import os.path as op
+from pathlib import Path
 import re
 from typing import Any, Optional
 import warnings
@@ -461,7 +462,9 @@ def find_subj_ses(f_name: str) -> tuple[Optional[str], Optional[str]]:
     return res.get("subj", None), res.get("ses", None)
 
 
-def save_scans_key(item, bids_files: list[str]) -> None:
+def save_scans_key(
+    item: tuple[str, tuple[str, ...], list[str]], bids_files: list[str]
+) -> None:
     """
     Parameters
     ----------
@@ -555,11 +558,11 @@ def add_rows_to_scans_keys_file(fn: str, newrows: dict[str, list[str]]) -> None:
         writer.writerows([header] + data_rows_sorted)
 
 
-def get_formatted_scans_key_row(dcm_fn) -> list[str]:
+def get_formatted_scans_key_row(dcm_fn: str | Path) -> list[str]:
     """
     Parameters
     ----------
-    item
+    dcm_fn: str
 
     Returns
     -------
@@ -1186,7 +1189,7 @@ def sanitize_label(label: str) -> str:
     clean_label = "".join(x for x in label if x.isalnum())
     if not clean_label:
         raise ValueError(
-            "Label became empty after cleanup.  Please provide manually "
+            "Label became empty after cleanup.  Please manually provide "
             "a suitable alphanumeric label."
         )
     if clean_label != label:
