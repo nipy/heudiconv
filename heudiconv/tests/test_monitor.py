@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Iterable, Iterator
 import os.path as op
 from pathlib import Path
-from typing import NamedTuple, Optional
+import sys
+from typing import TYPE_CHECKING, Any, Generic, NamedTuple, Optional, TypeVar
 from unittest.mock import patch
 
 import pytest
@@ -41,23 +43,33 @@ except AttributeError:
     pytestmark = pytest.mark.skip(reason="Unable to import inotify")
 
 
-class MockInotifyTree:
-    def __init__(self, events):
-        self.events = iter(events)
+if TYPE_CHECKING:
+    if sys.version_info >= (3, 11):
+        from typing import Self
+    else:
+        from typing_extensions import Self
 
-    def event_gen(self):
+
+T = TypeVar("T")
+
+
+class MockInotifyTree(Generic[T]):
+    def __init__(self, events: Iterable[T]) -> None:
+        self.events: Iterator[T] = iter(events)
+
+    def event_gen(self) -> Iterator[T]:
         for e in self.events:
             yield e
 
-    def __call__(self, _topdir):
+    def __call__(self, _topdir: Any) -> Self:
         return self
 
 
 class MockTime:
-    def __init__(self, time):
+    def __init__(self, time: float) -> None:
         self.time = time
 
-    def __call__(self):
+    def __call__(self) -> float:
         return self.time
 
 
