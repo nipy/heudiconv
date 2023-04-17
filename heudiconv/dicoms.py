@@ -20,6 +20,7 @@ with warnings.catch_warnings():
 
 lgr = logging.getLogger(__name__)
 total_files = 0
+compresslevel = 9
 
 
 def create_seqinfo(mw, series_files, series_id):
@@ -459,7 +460,8 @@ def compress_dicoms(dicom_list, out_prefix, tempdirs, overwrite):
         try:
             if op.lexists(outtar):
                 os.unlink(outtar)
-            with tarfile.open(outtar, "w:gz", dereference=True) as tar:
+            with tarfile.open(outtar, "w:gz", compresslevel=compresslevel,
+                              dereference=True) as tar:
                 for filename in dicom_list:
                     outfile = op.join(tmpdir, op.basename(filename))
                     if not op.islink(outfile):
