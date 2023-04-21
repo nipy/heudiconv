@@ -3,9 +3,11 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 
-df = pd.read_csv('../pypi-bigquery-results.csv',
-    index_col=1,
-    parse_dates=True,
+filename = os.path.splitext(os.path.basename(__file__))[0]
+
+df = pd.read_csv('../data/pypi-bigquery-results.csv',
+	index_col=1,
+	parse_dates=True,
 )
 # df.rename(columns={"num_downloads": "downloads"})
 df['rolling average'] = df.rolling(40).mean()
@@ -18,4 +20,5 @@ import matplotlib.pyplot as plt
 ax = df[['downloads/week']].plot(style='.', markersize=3)
 df[['rolling average']].plot(ax=ax, style='-')
 plt.yscale('log')
-plt.show()
+
+plt.savefig(os.path.join('..','figs',f'{filename}.pdf'))
