@@ -1,7 +1,6 @@
 import os
 import pandas as pd
 import seaborn as sns
-import matplotlib
 import matplotlib.pyplot as plt
 sns.set_theme(style='whitegrid')
 
@@ -11,17 +10,18 @@ df = pd.read_csv('../data/pypi-bigquery-results.csv',
 	index_col=1,
 	parse_dates=True,
 	)
-df['year'] = df.index.year
-df['month'] = df.index.month
-df['week'] = df.index
-df['Year'] = [f"{a}-{b}" for a,b in zip(df["year"],df["month"])]
-df['Year'] = pd.to_datetime(df['Year'], infer_datetime_format=True)
-df['week'] = pd.to_datetime(df['week'], infer_datetime_format=True)
 df = df.rename(columns={'num_downloads':'Weekly Downloads'})
-ax = sns.lineplot(data=df,
-	x="Year",
-	y="Weekly Downloads",
-	markers=True, dashes=False,
+df['Year'] = df.index.year
+df['Month'] = df.index.month
+
+# Only whole years, hard-coding for now.
+df = df[~df['Year'].isin([2017,2023])]
+
+sns.swarmplot(data=df,
+	x='Month',
+	y='Weekly Downloads',
+	hue='Year',
+	palette='flare',
 	)
 plt.yscale('log')
 
