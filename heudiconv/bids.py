@@ -718,11 +718,13 @@ def get_key_info_for_fmap_assignment(
         key_info = [get_shim_setting(json_file)]
     elif matching_parameter == "ImagingVolume":
         from nibabel import load as nb_load
+        from nibabel.nifti1 import Nifti1Header
 
         nifti_files = glob(remove_suffix(json_file, ".json") + ".nii*")
         assert len(nifti_files) == 1
         nifti_file = nifti_files[0]
         nifti_header = nb_load(nifti_file).header
+        assert isinstance(nifti_header, Nifti1Header)
         key_info = [nifti_header.get_best_affine(), nifti_header.get_data_shape()[:3]]
     elif matching_parameter == "ModalityAcquisitionLabel":
         # Check the acq label for the fmap and the modality for others:
