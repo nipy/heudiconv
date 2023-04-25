@@ -632,7 +632,7 @@ def embed_metadata_from_dicoms(
     item_dicoms: list[str],
     outname: str,
     outname_bids: str,
-    prov_file: str,
+    prov_file: Optional[str],
     scaninfo: str,
     tempdirs: TempDirs,
     with_prov: bool,
@@ -702,6 +702,7 @@ def embed_metadata_from_dicoms(
         res = embedfunc.run()
         set_readonly(scaninfo)
         if with_prov:
+            assert isinstance(prov_file, str)
             g = res.provenance.rdf()
             g.parse(prov_file, format="turtle")
             g.serialize(prov_file, format="turtle")
