@@ -100,7 +100,7 @@ def test_update_multiecho_name() -> None:
     # Providing echo times as something other than a list should raise a TypeError
     base_fn = "sub-X_ses-Y_task-Z_run-01_bold"
     with pytest.raises(TypeError):
-        update_multiecho_name(metadata, base_fn, set(echo_times))
+        update_multiecho_name(metadata, base_fn, set(echo_times))  # type: ignore[arg-type]
 
 
 def test_update_uncombined_name() -> None:
@@ -139,7 +139,7 @@ def test_update_uncombined_name() -> None:
     # Providing echo times as something other than a list should raise a TypeError
     base_fn = "sub-X_ses-Y_task-Z_run-01_bold"
     with pytest.raises(TypeError):
-        update_uncombined_name(metadata, base_fn, set(channel_names))
+        update_uncombined_name(metadata, base_fn, set(channel_names))  # type: ignore[arg-type]
 
 
 def test_b0dwi_for_fmap(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:

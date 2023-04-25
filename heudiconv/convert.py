@@ -11,7 +11,7 @@ import re
 import shutil
 import sys
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, List, Optional, cast
 
 import filelock
 from nipype import Node
@@ -293,7 +293,7 @@ def prep_conversion(
             )
 
 
-def update_complex_name(metadata, filename: str) -> str:
+def update_complex_name(metadata: dict[str, Any], filename: str) -> str:
     """
     Insert `_part-<mag|phase>` entity into filename if data are from a
     sequence with magnitude/phase part.
@@ -327,7 +327,7 @@ def update_complex_name(metadata, filename: str) -> str:
         return filename
 
     # Check to see if it is magnitude or phase part:
-    img_type = metadata.get("ImageType", "")
+    img_type = cast(List[str], metadata.get("ImageType", []))
     if "M" in img_type:
         mag_or_phase = "mag"
     elif "P" in img_type:
@@ -370,7 +370,9 @@ def update_complex_name(metadata, filename: str) -> str:
     return filename
 
 
-def update_multiecho_name(metadata, filename: str, echo_times) -> str:
+def update_multiecho_name(
+    metadata: dict[str, Any], filename: str, echo_times: list[float]
+) -> str:
     """
     Insert `_echo-<num>` entity into filename if data are from a multi-echo
     sequence.
@@ -412,6 +414,7 @@ def update_multiecho_name(metadata, filename: str, echo_times) -> str:
     # Get the EchoNumber from json file info.  If not present, use EchoTime.
     if "EchoNumber" in metadata.keys():
         echo_number = metadata["EchoNumber"]
+        assert isinstance(echo_number, int)
     elif "EchoTime" in metadata.keys():
         echo_number = echo_times.index(metadata["EchoTime"]) + 1
     else:
@@ -450,7 +453,9 @@ def update_multiecho_name(metadata, filename: str, echo_times) -> str:
     return filename
 
 
-def update_uncombined_name(metadata, filename: str, channel_names) -> str:
+def update_uncombined_name(
+    metadata: dict[str, Any], filename: str, channel_names: list[str]
+) -> str:
     """
     Insert `_ch-<num>` entity into filename if data are from a sequence
     with "save uncombined".
@@ -481,9 +486,11 @@ def update_uncombined_name(metadata, filename: str, channel_names) -> str:
         )
 
     # Determine the channel number
-    channel_number = "".join([c for c in metadata["CoilString"] if c.isdigit()])
+    coil_string = metadata["CoilString"]
+    assert isinstance(coil_string, str)
+    channel_number = "".join(c for c in coil_string if c.isdigit())
     if not channel_number:
-        channel_number = str(channel_names.index(metadata["CoilString"]) + 1)
+        channel_number = str(channel_names.index(coil_string) + 1)
     channel_number = channel_number.zfill(2)
 
     # Determine scan suffix
@@ -939,15 +946,24 @@ def save_converted_files(
         #   echo times for all bids_files and see if they are all the same or not.
 
         # Collect some metadata across all images
-        echo_times, channel_names, image_types = set(), set(), set()
+        echo_times: set[float] = set()
+        channel_names: set[str] = set()
+        image_types: set[str] = set()
         for metadata in bids_metas:
             if not metadata:
                 continue
-
-            # If the field is not available, fill that entry in the set with a False.
-            echo_times.add(metadata.get("EchoTime", False))
-            channel_names.add(metadata.get("CoilString", False))
-            image_types.update(metadata.get("ImageType", [False]))
+            try:
+                echo_times.add(metadata["EchoTime"])
+            except KeyError:
+                pass
+            try:
+                channel_names.add(metadata["CoilString"])
+            except KeyError:
+                pass
+            try:
+                image_types.update(metadata["ImageType"])
+            except KeyError:
+                pass
 
         is_multiecho = (
             len(set(filter(bool, echo_times))) > 1
