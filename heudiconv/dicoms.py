@@ -32,14 +32,12 @@ lgr = logging.getLogger(__name__)
 total_files = 0
 
 
-def create_seqinfo(
-    mw: dw.MosaicWrapper, series_files: list[str], series_id: str
-) -> SeqInfo:
+def create_seqinfo(mw: dw.Wrapper, series_files: list[str], series_id: str) -> SeqInfo:
     """Generate sequence info
 
     Parameters
     ----------
-    mw: MosaicWrapper
+    mw: Wrapper
     series_files: list
     series_id: str
     """
