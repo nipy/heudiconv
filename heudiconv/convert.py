@@ -124,7 +124,7 @@ def prep_conversion(
     anon_sid: Optional[str],
     anon_outdir: Optional[str],
     with_prov: bool,
-    ses: str | int | None,
+    ses: Optional[str],
     bids_options: Optional[str],
     seqinfo: Optional[dict[SeqInfo, list[str]]],
     min_meta: bool,

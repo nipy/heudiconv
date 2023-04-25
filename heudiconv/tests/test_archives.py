@@ -51,7 +51,7 @@ def test_get_extracted_dicoms_multple_session_integers(
         for session, _ in get_extracted_dicoms(get_dicoms_gztar + get_dicoms_gztar)
     ]
 
-    assert sessions == [0, 1]
+    assert sessions == ["0", "1"]
 
 
 @pytest.mark.parametrize(

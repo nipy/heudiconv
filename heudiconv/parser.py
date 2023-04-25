@@ -70,7 +70,7 @@ def find_files(
             yield path
 
 
-def get_extracted_dicoms(fl: Iterable[str]) -> ItemsView[Optional[int], list[str]]:
+def get_extracted_dicoms(fl: Iterable[str]) -> ItemsView[Optional[str], list[str]]:
     """Given a collection of files and/or directories, list out and possibly
     extract the contents from archives.
 
@@ -81,7 +81,7 @@ def get_extracted_dicoms(fl: Iterable[str]) -> ItemsView[Optional[int], list[str
 
     Returns
     -------
-    ItemsView[int | None, list[str]]
+    ItemsView[str | None, list[str]]
         The absolute paths of (possibly newly extracted) files.
 
     Notes
@@ -105,7 +105,7 @@ def get_extracted_dicoms(fl: Iterable[str]) -> ItemsView[Optional[int], list[str
     the unarchived file. If there are multiple archived files, they are grouped
     into separate sessions.
     """
-    sessions: dict[Optional[int], list[str]] = defaultdict(list)
+    sessions: dict[Optional[str], list[str]] = defaultdict(list)
 
     # keep track of session manually to ensure that the variable is bound
     # when it is used after the loop (e.g., consider situation with
@@ -136,14 +136,14 @@ def get_extracted_dicoms(fl: Iterable[str]) -> ItemsView[Optional[int], list[str
             os.chmod(f, mode=0o700)
         # store full paths to each file, so we don't need to drag along
         # tmpdir as some basedir
-        sessions[session] = archive_content
+        sessions[str(session)] = archive_content
         session += 1
 
     if session == 1:
         # we had only 1 session (and at least 1), so not really multiple
         # sessions according to classical 'heudiconv' assumptions, thus
         # just move them all into None
-        sessions[None] += sessions.pop(0)
+        sessions[None] += sessions.pop("0")
 
     return sessions.items()
 

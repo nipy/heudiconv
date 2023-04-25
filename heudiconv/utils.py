@@ -78,7 +78,7 @@ class StudySessionInfo(NamedTuple):
     # StudyInstanceUID into some place within hierarchy
     locator: Optional[str]
 
-    session: Optional[str | int]
+    session: Optional[str]
 
     # should be some ID defined either in cmdline or deduced
     subject: Optional[str]
