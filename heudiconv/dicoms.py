@@ -9,7 +9,7 @@ import os.path as op
 from pathlib import Path
 import sys
 import tarfile
-from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, overload
+from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, cast, overload
 from unittest.mock import patch
 import warnings
 
@@ -261,7 +261,8 @@ def group_dicoms_into_seqinfos(
         if custom_grouping is None:
             raise RuntimeError("Custom grouping is not defined in heuristic")
         if callable(custom_grouping):
-            return custom_grouping(files, dcmfilter, SeqInfo)
+            return cast(Dict[SeqInfo, List[str]],
+                        custom_grouping(files, dcmfilter, SeqInfo))
         grouping = custom_grouping
         study_customgroup = None
 
