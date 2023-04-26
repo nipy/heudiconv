@@ -52,7 +52,7 @@ if TYPE_CHECKING:
     if sys.version_info >= (3, 8):
         from typing import TypedDict
     else:
-        from type_extensions import TypedDict
+        from typing_extensions import TypedDict
 
     class PopulateIntendedForOpts(TypedDict, total=False):
         matching_parameters: str | list[str]
