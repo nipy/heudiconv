@@ -285,7 +285,7 @@ def get_study_sessions(
                         "Existing study session with the same values (%r)."
                         " Skipping DICOMS %s",
                         study_session_info,
-                        *seqinfo.values(),
+                        seqinfo.values(),
                     )
                     continue
             study_sessions[study_session_info] = seqinfo
