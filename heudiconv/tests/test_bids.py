@@ -66,6 +66,7 @@ def test_maybe_na() -> None:
 
 
 def test_treat_age() -> None:
+    assert treat_age(None) is None
     assert treat_age(0) == "0"
     assert treat_age("0") == "0"
     assert treat_age("0000") == "0"

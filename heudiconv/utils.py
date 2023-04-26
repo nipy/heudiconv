@@ -57,18 +57,18 @@ class SeqInfo(NamedTuple):
     protocol_name: str  # 12
     is_motion_corrected: bool  # 13
     is_derived: bool  # 14
-    patient_id: Any  # 15
+    patient_id: Optional[str]  # 15
     study_description: str  # 16
     referring_physician_name: str  # 17
     series_description: str  # 18
     sequence_name: str  # 19
     image_type: tuple[str, ...]  # 20
     accession_number: str  # 21
-    patient_age: Any  # 22
-    patient_sex: Any  # 23
-    date: Any  # 24
-    series_uid: Any  # 25
-    time: Any  # 26
+    patient_age: Optional[str]  # 22
+    patient_sex: Optional[str]  # 23
+    date: Optional[str]  # 24
+    series_uid: Optional[str]  # 25
+    time: Optional[str]  # 26
 
 
 class StudySessionInfo(NamedTuple):
@@ -356,7 +356,7 @@ def treat_infofile(filename: str) -> None:
     set_readonly(filename)
 
 
-def slim_down_info(j: Any) -> Any:
+def slim_down_info(j: dict[str, Any]) -> dict[str, Any]:
     """Given an aggregated info structure, removes excessive details
 
     Such as CSA fields, and SourceImageSequence which on Siemens files could be

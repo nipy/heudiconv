@@ -103,8 +103,10 @@ def maybe_na(val: Any) -> str:
         return "n/a"
 
 
-def treat_age(age: str|float) -> str:
+def treat_age(age: str | float | None) -> str | None:
     """Age might encounter 'Y' suffix or be a float"""
+    if age is None:
+        return None  # might be converted to N/A by maybe_na
     agestr = str(age)
     if agestr.endswith("M"):
         agestr = agestr.rstrip("M")
@@ -367,7 +369,7 @@ def tuneup_bids_json_files(json_files: list[str]) -> None:
                 set_readonly(json_phasediffname)
 
 
-def add_participant_record(studydir: str, subject: str, age: str, sex: str) -> None:
+def add_participant_record(studydir: str, subject: str, age: str | None, sex: str | None) -> None:
     participants_tsv = op.join(studydir, "participants.tsv")
     participant_id = "sub-%s" % subject
 
