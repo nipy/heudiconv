@@ -72,20 +72,26 @@ def infotodict(
     }
     last_run = len(seqinfo)
     for s in seqinfo:
+        series_num_str = s.series_id.split('-', 1)[0]
+        if not series_num_str.isdecimal():
+            raise ValueError(
+                f"This heuristic can operate only on data when series_id has form <series-number>-<something else>, "
+                f"and <series-number> is a numeric number. Got series_id={s.series_id}")
+        series_num: int = int(series_num_str)
         sl, nt = (s.dim3, s.dim4)
         if (sl == 176) and (nt == 1) and ("MPRAGE" in s.protocol_name):
             info[t1] = [s.series_id]
         elif (nt > 60) and ("ge_func_2x2x2_Resting" in s.protocol_name):
             if not s.is_motion_corrected:
-                info[rs].append(int(s.series_id))
+                info[rs].append(s.series_id)
         elif (
             (nt == 156)
             and ("ge_functionals_128_PACE_ACPC-30" in s.protocol_name)
-            and s.series_id < last_run
+            and series_num < last_run
         ):
             if not s.is_motion_corrected:
                 info[boldt1].append(s.series_id)
-                last_run = s.series_id
+                last_run = series_num
         elif (nt == 155) and ("ge_functionals_128_PACE_ACPC-30" in s.protocol_name):
             if not s.is_motion_corrected:
                 info[boldt2].append(s.series_id)
@@ -96,7 +102,7 @@ def infotodict(
             if not s.is_motion_corrected:
                 info[boldt4].append(s.series_id)
         elif (nt == 156) and ("ge_functionals_128_PACE_ACPC-30" in s.protocol_name):
-            if not s.is_motion_corrected and (s.series_id > last_run):
+            if not s.is_motion_corrected and (series_num > last_run):
                 info[boldt5].append(s.series_id)
         elif (nt == 324) and ("ge_func_3.1x3.1x4_PACE" in s.protocol_name):
             if not s.is_motion_corrected:
