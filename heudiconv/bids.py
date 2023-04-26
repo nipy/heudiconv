@@ -103,7 +103,7 @@ def maybe_na(val: Any) -> str:
         return "n/a"
 
 
-def treat_age(age: Any) -> str:
+def treat_age(age: str|float) -> str:
     """Age might encounter 'Y' suffix or be a float"""
     agestr = str(age)
     if agestr.endswith("M"):

@@ -31,6 +31,7 @@ from typing import (
     Tuple,
     TypeVar,
     Union,
+    cast,
     overload,
 )
 
@@ -170,13 +171,13 @@ def create_file_if_missing(filename: str, content: str) -> bool:
     return True
 
 
-def read_config(infile: str) -> Any:
+def read_config(infile: str) -> dict:
     with open(infile, "r") as fp:
-        info = eval(fp.read())
+        info = cast(dict, eval(fp.read()))
     return info
 
 
-def write_config(outfile: str, info: Any) -> None:
+def write_config(outfile: str, info: dict) -> None:
     from pprint import PrettyPrinter
 
     with open(outfile, "w") as fp:
