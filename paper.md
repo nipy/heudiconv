@@ -59,13 +59,14 @@ HeuDiConv was created in 2014 to provide flexible tooling so that labs may rapid
 As manual file renaming and metadata reorganization is tedious and error prone, automation is preferable, and this is a consistent focus of HeuDiConv.
 
 Since the inception of HeuDiConv in 2014, the BIDS standard [@GAC+16] was established.
-This standard formalizes data file hierarchies and metadata storage in a fashion which, due to its community-driven nature, is both highly optimized and widely understood by analysis tools.
+BIDS standard formalizes data file hierarchies and metadata storage in a fashion which, due to its community-driven nature, is both highly optimized and widely understood by analysis tools.
 Since then, DICOM conversion to NIfTI files contained within a BIDS hierarchy has emerged as the most frequent use-case for HeuDiConv.
 
 # Overview of HeuDiConv functionality
 
-HeuDiConv was initially developed to implement common for every lab logic (groupping DICOMs, extraction of metadata, conversion of individual sequences, populating standard BIDS files, etc) while allowing individual groups to customize **how** files should be organized and named while driving custom decisions by the conventions and desires of those individual groups.
+HeuDiConv was initially developed to implement common for every lab logic (groupping DICOMs, extraction of metadata, conversion of individual sequences, populating standard BIDS files, etc.) while allowing individual groups to customize **how** files should be organized and named while driving custom decisions by the conventions and desires of those individual groups.
 Such decision making is implemented in *HeuDiConv heuristics*, which are implemented as Python modules following some minimalistic specified interfaces documented in HeuDiConv documentation (https://heudiconv.readthedocs.io/en/latest/heuristics.html).
+HeuDiConv, if instructed to operate in BIDS mode (`--bids` flag) after heuristic provides base naming instructions, takes care about correct placement of files in the hierarchy, naming of multi-echo and other split files, etc.
 
 ## Exemplar heuristics
 
