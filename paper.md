@@ -85,16 +85,13 @@ It is achieved by ensuring that reference MRI sequences on the instrumentation a
 
 In case of correct specification and absent operator errors, such as mis-typed subject or session IDs, it can be fully automated, and work is ongoing to make such deployments turnkey. Visit ReproIn project page http://reproin.repronim.org to discover more.
 
-# Adoption/Usage
+# Adoption and usage
 
-- HeuDiConv has [RRID:SCR_017427](https://scicrunch.org/resolver/RRID:SCR_017427) which mentions already [6 mentions in papers](https://scicrunch.org/resolver/SCR_017427/mentions?q=&i=rrid:scr_017427)
-- TODO: plot from etelem.csv (executions per week), add downloads from PyPI
-  
-- Over 40 datasets were converted using HeuDiConv with ReproIn heuristic over to BIDS at DBIC.
-
-- Used for PET data conversion [@JZC+21:PET], shared as OpenNeuro ds003382 [@openneuro.ds003382.v1.0.0]
-
-- Inspired development of `fw-heudiconv` (FlywheelTools: Software for HeuDiConv-Style BIDS Curation On Flywheel) [@TCB+21:fw-heudiconv] 
+HeuDiConv has [RRID:SCR_017427](https://scicrunch.org/resolver/RRID:SCR_017427) as of time of writing mentions already [6 mentions in papers](https://scicrunch.org/resolver/SCR_017427/mentions?q=&i=rrid:scr_017427).
+There is a growing number of downloads from PyPI and uses of HeuDiConv (see \autoref{fig:usage}).
+Over 40 BIDS datasets were converted using HeuDiConv with ReproIn heuristic over to BIDS at Dartmouth Brain Imaging Center (DBIC), where ReproIn heuristic being developed. 
+HeuDiConv was found to be used for PET data conversion [@JZC+21:PET], shared as OpenNeuro ds003382 [@openneuro.ds003382.v1.0.0].
+Moreover, HeuDiConv approach inspired development of `fw-heudiconv` (FlywheelTools: Software for HeuDiConv-Style BIDS Curation On Flywheel) [@TCB+21:fw-heudiconv].
 
 # External dependencies
 
