@@ -95,15 +95,15 @@ Moreover, HeuDiConv approach inspired development of `fw-heudiconv` (FlywheelToo
 
 # External dependencies
 
-TODO: add citations (if no official - check zenodor) and RRIDs (where known, discover using https://scicrunch.org/resources/data/source/nlx_144509-1/search)
+HeuDiConv uses specialized tools and libraries: 
 
-`dcm2niix` [@Li_2016] (RRID: TODO) is used for the conversion from DICOM to NIfTI and initial versions of sidecar .json files,
-`pydicom` [@TODO] (RRID: TODO) and `dcmstack` [@TODO] (RRID: TODO) for DICOM analysis and extraction of extra metadata to place to BIDS sidecar files,
-`nipype` [@TODO] (RRID: TODO) to interface `dcm2niix` and extra metadata invocations,
-and `datalad` [@datalad] ([RRID: SCR_003931](https://scicrunch.org/resolver/RRID:SCR_003931)) enables managing produced datasets as version controlled repositories.
-`etelemetry` and `filelock` are used as supplementary utilities,
-`neurodocker` [@TODO] ([RRID:SCR_017426](https://scicrunch.org/resources/data/record/nlx_144509-1/SCR_017426/resolver?q=dcm2niix&l=dcm2niix&i=rrid:scr_017426)) is used to produce `Dockerfile` from which docker images are built,
-and `pytest` formalizes unit and integration testing.
+- [`datalad`](https://datalad.org) [@datalad] ([RRID: SCR_003931](https://scicrunch.org/resolver/RRID:SCR_003931)) enables managing produced datasets as version controlled repositories.
+- [`dcm2niix`](https://github.com/rordenlab/dcm2niix) [@Li_2016] is used for the conversion from DICOM to NIfTI and initial versions of sidecar .json files,
+- [`etelemetry`](https://github.com/sensein/etelemetry-client) and [`filelock`](https://github.com/tox-dev/py-filelock) are used as supplementary utilities,
+- [`neurodocker`](https://github.com/ReproNim/neurodocker) [@zenodo:neurodocker] ([RRID:SCR_017426](https://scicrunch.org/resources/data/record/nlx_144509-1/SCR_017426/resolver?q=dcm2niix&l=dcm2niix&i=rrid:scr_017426)) is used to produce `Dockerfile` from which docker images are built,
+- [`nipype`](https://nipype.readthedocs.org/) [@nipype] ([RRID:SCR_002502](https://scicrunch.org/resources/data/record/nlx_144509-1/SCR_002502/resolver)) to interface `dcm2niix` and extra metadata invocations,
+- [`pydicom`](https://pydicom.github.io/) [@zenodo:pydicom] ([RRID:SCR_002573](https://scicrunch.org/resources/data/record/nlx_144509-1/SCR_002573/resolver)) and [`dcmstack`](https://github.com/moloney/dcmstack) for DICOM analysis and extraction of extra metadata to place to BIDS sidecar files,
+- [`pytest`](https://pytest.org) formalizes unit and integration testing.
 
 # Acknowledgments
 
@@ -111,7 +111,7 @@ We would like to extend our gratitude to
 ADD YOUR NAME HERE
 for notable contributions to the codebase, bug reports, recommendations, and promotion of HeuDiConv.
 
-HeuDiConv development was primarily done under the umbrella of the NIH funded ReproNim [1P41EB019936-01A1](https://projectreporter.nih.gov/project_info_details.cfm?aid=8999833&map=y) and [TODO - renewal](TODO) (PI: Kennedy).
-It also received contributions from the ...
+HeuDiConv development was primarily done under the umbrella of the NIH funded ReproNim [1P41EB019936-01A1](https://projectreporter.nih.gov/project_info_details.cfm?aid=8999833&map=y) and [2P41EB019936-06A1](https://projectreporter.nih.gov/project_info_details.cfm?aid=10334133&map=y) (PI: Kennedy).
+Contributions of TODO1 were supported by TODO1, ...
 
 # References
