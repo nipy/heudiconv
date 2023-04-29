@@ -194,6 +194,7 @@ def group_dicoms_into_seqinfos(
         dict[SeqInfo, list[str]],
     ]
     | None = None,
+    custom_seqinfo: CustomSeqinfoT | None = None,
 ) -> dict[Optional[str], dict[SeqInfo, list[str]]]:
     ...
 
@@ -212,7 +213,7 @@ def group_dicoms_into_seqinfos(
         dict[SeqInfo, list[str]],
     ]
     | None = None,
-     custom_seqinfo: CustomSeqinfoT | None = None,
+    custom_seqinfo: CustomSeqinfoT | None = None,
 ) -> dict[SeqInfo, list[str]]:
     ...
 
