@@ -20,8 +20,8 @@ with warnings.catch_warnings():
 
 lgr = logging.getLogger(__name__)
 total_files = 0
-# Might be monkey patched by user heuristic to tune desired compression level
-# Preferably do not move/rename unless 
+# Might be monkey patched by user heuristic to tune desired compression level.
+# Preferably do not move/rename.
 compresslevel = 9
 
 
