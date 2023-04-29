@@ -1,16 +1,30 @@
+from __future__ import annotations
+
 from glob import glob
 import inspect
 import logging
 import os
 import os.path as op
+from typing import TYPE_CHECKING, Optional
 
 from ..info import MIN_DATALAD_VERSION as MIN_VERSION
-from ..utils import create_file_if_missing
+from ..utils import SeqInfo, create_file_if_missing
 
 lgr = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    from datalad.api import Dataset
 
-def prepare_datalad(studydir, outdir, sid, session, seqinfo, dicoms, bids):
+
+def prepare_datalad(
+    studydir: str,
+    outdir: str,
+    sid: Optional[str],
+    session: str | int | None,
+    seqinfo: Optional[dict[SeqInfo, list[str]]],
+    dicoms: Optional[list[str]],
+    bids: Optional[str],
+) -> str:
     """Prepare data for datalad"""
     from datalad.api import Dataset
 
@@ -19,9 +33,10 @@ def prepare_datalad(studydir, outdir, sid, session, seqinfo, dicoms, bids):
         datalad_msg_suf += ", session %s" % session
     if seqinfo:
         datalad_msg_suf += ", %d sequences" % len(seqinfo)
-    datalad_msg_suf += ", %d dicoms" % (
-        len(sum(seqinfo.values(), [])) if seqinfo else len(dicoms)
-    )
+        datalad_msg_suf += ", %d dicoms" % len(sum(seqinfo.values(), []))
+    else:
+        assert dicoms is not None
+        datalad_msg_suf += ", %d dicoms" % len(dicoms)
     ds = Dataset(studydir)
     if not op.exists(outdir) or not ds.is_installed():
         add_to_datalad(
@@ -30,7 +45,9 @@ def prepare_datalad(studydir, outdir, sid, session, seqinfo, dicoms, bids):
     return datalad_msg_suf
 
 
-def add_to_datalad(topdir, studydir, msg, bids):  # noqa: U100
+def add_to_datalad(
+    topdir: str, studydir: str, msg: Optional[str], bids: Optional[str]  # noqa: U100
+) -> None:
     """Do all necessary preparations (if were not done before) and save"""
     import datalad.api as dl
     from datalad.api import Dataset
@@ -161,7 +178,7 @@ def add_to_datalad(topdir, studydir, msg, bids):  # noqa: U100
     """
 
 
-def mark_sensitive(ds, path_glob):
+def mark_sensitive(ds: Dataset, path_glob: str) -> None:
     """
 
     Parameters

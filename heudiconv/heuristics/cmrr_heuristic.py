@@ -1,10 +1,23 @@
-def create_key(template, outtype=("nii.gz", "dicom"), annotation_classes=None):
+from __future__ import annotations
+
+from typing import Optional
+
+from heudiconv.utils import SeqInfo
+
+
+def create_key(
+    template: Optional[str],
+    outtype: tuple[str, ...] = ("nii.gz", "dicom"),
+    annotation_classes: None = None,
+) -> tuple[str, tuple[str, ...], None]:
     if template is None or not template:
         raise ValueError("Template must be a valid format string")
     return (template, outtype, annotation_classes)
 
 
-def infotodict(seqinfo):
+def infotodict(
+    seqinfo: list[SeqInfo],
+) -> dict[tuple[str, tuple[str, ...], None], list]:
     """Heuristic evaluator for determining which runs belong where
 
     allowed template fields - follow python string module:
@@ -33,7 +46,7 @@ def infotodict(seqinfo):
         "fmap/sub-{subject}_acq-dwi{acq}_dir-{dir}_run-{item:02d}_epi"
     )
 
-    info = {
+    info: dict[tuple[str, tuple[str, ...], None], list] = {
         t1: [],
         t2: [],
         rest: [],

@@ -1,13 +1,25 @@
+from __future__ import annotations
+
+from typing import Optional
+
+import pydicom as dcm
+
+from heudiconv.utils import SeqInfo
+
 scaninfo_suffix = ".json"
 
 
-def create_key(template, outtype=("nii.gz",), annotation_classes=None):
+def create_key(
+    template: Optional[str],
+    outtype: tuple[str, ...] = ("nii.gz",),
+    annotation_classes: None = None,
+) -> tuple[str, tuple[str, ...], None]:
     if template is None or not template:
         raise ValueError("Template must be a valid format string")
-    return template, outtype, annotation_classes
+    return (template, outtype, annotation_classes)
 
 
-def filter_dicom(dcmdata):
+def filter_dicom(dcmdata: dcm.dataset.Dataset) -> bool:
     """Return True if a DICOM dataset should be filtered out, else False"""
     comments = getattr(dcmdata, "ImageComments", "")
     if len(comments):
@@ -17,7 +29,9 @@ def filter_dicom(dcmdata):
     return False
 
 
-def extract_moco_params(basename, _outypes, dicoms):
+def extract_moco_params(
+    basename: str, _outypes: tuple[str, ...], dicoms: list[str]
+) -> None:
     if "_rec-dico" not in basename:
         return
     from pydicom import dcmread
@@ -47,7 +61,9 @@ def extract_moco_params(basename, _outypes, dicoms):
 custom_callable = extract_moco_params
 
 
-def infotodict(seqinfo):
+def infotodict(
+    seqinfo: list[SeqInfo],
+) -> dict[tuple[str, tuple[str, ...], None], list[str]]:
     """Heuristic evaluator for determining which runs belong where
 
     allowed template fields - follow python string module:
@@ -58,17 +74,17 @@ def infotodict(seqinfo):
     subindex: sub index within group
     """
 
-    info = {}
+    info: dict[tuple[str, tuple[str, ...], None], list[str]] = {}
     for s in seqinfo:
-        if "_bold_" not in s[12]:
+        if "_bold_" not in s.protocol_name:
             continue
-        if "_coverage" not in s[12]:
+        if "_coverage" not in s.protocol_name:
             label = "orientation%s_run-{item:02d}"
         else:
             label = "coverage%s"
-        resolution = s[12].split("_")[5][:-3]
+        resolution = s.protocol_name.split("_")[5][:-3]
         assert float(resolution)
-        if s[13] is True:
+        if s.is_motion_corrected:
             label = label % ("_rec-dico",)
         else:
             label = label % ("",)
@@ -83,6 +99,6 @@ def infotodict(seqinfo):
 
         if key not in info:
             info[key] = []
-        info[key].append(s[2])
+        info[key].append(s.series_id)
 
     return info

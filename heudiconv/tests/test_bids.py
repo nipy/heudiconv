@@ -1,15 +1,20 @@
 """Test functions in heudiconv.bids module.
 """
 
+from __future__ import annotations
+
 from collections import OrderedDict
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from glob import glob
+import itertools
 import os
 import os.path as op
 from pathlib import Path
 from random import choice, random, seed, shuffle
 import re
 import string
+from typing import Any, Dict, List, Optional, Tuple
 
 import nibabel
 from numpy import testing as np_testing
@@ -32,7 +37,7 @@ from heudiconv.bids import (
     treat_age,
 )
 from heudiconv.cli.run import main as runner
-from heudiconv.utils import create_tree, load_json, remove_suffix, save_json
+from heudiconv.utils import Load, create_tree, load_json, remove_suffix, save_json
 
 from .utils import TESTS_DATA_PATH, fetch_data, gen_heudiconv_args
 
@@ -43,7 +48,7 @@ except ImportError:
     have_datalad = False
 
 
-def gen_rand_label(label_size, label_seed, seed_stdout=True):
+def gen_rand_label(label_size: int, label_seed: int, seed_stdout: bool = True) -> str:
     seed(label_seed)
     rand_char = "".join(choice(string.ascii_letters) for _ in range(label_size - 1))
     seed(label_seed)
@@ -53,14 +58,15 @@ def gen_rand_label(label_size, label_seed, seed_stdout=True):
     return rand_char + rand_num
 
 
-def test_maybe_na():
+def test_maybe_na() -> None:
     for na in "", " ", None, "n/a", "N/A", "NA":
         assert maybe_na(na) == "n/a"
     for notna in 0, 1, False, True, "value":
         assert maybe_na(notna) == str(notna)
 
 
-def test_treat_age():
+def test_treat_age() -> None:
+    assert treat_age(None) is None
     assert treat_age(0) == "0"
     assert treat_age("0") == "0"
     assert treat_age("0000") == "0"
@@ -79,9 +85,9 @@ LABEL_SEED = int.from_bytes(os.urandom(8), byteorder="big")
 A_SHIM = [random() for i in range(SHIM_LENGTH)]
 
 
-def test_get_shim_setting(tmpdir):
+def test_get_shim_setting(tmp_path: Path) -> None:
     """Tests for get_shim_setting"""
-    json_dir = op.join(str(tmpdir), "foo")
+    json_dir = op.join(tmp_path, "foo")
     if not op.exists(json_dir):
         os.makedirs(json_dir)
     json_name = op.join(json_dir, "sub-foo.json")
@@ -95,7 +101,9 @@ def test_get_shim_setting(tmpdir):
     assert get_shim_setting(json_name) == A_SHIM
 
 
-def test_get_key_info_for_fmap_assignment(tmpdir, label_size=4, label_seed=LABEL_SEED):
+def test_get_key_info_for_fmap_assignment(
+    tmp_path: Path, label_size: int = 4, label_seed: int = LABEL_SEED
+) -> None:
     """
     Test get_key_info_for_fmap_assignment.
 
@@ -136,7 +144,7 @@ def test_get_key_info_for_fmap_assignment(tmpdir, label_size=4, label_seed=LABEL
 
     # 5) matching_parameter = 'ModalityAcquisitionLabel'
     for d in ["fmap", "func", "dwi", "anat"]:
-        Path(op.join(str(tmpdir), d)).mkdir(parents=True, exist_ok=True)
+        (tmp_path / d).mkdir(parents=True, exist_ok=True)
     for dirname, fname, expected_key_info in [
         ("fmap", "sub-foo_acq-fmri_epi.json", "func"),
         ("fmap", "sub-foo_acq-bold_epi.json", "func"),
@@ -148,7 +156,7 @@ def test_get_key_info_for_fmap_assignment(tmpdir, label_size=4, label_seed=LABEL
         ("dwi", "sub-foo_dwi.json", "dwi"),
         ("anat", "sub-foo_T1w.json", "anat"),
     ]:
-        json_name = op.join(str(tmpdir), dirname, fname)
+        json_name = op.join(tmp_path, dirname, fname)
         save_json(json_name, {SHIM_KEY: A_SHIM})
         assert [expected_key_info] == get_key_info_for_fmap_assignment(
             json_name, matching_parameter="ModalityAcquisitionLabel"
@@ -157,7 +165,7 @@ def test_get_key_info_for_fmap_assignment(tmpdir, label_size=4, label_seed=LABEL
     # 6) matching_parameter = 'CustomAcquisitionLabel'
     A_LABEL = gen_rand_label(label_size, label_seed)
     for d in ["fmap", "func", "dwi", "anat"]:
-        Path(op.join(str(tmpdir), d)).mkdir(parents=True, exist_ok=True)
+        (tmp_path / d).mkdir(parents=True, exist_ok=True)
 
     for dirname, fname, expected_key_info in [
         ("fmap", f"sub-foo_acq-{A_LABEL}_epi.json", A_LABEL),
@@ -165,7 +173,7 @@ def test_get_key_info_for_fmap_assignment(tmpdir, label_size=4, label_seed=LABEL
         ("dwi", f"sub-foo_acq-{A_LABEL}_dwi.json", A_LABEL),
         ("anat", f"sub-foo_acq-{A_LABEL}_T1w.json", A_LABEL),
     ]:
-        json_name = op.join(str(tmpdir), dirname, fname)
+        json_name = op.join(tmp_path, dirname, fname)
         save_json(json_name, {SHIM_KEY: A_SHIM})
         assert [expected_key_info] == get_key_info_for_fmap_assignment(
             json_name, matching_parameter="CustomAcquisitionLabel"
@@ -177,7 +185,7 @@ def test_get_key_info_for_fmap_assignment(tmpdir, label_size=4, label_seed=LABEL
     )
 
 
-def generate_scans_tsv(session_struct):
+def generate_scans_tsv(session_struct: dict[str, dict[str, Any]]) -> str:
     """
     Generates the contents of the "_scans.tsv" file, given a session structure.
     Currently, it will have the columns "filename" and "acq_time".
@@ -209,7 +217,15 @@ def generate_scans_tsv(session_struct):
     return "\n".join(scans_file_content)
 
 
-def create_dummy_pepolar_bids_session(session_path):
+DummySession = Tuple[
+    Dict[str, Load],
+    Dict[str, Optional[List[str]]],
+    Dict[str, List[str]],
+    Dict[str, Dict[str, List[str]]],
+]
+
+
+def create_dummy_pepolar_bids_session(session_path: str) -> DummySession:
     """
     Creates a dummy BIDS session, with slim json files and empty nii.gz
     The fmap files are pepolar
@@ -217,7 +233,7 @@ def create_dummy_pepolar_bids_session(session_path):
 
     Parameters
     ----------
-    session_path : str or os.path
+    session_path : str
         path to the session (or subject) level folder
 
     Returns
@@ -249,15 +265,17 @@ def create_dummy_pepolar_bids_session(session_path):
 
     # Dict with the file structure for the session:
     # -anat:
-    anat_struct = {
-        "{p}_{m}.{e}".format(p=prefix, m=mod, e=ext): dummy_content
-        for ext, dummy_content in zip(
-            ["nii.gz", "json"], ["", {"ShimSetting": anat_shims}]
-        )
-        for mod in ["T1w", "T2w"]
+    anat_struct: dict[str, str | dict[str, list[float]]] = {
+        "{p}_{m}.nii.gz".format(p=prefix, m=mod): "" for mod in ["T1w", "T2w"]
     }
+    anat_struct.update(
+        {
+            "{p}_{m}.json".format(p=prefix, m=mod): {"ShimSetting": anat_shims}
+            for mod in ["T1w", "T2w"]
+        }
+    )
     # -dwi:
-    dwi_struct = {
+    dwi_struct: dict[str, str | dict[str, list[float]]] = {
         "{p}_acq-A_run-{r}_dwi.nii.gz".format(p=prefix, r=runNo): "" for runNo in [1, 2]
     }
     dwi_struct.update(
@@ -269,7 +287,7 @@ def create_dummy_pepolar_bids_session(session_path):
         }
     )
     # -func:
-    func_struct = {
+    func_struct: dict[str, str | dict[str, list[float]]] = {
         "{p}_acq-{a}_bold.nii.gz".format(p=prefix, a=acq): ""
         for acq in ["A", "B", "unmatched"]
     }
@@ -284,7 +302,7 @@ def create_dummy_pepolar_bids_session(session_path):
     )
     # -fmap:
     #  * NIfTI files:
-    fmap_struct = {
+    fmap_struct: dict[str, str | dict[str, list[float]]] = {
         "{p}_acq-{a}_dir-{d}_run-{r}_epi.nii.gz".format(p=prefix, a=acq, d=d, r=r): ""
         for acq in ["dwi", "fMRI"]
         for d in ["AP", "PA"]
@@ -331,23 +349,24 @@ def create_dummy_pepolar_bids_session(session_path):
         }
     )
     # structure for the full session (init the OrderedDict as a list to preserve order):
-    session_struct = OrderedDict(
-        [
-            ("fmap", fmap_struct),
-            ("anat", anat_struct),
-            ("dwi", dwi_struct),
-            ("func", func_struct),
-        ]
-    )
+    session_struct = {
+        "fmap": fmap_struct,
+        "anat": anat_struct,
+        "dwi": dwi_struct,
+        "func": func_struct,
+    }
     # add "_scans.tsv" file to the session_struct
     scans_file_content = generate_scans_tsv(session_struct)
-    session_struct.update({"{p}_scans.tsv".format(p=prefix): scans_file_content})
+    session_struct2: dict[str, Load] = {
+        **session_struct,
+        f"{prefix}_scans.tsv": scans_file_content,
+    }
 
-    create_tree(session_path, session_struct)
+    create_tree(session_path, session_struct2)
 
     # 2) Now, let's create a dict with the fmap groups compatible for each run
     # -anat: empty
-    expected_compatible_fmaps = {
+    expected_compatible_fmaps: dict[str, dict[str, list[str]]] = {
         "{p}_{m}.json".format(p=op.join(session_path, "anat", prefix), m=mod): {}
         for mod in ["T1w", "T2w"]
     }
@@ -431,14 +450,14 @@ def create_dummy_pepolar_bids_session(session_path):
     )
 
     return (
-        session_struct,
+        session_struct2,
         expected_result,
         expected_fmap_groups,
         expected_compatible_fmaps,
     )
 
 
-def create_dummy_no_shim_settings_bids_session(session_path):
+def create_dummy_no_shim_settings_bids_session(session_path: str) -> DummySession:
     """
     Creates a dummy BIDS session, with slim json files and empty nii.gz
     The fmap files are pepolar
@@ -446,7 +465,7 @@ def create_dummy_no_shim_settings_bids_session(session_path):
 
     Parameters
     ----------
-    session_path : str or os.path
+    session_path : str
         path to the session (or subject) level folder
 
     Returns
@@ -471,33 +490,18 @@ def create_dummy_no_shim_settings_bids_session(session_path):
     # Dict with the file structure for the session.
     # All json files will be empty.
     # -anat:
-    anat_struct = {
-        "{p}_{m}.{e}".format(p=prefix, m=mod, e=ext): dummy_content
-        for ext, dummy_content in zip(["nii.gz", "json"], ["", {}])
-        for mod in ["T1w", "T2w"]
-    }
+    anat_struct = mkstruct(f"{prefix}_{{0}}.{{ext}}", ["T1w", "T2w"])
     # -dwi:
-    dwi_struct = {
-        "{p}_acq-A_run-{r}_dwi.{e}".format(p=prefix, r=runNo, e=ext): dummy_content
-        for ext, dummy_content in zip(["nii.gz", "json"], ["", {}])
-        for runNo in [1, 2]
-    }
+    dwi_struct = mkstruct(f"{prefix}_acq-A_run-{{0}}_dwi.{{ext}}", [1, 2])
     # -func:
-    func_struct = {
-        "{p}_acq-{a}_bold.{e}".format(p=prefix, a=acq, e=ext): dummy_content
-        for ext, dummy_content in zip(["nii.gz", "json"], ["", {}])
-        for acq in ["A", "B"]
-    }
+    func_struct = mkstruct(f"{prefix}_acq-{{0}}_bold.{{ext}}", ["A", "B"])
     # -fmap:
-    fmap_struct = {
-        "{p}_acq-{a}_dir-{d}_run-{r}_epi.{e}".format(
-            p=prefix, a=acq, d=d, r=r, e=ext
-        ): dummy_content
-        for ext, dummy_content in zip(["nii.gz", "json"], ["", {}])
-        for acq in ["dwi", "fMRI"]
-        for d in ["AP", "PA"]
-        for r in [1, 2]
-    }
+    fmap_struct = mkstruct(
+        f"{prefix}_acq-{{0}}_dir-{{1}}_run-{{2}}_epi.{{ext}}",
+        ["dwi", "fMRI"],
+        ["AP", "PA"],
+        [1, 2],
+    )
     expected_fmap_groups = {
         "{p}_acq-{a}_run-{r}_epi".format(p=prefix, a=acq, r=r): [
             "{p}_acq-{a}_dir-{d}_run-{r}_epi.json".format(
@@ -520,13 +524,16 @@ def create_dummy_no_shim_settings_bids_session(session_path):
     )
     # add "_scans.tsv" file to the session_struct
     scans_file_content = generate_scans_tsv(session_struct)
-    session_struct.update({"{p}_scans.tsv".format(p=prefix): scans_file_content})
+    session_struct2: dict[str, Load] = {
+        **session_struct,
+        f"{prefix}_scans.tsv": scans_file_content,
+    }
 
-    create_tree(session_path, session_struct)
+    create_tree(session_path, session_struct2)
 
     # 2) Now, let's create a dict with the fmap groups compatible for each run
     # -anat: empty
-    expected_compatible_fmaps = {
+    expected_compatible_fmaps: dict[str, dict[str, list[str]]] = {
         "{p}_{m}.json".format(p=op.join(session_path, "anat", prefix), m=mod): {}
         for mod in ["T1w", "T2w"]
     }
@@ -616,7 +623,7 @@ def create_dummy_no_shim_settings_bids_session(session_path):
     )
 
     return (
-        session_struct,
+        session_struct2,
         expected_result,
         expected_fmap_groups,
         expected_compatible_fmaps,
@@ -624,8 +631,8 @@ def create_dummy_no_shim_settings_bids_session(session_path):
 
 
 def create_dummy_no_shim_settings_custom_label_bids_session(
-    session_path, label_size=4, label_seed=LABEL_SEED
-):
+    session_path: str, label_size: int = 4, label_seed: int = LABEL_SEED
+) -> DummySession:
     """
     Creates a dummy BIDS session, with slim json files and empty nii.gz
     The fmap files are pepolar
@@ -636,7 +643,7 @@ def create_dummy_no_shim_settings_custom_label_bids_session(
 
     Parameters
     ----------
-    session_path : str or os.path
+    session_path : str
         path to the session (or subject) level folder
     label_size : int, optional
         size of the random label
@@ -665,35 +672,25 @@ def create_dummy_no_shim_settings_custom_label_bids_session(
     # Dict with the file structure for the session.
     # All json files will be empty.
     # -anat:
-    anat_struct = {
-        f"{prefix}_{mod}.{ext}": dummy_content
-        for ext, dummy_content in zip(["nii.gz", "json"], ["", {}])
-        for mod in ["T1w", "T2w"]
-    }
+    anat_struct = mkstruct(f"{prefix}_{{0}}.{{ext}}", ["T1w", "T2w"])
     # -dwi:
     label_seed += 1
     DWI_LABEL = gen_rand_label(label_size, label_seed)
-    dwi_struct = {
-        f"{prefix}_acq-{DWI_LABEL}_run-{runNo}_dwi.{ext}": dummy_content
-        for ext, dummy_content in zip(["nii.gz", "json"], ["", {}])
-        for runNo in [1, 2]
-    }
+    dwi_struct = mkstruct(f"{prefix}_acq-{DWI_LABEL}_run-{{0}}_dwi.{{ext}}", [1, 2])
     # -func:
     label_seed += 1
     FUNC_LABEL = gen_rand_label(label_size, label_seed)
-    func_struct = {
-        f"{prefix}_task-{FUNC_LABEL}_acq-{acq}_bold.{ext}": dummy_content
-        for ext, dummy_content in zip(["nii.gz", "json"], ["", {}])
-        for acq in ["A", "B"]
-    }
+    func_struct = mkstruct(
+        f"{prefix}_task-{FUNC_LABEL}_acq-{{0}}_bold.{{ext}}",
+        ["A", "B"],
+    )
     # -fmap:
-    fmap_struct = {
-        f"{prefix}_acq-{acq}_dir-{d}_run-{r}_epi.{ext}": dummy_content
-        for ext, dummy_content in zip(["nii.gz", "json"], ["", {}])
-        for acq in [DWI_LABEL, FUNC_LABEL]
-        for d in ["AP", "PA"]
-        for r in [1, 2]
-    }
+    fmap_struct = mkstruct(
+        f"{prefix}_acq-{{0}}_dir-{{1}}_run-{{2}}_epi.{{ext}}",
+        [DWI_LABEL, FUNC_LABEL],
+        ["AP", "PA"],
+        [1, 2],
+    )
     expected_fmap_groups = {
         f"{prefix}_acq-{acq}_run-{r}_epi": [
             f'{op.join(session_path, "fmap", prefix)}_acq-{acq}_dir-{d}_run-{r}_epi.json'
@@ -714,13 +711,16 @@ def create_dummy_no_shim_settings_custom_label_bids_session(
     )
     # add "_scans.tsv" file to the session_struct
     scans_file_content = generate_scans_tsv(session_struct)
-    session_struct.update({"{p}_scans.tsv".format(p=prefix): scans_file_content})
+    session_struct2: dict[str, Load] = {
+        **session_struct,
+        f"{prefix}_scans.tsv": scans_file_content,
+    }
 
-    create_tree(session_path, session_struct)
+    create_tree(session_path, session_struct2)
 
     # 2) Now, let's create a dict with the fmap groups compatible for each run
     # -anat: empty
-    expected_compatible_fmaps = {
+    expected_compatible_fmaps: dict[str, dict[str, list[str]]] = {
         f'{op.join(session_path, "anat", prefix)}_{mod}.json': {}
         for mod in ["T1w", "T2w"]
     }
@@ -800,14 +800,14 @@ def create_dummy_no_shim_settings_custom_label_bids_session(
     )
 
     return (
-        session_struct,
+        session_struct2,
         expected_result,
         expected_fmap_groups,
         expected_compatible_fmaps,
     )
 
 
-def create_dummy_magnitude_phase_bids_session(session_path):
+def create_dummy_magnitude_phase_bids_session(session_path: str) -> DummySession:
     """
     Creates a dummy BIDS session, with slim json files and empty nii.gz
     The fmap files are a magnitude/phase pair
@@ -817,7 +817,7 @@ def create_dummy_magnitude_phase_bids_session(session_path):
 
     Parameters
     ----------
-    session_path : str or os.path
+    session_path : str
         path to the session (or subject) level folder
 
     Returns
@@ -845,7 +845,7 @@ def create_dummy_magnitude_phase_bids_session(session_path):
 
     # Dict with the file structure for the session:
     # -dwi:
-    dwi_struct = {
+    dwi_struct: dict[str, str | dict[str, list[float]]] = {
         "{p}_acq-A_run-{r}_dwi.nii.gz".format(p=prefix, r=runNo): "" for runNo in [1, 2]
     }
     dwi_struct.update(
@@ -857,7 +857,7 @@ def create_dummy_magnitude_phase_bids_session(session_path):
         }
     )
     # -func:
-    func_struct = {
+    func_struct: dict[str, str | dict[str, list[float]]] = {
         "{p}_acq-{a}_bold.nii.gz".format(p=prefix, a=acq): ""
         for acq in ["A", "B", "unmatched"]
     }
@@ -872,7 +872,7 @@ def create_dummy_magnitude_phase_bids_session(session_path):
     )
     # -fmap:
     #    * Case 1 in https://bids-specification.readthedocs.io/en/stable/04-modality-specific-files/01-magnetic-resonance-imaging-data.html#fieldmap-data
-    fmap_struct = {
+    fmap_struct: dict[str, str | dict[str, list[float]]] = {
         "{p}_acq-case1_{s}.nii.gz".format(p=prefix, s=suffix): ""
         for suffix in ["phasediff", "magnitude1", "magnitude2"]
     }
@@ -940,9 +940,12 @@ def create_dummy_magnitude_phase_bids_session(session_path):
     )
     # add "_scans.tsv" file to the session_struct
     scans_file_content = generate_scans_tsv(session_struct)
-    session_struct.update({"{p}_scans.tsv".format(p=prefix): scans_file_content})
+    session_struct2: dict[str, Load] = {
+        **session_struct,
+        f"{prefix}_scans.tsv": scans_file_content,
+    }
 
-    create_tree(session_path, session_struct)
+    create_tree(session_path, session_struct2)
 
     # 2) Now, let's create a dict with the fmap groups compatible for each run
     # -dwi: each of the runs (1, 2) is compatible with case1 fmap:
@@ -985,7 +988,7 @@ def create_dummy_magnitude_phase_bids_session(session_path):
     expected_prefix = session_path.split(sub_str)[-1].split(op.sep)[-1]
 
     # dict, with fmap names as keys and the expected "IntendedFor" as values.
-    expected_result = {
+    expected_result: dict[str, Optional[list[str]]] = {
         "{p}_acq-case1_{s}.json".format(p=prefix, s="phasediff"): [
             op.join(
                 expected_prefix,
@@ -1012,11 +1015,21 @@ def create_dummy_magnitude_phase_bids_session(session_path):
     )
 
     return (
-        session_struct,
+        session_struct2,
         expected_result,
         expected_fmap_groups,
         expected_compatible_fmaps,
     )
+
+
+def mkstruct(template: str, *params: list) -> dict[str, str | dict[str, str]]:
+    struct: dict[str, str | dict[str, str]] = {
+        template.format(*ps, ext="nii.gz"): "" for ps in itertools.product(*params)
+    }
+    struct.update(
+        {template.format(*ps, ext="json"): {} for ps in itertools.product(*params)}
+    )
+    return struct
 
 
 # Test cases:
@@ -1031,9 +1044,11 @@ def create_dummy_magnitude_phase_bids_session(session_path):
         create_dummy_magnitude_phase_bids_session,
     ],
 )
-def test_find_fmap_groups(tmpdir, simulation_function):
+def test_find_fmap_groups(
+    tmp_path: Path, simulation_function: Callable[[str], DummySession]
+) -> None:
     """Test for find_fmap_groups"""
-    folder = op.join(str(tmpdir), "sub-foo")
+    folder = op.join(tmp_path, "sub-foo")
     _, _, expected_fmap_groups, _ = simulation_function(folder)
     fmap_groups = find_fmap_groups(op.join(folder, "fmap"))
     assert fmap_groups == expected_fmap_groups
@@ -1055,19 +1070,21 @@ def test_find_fmap_groups(tmpdir, simulation_function):
         (create_dummy_magnitude_phase_bids_session, "Shims"),
     ],
 )
-def test_find_compatible_fmaps_for_run(tmpdir, simulation_function, match_param):
+def test_find_compatible_fmaps_for_run(
+    tmp_path: Path, simulation_function: Callable[[str], DummySession], match_param: str
+) -> None:
     """
     Test find_compatible_fmaps_for_run.
 
     Parameters
     ----------
-    tmpdir
+    tmp_path
     simulation_function : function
         function to create the directory tree and expected results
     match_param : str
         matching_parameter for assigning fmaps
     """
-    folder = op.join(str(tmpdir), "sub-foo")
+    folder = op.join(tmp_path, "sub-foo")
     _, _, expected_fmap_groups, expected_compatible_fmaps = simulation_function(folder)
     for modality in ["anat", "dwi", "func"]:
         for json_file in glob(op.join(folder, modality, "*.json")):
@@ -1103,16 +1120,20 @@ def test_find_compatible_fmaps_for_run(tmpdir, simulation_function, match_param)
     ],
 )
 def test_find_compatible_fmaps_for_session(
-    tmpdir, folder, expected_prefix, simulation_function, match_param
-):
+    tmp_path: Path,
+    folder: str,
+    expected_prefix: str,
+    simulation_function: Callable[[str], DummySession],
+    match_param: str,
+) -> None:
     """
     Test find_compatible_fmaps_for_session.
 
     Parameters
     ----------
-    tmpdir
-    folder : str or os.path
-        path to BIDS study to be simulated, relative to tmpdir
+    tmp_path
+    folder : str
+        path to BIDS study to be simulated, relative to tmp_path
     expected_prefix : str
         expected start of the "IntendedFor" elements
     simulation_function : function
@@ -1120,7 +1141,7 @@ def test_find_compatible_fmaps_for_session(
     match_param : str
         matching_parameter for assigning fmaps
     """
-    session_folder = op.join(str(tmpdir), folder)
+    session_folder = op.join(tmp_path, folder)
     _, _, _, expected_compatible_fmaps = simulation_function(session_folder)
 
     compatible_fmaps = find_compatible_fmaps_for_session(
@@ -1152,10 +1173,13 @@ def test_find_compatible_fmaps_for_session(
     ],
 )
 def test_select_fmap_from_compatible_groups(
-    tmpdir, folder, expected_prefix, simulation_function
-):
+    tmp_path: Path,
+    folder: str,
+    expected_prefix: str,
+    simulation_function: Callable[[str], DummySession],
+) -> None:
     """Test select_fmap_from_compatible_groups"""
-    session_folder = op.join(str(tmpdir), folder)
+    session_folder = op.join(tmp_path, folder)
     _, _, _, expected_compatible_fmaps = simulation_function(session_folder)
 
     for json_file, fmap_groups in expected_compatible_fmaps.items():
@@ -1208,15 +1232,19 @@ def test_select_fmap_from_compatible_groups(
     ],
 )
 def test_populate_intended_for(
-    tmpdir, folder, expected_prefix, simulation_function, match_param
-):
+    tmp_path: Path,
+    folder: str,
+    expected_prefix: str,
+    simulation_function: Callable[[str], DummySession],
+    match_param: str,
+) -> None:
     """
     Test populate_intended_for.
     Parameters
     ----------
-    tmpdir
-    folder : str or os.path
-        path to BIDS study to be simulated, relative to tmpdir
+    tmp_path
+    folder : str
+        path to BIDS study to be simulated, relative to tmp_path
     expected_prefix : str
         expected start of the "IntendedFor" elements
     simulation_function : function
@@ -1225,7 +1253,7 @@ def test_populate_intended_for(
         matching_parameter for assigning fmaps
     """
 
-    session_folder = op.join(str(tmpdir), folder)
+    session_folder = op.join(tmp_path, folder)
     session_struct, expected_result, _, _ = simulation_function(session_folder)
     populate_intended_for(
         session_folder, matching_parameters=match_param, criterion="First"
@@ -1234,7 +1262,9 @@ def test_populate_intended_for(
     # Now, loop through the jsons in the fmap folder and make sure it matches
     # the expected result:
     fmap_folder = op.join(session_folder, "fmap")
-    for j in session_struct["fmap"].keys():
+    fmap = session_struct["fmap"]
+    assert isinstance(fmap, dict)
+    for j in fmap.keys():
         if j.endswith(".json"):
             assert j in expected_result.keys()
             data = load_json(op.join(fmap_folder, j))
@@ -1252,7 +1282,7 @@ def test_populate_intended_for(
                 assert "IntendedFor" not in data.keys()
 
 
-def test_BIDSFile():
+def test_BIDSFile() -> None:
     """Tests for the BIDSFile class"""
 
     # define entities in the correct order:
@@ -1305,7 +1335,7 @@ def test_BIDSFile():
     # Complain if entity 'sub' is not set:
     with pytest.raises(ValueError) as e_info:
         assert str(BIDSFile.parse("dir-reversed.json"))
-        assert "sub-" in e_info.value
+        assert "sub-" in str(e_info.value)
 
     # Test set method:
     # -for a new entity, just set it without a complaint:
@@ -1322,20 +1352,25 @@ def test_BIDSFile():
 
 
 @pytest.mark.skipif(not have_datalad, reason="no datalad")
-def test_ME_mag_phase_conversion(tmpdir, subID="MEGRE", heuristic="bids_ME.py"):
+def test_ME_mag_phase_conversion(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    subID: str = "MEGRE",
+    heuristic: str = "bids_ME.py",
+) -> None:
     """Unit test for the case of multi-echo GRE data with
     magnitude and phase.
     The different echoes should be labeled automatically.
     """
-    tmpdir.chdir()
-    tmppath = tmpdir.strpath
+    monkeypatch.chdir(tmp_path)
     try:
-        datadir = fetch_data(tmppath, f"dicoms/velasco/{subID}")
+        datadir = fetch_data(tmp_path, f"dicoms/velasco/{subID}")
     except IncompleteResultsError as exc:
         pytest.skip("Failed to fetch test data: %s" % str(exc))
 
-    outdir = tmpdir.mkdir("out").strpath
-    args = gen_heudiconv_args(datadir, outdir, subID, heuristic)
+    outdir = tmp_path / "out"
+    outdir.mkdir()
+    args = gen_heudiconv_args(datadir, str(outdir), subID, heuristic)
     runner(args)  # run conversion
 
     # Check that the expected files have been extracted.
@@ -1349,7 +1384,7 @@ def test_ME_mag_phase_conversion(tmpdir, subID="MEGRE", heuristic="bids_ME.py"):
                 )
 
 
-def test_sanitize_label():
+def test_sanitize_label() -> None:
     assert sanitize_label("az XZ-@09") == "azXZ09"
     with pytest.raises(ValueError):
         sanitize_label(" @ ")

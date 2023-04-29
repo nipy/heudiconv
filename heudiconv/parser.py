@@ -1,15 +1,19 @@
+from __future__ import annotations
+
 import atexit
 from collections import defaultdict
+from collections.abc import ItemsView, Iterable, Iterator
 from glob import glob
 import logging
 import os
 import os.path as op
 import re
 import shutil
-from typing import DefaultDict, ItemsView, Iterable, List, Optional
+from types import ModuleType
+from typing import Optional
 
 from .dicoms import group_dicoms_into_seqinfos
-from .utils import StudySessionInfo, TempDirs, docstring_parameter
+from .utils import SeqInfo, StudySessionInfo, TempDirs, docstring_parameter
 
 lgr = logging.getLogger(__name__)
 tempdirs = TempDirs()
@@ -22,18 +26,24 @@ _UNPACK_FORMATS = tuple(sum((x[1] for x in shutil.get_unpack_formats()), []))
 
 
 @docstring_parameter(_VCS_REGEX)
-def find_files(regex, topdir=op.curdir, exclude=None, exclude_vcs=True, dirs=False):
+def find_files(
+    regex: str,
+    topdir: list[str] | tuple[str, ...] | str = op.curdir,
+    exclude: Optional[str] = None,
+    exclude_vcs: bool = True,
+    dirs: bool = False,
+) -> Iterator[str]:
     """Generator to find files matching regex
 
     Parameters
     ----------
-    regex: basestring
-    exclude: basestring, optional
+    regex: string
+    exclude: string, optional
       Matches to exclude
     exclude_vcs:
       If True, excludes commonly known VCS subdirectories.  If string, used
       as regex to exclude those files (regex: `{}`)
-    topdir: basestring or list, optional
+    topdir: string or list, optional
       Directory where to search
     dirs: bool, optional
       Either to match directories as well as files
@@ -60,7 +70,7 @@ def find_files(regex, topdir=op.curdir, exclude=None, exclude_vcs=True, dirs=Fal
             yield path
 
 
-def get_extracted_dicoms(fl: Iterable[str]) -> ItemsView[Optional[int], List[str]]:
+def get_extracted_dicoms(fl: Iterable[str]) -> ItemsView[Optional[str], list[str]]:
     """Given a collection of files and/or directories, list out and possibly
     extract the contents from archives.
 
@@ -71,7 +81,7 @@ def get_extracted_dicoms(fl: Iterable[str]) -> ItemsView[Optional[int], List[str
 
     Returns
     -------
-    ItemsView[int | None, list[str]]
+    ItemsView[str | None, list[str]]
         The absolute paths of (possibly newly extracted) files.
 
     Notes
@@ -95,12 +105,13 @@ def get_extracted_dicoms(fl: Iterable[str]) -> ItemsView[Optional[int], List[str
     the unarchived file. If there are multiple archived files, they are grouped
     into separate sessions.
     """
-    sessions: DefaultDict[Optional[int], List[str]] = defaultdict(list)
+    sessions: dict[Optional[str], list[str]] = defaultdict(list)
 
     # keep track of session manually to ensure that the variable is bound
     # when it is used after the loop (e.g., consider situation with
     # fl being empty)
     session = 0
+
     # needs sorting to keep the generated "session" label deterministic
     for _, t in enumerate(sorted(fl)):
         if not t.endswith(_UNPACK_FORMATS):
@@ -125,21 +136,27 @@ def get_extracted_dicoms(fl: Iterable[str]) -> ItemsView[Optional[int], List[str
             os.chmod(f, mode=0o700)
         # store full paths to each file, so we don't need to drag along
         # tmpdir as some basedir
-        sessions[session] = archive_content
+        sessions[str(session)] = archive_content
         session += 1
 
     if session == 1:
         # we had only 1 session (and at least 1), so not really multiple
         # sessions according to classical 'heudiconv' assumptions, thus
         # just move them all into None
-        sessions[None] += sessions.pop(0)
+        sessions[None] += sessions.pop("0")
 
     return sessions.items()
 
 
 def get_study_sessions(
-    dicom_dir_template, files_opt, heuristic, outdir, session, sids, grouping="studyUID"
-):
+    dicom_dir_template: Optional[str],
+    files_opt: Optional[list[str]],
+    heuristic: ModuleType,
+    outdir: str,
+    session: Optional[str],
+    sids: Optional[list[str]],
+    grouping: str = "studyUID",
+) -> dict[StudySessionInfo, list[str] | dict[SeqInfo, list[str]]]:
     """Sort files or dicom seqinfos into study_sessions.
 
     study_sessions put together files for a single session of a subject
@@ -151,13 +168,13 @@ def get_study_sessions(
 
     - if files_opt is provided, sorts all DICOMs it can find under those paths
     """
-    study_sessions = {}
+    study_sessions: dict[StudySessionInfo, list[str] | dict[SeqInfo, list[str]]] = {}
     if dicom_dir_template:
         dicom_dir_template = op.abspath(dicom_dir_template)
 
         # MG - should be caught by earlier checks
         # assert not files_opt  # see above TODO
-        # assert sids
+        assert sids
         # expand the input template
 
         if "{subject}" not in dicom_dir_template:
@@ -167,8 +184,7 @@ def get_study_sessions(
             )
         for sid in sids:
             sdir = dicom_dir_template.format(subject=sid, session=session)
-            files = sorted(glob(sdir))
-            for session_, files_ in get_extracted_dicoms(files):
+            for session_, files_ in get_extracted_dicoms(sorted(glob(sdir))):
                 if session_ is not None and session:
                     lgr.warning(
                         "We had session specified (%s) but while analyzing "
@@ -186,8 +202,8 @@ def get_study_sessions(
         # MG - should be caught on initial run
         # YOH - what if it is the initial run?
         # prep files
-        # assert files_opt
-        files = []
+        assert files_opt
+        files: list[str] = []
         for f in files_opt:
             if op.isdir(f):
                 files += sorted(
@@ -197,13 +213,13 @@ def get_study_sessions(
                 files.append(f)
 
         # in this scenario we don't care about sessions obtained this way
-        files_ = []
+        extracted_files: list[str] = []
         for _, files_ex in get_extracted_dicoms(files):
-            files_ += files_ex
+            extracted_files += files_ex
 
         # sort all DICOMS using heuristic
         seqinfo_dict = group_dicoms_into_seqinfos(
-            files_,
+            extracted_files,
             grouping,
             file_filter=getattr(heuristic, "filter_files", None),
             dcmfilter=getattr(heuristic, "filter_dicom", None),
@@ -237,10 +253,12 @@ def get_study_sessions(
                 sid,
             )
 
-            def infotoids(seqinfos, outdir):  # noqa: U100
+            def infotoids(
+                seqinfos: Iterable[SeqInfo], outdir: str  # noqa: U100
+            ) -> dict[str, Optional[str]]:
                 return {"locator": None, "session": None, "subject": None}
 
-            heuristic.infotoids = infotoids
+            heuristic.infotoids = infotoids  # type: ignore[attr-defined]
 
         for _studyUID, seqinfo in seqinfo_dict.items():
             # so we have a single study, we need to figure out its
@@ -267,7 +285,7 @@ def get_study_sessions(
                         "Existing study session with the same values (%r)."
                         " Skipping DICOMS %s",
                         study_session_info,
-                        *seqinfo.values()
+                        seqinfo.values(),
                     )
                     continue
             study_sessions[study_session_info] = seqinfo

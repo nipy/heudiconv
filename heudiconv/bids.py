@@ -1,5 +1,7 @@
 """Handle BIDS specific operations"""
 
+from __future__ import annotations
+
 __docformat__ = "numpy"
 
 from collections import OrderedDict
@@ -11,8 +13,9 @@ import hashlib
 import logging
 import os
 import os.path as op
+from pathlib import Path
 import re
-import typing
+from typing import Any, Optional
 import warnings
 
 import numpy as np
@@ -87,37 +90,42 @@ AllowedCriteriaForFmapAssignment = [
 ]
 
 
-def maybe_na(val):
+def maybe_na(val: Any) -> str:
     """Return 'n/a' if non-None value represented as str is not empty
 
     Primarily for the consistent use of lower case 'n/a' so 'N/A' and 'NA'
     are also treated as 'n/a'
     """
     if val is not None:
-        val = str(val)
-        val = val.strip()
-    return "n/a" if (not val or val in ("N/A", "NA")) else val
-
-
-def treat_age(age):
-    """Age might encounter 'Y' suffix or be a float"""
-    age = str(age)
-    if age.endswith("M"):
-        age = age.rstrip("M")
-        age = float(age) / 12
-        age = ("%.2f" if age != int(age) else "%d") % age
+        valstr = str(val).strip()
+        return "n/a" if (not valstr or valstr in ("N/A", "NA")) else valstr
     else:
-        age = age.rstrip("Y")
-    if age:
+        return "n/a"
+
+
+def treat_age(age: str | float | None) -> str | None:
+    """Age might encounter 'Y' suffix or be a float"""
+    if age is None:
+        return None  # might be converted to N/A by maybe_na
+    agestr = str(age)
+    if agestr.endswith("M"):
+        agestr = agestr.rstrip("M")
+        ageflt = float(agestr) / 12
+        agestr = ("%.2f" if ageflt != int(ageflt) else "%d") % ageflt
+    else:
+        agestr = agestr.rstrip("Y")
+    if agestr:
         # strip all leading 0s but allow to scan a newborn (age 0Y)
-        age = "0" if not age.lstrip("0") else age.lstrip("0")
-        if age.startswith("."):
+        agestr = "0" if not agestr.lstrip("0") else agestr.lstrip("0")
+        if agestr.startswith("."):
             # we had float point value, let's prepend 0
-            age = "0" + age
-    return age
+            agestr = "0" + agestr
+    return agestr
 
 
-def populate_bids_templates(path, defaults=None):
+def populate_bids_templates(
+    path: str, defaults: Optional[dict[str, Any]] = None
+) -> None:
     """Premake BIDS text files with templates"""
 
     lgr.info("Populating template files under %s", path)
@@ -198,7 +206,7 @@ def populate_bids_templates(path, defaults=None):
     populate_aggregated_jsons(path)
 
 
-def populate_aggregated_jsons(path):
+def populate_aggregated_jsons(path: str) -> None:
     """Aggregate across the entire BIDS dataset ``.json``\\s into top level ``.json``\\s
 
     Top level .json files would contain only the fields which are
@@ -267,8 +275,8 @@ def populate_aggregated_jsons(path):
         # do not touch any existing thing, it may be precious
         if not op.lexists(events_file):
             lgr.debug("Generating %s", events_file)
-            with open(events_file, "w") as f:
-                f.write(
+            with open(events_file, "w") as fp:
+                fp.write(
                     "onset\tduration\ttrial_type\tresponse_time\tstim_file"
                     "\tTODO -- fill in rows and add more tab-separated "
                     "columns if desired"
@@ -302,7 +310,7 @@ def populate_aggregated_jsons(path):
         save_json(task_file, fields, sort_keys=True, pretty=True)
 
 
-def tuneup_bids_json_files(json_files):
+def tuneup_bids_json_files(json_files: list[str]) -> None:
     """Given a list of BIDS .json files, e.g."""
     if not json_files:
         return
@@ -361,7 +369,7 @@ def tuneup_bids_json_files(json_files):
                 set_readonly(json_phasediffname)
 
 
-def add_participant_record(studydir, subject, age, sex):
+def add_participant_record(studydir: str, subject: str, age: str | None, sex: str | None) -> None:
     participants_tsv = op.join(studydir, "participants.tsv")
     participant_id = "sub-%s" % subject
 
@@ -446,7 +454,7 @@ def add_participant_record(studydir, subject, age, sex):
         )
 
 
-def find_subj_ses(f_name):
+def find_subj_ses(f_name: str) -> tuple[Optional[str], Optional[str]]:
     """Given a path to the bids formatted filename parse out subject/session"""
     # we will allow the match at either directories or within filename
     # assuming that bids layout is "correct"
@@ -456,12 +464,14 @@ def find_subj_ses(f_name):
     return res.get("subj", None), res.get("ses", None)
 
 
-def save_scans_key(item, bids_files):
+def save_scans_key(
+    item: tuple[str, tuple[str, ...], list[str]], bids_files: list[str]
+) -> None:
     """
     Parameters
     ----------
     item:
-    bids_files: str or list
+    bids_files: list of str
 
     Returns
     -------
@@ -473,7 +483,8 @@ def save_scans_key(item, bids_files):
     # and if there is a conflict, we would just blow since this function
     # should be invoked only on a result of a single item conversion as far
     # as I see it, so should have the same subject/session
-    subj, ses = None, None
+    subj: Optional[str] = None
+    ses: Optional[str] = None
     for bids_file in bids_files:
         # get filenames
         f_name = "/".join(bids_file.split("/")[-2:])
@@ -508,7 +519,7 @@ def save_scans_key(item, bids_files):
     )
 
 
-def add_rows_to_scans_keys_file(fn, newrows):
+def add_rows_to_scans_keys_file(fn: str, newrows: dict[str, list[str]]) -> None:
     """Add new rows to the _scans file.
 
     Parameters
@@ -534,7 +545,7 @@ def add_rows_to_scans_keys_file(fn, newrows):
     else:
         fnames2info = newrows
 
-    header = SCANS_FILE_FIELDS
+    header = list(SCANS_FILE_FIELDS.keys())
     # prepare all the data rows
     data_rows = [[k] + v for k, v in fnames2info.items()]
     # sort by the date/filename
@@ -549,11 +560,11 @@ def add_rows_to_scans_keys_file(fn, newrows):
         writer.writerows([header] + data_rows_sorted)
 
 
-def get_formatted_scans_key_row(dcm_fn) -> typing.List[str]:
+def get_formatted_scans_key_row(dcm_fn: str | Path) -> list[str]:
     """
     Parameters
     ----------
-    item
+    dcm_fn: str
 
     Returns
     -------
@@ -582,7 +593,7 @@ def get_formatted_scans_key_row(dcm_fn) -> typing.List[str]:
     return row
 
 
-def convert_sid_bids(subject_id):
+def convert_sid_bids(subject_id: str) -> str:
     """Shim for stripping any non-BIDS compliant characters within subject_id
 
     Parameters
@@ -593,8 +604,6 @@ def convert_sid_bids(subject_id):
     -------
     sid : string
         New subject ID
-    subject_id : string
-        Original subject ID
     """
     warnings.warn(
         "convert_sid_bids() is deprecated, please use sanitize_label() instead.",
@@ -604,7 +613,7 @@ def convert_sid_bids(subject_id):
     return sanitize_label(subject_id)
 
 
-def get_shim_setting(json_file):
+def get_shim_setting(json_file: str) -> Any:
     """
     Gets the "ShimSetting" field from a json_file.
     If no "ShimSetting" present, return error
@@ -627,11 +636,11 @@ def get_shim_setting(json_file):
             json_file,
             SHIM_KEY,
         )
-        raise KeyError
+        raise
     return shims
 
 
-def find_fmap_groups(fmap_dir):
+def find_fmap_groups(fmap_dir: str) -> dict[str, list[str]]:
     """
     Finds the different fmap groups in a fmap directory.
     By groups here we mean fmaps that are intended to go together
@@ -639,7 +648,7 @@ def find_fmap_groups(fmap_dir):
 
     Parameters
     ----------
-    fmap_dir : str or os.path
+    fmap_dir : str
         path to the session folder (or to the subject folder, if there are no
         sessions).
 
@@ -672,17 +681,19 @@ def find_fmap_groups(fmap_dir):
             for fm in fmap_jsons
         )
     )
-    fmap_groups = OrderedDict()
-    for k in prefixes:
-        fmap_groups[k] = [
+    return {
+        k: [
             fm
             for fm in fmap_jsons
             if fmap_regex.sub("", remove_suffix(op.basename(fm), ".json")) == k
         ]
-    return fmap_groups
+        for k in prefixes
+    }
 
 
-def get_key_info_for_fmap_assignment(json_file, matching_parameter):
+def get_key_info_for_fmap_assignment(
+    json_file: str, matching_parameter: str
+) -> list[Any]:
     """
     Gets key information needed to assign fmaps to other modalities.
     (Note: It is the responsibility of the calling function to make sure
@@ -690,14 +701,14 @@ def get_key_info_for_fmap_assignment(json_file, matching_parameter):
 
     Parameters
     ----------
-    json_file : str or os.path
+    json_file : str
         path to the json file
     matching_parameter : str in AllowedFmapParameterMatching
         matching_parameter that will be used to match runs
 
     Returns
     -------
-    key_info : dict
+    key_info : list
         part of the json file that will need to match between the fmap and
         the other image
     """
@@ -709,11 +720,13 @@ def get_key_info_for_fmap_assignment(json_file, matching_parameter):
         key_info = [get_shim_setting(json_file)]
     elif matching_parameter == "ImagingVolume":
         from nibabel import load as nb_load
+        from nibabel.nifti1 import Nifti1Header
 
-        nifti_file = glob(remove_suffix(json_file, ".json") + ".nii*")
-        assert len(nifti_file) == 1
-        nifti_file = nifti_file[0]
+        nifti_files = glob(remove_suffix(json_file, ".json") + ".nii*")
+        assert len(nifti_files) == 1
+        nifti_file = nifti_files[0]
         nifti_header = nb_load(nifti_file).header
+        assert isinstance(nifti_header, Nifti1Header)
         key_info = [nifti_header.get_best_affine(), nifti_header.get_data_shape()[:3]]
     elif matching_parameter == "ModalityAcquisitionLabel":
         # Check the acq label for the fmap and the modality for others:
@@ -721,6 +734,7 @@ def get_key_info_for_fmap_assignment(json_file, matching_parameter):
         if modality == "fmap":
             # extract the <acq> entity:
             acq_label = BIDSFile.parse(op.basename(json_file))["acq"]
+            assert acq_label is not None
             if any(s in acq_label.lower() for s in ["fmri", "bold", "func"]):
                 key_info = ["func"]
             elif any(s in acq_label.lower() for s in ["diff", "dwi"]):
@@ -750,7 +764,9 @@ def get_key_info_for_fmap_assignment(json_file, matching_parameter):
     return key_info
 
 
-def find_compatible_fmaps_for_run(json_file, fmap_groups, matching_parameters):
+def find_compatible_fmaps_for_run(
+    json_file: str, fmap_groups: dict[str, list[str]], matching_parameters: list[str]
+) -> dict[str, list[str]]:
     """
     Finds compatible fmaps for a given run, for populate_intended_for.
     (Note: It is the responsibility of the calling function to make sure
@@ -758,7 +774,7 @@ def find_compatible_fmaps_for_run(json_file, fmap_groups, matching_parameters):
 
     Parameters
     ----------
-    json_file : str or os.path
+    json_file : str
         path to the json file
     fmap_groups : dict
         key: prefix common to the group
@@ -806,7 +822,9 @@ def find_compatible_fmaps_for_run(json_file, fmap_groups, matching_parameters):
     return compatible_fmap_groups
 
 
-def find_compatible_fmaps_for_session(path_to_bids_session, matching_parameters):
+def find_compatible_fmaps_for_session(
+    path_to_bids_session: str, matching_parameters: list[str]
+) -> Optional[dict[str, dict[str, list[str]]]]:
     """
     Finds compatible fmaps for all non-fmap runs in a session.
     (Note: It is the responsibility of the calling function to make sure
@@ -814,7 +832,7 @@ def find_compatible_fmaps_for_session(path_to_bids_session, matching_parameters)
 
     Parameters
     ----------
-    path_to_bids_session : str or os.path
+    path_to_bids_session : str
         path to the session folder (or to the subject folder, if there are no
         sessions).
     matching_parameters : list of str from AllowedFmapParameterMatching
@@ -836,7 +854,7 @@ def find_compatible_fmaps_for_session(path_to_bids_session, matching_parameters)
         lgr.warning(
             "We cannot add the IntendedFor field: no fmap/ in %s", path_to_bids_session
         )
-        return
+        return None
     fmap_groups = find_fmap_groups(fmap_dir)
 
     # Get a set with all non-fmap json files in the session (exclude SBRef files).
@@ -857,7 +875,9 @@ def find_compatible_fmaps_for_session(path_to_bids_session, matching_parameters)
     return compatible_fmaps
 
 
-def select_fmap_from_compatible_groups(json_file, compatible_fmap_groups, criterion):
+def select_fmap_from_compatible_groups(
+    json_file: str, compatible_fmap_groups: dict[str, list[str]], criterion: str
+) -> Optional[str]:
     """
     Selects the fmap that will be used to correct for distortions in json_file
     from the compatible fmap_groups list, based on the given criterion
@@ -866,7 +886,7 @@ def select_fmap_from_compatible_groups(json_file, compatible_fmap_groups, criter
 
     Parameters
     ----------
-    json_file : str or os.path
+    json_file : str
         path to the json file
     compatible_fmap_groups : dict
         fmap_groups that are compatible with the specific json_file
@@ -875,7 +895,7 @@ def select_fmap_from_compatible_groups(json_file, compatible_fmap_groups, criter
 
     Returns
     -------
-    selected_fmap_key : str or os.path
+    selected_fmap_key : str
         key from the compatible_fmap_groups for the selected fmap group
     """
     if len(compatible_fmap_groups) == 0:
@@ -888,12 +908,12 @@ def select_fmap_from_compatible_groups(json_file, compatible_fmap_groups, criter
     modality_folders = set(
         op.dirname(fmap) for v in compatible_fmap_groups.values() for fmap in v
     )  # there should be only one value, ending in 'fmap'
-    sess_folder = set(op.dirname(k) for k in modality_folders)
-    if len(sess_folder) > 1:
+    sess_folders = set(op.dirname(k) for k in modality_folders)
+    if len(sess_folders) > 1:
         # for now, we only deal with single sessions:
         raise RuntimeError
     # if we made it here, we have only one session:
-    sess_folder = list(sess_folder)[0]
+    sess_folder = list(sess_folders)[0]
 
     # get acquisition times from '_scans.tsv':
     try:
@@ -942,11 +962,15 @@ def select_fmap_from_compatible_groups(json_file, compatible_fmap_groups, criter
         selected_fmap_key = [
             k for k, v in diff_fmaps_acq_times.items() if v == min_diff_acq_times
         ][0]
+    else:
+        raise ValueError(f"Invalid 'criterion' value: {criterion!r}")
 
     return selected_fmap_key
 
 
-def populate_intended_for(path_to_bids_session, matching_parameters, criterion):
+def populate_intended_for(
+    path_to_bids_session: str, matching_parameters: str | list[str], criterion: str
+) -> None:
     """
     Adds the 'IntendedFor' field to the fmap .json files in a session folder.
     It goes through the session folders and for every json file, it finds
@@ -961,7 +985,7 @@ def populate_intended_for(path_to_bids_session, matching_parameters, criterion):
 
     Parameters
     ----------
-    path_to_bids_session : str or os.path
+    path_to_bids_session : str
         path to the session folder (or to the subject folder, if there are no
         sessions).
     matching_parameters : list of str from AllowedFmapParameterMatching
@@ -1004,6 +1028,7 @@ def populate_intended_for(path_to_bids_session, matching_parameters, criterion):
     compatible_fmaps = find_compatible_fmaps_for_session(
         path_to_bids_session, matching_parameters=matching_parameters
     )
+    assert compatible_fmaps is not None
     selected_fmaps = {}
     for json_file, fmap_groups in compatible_fmaps.items():
         if not op.dirname(json_file).endswith("fmap"):
@@ -1034,7 +1059,7 @@ def populate_intended_for(path_to_bids_session, matching_parameters, criterion):
                 update_json(fm_json, {"IntendedFor": intended_for}, pretty=True)
 
 
-class BIDSFile(object):
+class BIDSFile:
     """as defined in https://bids-specification.readthedocs.io/en/stable/99-appendices/04-entity-table.html
     which might soon become machine readable
     order matters
@@ -1058,12 +1083,14 @@ class BIDSFile(object):
         "recording",
     ]
 
-    def __init__(self, entities, suffix, extension):
+    def __init__(
+        self, entities: dict[str, str], suffix: str, extension: Optional[str]
+    ) -> None:
         self._entities = entities
         self._suffix = suffix
         self._extension = extension
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         if not isinstance(other, self.__class__):
             return False
         if (
@@ -1076,7 +1103,7 @@ class BIDSFile(object):
             return False
 
     @classmethod
-    def parse(cls, filename):
+    def parse(cls, filename: str) -> BIDSFile:
         """Parse the filename for BIDS entities, suffix and extension"""
         # use re.findall to find all lower-case-letters + '-' + alphanumeric + '_' pairs:
         entities_list = re.findall("([a-z]+)-([a-zA-Z0-9]+)[_]*", filename)
@@ -1093,7 +1120,7 @@ class BIDSFile(object):
             suffix, extension = ending, None
         return BIDSFile(entities, suffix, extension)
 
-    def __str__(self):
+    def __str__(self) -> str:
         """reconstitute in a legit BIDS filename using the order from entity table"""
         if "sub" not in self._entities:
             raise ValueError("The 'sub-' entity is mandatory")
@@ -1112,15 +1139,15 @@ class BIDSFile(object):
             + extension
         )
 
-    def __getitem__(self, entity):
+    def __getitem__(self, entity: str) -> Optional[str]:
         return self._entities[entity] if entity in self._entities else None
 
     def __setitem__(
-        self, entity, value
-    ):  # would puke with some exception if already known
+        self, entity: str, value: str
+    ) -> None:  # would puke with some exception if already known
         return self.set(entity, value, overwrite=False)
 
-    def set(self, entity, value, overwrite=True):
+    def set(self, entity: str, value: str, overwrite: bool = True) -> None:
         if entity not in self._entities:
             # just set it; no complains here
             self._entities[entity] = value
@@ -1143,15 +1170,15 @@ class BIDSFile(object):
             )
 
     @property  # as needed make them RW
-    def suffix(self):
+    def suffix(self) -> str:
         return self._suffix
 
     @property
-    def extension(self):
+    def extension(self) -> Optional[str]:
         return self._extension
 
 
-def sanitize_label(label):
+def sanitize_label(label: str) -> str:
     """Strips any non-BIDS compliant characters within label
 
     Parameters
@@ -1166,7 +1193,7 @@ def sanitize_label(label):
     clean_label = "".join(x for x in label if x.isalnum())
     if not clean_label:
         raise ValueError(
-            "Label became empty after cleanup.  Please provide manually "
+            "Label became empty after cleanup.  Please manually provide "
             "a suitable alphanumeric label."
         )
     if clean_label != label:

@@ -1,9 +1,13 @@
+from __future__ import annotations
+
+from pathlib import Path
 import sys
 
+from nipype.utils.filemanip import which
 import pytest
 
 from heudiconv.cli.run import main as runner
-from heudiconv.queue import clean_args, which
+from heudiconv.queue import clean_args
 
 from .utils import TESTS_DATA_PATH
 
@@ -18,39 +22,36 @@ from .utils import TESTS_DATA_PATH
         ["-d", f"{TESTS_DATA_PATH}/{{subject}}/*", "-s", "01-fmap_acq-3mm"],
     ],
 )
-def test_queue_no_slurm(tmpdir, hargs):
-    tmpdir.chdir()
+def test_queue_no_slurm(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, hargs: list[str]
+) -> None:
+    monkeypatch.chdir(tmp_path)
     hargs.extend(["-f", "reproin", "-b", "--minmeta", "--queue", "SLURM"])
 
     # simulate command-line call
-    _sys_args = sys.argv
-    sys.argv = ["heudiconv"] + hargs
+    monkeypatch.setattr(sys, "argv", ["heudiconv"] + hargs)
 
-    try:
-        with pytest.raises(OSError):  # SLURM should not be installed
-            runner(hargs)
-        # should have generated a slurm submission script
-        slurm_cmd_file = (tmpdir / "heudiconv-SLURM.sh").strpath
-        assert slurm_cmd_file
-        # check contents and ensure args match
-        with open(slurm_cmd_file) as fp:
-            lines = fp.readlines()
-        assert lines[0] == "#!/bin/bash\n"
-        cmd = lines[1]
+    with pytest.raises(OSError):  # SLURM should not be installed
+        runner(hargs)
+    # should have generated a slurm submission script
+    slurm_cmd_file = str(tmp_path / "heudiconv-SLURM.sh")
+    assert slurm_cmd_file
+    # check contents and ensure args match
+    with open(slurm_cmd_file) as fp:
+        lines = fp.readlines()
+    assert lines[0] == "#!/bin/bash\n"
+    cmd = lines[1]
 
-        # check that all flags we gave still being called
-        for arg in hargs:
-            # except --queue <queue>
-            if arg in ["--queue", "SLURM"]:
-                assert arg not in cmd
-            else:
-                assert arg in cmd
-    finally:
-        # revert before breaking something
-        sys.argv = _sys_args
+    # check that all flags we gave still being called
+    for arg in hargs:
+        # except --queue <queue>
+        if arg in ["--queue", "SLURM"]:
+            assert arg not in cmd
+        else:
+            assert arg in cmd
 
 
-def test_argument_filtering():
+def test_argument_filtering() -> None:
     cmd_files = [
         "heudiconv",
         "--files",

@@ -1,7 +1,11 @@
+from __future__ import annotations
+
 from glob import glob
 import logging
 import os.path as op
 import sys
+from types import TracebackType
+from typing import Any, Optional
 
 from . import __packagename__, __version__
 from .bids import populate_bids_templates, populate_intended_for, tuneup_bids_json_files
@@ -17,13 +21,13 @@ lgr = logging.getLogger(__name__)
 INIT_MSG = "Running {packname} version {version} latest {latest}".format
 
 
-def is_interactive():
+def is_interactive() -> bool:
     """Return True if all in/outs are tty"""
     # TODO: check on windows if hasattr check would work correctly and add value:
     return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
 
 
-def setup_exceptionhook():
+def setup_exceptionhook() -> None:
     """
     Overloads default sys.excepthook with our exceptionhook handler.
 
@@ -31,7 +35,11 @@ def setup_exceptionhook():
     if not interactive, then invokes default handler.
     """
 
-    def _pdb_excepthook(exc_type, exc_value, tb):
+    def _pdb_excepthook(
+        exc_type: type[BaseException],
+        exc_value: BaseException,
+        tb: Optional[TracebackType],
+    ) -> None:
         if is_interactive():
             import pdb
             import traceback
@@ -46,8 +54,14 @@ def setup_exceptionhook():
 
 
 def process_extra_commands(
-    outdir, command, files, dicom_dir_template, heuristic, session, subjs, grouping
-):
+    outdir: str,
+    command: str,
+    files: list[str],
+    heuristic: Optional[str],
+    session: Optional[str],
+    subjs: Optional[list[str]],
+    grouping: str,
+) -> None:
     """
     Perform custom command instead of regular operations. Supported commands:
     ['treat-json', 'ls', 'populate-templates', 'populate-intended-for']
@@ -60,50 +74,46 @@ def process_extra_commands(
         Heudiconv command to run
     files : list of str
         List of files
-    dicom_dir_template : str
-        Location of dicomdir that can be indexed with subject id
-        {subject} and session {session}. Tarballs (can be compressed)
-        are supported in addition to directory. All matching tarballs
-        for a subject are extracted and their content processed in a
-        single pass. If multiple tarballs are found, each is assumed to
-        be a separate session and the 'session' argument is ignored.
-    heuristic : str
+    heuristic : str or None
         Path to heuristic file or name of builtin heuristic.
-    session : str
+    session : str or None
         Session identifier
-    subjs : list of str
+    subjs : None or list of str
         List of subject identifiers
     grouping : {'studyUID', 'accession_number', 'all', 'custom'}
         How to group dicoms.
     """
     if command == "treat-jsons":
-        for f in files:
-            treat_infofile(f)
+        for fname in files:
+            treat_infofile(fname)
     elif command == "ls":
         ensure_heuristic_arg(heuristic)
-        heuristic = load_heuristic(heuristic)
-        heuristic_ls = getattr(heuristic, "ls", None)
-        for f in files:
+        assert heuristic is not None
+        heuristic_mod = load_heuristic(heuristic)
+        heuristic_ls = getattr(heuristic_mod, "ls", None)
+        for fname in files:
             study_sessions = get_study_sessions(
-                dicom_dir_template,
-                [f],
-                heuristic,
+                None,
+                [fname],
+                heuristic_mod,
                 outdir,
                 session,
                 subjs,
                 grouping=grouping,
             )
-            print(f)
+            print(fname)
             for study_session, sequences in study_sessions.items():
+                assert isinstance(sequences, dict)
                 suf = ""
                 if heuristic_ls:
-                    suf += heuristic_ls(study_session, sequences)
+                    suf += heuristic_ls(study_session, list(sequences.keys()))
                 print("\t%s %d sequences%s" % (str(study_session), len(sequences), suf))
     elif command == "populate-templates":
         ensure_heuristic_arg(heuristic)
-        heuristic = load_heuristic(heuristic)
-        for f in files:
-            populate_bids_templates(f, getattr(heuristic, "DEFAULT_FIELDS", {}))
+        assert heuristic is not None
+        heuristic_mod = load_heuristic(heuristic)
+        for fname in files:
+            populate_bids_templates(fname, getattr(heuristic_mod, "DEFAULT_FIELDS", {}))
     elif command == "sanitize-jsons":
         tuneup_bids_json_files(files)
     elif command == "heuristics":
@@ -113,14 +123,15 @@ def process_extra_commands(
             print("- %s: %s" % name_desc)
     elif command == "heuristic-info":
         ensure_heuristic_arg(heuristic)
+        assert heuristic is not None
         from .utils import get_heuristic_description
 
         print(get_heuristic_description(heuristic, full=True))
     elif command == "populate-intended-for":
-        kwargs = {}
+        kwargs: dict[str, Any] = {}
         if heuristic:
-            heuristic = load_heuristic(heuristic)
-            kwargs = getattr(heuristic, "POPULATE_INTENDED_FOR_OPTS", {})
+            heuristic_mod = load_heuristic(heuristic)
+            kwargs = getattr(heuristic_mod, "POPULATE_INTENDED_FOR_OPTS", {})
         if not subjs:
             subjs = [
                 # search outdir for 'sub-*'; if it is a directory (not a regular file), remove
@@ -165,10 +176,9 @@ def process_extra_commands(
                 populate_intended_for(session_path, **kwargs)
     else:
         raise ValueError("Unknown command %s" % command)
-    return
 
 
-def ensure_heuristic_arg(heuristic=None):
+def ensure_heuristic_arg(heuristic: Optional[str] = None) -> None:
     """
     Check that the heuristic argument was provided.
     """
@@ -190,29 +200,29 @@ def ensure_heuristic_arg(heuristic=None):
 )
 def workflow(
     *,
-    dicom_dir_template=None,
-    files=None,
-    subjs=None,
-    converter="dcm2niix",
-    outdir=".",
-    locator=None,
-    conv_outdir=None,
-    anon_cmd=None,
-    heuristic=None,
-    with_prov=False,
-    session=None,
-    bids_options=None,
-    overwrite=False,
-    datalad=False,
-    debug=False,
-    command=None,
-    grouping="studyUID",
-    minmeta=False,
-    random_seed=None,
-    dcmconfig=None,
-    queue=None,
-    queue_args=None
-):
+    dicom_dir_template: Optional[str] = None,
+    files: Optional[list[str]] = None,
+    subjs: Optional[list[str]] = None,
+    converter: str = "dcm2niix",
+    outdir: str = ".",
+    locator: Optional[str] = None,
+    conv_outdir: Optional[str] = None,
+    anon_cmd: Optional[str] = None,
+    heuristic: Optional[str] = None,
+    with_prov: bool = False,
+    session: Optional[str] = None,
+    bids_options: Optional[str] = None,
+    overwrite: bool = False,
+    datalad: bool = False,
+    debug: bool = False,
+    command: Optional[str] = None,
+    grouping: str = "studyUID",
+    minmeta: bool = False,
+    random_seed: Optional[int] = None,
+    dcmconfig: Optional[str] = None,
+    queue: Optional[str] = None,
+    queue_args: Optional[str] = None,
+) -> None:
     """Run the HeuDiConv conversion workflow.
 
     Parameters
@@ -232,10 +242,10 @@ def workflow(
         List of subjects - required for dicom template. If not
         provided, DICOMS would first be "sorted" and subject IDs
         deduced by the heuristic. Default is None.
-    converter : {'dcm2niix', None}, optional
-        Tool to use for DICOM conversion. Setting to None disables
+    converter : {'dcm2niix', 'none'}, optional
+        Tool to use for DICOM conversion. Setting to 'none' disables
         the actual conversion step -- useful for testing heuristics.
-        Default is None.
+        Default is 'dcm2niix'.
     outdir : str, optional
         Output directory for conversion setup (for further
         customization and future reference. This directory will refer
@@ -347,11 +357,13 @@ def workflow(
     )
 
     if command:
+        if files is None:
+            raise ValueError("'command' given but 'files' is None")
+        assert dicom_dir_template is None
         process_extra_commands(
             outdir,
             command,
             files,
-            dicom_dir_template,
             heuristic,
             session,
             subjs,
@@ -366,16 +378,27 @@ def workflow(
 
     if queue:
         lgr.info("Queuing %s conversion", queue)
-        iterarg, iterables = (
-            ("files", len(files)) if files else ("subjects", len(subjs))
-        )
+        if files:
+            iterarg = "files"
+            iterables = len(files)
+        elif subjs:
+            iterarg = "subjects"
+            iterables = len(subjs)
+        else:
+            raise ValueError("'queue' given but both 'files' and 'subjects' are false")
         queue_conversion(queue, iterarg, iterables, queue_args)
         return
 
-    heuristic = load_heuristic(heuristic)
+    heuristic_mod = load_heuristic(heuristic)
 
     study_sessions = get_study_sessions(
-        dicom_dir_template, files, heuristic, outdir, session, subjs, grouping=grouping
+        dicom_dir_template,
+        files,
+        heuristic_mod,
+        outdir,
+        session,
+        subjs,
+        grouping=grouping,
     )
 
     # extract tarballs, and replace their entries with expanded lists of files
@@ -385,10 +408,10 @@ def workflow(
     # processed_studydirs = set()
 
     locator_manual, session_manual = locator, session
-    for (locator, session, sid), files_or_seqinfo in study_sessions.items():
+    for (locator, session_, sid), files_or_seqinfo in study_sessions.items():
         # Allow for session to be overloaded from command line
         if session_manual is not None:
-            session = session_manual
+            session_ = session_manual
         if locator_manual is not None:
             locator = locator_manual
         if not len(files_or_seqinfo):
@@ -407,9 +430,11 @@ def workflow(
             lgr.warning("Skipping unknown locator dataset")
             continue
 
-        anon_sid = anonymize_sid(sid, anon_cmd) if anon_cmd else None
-        if anon_cmd:
+        if anon_cmd and sid is not None:
+            anon_sid = anonymize_sid(sid, anon_cmd)
             lgr.info("Anonymized {} to {}".format(sid, anon_sid))
+        else:
+            anon_sid = None
 
         study_outdir = op.join(outdir, locator or "")
         anon_outdir = conv_outdir or outdir
@@ -423,7 +448,7 @@ def workflow(
                 anon_study_outdir,
                 anon_outdir,
                 dlad_sid,
-                session,
+                session_,
                 seqinfo,
                 dicoms,
                 bids_options,
@@ -431,7 +456,7 @@ def workflow(
 
         lgr.info(
             "PROCESSING STARTS: {0}".format(
-                str(dict(subject=sid, outdir=study_outdir, session=session))
+                str(dict(subject=sid, outdir=study_outdir, session=session_))
             )
         )
 
@@ -439,12 +464,12 @@ def workflow(
             sid,
             dicoms,
             study_outdir,
-            heuristic,
+            heuristic_mod,
             converter=converter,
             anon_sid=anon_sid,
             anon_outdir=anon_study_outdir,
             with_prov=with_prov,
-            ses=session,
+            ses=session_,
             bids_options=bids_options,
             seqinfo=seqinfo,
             min_meta=minmeta,
@@ -455,7 +480,7 @@ def workflow(
 
         lgr.info(
             "PROCESSING DONE: {0}".format(
-                str(dict(subject=sid, outdir=study_outdir, session=session))
+                str(dict(subject=sid, outdir=study_outdir, session=session_))
             )
         )
 

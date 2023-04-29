@@ -1,17 +1,27 @@
 # dicom operations
-from collections import OrderedDict
+from __future__ import annotations
+
+from collections.abc import Callable
 import datetime
 import logging
 import os
 import os.path as op
+from pathlib import Path
+import sys
 import tarfile
-from typing import List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, cast, overload
 from unittest.mock import patch
 import warnings
 
 import pydicom as dcm
 
-from .utils import SeqInfo, get_typed_attr, load_json, set_readonly
+from .utils import SeqInfo, TempDirs, get_typed_attr, load_json, set_readonly
+
+if TYPE_CHECKING:
+    if sys.version_info >= (3, 8):
+        from typing import Literal
+    else:
+        from typing_extensions import Literal
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
@@ -22,12 +32,12 @@ lgr = logging.getLogger(__name__)
 total_files = 0
 
 
-def create_seqinfo(mw, series_files, series_id):
+def create_seqinfo(mw: dw.Wrapper, series_files: list[str], series_id: str) -> SeqInfo:
     """Generate sequence info
 
     Parameters
     ----------
-    mw: MosaicWrapper
+    mw: Wrapper
     series_files: list
     series_id: str
     """
@@ -35,7 +45,7 @@ def create_seqinfo(mw, series_files, series_id):
     accession_number = dcminfo.get("AccessionNumber")
 
     # TODO: do not group echoes by default
-    size = list(mw.image_shape) + [len(series_files)]
+    size: list[int] = list(mw.image_shape) + [len(series_files)]
     if len(size) < 4:
         size.append(1)
 
@@ -60,7 +70,7 @@ def create_seqinfo(mw, series_files, series_id):
     global total_files
     total_files += len(series_files)
 
-    seqinfo = SeqInfo(
+    return SeqInfo(
         total_files_till_now=total_files,
         example_dcm_file=op.basename(series_files[0]),
         series_id=series_id,
@@ -90,10 +100,11 @@ def create_seqinfo(mw, series_files, series_id):
         series_uid=dcminfo.get("SeriesInstanceUID"),
         time=dcminfo.get("AcquisitionTime"),
     )
-    return seqinfo
 
 
-def validate_dicom(fl, dcmfilter):
+def validate_dicom(
+    fl: str, dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]]
+) -> Optional[tuple[dw.Wrapper, tuple[int, str], Optional[str]]]:
     """
     Parse DICOM attributes. Returns None if not valid.
     """
@@ -112,34 +123,86 @@ def validate_dicom(fl, dcmfilter):
             else ""
         )
     try:
-        series_id = (int(mw.dcm_data.SeriesNumber), mw.dcm_data.ProtocolName)
+        protocol_name = mw.dcm_data.ProtocolName
+        assert isinstance(protocol_name, str)
+        series_id = (int(mw.dcm_data.SeriesNumber), protocol_name)
     except AttributeError as e:
         lgr.warning('Ignoring %s since not quite a "normal" DICOM: %s', fl, e)
-        return
+        return None
     if dcmfilter is not None and dcmfilter(mw.dcm_data):
         lgr.warning("Ignoring %s because of DICOM filter", fl)
-        return
+        return None
     if mw.dcm_data[0x0008, 0x0016].repval in (
         "Raw Data Storage",
         "GrayscaleSoftcopyPresentationStateStorage",
     ):
-        return
+        return None
     try:
         file_studyUID = mw.dcm_data.StudyInstanceUID
+        assert isinstance(file_studyUID, str)
     except AttributeError:
         lgr.info("File {} is missing any StudyInstanceUID".format(fl))
         file_studyUID = None
     return mw, series_id, file_studyUID
 
 
+class SeriesID(NamedTuple):
+    series_number: int
+    protocol_name: str
+    file_studyUID: Optional[str] = None
+
+    def __str__(self) -> str:
+        s = f"{self.series_number}-{self.protocol_name}"
+        if self.file_studyUID is not None:
+            s += f"-{self.file_studyUID}"
+        return s
+
+
+@overload
 def group_dicoms_into_seqinfos(
-    files,
-    grouping,
-    file_filter=None,
-    dcmfilter=None,
-    flatten=False,
-    custom_grouping=None,
-):
+    files: list[str],
+    grouping: str,
+    file_filter: Optional[Callable[[str], Any]] = None,
+    dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]] = None,
+    flatten: Literal[False] = False,
+    custom_grouping: str
+    | Callable[
+        [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]], Any
+    ]
+    | None = None,
+) -> dict[Optional[str], dict[SeqInfo, list[str]]]:
+    ...
+
+
+@overload
+def group_dicoms_into_seqinfos(
+    files: list[str],
+    grouping: str,
+    file_filter: Optional[Callable[[str], Any]] = None,
+    dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]] = None,
+    *,
+    flatten: Literal[True],
+    custom_grouping: str
+    | Callable[
+        [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]], Any
+    ]
+    | None = None,
+) -> dict[SeqInfo, list[str]]:
+    ...
+
+
+def group_dicoms_into_seqinfos(
+    files: list[str],
+    grouping: str,
+    file_filter: Optional[Callable[[str], Any]] = None,
+    dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]] = None,
+    flatten: Literal[False, True] = False,
+    custom_grouping: str
+    | Callable[
+        [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]], Any
+    ]
+    | None = None,
+) -> dict[Optional[str], dict[SeqInfo, list[str]]] | dict[SeqInfo, list[str]]:
     """Process list of dicoms and return seqinfo and file group
     `seqinfo` contains per-sequence extract of fields from DICOMs which
     will be later provided into heuristics to decide on filenames
@@ -179,9 +242,10 @@ def group_dicoms_into_seqinfos(
     # per_accession_number = grouping == 'accession_number'
     lgr.info("Analyzing %d dicoms", len(files))
 
-    groups = [[], []]
-    mwgroup = []
-    studyUID = None
+    group_keys: list[SeriesID] = []
+    group_values: list[int] = []
+    mwgroup: list[dw.Wrapper] = []
+    studyUID: Optional[str] = None
 
     if file_filter:
         nfl_before = len(files)
@@ -197,7 +261,8 @@ def group_dicoms_into_seqinfos(
         if custom_grouping is None:
             raise RuntimeError("Custom grouping is not defined in heuristic")
         if callable(custom_grouping):
-            return custom_grouping(files, dcmfilter, SeqInfo)
+            return cast(Dict[SeqInfo, List[str]],
+                        custom_grouping(files, dcmfilter, SeqInfo))
         grouping = custom_grouping
         study_customgroup = None
 
@@ -207,9 +272,10 @@ def group_dicoms_into_seqinfos(
         if mwinfo is None:
             removeidx.append(idx)
             continue
-        mw, series_id, file_studyUID = mwinfo
+        mw, series_id_, file_studyUID = mwinfo
+        series_id = SeriesID(series_id_[0], series_id_[1])
         if per_studyUID:
-            series_id = series_id + (file_studyUID,)
+            series_id = series_id._replace(file_studyUID=file_studyUID)
 
         if flatten:
             if per_studyUID:
@@ -239,37 +305,38 @@ def group_dicoms_into_seqinfos(
                         mwgroup[idx].dcm_data.get("StudyInstanceUID") == file_studyUID
                     ), "Same series found for multiple different studies"
                 ingrp = True
-                series_id = (
+                series_id = SeriesID(
                     mwgroup[idx].dcm_data.SeriesNumber,
                     mwgroup[idx].dcm_data.ProtocolName,
                 )
                 if per_studyUID:
-                    series_id = series_id + (file_studyUID,)
-                groups[0].append(series_id)
-                groups[1].append(idx)
+                    series_id = series_id._replace(file_studyUID=file_studyUID)
+                group_keys.append(series_id)
+                group_values.append(idx)
 
         if not ingrp:
             mwgroup.append(mw)
-            groups[0].append(series_id)
-            groups[1].append(len(mwgroup) - 1)
+            group_keys.append(series_id)
+            group_values.append(len(mwgroup) - 1)
 
-    group_map = dict(zip(groups[0], groups[1]))
+    group_map = dict(zip(group_keys, group_values))
 
     if removeidx:
         # remove non DICOMS from files
         for idx in sorted(removeidx, reverse=True):
             del files[idx]
 
-    seqinfos = OrderedDict()
+    seqinfos: dict[Optional[str], dict[SeqInfo, list[str]]] = {}
+    flat_seqinfos: dict[SeqInfo, list[str]] = {}
     # for the next line to make any sense the series_id needs to
     # be sortable in a way that preserves the series order
     for series_id, mwidx in sorted(group_map.items()):
         mw = mwgroup[mwidx]
-        series_files = [files[i] for i, s in enumerate(groups[0]) if s == series_id]
+        series_files = [files[i] for i, s in enumerate(group_keys) if s == series_id]
         if per_studyUID:
-            studyUID = series_id[2]
-            series_id = series_id[:2]
-        series_id = "-".join(map(str, series_id))
+            studyUID = series_id.file_studyUID
+            series_id = series_id._replace(file_studyUID=None)
+        series_id_str = str(series_id)
         if mw.image_shape is None:
             # this whole thing has no image data (maybe just PSg DICOMs)
             # If this is a Siemens PhoenixZipReport or PhysioLog, keep it:
@@ -279,8 +346,9 @@ def group_dicoms_into_seqinfos(
             else:
                 # nothing to see here, just move on
                 continue
-        seqinfo = create_seqinfo(mw, series_files, series_id)
+        seqinfo = create_seqinfo(mw, series_files, series_id_str)
 
+        key: Optional[str]
         if per_studyUID:
             key = studyUID
         elif grouping == "accession_number":
@@ -306,35 +374,43 @@ def group_dicoms_into_seqinfos(
         )
 
         if not flatten:
-            if key not in seqinfos:
-                seqinfos[key] = OrderedDict()
-            seqinfos[key][seqinfo] = series_files
+            seqinfos.setdefault(key, {})[seqinfo] = series_files
         else:
-            seqinfos[seqinfo] = series_files
+            flat_seqinfos[seqinfo] = series_files
+
+    if not flatten:
+        entries = len(seqinfos)
+        subentries = sum(map(len, seqinfos.values()))
+    else:
+        entries = len(flat_seqinfos)
+        subentries = sum(map(len, flat_seqinfos.values()))
 
     if per_studyUID:
         lgr.info(
             "Generated sequence info for %d studies with %d entries total",
-            len(seqinfos),
-            sum(map(len, seqinfos.values())),
+            entries,
+            subentries,
         )
     elif grouping == "accession_number":
         lgr.info(
-            "Generated sequence info for %d accession numbers with %d " "entries total",
-            len(seqinfos),
-            sum(map(len, seqinfos.values())),
+            "Generated sequence info for %d accession numbers with %d entries total",
+            entries,
+            subentries,
         )
     else:
-        lgr.info("Generated sequence info with %d entries", len(seqinfos))
-    return seqinfos
+        lgr.info("Generated sequence info with %d entries", entries)
+    if not flatten:
+        return seqinfos
+    else:
+        return flat_seqinfos
 
 
-def get_reproducible_int(dicom_list: List[str]) -> int:
+def get_reproducible_int(dicom_list: list[str]) -> int:
     """Get integer that can be used to reproducibly sort input DICOMs, which is based on when they were acquired.
 
     Parameters
     ----------
-    dicom_list : List[str]
+    dicom_list : list[str]
         Paths to existing DICOM files
 
     Returns
@@ -410,9 +486,12 @@ def get_datetime_from_dcm(dcm_data: dcm.FileDataset) -> Optional[datetime.dateti
     series_time = dcm_data.get("SeriesTime")
     if not (series_date is None or series_time is None):
         return datetime.datetime.strptime(series_date + series_time, "%Y%m%d%H%M%S.%f")
+    return None
 
 
-def compress_dicoms(dicom_list, out_prefix, tempdirs, overwrite):
+def compress_dicoms(
+    dicom_list: list[str], out_prefix: str, tempdirs: TempDirs, overwrite: bool
+) -> Optional[str]:
     """Archives DICOMs into a tarball
 
     Also tries to do it reproducibly, so takes the date for files
@@ -425,7 +504,7 @@ def compress_dicoms(dicom_list, out_prefix, tempdirs, overwrite):
     out_prefix : str
       output path prefix, including the portion of the output file name
       before .dicom.tgz suffix
-    tempdirs : object
+    tempdirs : TempDirs
       TempDirs object to handle multiple tmpdirs
     overwrite : bool
       Overwrite existing tarfiles
@@ -441,7 +520,7 @@ def compress_dicoms(dicom_list, out_prefix, tempdirs, overwrite):
 
     if op.exists(outtar) and not overwrite:
         lgr.info("File {} already exists, will not overwrite".format(outtar))
-        return
+        return None
     # tarfile encodes current time.time inside making those non-reproducible
     # so we should choose which date to use.
     # Solution from DataLad although ugly enough:
@@ -478,7 +557,18 @@ def compress_dicoms(dicom_list, out_prefix, tempdirs, overwrite):
     return outtar
 
 
-def embed_dicom_and_nifti_metadata(dcmfiles, niftifile, infofile, bids_info):
+# Note: This function is passed to nipype by `embed_metadata_from_dicoms()`,
+# and nipype reparses the function source in a clean namespace that does not
+# have `from __future__ import annotations` enabled.  Thus, we need to use
+# Python 3.7-compatible annotations on this function, and any non-builtin types
+# used in the annotations need to be included by import statements passed to
+# the `nipype.Function` constructor.
+def embed_dicom_and_nifti_metadata(
+    dcmfiles: List[str],
+    niftifile: str,
+    infofile: str | Path,
+    bids_info: Optional[Dict[str, Any]],
+) -> None:
     """Embed metadata from nifti (affine etc) and dicoms into infofile (json)
 
     `niftifile` should exist. Its affine's orientation information is used while
@@ -521,12 +611,13 @@ def embed_dicom_and_nifti_metadata(dcmfiles, niftifile, infofile, bids_info):
         )
 
     orig_nii = nb.load(niftifile)
-    aff = orig_nii.affine
+    aff = orig_nii.affine  # type: ignore[attr-defined]
     ornt = nb.orientations.io_orientation(aff)
     axcodes = nb.orientations.ornt2axcodes(ornt)
     new_nii = stack.to_nifti(voxel_order="".join(axcodes), embed_meta=True)
-    meta_info = ds.NiftiWrapper(new_nii).meta_ext.to_json()
-    meta_info = json.loads(meta_info)
+    meta_info_str = ds.NiftiWrapper(new_nii).meta_ext.to_json()
+    meta_info = json.loads(meta_info_str)
+    assert isinstance(meta_info, dict)
 
     if bids_info:
         meta_info.update(bids_info)
@@ -536,15 +627,15 @@ def embed_dicom_and_nifti_metadata(dcmfiles, niftifile, infofile, bids_info):
 
 
 def embed_metadata_from_dicoms(
-    bids_options,
-    item_dicoms,
-    outname,
-    outname_bids,
-    prov_file,
-    scaninfo,
-    tempdirs,
-    with_prov,
-):
+    bids_options: Optional[str],
+    item_dicoms: list[str],
+    outname: str,
+    outname_bids: str,
+    prov_file: Optional[str],
+    scaninfo: str,
+    tempdirs: TempDirs,
+    with_prov: bool,
+) -> None:
     """
     Enhance sidecar information file with more information from DICOMs
 
@@ -568,7 +659,8 @@ def embed_metadata_from_dicoms(
     tmpdir = tempdirs(prefix="embedmeta")
 
     # We need to assure that paths are absolute if they are relative
-    item_dicoms = list(map(op.abspath, item_dicoms))
+    # <https://github.com/python/mypy/issues/9864>
+    item_dicoms = list(map(op.abspath, item_dicoms))  # type: ignore[arg-type]
 
     embedfunc = Node(
         Function(
@@ -579,6 +671,10 @@ def embed_metadata_from_dicoms(
                 "bids_info",
             ],
             function=embed_dicom_and_nifti_metadata,
+            imports=[
+                "from pathlib import Path",
+                "from typing import Any, Dict, List, Optional",
+            ],
         ),
         name="embedder",
     )
@@ -605,6 +701,7 @@ def embed_metadata_from_dicoms(
         res = embedfunc.run()
         set_readonly(scaninfo)
         if with_prov:
+            assert isinstance(prov_file, str)
             g = res.provenance.rdf()
             g.parse(prov_file, format="turtle")
             g.serialize(prov_file, format="turtle")
@@ -614,7 +711,12 @@ def embed_metadata_from_dicoms(
         os.chdir(cwd)
 
 
-def parse_private_csa_header(dcm_data, _public_attr, private_attr, default=None):
+def parse_private_csa_header(
+    dcm_data: dcm.dataset.Dataset,
+    _public_attr: str,
+    private_attr: str,
+    default: Optional[str] = None,
+) -> str:
     """
     Parses CSA header in cases where value is not defined publicly
 
@@ -649,4 +751,5 @@ def parse_private_csa_header(dcm_data, _public_attr, private_attr, default=None)
     except Exception as e:
         lgr.debug("Failed to parse CSA header: %s", str(e))
         val = default or ""
+    assert isinstance(val, str)
     return val

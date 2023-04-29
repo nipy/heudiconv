@@ -1,7 +1,11 @@
 """Test functions in heudiconv.convert module.
 """
+from __future__ import annotations
+
 from glob import glob
 import os.path as op
+from pathlib import Path
+from typing import Optional
 
 import pytest
 
@@ -19,7 +23,7 @@ from heudiconv.utils import load_heuristic
 from .utils import TESTS_DATA_PATH
 
 
-def test_update_complex_name():
+def test_update_complex_name() -> None:
     """Unit testing for heudiconv.convert.update_complex_name(), which updates
     filenames with the part field if appropriate.
     """
@@ -56,7 +60,7 @@ def test_update_complex_name():
     assert out_fn_test == base_fn
 
 
-def test_update_multiecho_name():
+def test_update_multiecho_name() -> None:
     """Unit testing for heudiconv.convert.update_multiecho_name(), which updates
     filenames with the echo field if appropriate.
     """
@@ -96,10 +100,10 @@ def test_update_multiecho_name():
     # Providing echo times as something other than a list should raise a TypeError
     base_fn = "sub-X_ses-Y_task-Z_run-01_bold"
     with pytest.raises(TypeError):
-        update_multiecho_name(metadata, base_fn, set(echo_times))
+        update_multiecho_name(metadata, base_fn, set(echo_times))  # type: ignore[arg-type]
 
 
-def test_update_uncombined_name():
+def test_update_uncombined_name() -> None:
     """Unit testing for heudiconv.convert.update_uncombined_name(), which updates
     filenames with the ch field if appropriate.
     """
@@ -135,10 +139,10 @@ def test_update_uncombined_name():
     # Providing echo times as something other than a list should raise a TypeError
     base_fn = "sub-X_ses-Y_task-Z_run-01_bold"
     with pytest.raises(TypeError):
-        update_uncombined_name(metadata, base_fn, set(channel_names))
+        update_uncombined_name(metadata, base_fn, set(channel_names))  # type: ignore[arg-type]
 
 
-def test_b0dwi_for_fmap(tmpdir, caplog):
+def test_b0dwi_for_fmap(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     """Make sure we raise a warning when .bvec and .bval files
     are present but the modality is not dwi.
     We check it by extracting a few DICOMs from a series with
@@ -147,13 +151,12 @@ def test_b0dwi_for_fmap(tmpdir, caplog):
     import logging
 
     caplog.set_level(logging.WARNING)
-    tmppath = tmpdir.strpath
     subID = "b0dwiForFmap"
     args = [
         "-c",
         "dcm2niix",
         "-o",
-        str(tmpdir),
+        str(tmp_path),
         "-b",
         "-f",
         "test_b0dwi_for_fmap",
@@ -167,18 +170,16 @@ def test_b0dwi_for_fmap(tmpdir, caplog):
     # assert that it raised a warning that the fmap directory will contain
     # bvec and bval files.
     expected_msg = DW_IMAGE_IN_FMAP_FOLDER_WARNING.format(
-        folder=op.join(tmppath, "sub-%s", "fmap") % subID
+        folder=op.join(tmp_path, f"sub-{subID}", "fmap")
     )
     assert any(expected_msg in c.message for c in caplog.records)
 
     # check that both 'fmap' and 'dwi' directories have been extracted and they contain
     # *.bvec and a *.bval files
     for mod in ["fmap", "dwi"]:
-        assert op.isdir(op.join(tmppath, "sub-%s", mod) % (subID))
+        assert op.isdir(op.join(tmp_path, f"sub-{subID}", mod))
         for ext in ["bval", "bvec"]:
-            assert glob(
-                op.join(tmppath, "sub-%s", mod, "sub-%s_*.%s") % (subID, subID, ext)
-            )
+            assert glob(op.join(tmp_path, f"sub-{subID}", mod, f"sub-{subID}_*.{ext}"))
 
 
 # Test two scenarios for each case:
@@ -197,8 +198,14 @@ def test_b0dwi_for_fmap(tmpdir, caplog):
     ["example", "reproin", None],  # heuristics/example.py, heuristics/reproin.py
 )
 def test_populate_intended_for(
-    tmpdir, monkeypatch, capfd, subjects, sesID, _expected_session_folder, heuristic
-):
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capfd: pytest.CaptureFixture[str],
+    subjects: list[str],
+    sesID: Optional[str],
+    _expected_session_folder: str,
+    heuristic: Optional[str],
+) -> None:
     """
     Test convert
 
@@ -208,22 +215,23 @@ def test_populate_intended_for(
     """
 
     def mock_populate_intended_for(
-        session, matching_parameters="Shims", criterion="Closest"
-    ):
+        session: str,
+        matching_parameters: str | list[str] = "Shims",
+        criterion: str = "Closest",
+    ) -> None:
         """
         Pretend we run populate_intended_for, but just print out the arguments.
         """
         print("session: {}".format(session))
         print("matching_parameters: {}".format(matching_parameters))
         print("criterion: {}".format(criterion))
-        return
 
     # mock the "populate_intended_for":
     monkeypatch.setattr(
         heudiconv.convert, "populate_intended_for", mock_populate_intended_for
     )
 
-    outdir = op.join(str(tmpdir), "foo")
+    outdir = op.join(tmp_path, "foo")
     outfolder = (
         op.join(outdir, "sub-{sID}", "ses-{ses}")
         if sesID
@@ -233,7 +241,7 @@ def test_populate_intended_for(
 
     # items are a list of tuples, with each tuple having three elements:
     #   prefix, outtypes, item_dicoms
-    items = [
+    items: list[tuple[str, tuple[str, ...], list[str]]] = [
         (
             op.join(outfolder, "anat", sub_ses + "_T1w").format(sID=s, ses=sesID),
             ("",),
@@ -242,17 +250,17 @@ def test_populate_intended_for(
         for s in subjects
     ]
 
-    heuristic = load_heuristic(heuristic) if heuristic else None
+    heuristic_mod = load_heuristic(heuristic) if heuristic else None
     heudiconv.convert.convert(
         items,
         converter="",
         scaninfo_suffix=".json",
         custom_callable=None,
         populate_intended_for_opts=getattr(
-            heuristic, "POPULATE_INTENDED_FOR_OPTS", None
+            heuristic_mod, "POPULATE_INTENDED_FOR_OPTS", None
         ),
-        with_prov=None,
-        bids_options=[],
+        with_prov=False,
+        bids_options="",
         outdir=outdir,
         min_meta=True,
         overwrite=False,
@@ -260,7 +268,7 @@ def test_populate_intended_for(
     output = capfd.readouterr()
     # if the heuristic module has a 'POPULATE_INTENDED_FOR_OPTS' field, we expect
     # to get the output of the mock_populate_intended_for, otherwise, no output:
-    pif_cfg = getattr(heuristic, "POPULATE_INTENDED_FOR_OPTS", None)
+    pif_cfg = getattr(heuristic_mod, "POPULATE_INTENDED_FOR_OPTS", None)
     if pif_cfg:
         assert all(
             [
