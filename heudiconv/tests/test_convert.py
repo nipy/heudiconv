@@ -13,6 +13,7 @@ from heudiconv.convert import (
     update_complex_name,
     update_multiecho_name,
     update_uncombined_name,
+    update_multiorient_name,
 )
 
 from .utils import TESTS_DATA_PATH
@@ -137,6 +138,16 @@ def test_update_uncombined_name():
     with pytest.raises(TypeError):
         update_uncombined_name(metadata, base_fn, set(channel_names))
 
+def test_update_multiorient_name():
+    """Unit testing for heudiconv.convert.update_multiorient_name(), which updates
+    filenames with the acq field if appropriate.
+    """
+    # Standard name update
+    base_fn = 'sub-X_ses-Y_task-Z_run-01_bold'
+    metadata = {'ImageOrientationPatientDICOM': [0,1,0,0,0,-1]}
+    out_fn_true = 'sub-X_ses-Y_acq-sagittal_task-Z_run-01_bold'
+    out_fn_test = update_multiorient_name(metadata, base_fn)
+    assert out_fn_test == out_fn_true
 
 def test_b0dwi_for_fmap(tmpdir, caplog):
     """Make sure we raise a warning when .bvec and .bval files
