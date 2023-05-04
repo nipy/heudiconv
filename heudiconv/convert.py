@@ -448,7 +448,7 @@ def update_uncombined_name(metadata, filename, channel_names):
     return filename
 
 
-def update_mutliorient_name(bids_meta, this_prefix_basename):
+def update_multiorient_name(bids_meta, this_prefix_basename):
     if 'acq-' in this_prefix_basename:
         lgr.warning('Not embedding multi-orientation information as prefix already uses acq- parameter.')
         return this_prefix_basename
@@ -848,7 +848,7 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
         )))
 
         is_multiorient = len(iops) > 1
-        
+
         ### Loop through the bids_files, set the output name and save files
         for fl, suffix, bids_file, bids_meta in zip(res_files, suffixes, bids_files, bids_metas):
 
@@ -873,6 +873,11 @@ def save_converted_files(res, item_dicoms, bids_options, outtype, prefix, outnam
                 if is_uncombined:
                     this_prefix_basename = update_uncombined_name(
                         bids_meta, this_prefix_basename, channel_names
+                    )
+
+                if is_multiorient:
+                    this_prefix_basename = update_multiorient_name(
+                        bids_meta, this_prefix_basename
                     )
 
             # Fallback option:
