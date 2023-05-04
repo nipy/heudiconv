@@ -12,7 +12,7 @@ jobs:
     if: "!contains(github.event.head_commit.message, 'ci skip') && !contains(github.event.head_commit.message, 'skip ci')"
     steps:
       - name: Checkout source
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
@@ -28,13 +28,13 @@ jobs:
         id: auto-version
         run: |
           version="$(~/auto version)"
-          echo "::set-output name=version::$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
         if: steps.auto-version.outputs.version != ''
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: '^3.7'
 
@@ -67,8 +67,9 @@ jobs:
         run: |
           docker build \
             -t nipy/heudiconv:master \
+            -t nipy/heudiconv:unstable \
             -t nipy/heudiconv:latest \
-            -t nipy/heudiconv:"$(git describe)" \
+            -t nipy/heudiconv:"$(git describe | sed -e 's,^v,,g')" \
             .
 
       - name: Push Docker images

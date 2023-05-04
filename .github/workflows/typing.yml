@@ -1,0 +1,27 @@
+name: Type-check
+
+on:
+  - push
+  - pull_request
+
+jobs:
+  typing:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.7'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --upgrade tox
+
+      - name: Run type checker
+        run: tox -e typing

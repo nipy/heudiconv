@@ -1,0 +1,4 @@
+[codespell]
+skip = .git,.venv,venvs,*.svg,_build
+# te -- TE as codespell is case insensitive
+ignore-words-list = bu,nd,te

@@ -1,3 +1,155 @@
+# v0.12.2 (Tue Mar 14 2023)
+
+#### 🏠 Internal
+
+- [DATALAD RUNCMD] produce updated dockerfile [#652](https://github.com/nipy/heudiconv/pull/652) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 1
+
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
+# v0.12.1 (Tue Mar 14 2023)
+
+#### 🐛 Bug Fix
+
+- Re-add explicit instructions to install dcm2niix "manually" and remove it from install_requires [#651](https://github.com/nipy/heudiconv/pull/651) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### 📝 Documentation
+
+- Contributing guide. [#641](https://github.com/nipy/heudiconv/pull/641) ([@TheChymera](https://github.com/TheChymera))
+- Reword and correct punctuation on installation.rst [#643](https://github.com/nipy/heudiconv/pull/643) ([@yarikoptic](https://github.com/yarikoptic) [@candleindark](https://github.com/candleindark))
+
+#### Authors: 3
+
+- Horea Christian ([@TheChymera](https://github.com/TheChymera))
+- Isaac To ([@candleindark](https://github.com/candleindark))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
+# v0.12.0 (Tue Feb 21 2023)
+
+#### 🚀 Enhancement
+
+- strip non-alphanumeric from session ids too [#647](https://github.com/nipy/heudiconv/pull/647) ([@keithcallenberg](https://github.com/keithcallenberg) [@yarikoptic](https://github.com/yarikoptic))
+
+#### 🐛 Bug Fix
+
+- Docker images: tag also as "unstable", strip "v" prefix, and avoid building in non-release workflow for releases. [#642](https://github.com/nipy/heudiconv/pull/642) ([@yarikoptic](https://github.com/yarikoptic))
+- add install link to README [#640](https://github.com/nipy/heudiconv/pull/640) ([@asmacdo](https://github.com/asmacdo))
+- Setting git author and email in test environment [#631](https://github.com/nipy/heudiconv/pull/631) ([@TheChymera](https://github.com/TheChymera))
+- Duecredit dcm2niix [#622](https://github.com/nipy/heudiconv/pull/622) ([@yarikoptic](https://github.com/yarikoptic))
+- Do not issue warning if cannot parse _task entity [#621](https://github.com/nipy/heudiconv/pull/621) ([@yarikoptic](https://github.com/yarikoptic))
+- Provide codespell config and workflow [#619](https://github.com/nipy/heudiconv/pull/619) ([@yarikoptic](https://github.com/yarikoptic))
+- BF: Use .get in group_dicoms_into_seqinfos to not puke if SeriesDescription is missing [#622](https://github.com/nipy/heudiconv/pull/622) ([@yarikoptic](https://github.com/yarikoptic))
+- DOC: do provide short version for sphinx [#609](https://github.com/nipy/heudiconv/pull/609) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### ⚠️ Pushed to `master`
+
+- DOC: add clarification on where docs/requirements.txt should be "installed" from ([@yarikoptic](https://github.com/yarikoptic))
+- fix minor typo ([@yarikoptic](https://github.com/yarikoptic))
+- DOC: fixed the comment. Original was copy/pasted from DataLad ([@yarikoptic](https://github.com/yarikoptic))
+
+#### 🏠 Internal
+
+- dcm2niix explicitly noted as a (PyPI) dependency and removed from being installed via apt-get etc [#628](https://github.com/nipy/heudiconv/pull/628) ([@TheChymera](https://github.com/TheChymera) [@yarikoptic](https://github.com/yarikoptic))
+
+#### 📝 Documentation
+
+- Reword number of intended ideas in README.rst [#639](https://github.com/nipy/heudiconv/pull/639) ([@candleindark](https://github.com/candleindark))
+- Add a bash anon-cmd to be used to incrementally anonymize sids [#615](https://github.com/nipy/heudiconv/pull/615) ([@yarikoptic](https://github.com/yarikoptic))
+- Reword and correct punctuation on usage.rst [#644](https://github.com/nipy/heudiconv/pull/644) ([@candleindark](https://github.com/candleindark) [@yarikoptic](https://github.com/yarikoptic))
+- Clarify the infotodict function [#645](https://github.com/nipy/heudiconv/pull/645) ([@yarikoptic](https://github.com/yarikoptic))
+- Added distribution badges [#632](https://github.com/nipy/heudiconv/pull/632) ([@TheChymera](https://github.com/TheChymera))
+- Capitalize sentences and end sentences with period [#629](https://github.com/nipy/heudiconv/pull/629) ([@candleindark](https://github.com/candleindark))
+- Tune up .mailmap to harmonize Pablo, Dae and Mathias [#629](https://github.com/nipy/heudiconv/pull/629) ([@yarikoptic](https://github.com/yarikoptic))
+- Add HOWTO 101 section, with references to ReproIn to README.rst [#623](https://github.com/nipy/heudiconv/pull/623) ([@yarikoptic](https://github.com/yarikoptic))
+- minor fix -- Fix use of code:: directive [#623](https://github.com/nipy/heudiconv/pull/623) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### 🧪 Tests
+
+- Add 3.11 to be tested etc [#635](https://github.com/nipy/heudiconv/pull/635) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 5
+
+- Austin Macdonald ([@asmacdo](https://github.com/asmacdo))
+- Horea Christian ([@TheChymera](https://github.com/TheChymera))
+- Isaac To ([@candleindark](https://github.com/candleindark))
+- Keith Callenberg ([@keithcallenberg](https://github.com/keithcallenberg))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
+# v0.11.6 (Thu Nov 03 2022)
+
+#### 🏠 Internal
+
+- Delete .dockerignore [#607](https://github.com/nipy/heudiconv/pull/607) ([@jwodder](https://github.com/jwodder))
+
+#### 📝 Documentation
+
+- DOC: Various fixes to make RTD build the docs again [#608](https://github.com/nipy/heudiconv/pull/608) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 2
+
+- John T. Wodder II ([@jwodder](https://github.com/jwodder))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
+# v0.11.5 (Thu Nov 03 2022)
+
+#### 🐛 Bug Fix
+
+- Fix certificate issue as indicated in #595 [#597](https://github.com/nipy/heudiconv/pull/597) ([@neurorepro](https://github.com/neurorepro))
+- BF docker build: use python3.9 (not 3.7 which gets upgraded to 3.9) and newer dcm2niix [#596](https://github.com/nipy/heudiconv/pull/596) ([@yarikoptic](https://github.com/yarikoptic))
+- Fixup miniconda spec for neurodocker so it produces dockerfile now [#596](https://github.com/nipy/heudiconv/pull/596) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### 🏠 Internal
+
+- Update GitHub Actions action versions [#601](https://github.com/nipy/heudiconv/pull/601) ([@jwodder](https://github.com/jwodder))
+- Set action step outputs via $GITHUB_OUTPUT [#600](https://github.com/nipy/heudiconv/pull/600) ([@jwodder](https://github.com/jwodder))
+
+#### 📝 Documentation
+
+- DOC: codespell fix a few typos in code comments [#605](https://github.com/nipy/heudiconv/pull/605) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 3
+
+- John T. Wodder II ([@jwodder](https://github.com/jwodder))
+- Michael ([@neurorepro](https://github.com/neurorepro))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
+# v0.11.4 (Thu Sep 29 2022)
+
+#### 🐛 Bug Fix
+
+- install dcmstack straight from github until it is released [#593](https://github.com/nipy/heudiconv/pull/593) ([@yarikoptic](https://github.com/yarikoptic))
+- DOC: provide rudimentary How to contribute section in README.rst ([@yarikoptic](https://github.com/yarikoptic))
+
+#### ⚠️ Pushed to `master`
+
+- Check out a full clone when testing ([@jwodder](https://github.com/jwodder))
+- Convert Travis workflow to GitHub Actions ([@jwodder](https://github.com/jwodder))
+- BF(docker): replace old -tipsy with -y -all for conda clean as neurodocker does now ([@yarikoptic](https://github.com/yarikoptic))
+- adjusted script for neurodocker although it does not work ([@yarikoptic](https://github.com/yarikoptic))
+
+#### 🏠 Internal
+
+- 0.9 of dcmstack was released, no need for github version [#594](https://github.com/nipy/heudiconv/pull/594) ([@yarikoptic](https://github.com/yarikoptic))
+- Minor face-lifts to ReproIn: align doc and code better to BIDS terms, address deprecation warnings etc [#569](https://github.com/nipy/heudiconv/pull/569) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 2
+
+- John T. Wodder II ([@jwodder](https://github.com/jwodder))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v0.11.3 (Thu May 12 2022)
 
 #### 🏠 Internal
@@ -52,7 +204,7 @@
 - try a simple fix for wrongly ordered files in tar file [#535](https://github.com/nipy/heudiconv/pull/535) ([@bpinsard](https://github.com/bpinsard))
 - BF: Fix the order of the 'echo' entity in the filename [#542](https://github.com/nipy/heudiconv/pull/542) ([@pvelasco](https://github.com/pvelasco))
 - ENH: add HeudiconvVersion to sidecar .json files [#529](https://github.com/nipy/heudiconv/pull/529) ([@yarikoptic](https://github.com/yarikoptic))
-- BF (TST): make anonymize_script actually output anything and map determinstically [#511](https://github.com/nipy/heudiconv/pull/511) ([@yarikoptic](https://github.com/yarikoptic))
+- BF (TST): make anonymize_script actually output anything and map deterministically [#511](https://github.com/nipy/heudiconv/pull/511) ([@yarikoptic](https://github.com/yarikoptic))
 - Rename DICOMCONVERT_README.md to README.md [#4](https://github.com/nipy/heudiconv/pull/4) ([@satra](https://github.com/satra))
 
 #### ⚠️ Pushed to `master`
@@ -97,7 +249,7 @@ Various improvements and compatibility/support (dcm2niix, datalad) changes.
 
 - Python 3.5 EOLed, supported (tested) versions now: 3.6 - 3.9
 - In reprorin heuristic, allow for having multiple accessions since now there is
-  `-g all` groupping ([#508][])
+  `-g all` grouping ([#508][])
 - For BIDS, produce a singular `scans.json` at the top level, and not one per
   sub/ses (generates too many identical files) ([#507][])
 
@@ -418,7 +570,7 @@ A usable release to support [DBIC][] use-case
 A somewhat working release on the way to support [DBIC][] use-case
 ## Added
 - more tests
-- groupping of dicoms by series if provided
+- grouping of dicoms by series if provided
 - many more features and fixes
 
 # [0.2] - 2016-10-20

@@ -2,4 +2,4 @@
 Changes
 =======
 
-.. mdinclude:: ../CHANGELOG.md
+.. literalinclude:: ../CHANGELOG.md

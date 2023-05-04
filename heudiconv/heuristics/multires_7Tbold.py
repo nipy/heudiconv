@@ -1,82 +1,104 @@
-import os
+from __future__ import annotations
 
-scaninfo_suffix = '.json'
+from typing import Optional
+
+import pydicom as dcm
+
+from heudiconv.utils import SeqInfo
+
+scaninfo_suffix = ".json"
 
 
-def create_key(template, outtype=('nii.gz',), annotation_classes=None):
+def create_key(
+    template: Optional[str],
+    outtype: tuple[str, ...] = ("nii.gz",),
+    annotation_classes: None = None,
+) -> tuple[str, tuple[str, ...], None]:
     if template is None or not template:
-        raise ValueError('Template must be a valid format string')
-    return template, outtype, annotation_classes
+        raise ValueError("Template must be a valid format string")
+    return (template, outtype, annotation_classes)
 
 
-def filter_dicom(dcmdata):
+def filter_dicom(dcmdata: dcm.dataset.Dataset) -> bool:
     """Return True if a DICOM dataset should be filtered out, else False"""
-    comments = getattr(dcmdata, 'ImageComments', '')
+    comments = getattr(dcmdata, "ImageComments", "")
     if len(comments):
-        if 'reference volume' in comments.lower():
+        if "reference volume" in comments.lower():
             print("Filter out image with comment '%s'" % comments)
             return True
     return False
 
 
-def extract_moco_params(basename, outypes, dicoms):
-    if '_rec-dico' not in basename:
+def extract_moco_params(
+    basename: str, _outypes: tuple[str, ...], dicoms: list[str]
+) -> None:
+    if "_rec-dico" not in basename:
         return
-    from dicom import read_file as dcm_read
+    from pydicom import dcmread
+
     # get acquisition time for all dicoms
-    dcm_times = [(d,
-                  float(dcm_read(d, stop_before_pixels=True).AcquisitionTime))
-                    for d in dicoms]
-    # store MoCo info from image comments sorted by acqusition time
-    moco = ['\t'.join(
-        [str(float(i)) for i in dcm_read(fn, stop_before_pixels=True).ImageComments.split()[1].split(',')])
-                for fn, t in sorted(dcm_times, key=lambda x: x[1])]
-    outname = basename[:-4] + 'recording-motion_physio.tsv'
-    with open(outname, 'wt') as fp:
+    dcm_times = [
+        (d, float(dcmread(d, stop_before_pixels=True).AcquisitionTime)) for d in dicoms
+    ]
+    # store MoCo info from image comments sorted by acquisition time
+    moco = [
+        "\t".join(
+            [
+                str(float(i))
+                for i in dcmread(fn, stop_before_pixels=True)
+                .ImageComments.split()[1]
+                .split(",")
+            ]
+        )
+        for fn, t in sorted(dcm_times, key=lambda x: x[1])
+    ]
+    outname = basename[:-4] + "recording-motion_physio.tsv"
+    with open(outname, "wt") as fp:
         for m in moco:
-            fp.write('%s\n' % (m,))
+            fp.write("%s\n" % (m,))
+
 
 custom_callable = extract_moco_params
 
 
-def infotodict(seqinfo):
+def infotodict(
+    seqinfo: list[SeqInfo],
+) -> dict[tuple[str, tuple[str, ...], None], list[str]]:
     """Heuristic evaluator for determining which runs belong where
 
-    allowed template fields - follow python string module: 
+    allowed template fields - follow python string module:
 
-    item: index within category 
-    subject: participant id 
+    item: index within category
+    subject: participant id
     seqitem: run number during scanning
     subindex: sub index within group
     """
 
-    label_map = {
-        'movie': 'movielocalizer',
-        'retmap': 'retmap',
-        'visloc': 'objectcategories',
-    }
-    info = {}
+    info: dict[tuple[str, tuple[str, ...], None], list[str]] = {}
     for s in seqinfo:
-        if '_bold_' not in s[12]:
+        if "_bold_" not in s.protocol_name:
             continue
-        if not '_coverage'in s[12]:
-            label = 'orientation%s_run-{item:02d}'
+        if "_coverage" not in s.protocol_name:
+            label = "orientation%s_run-{item:02d}"
         else:
-            label = 'coverage%s'
-        resolution = s[12].split('_')[5][:-3]
-        assert(float(resolution))
-        if s[13] == True:
-            label = label % ('_rec-dico',)
+            label = "coverage%s"
+        resolution = s.protocol_name.split("_")[5][:-3]
+        assert float(resolution)
+        if s.is_motion_corrected:
+            label = label % ("_rec-dico",)
         else:
-            label = label % ('',)
+            label = label % ("",)
 
-        templ = 'ses-%smm/func/{subject}_ses-%smm_task-%s_bold' \
-                % (resolution, resolution, label)
+        templ = "ses-%smm/func/{subject}_ses-%smm_task-%s_bold" % (
+            resolution,
+            resolution,
+            label,
+        )
 
         key = create_key(templ)
 
         if key not in info:
             info[key] = []
-        info[key].append(s[2])
+        info[key].append(s.series_id)
 
     return info
