@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+
+from pathlib import Path
+import yaml
+import json
+import subprocess
+
+
+template = Path('email-template.txt').read_text()
+
+
+def email_one(invitee):
+    email = template.format(**invitee)
+    r = subprocess.run(
+        ['sendmail', '--read-envelope-from', '-t'],
+        input=email,
+        text=True,
+        capture_output=True)
+    if r.returncode:
+        raise RuntimeError(r)
+    else:
+        print(f"Emailed {invitee['name']} to {invitee['email']}")
+
+
+def email_all(invitees_path, paper_path):
+    with open(invitees_path) as f:
+        invitees = json.loads(f.read())
+
+    with open(paper_path) as f:
+        y = next(yaml.load_all(f, Loader=yaml.SafeLoader))
+        authors = y['authors']
+    author_names = [author['name'].split('^')[0] for author in authors]
+    for i in invitees:
+        if i.get('status') != 'emailed':  # if any record already - skip for now
+            print(f"Skip {i['name']}: {i['status']}")
+            continue
+        if i['name'] in author_names:
+            print(f"Skip {i['name']}: already among authors")
+            i['status'] = 'co-author'
+            continue
+        # debug
+        # if i['name'].startswith('Joey Hess'): # Yaros'):
+        #      email_one(i)
+        # continue
+        try:
+            #print(f"TODO: {i['name']} <{i['email']}>")
+            #pass
+            email_one(i)
+            i['status'] = 'emailed'
+        except Exception as exc:
+            print(f"Failed to email {i['name']}: {exc}")
+            i['status'] = 'email-failed'
+
+    with open(invitees_path, 'w') as f:
+        json.dump(invitees, f, indent=2)
+
+# one/two time use -- will not do it pretty, although should have
+# just done all this scripting inside that repo. good idea too late
+# to be worth bothering ATM
+email_all("invitees.json", "../heudiconv-paper-joss/paper.md")

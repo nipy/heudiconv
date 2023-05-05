@@ -1,0 +1,180 @@
+#!/usr/bin/env python3
+
+import click
+from collections import defaultdict
+import json
+#import fscacher
+import tqdm
+import requests
+import re
+import subprocess
+import os
+
+import difflib
+
+from fscacher import PersistentCache
+emails_cache = PersistentCache("joss-authors-collector")
+
+
+def get_human_id(rec):
+    ret = rec['name']
+    # login = rec.get('login', '')
+    # if login:
+    #     ret += f' ({login})'
+    if not ret:
+        raise ValueError(f"Empty human in {rec}")
+    return ret.lower()
+
+
+def create_human(rec):
+    return dict(
+                name=rec['name'],
+                login=rec.get('login', None),
+                id=get_human_id(rec),
+                opened=[],
+                participated=[],
+                commits=0,
+                email=rec.get('email')
+            )
+
+
+@emails_cache.memoize
+def get_user_email(login):
+    resp = requests.get(
+        f"https://api.github.com/users/{login}",
+        headers={"Authorization": "token %s" % os.environ['GH_TOKEN']}
+    )
+    j = json.loads(resp.content)
+    return j.get('email', None)
+
+
+def get_committers(path):
+    out = subprocess.run(
+        ['git', 'shortlog', '-sn', '-e'],
+        capture_output=True,
+        cwd=path
+    )
+    stdout = out.stdout.decode()
+    for line in stdout.split(os.linesep):
+        line = line.strip()
+        if not line:
+            continue
+        g = re.match(
+            '^\s*(?P<commits>\d*)\t(?P<name>.*) <(?P<email>.*)>',
+            line
+        ).groupdict()
+        if g['name'] in ('Yarchael', 'Neuroimaging Community'):
+            # I believe it is me &| Michael or some undisclosed/demo - just skip
+            continue
+        if not g:
+            raise ValueError(line)
+        yield g
+
+
+@click.command()
+@click.option("--repo-path", type=click.Path(exists=True, file_okay=False, dir_okay=True))
+def summary(repo_path):
+    with open("all-bugs.json") as f:
+        bugs = json.load(f)
+    print(f"Loaded {len(bugs)} bugs")
+    humans = {}
+    for bug in tqdm.tqdm(bugs, leave=False):
+        author = bug['author']
+        # our own id
+        author_id = get_human_id(author)
+        url = bug['metadata']['github-url']
+        if author_id not in humans:
+            humans[author_id] = create_human(author)
+        humans[author_id]['opened'].append(url)
+
+        for p in bug['participants']:
+            p_id = get_human_id(p)
+            if p['login'].lower() in ('yarikoptic-gitmate', 'yarikoptic-private'):
+                continue
+            if p_id != author_id:
+                if p_id not in humans:
+                    humans[p_id] = create_human(p)
+                humans[p_id]["participated"].append(url)
+
+    # get direct contributors
+    for author in get_committers(repo_path):
+        author_id = get_human_id(author)
+        if author_id not in humans:
+            # let's try to match "loosely" based on name or email
+            name_map = {h['name'].lower(): i for i, h in humans.items()}
+            suggestions = difflib.get_close_matches(author['name'].lower(), name_map)
+            if suggestions:
+                print(f"Taking {suggestions[0]} for {author_id}")
+                author_id = name_map[suggestions[0]]
+                # take our mailmap as canonical source for full names
+                humans[author_id]['name'] = author['name']
+        if author_id not in humans:
+            print(f"Adding contributor without issues: {author}")
+            humans[author_id] = create_human(author)
+        rec = humans[author_id]
+        rec['commits'] = int(author['commits'])
+        if not rec['email']:
+            rec['email'] = author['email']
+
+    if os.path.exists("custom.json"):
+        with open('custom.json') as f:
+            custom = json.load(f)
+            for i, rec in custom.items():
+                for k, v in rec.items():
+                    if k == 'comment':
+                        continue
+                    humans[i][k] = v
+
+    for rec in tqdm.tqdm(humans.values(), leave=False):
+        rec['all'] = len(set(rec['opened'] + rec['participated'])) + rec['commits']
+        if not rec.get('email'):
+            if rec.get('login'):
+                rec['email'] = get_user_email(rec['login'])
+            else:
+                print(f"Do not know login for {rec['name']} to get email")
+
+    # we do not care about individual issue for now, so let's replace with count
+    for h in humans.values():
+        h['opened'] = len(h['opened'])
+        h['participated'] = len(h['participated'])
+    # report in decreasing order
+    to_invite = [h for h in humans.values() if h['all'] >= 3]
+    to_be_thankful_to = [h for h in humans.values() if h['all'] < 3]
+
+    print(f"Inviting {len(to_invite)} from {len(humans)}")
+    custom_to_add = {
+        rec['id']: {"email": None, "name": rec['name']}
+        for rec in to_invite
+        if not rec['email']
+    }
+    if custom_to_add:
+        print(f"Have no email for {json.dumps(custom_to_add, indent=2)}")
+
+    to_invite = sorted(to_invite, key=lambda x: x['all'])[::-1]
+    with open('invitees.json', 'w') as f:
+        json.dump(to_invite, f, indent=2)
+
+    with open('paper-header.yaml', 'w') as f:
+        for p in to_invite:
+            # Already there
+            # if p['name'] in ['Yaroslav O. Halchenko', 'Adina Wagner', 'Vanessa Sochat', 'Michael Hanke']:
+            #     continue
+            print(f"""\
+ - name: {p['name']}  # {p['commits']} commits, issues: opened {p['opened']} participated in {p['participated']}
+   orcid: {p.get('orcid', '')}
+   affiliation: {p.get('affiliation', " # add full names if not yet listed, or indexes if already are")}""", file=f)
+    # Let's generate perspective list of authors
+    # with open("all-humans.txt", "w") as f:
+    #     print('Format: # name (login) <{email>}: #bugs-opened #bugs-participated -> #bugs-opened+participated', file=f)
+    #     for i, human in enumerate(sorted(humans.values(), key=lambda x: x['all'])[::-1], 1):
+    #         if human['all'] >= 3:
+    #             print("{} {} <{}>: {} {} {} -> {} ".format(
+    #                 i, human['name'], human['email'],
+    #                 human['opened'], human['participated'], human['commits'], human['all']),
+    #                 file=f)
+    #         else:
+    #             print(f"skipping {human['name']}")
+
+
+if __name__ == '__main__':
+    summary()
