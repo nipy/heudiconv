@@ -1,4 +1,4 @@
- - name: Yaroslav Halchenko  # 624 commits, issues: opened 81 participated in 146
+ - name: Yaroslav Halchenko  # 625 commits, issues: opened 81 participated in 146
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Mathias Goncalves  # 5 commits, issues: opened 16 participated in 98
@@ -8,9 +8,6 @@
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Taylor Salo  # 76 commits, issues: opened 11 participated in 4
-   orcid: 
-   affiliation:  # add full names if not yet listed, or indexes if already are
- - name: DBIC BIDS Team  # 38 commits, issues: opened 0 participated in 0
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Pablo Velasco  # 4 commits, issues: opened 6 participated in 22
@@ -37,22 +34,25 @@
  - name: github-actions  # 0 commits, issues: opened 0 participated in 12
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
- - name: Michael  # 1 commits, issues: opened 7 participated in 3
-   orcid: 
-   affiliation:  # add full names if not yet listed, or indexes if already are
  - name: James Kent  # 8 commits, issues: opened 3 participated in 0
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
  - name: auto  # 10 commits, issues: opened 0 participated in 0
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
- - name: Basile  # 1 commits, issues: opened 6 participated in 1
+ - name: Michael  # 0 commits, issues: opened 7 participated in 3
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Basile Pinsard  # 1 commits, issues: opened 6 participated in 1
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Ted Strauss  # 0 commits, issues: opened 8 participated in 0
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
  - name: John T. Wodder II  # 1 commits, issues: opened 2 participated in 4
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Christopher J. Markiewicz  # 4 commits, issues: opened 1 participated in 2
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Darren Lukas  # 4 commits, issues: opened 1 participated in 2
@@ -95,9 +95,6 @@
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Austin Macdonald  # 2 commits, issues: opened 1 participated in 1
-   orcid: 
-   affiliation:  # add full names if not yet listed, or indexes if already are
- - name: Christopher J. Markiewicz  # 1 commits, issues: opened 1 participated in 2
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
  - name: araikes  # 0 commits, issues: opened 3 participated in 1
