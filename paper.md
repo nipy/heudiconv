@@ -68,6 +68,8 @@ HeuDiConv was initially developed to implement common for every lab logic (group
 Such decision making is implemented in *HeuDiConv heuristics*, which are implemented as Python modules following some minimalistic specified interfaces documented in HeuDiConv documentation (https://heudiconv.readthedocs.io/en/latest/heuristics.html).
 HeuDiConv, if instructed to operate in BIDS mode (`--bids` flag) after heuristic provides base naming instructions, takes care about correct placement of files in the hierarchy, naming of multi-echo and other split files, etc.
 
+![**HeuDiConv automates the keystone conversion step in reproducible data handling, without compromising operator flexibility.** The showcased set-up depicts a 2-machine infrastructure, with heudiconv operating on the same machine as subsequent analysis steps for data in a standardized and shareable representation. For more advanced usage at institutions with dedicated infrastructure, HeuDiConv can operate on an additional third machine, interfacing between the depicted two, and dedicated to data repositing, versioning, and backup.](figs/workflow.pdf)
+
 ## Exemplar heuristics
 
 ### Convertall
