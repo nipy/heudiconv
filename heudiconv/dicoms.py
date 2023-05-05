@@ -9,7 +9,17 @@ import os.path as op
 from pathlib import Path
 import sys
 import tarfile
-from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, cast, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    NamedTuple,
+    Optional,
+    Union,
+    cast,
+    overload,
+)
 from unittest.mock import patch
 import warnings
 
@@ -264,8 +274,9 @@ def group_dicoms_into_seqinfos(
         if custom_grouping is None:
             raise RuntimeError("Custom grouping is not defined in heuristic")
         if callable(custom_grouping):
-            return cast(Dict[SeqInfo, List[str]],
-                        custom_grouping(files, dcmfilter, SeqInfo))
+            return cast(
+                Dict[SeqInfo, List[str]], custom_grouping(files, dcmfilter, SeqInfo)
+            )
         grouping = custom_grouping
         study_customgroup = None
 
@@ -541,8 +552,9 @@ def compress_dicoms(
         try:
             if op.lexists(outtar):
                 os.unlink(outtar)
-            with tarfile.open(outtar, "w:gz", compresslevel=compresslevel,
-                              dereference=True) as tar:
+            with tarfile.open(
+                outtar, "w:gz", compresslevel=compresslevel, dereference=True
+            ) as tar:
                 for filename in dicom_list:
                     outfile = op.join(tmpdir, op.basename(filename))
                     if not op.islink(outfile):
@@ -570,7 +582,7 @@ def compress_dicoms(
 def embed_dicom_and_nifti_metadata(
     dcmfiles: List[str],
     niftifile: str,
-    infofile: str | Path,
+    infofile: Union[str, Path],
     bids_info: Optional[Dict[str, Any]],
 ) -> None:
     """Embed metadata from nifti (affine etc) and dicoms into infofile (json)
@@ -677,7 +689,7 @@ def embed_metadata_from_dicoms(
             function=embed_dicom_and_nifti_metadata,
             imports=[
                 "from pathlib import Path",
-                "from typing import Any, Dict, List, Optional",
+                "from typing import Any, Dict, List, Optional, Union",
             ],
         ),
         name="embedder",
