@@ -1,16 +1,22 @@
- - name: Yaroslav Halchenko  # 625 commits, issues: opened 81 participated in 146
+ - name: Yaroslav Halchenko  # 626 commits, issues: opened 81 participated in 146
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
- - name: Mathias Goncalves  # 5 commits, issues: opened 16 participated in 98
+ - name: Mathias Goncalves  # 287 commits, issues: opened 16 participated in 98
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
- - name: Satrajit Ghosh  # 14 commits, issues: opened 16 participated in 62
+ - name: Satrajit Ghosh  # 77 commits, issues: opened 16 participated in 62
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Pablo Velasco  # 113 commits, issues: opened 6 participated in 22
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Matteo Visconti di Oleggio Castello  # 88 commits, issues: opened 2 participated in 1
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Taylor Salo  # 76 commits, issues: opened 11 participated in 4
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
- - name: Pablo Velasco  # 4 commits, issues: opened 6 participated in 22
+ - name: John T. Wodder II  # 58 commits, issues: opened 2 participated in 4
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Patrick Sadil  # 18 commits, issues: opened 3 participated in 2
@@ -25,10 +31,16 @@
  - name: Chris Rorden  # 0 commits, issues: opened 1 participated in 17
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
- - name: Michael Krause  # 1 commits, issues: opened 10 participated in 6
+ - name: Michael Krause  # 2 commits, issues: opened 10 participated in 6
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Timothy Hendrickson  # 0 commits, issues: opened 10 participated in 4
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Dae Houlihan  # 12 commits, issues: opened 1 participated in 0
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Steven Tilley  # 11 commits, issues: opened 1 participated in 0
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
  - name: github-actions  # 0 commits, issues: opened 0 participated in 12
@@ -43,13 +55,16 @@
  - name: Michael  # 0 commits, issues: opened 7 participated in 3
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Jörg Stadler  # 6 commits, issues: opened 3 participated in 0
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Basile Pinsard  # 1 commits, issues: opened 6 participated in 1
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Ted Strauss  # 0 commits, issues: opened 8 participated in 0
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
- - name: John T. Wodder II  # 1 commits, issues: opened 2 participated in 4
+ - name: Isaac To  # 7 commits, issues: opened 0 participated in 0
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Christopher J. Markiewicz  # 4 commits, issues: opened 1 participated in 2
@@ -121,12 +136,6 @@
  - name: Hu Chuan-Peng  # 0 commits, issues: opened 3 participated in 1
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
- - name: Dae Houlihan  # 3 commits, issues: opened 1 participated in 0
-   orcid: 
-   affiliation:  # add full names if not yet listed, or indexes if already are
- - name: Matteo Visconti di Oleggio Castello  # 1 commits, issues: opened 2 participated in 1
-   orcid: 
-   affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Bob Kraft  # 0 commits, issues: opened 4 participated in 0
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
@@ -139,9 +148,6 @@
  - name: Choong-Wan Woo  # 0 commits, issues: opened 2 participated in 2
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
- - name: Jörg Stadler  # 1 commits, issues: opened 3 participated in 0
-   orcid: 
-   affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Dylan Nielson  # 0 commits, issues: opened 3 participated in 1
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
@@ -152,9 +158,6 @@
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Jakub Kaczmarzyk  # 3 commits, issues: opened 0 participated in 0
-   orcid: 
-   affiliation:  # add full names if not yet listed, or indexes if already are
- - name: Isaac To  # 3 commits, issues: opened 0 participated in 0
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Andrew Sun  # 0 commits, issues: opened 3 participated in 0
