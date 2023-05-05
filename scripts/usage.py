@@ -18,7 +18,7 @@ df['year'] = df.index.year
 df['month'] = df.index.month
 df['Year'] = [f"{a}-{b}" for a,b in zip(df["year"],df["month"])]
 df['Year'] = pd.to_datetime(df['Year'], infer_datetime_format=True)
-df = df.rename(columns={'num_downloads':'Weekly Downloads'})
+df = df.rename(columns={'num_downloads':'Downloads'})
 df = df.drop(columns=['year', 'month'])
 df.index.names = ['date']
 
@@ -29,7 +29,7 @@ df_et = pd.read_csv('../data/etelemetry.csv',
 	parse_dates=True,
 	)
 ## Create value column
-df_et['Confirmed User Sessions'] = df_et.index
+df_et['User Sessions'] = df_et.index
 ## Organize columns with correct types:
 df_et['date'] = pd.to_datetime(df_et['year-week'] + "0", format="%Y-%W%w")
 df_et['month'] = df_et['date'].map(lambda x: x.month)
@@ -44,15 +44,15 @@ df_et = df_et.loc[:'2023-04-01']
 
 # Merge data and reformat to long
 df = pd.merge(df, df_et, on=['Year'], how='outer')
-df = pd.melt(df, id_vars=['Year'], value_vars=['Weekly Downloads', 'Confirmed User Sessions'])
-df = df.rename(columns={'value':'Count'})
+df = pd.melt(df, id_vars=['Year'], value_vars=['Downloads', 'User Sessions'])
+df = df.rename(columns={'value':'Weekly Count'})
 df = df.rename(columns={'variable':'Metric'})
 
 
 # Plotting
 ax = sns.lineplot(data=df,
 	x='Year',
-	y='Count',
+	y='Weekly Count',
 	hue='Metric',
 	markers=True, dashes=False,
 	)
