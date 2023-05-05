@@ -55,6 +55,7 @@ def get_committers(path):
         cwd=path
     )
     stdout = out.stdout.decode()
+    committers = []
     for line in stdout.split(os.linesep):
         line = line.strip()
         if not line:
@@ -68,7 +69,17 @@ def get_committers(path):
             continue
         if not g:
             raise ValueError(line)
-        yield g
+        committers.append(g)
+    # sanity checks
+    from collections import Counter
+    counts = Counter([g['name'] for g in committers])
+    multiples = {k: [c for c in committers if c['name'] == k] for k, v in counts.items() if v>1}
+    if multiples:
+        from pprint import pprint
+        pprint(multiples)
+        raise ValueError("Ambiguity among contributors")
+    return committers
+
 
 
 @click.command()
