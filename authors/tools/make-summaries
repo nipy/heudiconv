@@ -117,12 +117,22 @@ def summary(repo_path):
         if author_id not in humans:
             # let's try to match "loosely" based on name or email
             name_map = {h['name'].lower(): i for i, h in humans.items()}
-            suggestions = difflib.get_close_matches(author['name'].lower(), name_map)
+            suggestions = difflib.get_close_matches(author['name'].lower(), name_map, 1, .8)
             if suggestions:
                 print(f"Taking {suggestions[0]} for {author_id}")
                 author_id = name_map[suggestions[0]]
                 # take our mailmap as canonical source for full names
                 humans[author_id]['name'] = author['name']
+            else:
+                loose_suggestions = difflib.get_close_matches(author['name'].lower(), name_map, 1)
+                if loose_suggestions:
+                    print(f"Should I take {loose_suggestions[0]} for {author_id}? [y/n]")
+                    answer = input()
+                    if answer == "y":
+                        author_id = name_map[loose_suggestions[0]]
+                        # take our mailmap as canonical source for full names
+                        humans[author_id]['name'] = author['name']
+                        
         if author_id not in humans:
             print(f"Adding contributor without issues: {author}")
             humans[author_id] = create_human(author)
