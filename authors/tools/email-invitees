@@ -43,9 +43,9 @@ def email_all(invitees_path, paper_path):
         #      email_one(i)
         # continue
         try:
-            #print(f"TODO: {i['name']} <{i['email']}>")
+            print(f"TODO: {i['name']} <{i['email']}>")
             #pass
-            email_one(i)
+            # email_one(i)
             i['status'] = 'emailed'
         except Exception as exc:
             print(f"Failed to email {i['name']}: {exc}")
@@ -57,4 +57,4 @@ def email_all(invitees_path, paper_path):
 # one/two time use -- will not do it pretty, although should have
 # just done all this scripting inside that repo. good idea too late
 # to be worth bothering ATM
-email_all("invitees.json", "../heudiconv-paper-joss/paper.md")
+email_all("invitees.json", "../paper.md")
