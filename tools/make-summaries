@@ -12,9 +12,8 @@ import os
 
 import difflib
 
-from datalad import cfg
 from fscacher import PersistentCache
-emails_cache = PersistentCache("datalad-bug-emails")
+emails_cache = PersistentCache("joss-authors-collector")
 
 
 def get_human_id(rec):
@@ -43,7 +42,7 @@ def create_human(rec):
 def get_user_email(login):
     resp = requests.get(
         f"https://api.github.com/users/{login}",
-        headers={"Authorization": "token %s" % cfg.get('hub.oauthtoken')}
+        headers={"Authorization": "token %s" % os.environ['GH_TOKEN']}
     )
     j = json.loads(resp.content)
     return j.get('email', None)
@@ -73,7 +72,8 @@ def get_committers(path):
 
 
 @click.command()
-def summary():
+@click.option("--repo-path", type=click.Path(exists=True, file_okay=False, dir_okay=True))
+def summary(repo_path):
     with open("all-bugs.json") as f:
         bugs = json.load(f)
     print(f"Loaded {len(bugs)} bugs")
@@ -96,11 +96,8 @@ def summary():
                     humans[p_id] = create_human(p)
                 humans[p_id]["participated"].append(url)
 
-    # few custom fixups
-    humans['debanjum']['name'] = 'Debanjum Singh Solanky'
-
     # get direct contributors
-    for author in get_committers('../datalad-master'):
+    for author in get_committers(repo_path):
         author_id = get_human_id(author)
         if author_id not in humans:
             # let's try to match "loosely" based on name or email
@@ -119,13 +116,14 @@ def summary():
         if not rec['email']:
             rec['email'] = author['email']
 
-    with open('custom.json') as f:
-        custom = json.load(f)
-        for i, rec in custom.items():
-            for k, v in rec.items():
-                if k == 'comment':
-                    continue
-                humans[i][k] = v
+    if os.path.exists("custom.json"):
+        with open('custom.json') as f:
+            custom = json.load(f)
+            for i, rec in custom.items():
+                for k, v in rec.items():
+                    if k == 'comment':
+                        continue
+                    humans[i][k] = v
 
     for rec in tqdm.tqdm(humans.values(), leave=False):
         rec['all'] = len(set(rec['opened'] + rec['participated'])) + rec['commits']
