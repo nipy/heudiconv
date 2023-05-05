@@ -97,6 +97,7 @@ HeuDiConv was found to be used for PET data conversion [@JZC+21:PET], shared as 
 Moreover, HeuDiConv approach inspired development of `fw-heudiconv` (FlywheelTools: Software for HeuDiConv-Style BIDS Curation On Flywheel) [@TCB+21:fw-heudiconv].
 
 ![**Weekly downloads experienced an initial sharp rise after the 0.5.1 ReproNim training event in mid 2018, and have continued to grow along a positive trend.** Depicted are weekly download averages per month, with a 95% confidence interval.](figs/downloads.pdf)
+![Usage](figs/etelemetry.pdf)
 
 
 # External dependencies

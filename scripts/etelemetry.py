@@ -21,9 +21,11 @@ df['month'] = df['date'].map(lambda x: x.month)
 df['year'] = df['date'].map(lambda x: x.year)
 df['Year'] = [f"{a}-{b}" for a,b in zip(df["year"],df["month"])]
 df['Year'] = pd.to_datetime(df['Year'], infer_datetime_format=True)
+df = df.drop(columns=['year-week','year', 'month'])
+df = df.set_index(['date']).sort_index()
 
 # Filter data by date cap:
-df = df.loc[(df['date'] < '2023-04-01')]
+df = df.loc[:'2023-04-01']
 
 #Plot:
 ax = sns.lineplot(data=df,
@@ -34,6 +36,7 @@ ax = sns.lineplot(data=df,
 plt.yscale('log')
 
 # Only keep years on xaxis:
+ax.xaxis.set_major_locator(YearLocator())
 ax.xaxis.set_major_formatter(DateFormatter("%Y"))
 
 plt.savefig(os.path.join('..','figs',f'{filename}.pdf'))
