@@ -6,7 +6,7 @@ import json
 import subprocess
 
 
-template = Path('../datalad-paper-joss/email-template.txt').read_text()
+template = Path('email-template.txt').read_text()
 
 
 def email_one(invitee):
@@ -57,4 +57,4 @@ def email_all(invitees_path, paper_path):
 # one/two time use -- will not do it pretty, although should have
 # just done all this scripting inside that repo. good idea too late
 # to be worth bothering ATM
-email_all("invitees.json", "../datalad-paper-joss/paper.md")
+email_all("invitees.json", "../heudiconv-paper-joss/paper.md")
