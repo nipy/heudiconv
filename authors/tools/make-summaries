@@ -63,7 +63,7 @@ def get_committers(path):
             '^\s*(?P<commits>\d*)\t(?P<name>.*) <(?P<email>.*)>',
             line
         ).groupdict()
-        if g['name'] in ('Yarchael', 'Neuroimaging Community'):
+        if g['name'] in ('Yarchael', 'Neuroimaging Community', 'DBIC BIDS Team'):
             # I believe it is me &| Michael or some undisclosed/demo - just skip
             continue
         if not g:
