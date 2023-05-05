@@ -96,6 +96,9 @@ Over 40 BIDS datasets were converted using HeuDiConv with ReproIn heuristic over
 HeuDiConv was found to be used for PET data conversion [@JZC+21:PET], shared as OpenNeuro ds003382 [@openneuro.ds003382.v1.0.0].
 Moreover, HeuDiConv approach inspired development of `fw-heudiconv` (FlywheelTools: Software for HeuDiConv-Style BIDS Curation On Flywheel) [@TCB+21:fw-heudiconv].
 
+![**Weekly downloads experienced an initial sharp rise after the 0.5.1 ReproNim training event in mid 2018, and have continued to grow along a positive trend.** Depicted are weekly download averages per month, with a 95% confidence interval.](figs/downloads.pdf)
+
+
 # External dependencies
 
 HeuDiConv uses specialized tools and libraries: 
