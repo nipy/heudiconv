@@ -77,6 +77,10 @@ def get_committers(path):
     if multiples:
         from pprint import pprint
         pprint(multiples)
+        for gs in multiples.values():
+            first = gs[0]
+            for alt in gs[1:]:
+                print(f"{first['name']} <{first['email']}> {alt['name']} <{alt['email']}>")
         raise ValueError("Ambiguity among contributors")
     return committers
 
