@@ -9,17 +9,7 @@ import os.path as op
 from pathlib import Path
 import sys
 import tarfile
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Dict,
-    List,
-    NamedTuple,
-    Optional,
-    Union,
-    cast,
-    overload,
-)
+from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Union, overload
 from unittest.mock import patch
 import warnings
 
@@ -180,7 +170,8 @@ def group_dicoms_into_seqinfos(
     flatten: Literal[False] = False,
     custom_grouping: str
     | Callable[
-        [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]], Any
+        [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]],
+        dict[SeqInfo, list[str]],
     ]
     | None = None,
 ) -> dict[Optional[str], dict[SeqInfo, list[str]]]:
@@ -197,7 +188,8 @@ def group_dicoms_into_seqinfos(
     flatten: Literal[True],
     custom_grouping: str
     | Callable[
-        [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]], Any
+        [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]],
+        dict[SeqInfo, list[str]],
     ]
     | None = None,
 ) -> dict[SeqInfo, list[str]]:
@@ -212,7 +204,8 @@ def group_dicoms_into_seqinfos(
     flatten: Literal[False, True] = False,
     custom_grouping: str
     | Callable[
-        [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]], Any
+        [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]],
+        dict[SeqInfo, list[str]],
     ]
     | None = None,
 ) -> dict[Optional[str], dict[SeqInfo, list[str]]] | dict[SeqInfo, list[str]]:
@@ -274,9 +267,7 @@ def group_dicoms_into_seqinfos(
         if custom_grouping is None:
             raise RuntimeError("Custom grouping is not defined in heuristic")
         if callable(custom_grouping):
-            return cast(
-                Dict[SeqInfo, List[str]], custom_grouping(files, dcmfilter, SeqInfo)
-            )
+            return custom_grouping(files, dcmfilter, SeqInfo)
         grouping = custom_grouping
         study_customgroup = None
 
