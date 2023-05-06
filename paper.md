@@ -10,13 +10,13 @@ tags:
   - FOSS
 authors:
  - name: Yaroslav Halchenko  # 626 commits, issues: opened 81 participated in 146
-   orcid: 
-   affiliation:  # add full names if not yet listed, or indexes if already are
+   orcid: 0000-0003-3456-2493
+   affiliation: 1
  - name: Mathias Goncalves  # 287 commits, issues: opened 16 participated in 98
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Satrajit Ghosh  # 77 commits, issues: opened 16 participated in 62
-   orcid: 
+   orcid: 0000-0002-5312-6729
    affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Pablo Velasco  # 113 commits, issues: opened 6 participated in 22
    orcid: 
@@ -29,9 +29,9 @@ authors:
    affiliation:  # add full names if not yet listed, or indexes if already are
  - name: John T. Wodder II  # 58 commits, issues: opened 2 participated in 4
    orcid: 
-   affiliation:  # add full names if not yet listed, or indexes if already are
+   affiliation: 1
  - name: Michael Hanke  # 32 commits, issues: opened 10 participated in 6
-   orcid: 
+   orcid: 0000-0001-6398-6370
    affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Patrick Sadil  # 18 commits, issues: opened 3 participated in 2
    orcid: 
@@ -40,8 +40,8 @@ authors:
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Horea Christian  # 17 commits, issues: opened 1 participated in 1
-   orcid: 
-   affiliation:  # add full names if not yet listed, or indexes if already are
+   orcid: 0000-0001-7037-2449
+   affiliation: 1
  - name: Chris Rorden  # 0 commits, issues: opened 1 participated in 17
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
@@ -57,13 +57,7 @@ authors:
  - name: Steven Tilley  # 11 commits, issues: opened 1 participated in 0
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
- - name: github-actions  # 0 commits, issues: opened 0 participated in 12
-   orcid: 
-   affiliation:  # add full names if not yet listed, or indexes if already are
  - name: James Kent  # 8 commits, issues: opened 3 participated in 0
-   orcid: 
-   affiliation:  # add full names if not yet listed, or indexes if already are
- - name: auto  # 10 commits, issues: opened 0 participated in 0
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Michael  # 0 commits, issues: opened 7 participated in 3
@@ -78,12 +72,12 @@ authors:
  - name: Ted Strauss  # 0 commits, issues: opened 8 participated in 0
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
- - name: john lee  # 2 commits, issues: opened 5 participated in 1
+ - name: John Lee  # 2 commits, issues: opened 5 participated in 1
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Isaac To  # 7 commits, issues: opened 0 participated in 0
    orcid: 
-   affiliation:  # add full names if not yet listed, or indexes if already are
+   affiliation: 1
  - name: Christopher J. Markiewicz  # 4 commits, issues: opened 1 participated in 2
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
@@ -120,15 +114,14 @@ authors:
  - name: David V. Smith  # 0 commits, issues: opened 4 participated in 1
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
- - name: danlurie  # 2 commits, issues: opened 3 participated in 0
+ - name: Dan Lurie  # 2 commits, issues: opened 3 participated in 0
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Austin Macdonald  # 2 commits, issues: opened 1 participated in 1 + 1 commit in paper repo
    orcid: 
-   affiliation:  # add full names if not yet listed, or indexes if already are
- # cutoff of 5 contributions
+   affiliation: 1
 affiliations:
- - name: TODO
+ - name: Center for Open Neuroscience, Department of Psychological and Brain Sciences, Dartmouth College, Hanover, NH, USA
    index: 1
  - name: Institution Name, Country
    index: 2
