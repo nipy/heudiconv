@@ -187,7 +187,7 @@ The [ReproIn heuristic](https://github.com/nipy/heudiconv/blob/v0.12.2/heudiconv
 The core principle behind ReproIn is the reduction of operator interaction required to obtain BIDS datasets for acquired data.
 It is achieved by ensuring that reference MRI sequences on the instrumentation are organized and named in a consistent and flexible way, such that upon usage in any experimental protocol they will encode the information required for fully automatic conversion and repositing of the resulting data.
 
-In case of correct specification and absent operator errors, such as mis-typed subject or session IDs, it can be fully automated, and work is ongoing to make such deployments turnkey. Visit ReproIn project page http://reproin.repronim.org to discover more.
+In case of correct specification and absent operator errors, such as mis-typed subject or session IDs, it can be fully automated, and work is ongoing to make such deployments turnkey. Visit ReproIn project page [http://reproin.repronim.org](http://reproin.repronim.org) to discover more.
 
 # Adoption and usage
 
