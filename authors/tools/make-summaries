@@ -164,7 +164,7 @@ def summary(repo_path):
         h['participated'] = len(h['participated'])
     # report in decreasing order
     to_invite = [h for h in humans.values() if h['all'] >= 3]
-    to_be_thankful_to = [h for h in humans.values() if h['all'] < 3]
+    to_be_thankful_to = [h for h in humans.values() if h['all'] < 5]
 
     print(f"Inviting {len(to_invite)} from {len(humans)}")
     custom_to_add = {
