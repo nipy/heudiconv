@@ -1,3 +1,55 @@
+# v0.13.0 (Mon May 08 2023)
+
+#### 🚀 Enhancement
+
+- Add type annotations [#656](https://github.com/nipy/heudiconv/pull/656) ([@jwodder](https://github.com/jwodder) [@yarikoptic](https://github.com/yarikoptic))
+- ENH: Support extracting DICOMs from ZIP files (and possibly other archives) by switching to use shutil.unpack_archive instead of tarfile module functionality [#471](https://github.com/nipy/heudiconv/pull/471) ([@HippocampusGirl](https://github.com/HippocampusGirl) [@psadil](https://github.com/psadil))
+- Allow filling of acq_time when AcquisitionDate AcquisitionTime missing [#614](https://github.com/nipy/heudiconv/pull/614) ([@psadil](https://github.com/psadil))
+
+#### 🐛 Bug Fix
+
+- BF(?): make _setter images be taken as scouts - only DICOMs are saved [#570](https://github.com/nipy/heudiconv/pull/570) ([@yarikoptic](https://github.com/yarikoptic))
+- Adjust .mailmap to account for mapping various folks with multiple emails so that git shortlog -sn -e provides entries without duplicates [#570](https://github.com/nipy/heudiconv/pull/570) ([@yarikoptic](https://github.com/yarikoptic))
+- Make an `embed_dicom_and_nifti_metadata()` annotation work on Python 3.7 [#673](https://github.com/nipy/heudiconv/pull/673) ([@jwodder](https://github.com/jwodder))
+- Merge branch 'feature_dicom_compresslevel' [#673](https://github.com/nipy/heudiconv/pull/673) ([@yarikoptic](https://github.com/yarikoptic))
+- Update heudiconv/dicoms.py [#669](https://github.com/nipy/heudiconv/pull/669) ([@octomike](https://github.com/octomike))
+- Don't call `logging.basicConfig()` in `__init__.py` [#659](https://github.com/nipy/heudiconv/pull/659) ([@jwodder](https://github.com/jwodder))
+
+#### ⚠️ Pushed to `master`
+
+- Mailmapping more contributors ([@yarikoptic](https://github.com/yarikoptic))
+- Adjust comment and remove trailing space flipping linting ([@yarikoptic](https://github.com/yarikoptic))
+
+#### 🏠 Internal
+
+- Declare `custom_grouping` return type instead of casting [#671](https://github.com/nipy/heudiconv/pull/671) ([@jwodder](https://github.com/jwodder))
+- Use `pydicom.dcmread()` instead of `pydicom.read_file()` [#668](https://github.com/nipy/heudiconv/pull/668) ([@jwodder](https://github.com/jwodder))
+- Add `sample_nifti.json` to `.gitignore` [#663](https://github.com/nipy/heudiconv/pull/663) ([@jwodder](https://github.com/jwodder))
+- Write command arguments as lists of strings instead of splitting strings on whitespace [#664](https://github.com/nipy/heudiconv/pull/664) ([@jwodder](https://github.com/jwodder))
+- Add & apply pre-commit and lint job [#658](https://github.com/nipy/heudiconv/pull/658) ([@jwodder](https://github.com/jwodder))
+- Fix some strings with \ (make them raw or double-\), improve pytest config: move to tox.ini, make unknown warnings into errors [#660](https://github.com/nipy/heudiconv/pull/660) ([@jwodder](https://github.com/jwodder))
+- Replace py.path with pathlib [#654](https://github.com/nipy/heudiconv/pull/654) ([@jwodder](https://github.com/jwodder))
+
+#### 🧪 Tests
+
+- Make `test_private_csa_header` test write to temp dir [#666](https://github.com/nipy/heudiconv/pull/666) ([@jwodder](https://github.com/jwodder))
+
+#### 🔩 Dependency Updates
+
+- Replace third-party `mock` library with stdlib's `unittest.mock` [#661](https://github.com/nipy/heudiconv/pull/661) ([@jwodder](https://github.com/jwodder))
+- Remove kludgy support for older versions of pydicom and dcmstack [#662](https://github.com/nipy/heudiconv/pull/662) ([@jwodder](https://github.com/jwodder))
+- Remove use of `six` [#655](https://github.com/nipy/heudiconv/pull/655) ([@jwodder](https://github.com/jwodder))
+
+#### Authors: 5
+
+- John T. Wodder II ([@jwodder](https://github.com/jwodder))
+- Lea Waller ([@HippocampusGirl](https://github.com/HippocampusGirl))
+- Michael ([@octomike](https://github.com/octomike))
+- Patrick Sadil ([@psadil](https://github.com/psadil))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v0.12.2 (Tue Mar 14 2023)
 
 #### 🏠 Internal
