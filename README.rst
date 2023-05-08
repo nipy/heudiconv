@@ -8,9 +8,9 @@
   :target: https://hub.docker.com/r/nipy/heudiconv/tags/
   :alt: Our Docker image
 
-.. image:: https://travis-ci.org/nipy/heudiconv.svg?branch=master
-  :target: https://travis-ci.org/nipy/heudiconv
-  :alt: TravisCI
+.. image:: https://github.com/nipy/heudiconv/actions/workflows/test.yml/badge.svg?event=push
+  :target: https://github.com/nipy/heudiconv/actions/workflows/test.yml
+  :alt: GitHub Actions (test)
 
 .. image:: https://codecov.io/gh/nipy/heudiconv/branch/master/graph/badge.svg
   :target: https://codecov.io/gh/nipy/heudiconv
