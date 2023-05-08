@@ -641,6 +641,8 @@ def infotodict(
             datatype == "anat"
             and datatype_suffix
             and datatype_suffix.startswith("scout")
+        ) or (
+            s.series_description.lower() == s.protocol_name.lower() + "_setter"
         ):
             outtype = ("dicom",)
         else:
