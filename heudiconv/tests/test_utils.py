@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 import json
 from json.decoder import JSONDecodeError
 import os
@@ -21,6 +22,7 @@ from heudiconv.utils import (
     remove_prefix,
     remove_suffix,
     save_json,
+    strptime_micr,
     update_json,
 )
 
@@ -165,6 +167,24 @@ def test_get_datetime() -> None:
     assert (
         get_datetime("20200512", "162130.5", microseconds=False)
         == "2020-05-12T16:21:30"
+    )
+
+
+@pytest.mark.parametrize(
+    "dt, fmt",
+    [
+        ("20230310190100", "%Y%m%d%H%M%S"),
+        ("2023-04-02T11:47:09", "%Y-%m-%dT%H:%M:%S"),
+    ],
+)
+def test_strptime_micr(dt: str, fmt: str) -> None:
+    target = datetime.strptime(dt, fmt)
+    assert strptime_micr(dt, fmt) == target
+    assert strptime_micr(dt, fmt + "[.%f]") == target
+    assert strptime_micr(dt + ".0", fmt + "[.%f]") == target
+    assert strptime_micr(dt + ".000000", fmt + "[.%f]") == target
+    assert strptime_micr(dt + ".1", fmt + "[.%f]") == datetime.strptime(
+        dt + ".1", fmt + ".%f"
     )
 
 
