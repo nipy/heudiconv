@@ -1,3 +1,21 @@
+# v0.13.1 (Tue May 23 2023)
+
+#### 🐛 Bug Fix
+
+- Make .subsecond optional in BIDS/DICOM datetime entries [#675](https://github.com/nipy/heudiconv/pull/675) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### 🏠 Internal
+
+- [gh-actions](deps): Bump codespell-project/actions-codespell from 1 to 2 [#677](https://github.com/nipy/heudiconv/pull/677) ([@dependabot[bot]](https://github.com/dependabot[bot]))
+- Replace (no longer used) Travis badge with GitHub action one (for test) [#677](https://github.com/nipy/heudiconv/pull/677) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 2
+
+- [@dependabot[bot]](https://github.com/dependabot[bot])
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v0.13.0 (Mon May 08 2023)
 
 #### 🚀 Enhancement
