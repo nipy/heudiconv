@@ -6,7 +6,6 @@ __docformat__ = "numpy"
 
 from collections import OrderedDict
 import csv
-from datetime import datetime
 import errno
 from glob import glob
 import hashlib
@@ -32,6 +31,7 @@ from .utils import (
     remove_suffix,
     save_json,
     set_readonly,
+    strptime_micr,
     update_json,
 )
 
@@ -369,7 +369,9 @@ def tuneup_bids_json_files(json_files: list[str]) -> None:
                 set_readonly(json_phasediffname)
 
 
-def add_participant_record(studydir: str, subject: str, age: str | None, sex: str | None) -> None:
+def add_participant_record(
+    studydir: str, subject: str, age: str | None, sex: str | None
+) -> None:
     participants_tsv = op.join(studydir, "participants.tsv")
     participant_id = "sub-%s" % subject
 
@@ -945,17 +947,17 @@ def select_fmap_from_compatible_groups(
             k for k, v in acq_times_fmaps.items() if v == first_acq_time
         ][0]
     elif criterion == "Closest":
-        json_acq_time = datetime.strptime(
+        json_acq_time = strptime_micr(
             acq_times[
                 # remove session folder and '.json', add '.nii.gz':
                 remove_suffix(remove_prefix(json_file, sess_folder + op.sep), ".json")
                 + ".nii.gz"
             ],
-            "%Y-%m-%dT%H:%M:%S.%f",
+            "%Y-%m-%dT%H:%M:%S[.%f]",
         )
         # differences in acquisition time (abs value):
         diff_fmaps_acq_times = {
-            k: abs(datetime.strptime(v, "%Y-%m-%dT%H:%M:%S.%f") - json_acq_time)
+            k: abs(strptime_micr(v, "%Y-%m-%dT%H:%M:%S[.%f]") - json_acq_time)
             for k, v in acq_times_fmaps.items()
         }
         min_diff_acq_times = sorted(diff_fmaps_acq_times.values())[0]

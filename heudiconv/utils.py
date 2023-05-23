@@ -666,6 +666,27 @@ def get_datetime(date: str, time: str, *, microseconds: bool = True) -> str:
     return datetime_str
 
 
+def strptime_micr(date_string: str, fmt: str) -> datetime:
+    r"""
+    Decorate strptime while supporting optional [.%f] in the format at the end
+
+    Parameters
+    ----------
+    date_string: str
+      Date string to parse
+    fmt: str
+      Format string. If it ends with [.%f], we keep it if date_string ends with
+      '.\d+' regex and not if it does not.
+    """
+
+    optional_micr = "[.%f]"
+    if fmt.endswith(optional_micr):
+        fmt = fmt[: -len(optional_micr)]
+        if re.search(r"\.\d+$", date_string):
+            fmt += ".%f"
+    return datetime.strptime(date_string, fmt)
+
+
 def remove_suffix(s: str, suf: str) -> str:
     """
     Remove suffix from the end of the string

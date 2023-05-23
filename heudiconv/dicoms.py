@@ -15,7 +15,14 @@ import warnings
 
 import pydicom as dcm
 
-from .utils import SeqInfo, TempDirs, get_typed_attr, load_json, set_readonly
+from .utils import (
+    SeqInfo,
+    TempDirs,
+    get_typed_attr,
+    load_json,
+    set_readonly,
+    strptime_micr,
+)
 
 if TYPE_CHECKING:
     if sys.version_info >= (3, 8):
@@ -481,16 +488,16 @@ def get_datetime_from_dcm(dcm_data: dcm.FileDataset) -> Optional[datetime.dateti
     acq_date = dcm_data.get("AcquisitionDate")
     acq_time = dcm_data.get("AcquisitionTime")
     if not (acq_date is None or acq_time is None):
-        return datetime.datetime.strptime(acq_date + acq_time, "%Y%m%d%H%M%S.%f")
+        return strptime_micr(acq_date + acq_time, "%Y%m%d%H%M%S[.%f]")
 
     acq_dt = dcm_data.get("AcquisitionDateTime")
     if acq_dt is not None:
-        return datetime.datetime.strptime(acq_dt, "%Y%m%d%H%M%S.%f")
+        return strptime_micr(acq_dt, "%Y%m%d%H%M%S[.%f]")
 
     series_date = dcm_data.get("SeriesDate")
     series_time = dcm_data.get("SeriesTime")
     if not (series_date is None or series_time is None):
-        return datetime.datetime.strptime(series_date + series_time, "%Y%m%d%H%M%S.%f")
+        return strptime_micr(series_date + series_time, "%Y%m%d%H%M%S[.%f]")
     return None
 
 
