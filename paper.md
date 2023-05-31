@@ -78,9 +78,9 @@ authors:
  - name: Isaac To  # 7 commits, issues: opened 0 participated in 0
    orcid: 0000-0002-4740-0824
    affiliation: 1
-# - name: Christopher J. Markiewicz  # 4 commits, issues: opened 1 participated in 2
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Christopher J. Markiewicz  # 4 commits, issues: opened 1 participated in 2
+   orcid: 0000-0002-6533-164X
+   affiliation: Department of Psychology, Stanford University, CA, USA
 # - name: Darren Lukas  # 4 commits, issues: opened 1 participated in 2
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
