@@ -3,6 +3,9 @@
 
 # Compilation traces
 paper/
+.ipynb_checkpoints
+*.ipynb
 paper.jats
 .idea
+media
 venvs
