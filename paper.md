@@ -120,9 +120,9 @@ authors:
  - name: Austin Macdonald  # 2 commits, issues: opened 1 participated in 1 + 1 commit in paper repo
    orcid: 
    affiliation: 1
-# - name: David Kennedy  # Benevolent leader of ReproNim who holds the umbrella and was brave to try a number of times
-#   orcid:
-#   affiliation:
+ - name: David N. Kennedy  # Benevolent leader of ReproNim who holds the umbrella and was brave to try a number of times
+   orcid: 0000-0002-9377-0797
+   affiliation: Departments of Psychiatry and Radiology, University of Massachusetts Chan Medical School
 affiliations:
  - name: Center for Open Neuroscience, Department of Psychological and Brain Sciences, Dartmouth College, Hanover, NH, USA
    index: 1
