@@ -39,7 +39,7 @@ authors:
  - name: Chris Filo Gorgolewski  # 4 commits, issues: opened 7 participated in 10
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
- - name: Horea Christian  # 17 commits, issues: opened 1 participated in 1
+ - name: Horea-Ioan Ioanas   # 17 commits, issues: opened 1 participated in 1
    orcid: 0000-0001-7037-2449
    affiliation: 1
  - name: Chris Rorden  # 0 commits, issues: opened 1 participated in 17
