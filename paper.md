@@ -48,9 +48,9 @@ authors:
 # - name: Timothy Hendrickson  # 0 commits, issues: opened 10 participated in 4
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Michael Dayan  # 12 commits, issues: opened 0 participated in 0
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Michael Dayan  # 12 commits, issues: opened 1 participated in 2
+   orcid: 0000-0002-2666-0969
+   affiliation: Human Neuroscience Platform, Fondation Campus Biotech Geneva, Geneva, Switzerland
  - name: Sean Dae Houlihan  # 12 commits, issues: opened 0 participated in 0 # First: Sean Dae; Last: Houlihan
    orcid: 0000-0001-5003-9278
    affiliation:  1, Department of Brain and Cognitive Sciences, Massachusetts Institute of Technology
