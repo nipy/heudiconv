@@ -34,9 +34,9 @@ def email_all(invitees_path, paper_path):
     for i in invitees:
         if 'status' not in i:
             i['status'] = None
-        #if i.get('status') != 'emailed':  # if any record already - skip for now
-        #    print(f"Skip {i['name']}: {i['status']}")
-        #    continue
+        if i.get('status') == 'emailed':  # if emailed - skip
+            print(f"Skip {i['name']}: {i['status']}")
+            continue
         if i['name'] in author_names:
             print(f"Skip {i['name']}: already among authors")
             i['status'] = 'co-author'
@@ -46,9 +46,10 @@ def email_all(invitees_path, paper_path):
         #      email_one(i)
         # continue
         try:
-            print(f"TODO: {i['name']} <{i['email']}>")
-            #pass
-            # email_one(i)
+            if not i['email']:
+                print(f"TODO: {i['name']} <{i['email']}>")
+            else:
+                email_one(i)
         except Exception as exc:
             print(f"Failed to email {i['name']}: {exc}")
             i['status'] = 'email-failed'
