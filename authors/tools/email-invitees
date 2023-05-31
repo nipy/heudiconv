@@ -19,6 +19,7 @@ def email_one(invitee):
     if r.returncode:
         raise RuntimeError(r)
     else:
+        invitee['status'] = 'emailed'
         print(f"Emailed {invitee['name']} to {invitee['email']}")
 
 
@@ -31,9 +32,11 @@ def email_all(invitees_path, paper_path):
         authors = y['authors']
     author_names = [author['name'].split('^')[0] for author in authors]
     for i in invitees:
-        if i.get('status') != 'emailed':  # if any record already - skip for now
-            print(f"Skip {i['name']}: {i['status']}")
-            continue
+        if 'status' not in i:
+            i['status'] = None
+        #if i.get('status') != 'emailed':  # if any record already - skip for now
+        #    print(f"Skip {i['name']}: {i['status']}")
+        #    continue
         if i['name'] in author_names:
             print(f"Skip {i['name']}: already among authors")
             i['status'] = 'co-author'
@@ -46,7 +49,6 @@ def email_all(invitees_path, paper_path):
             print(f"TODO: {i['name']} <{i['email']}>")
             #pass
             # email_one(i)
-            i['status'] = 'emailed'
         except Exception as exc:
             print(f"Failed to email {i['name']}: {exc}")
             i['status'] = 'email-failed'
