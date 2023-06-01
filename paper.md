@@ -15,9 +15,9 @@ authors:
 # - name: Mathias Goncalves  # 287 commits, issues: opened 16 participated in 98
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Satrajit Ghosh  # 77 commits, issues: opened 16 participated in 62
-#   orcid: 0000-0002-5312-6729
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Satrajit Ghosh  # 77 commits, issues: opened 16 participated in 62
+   orcid: 0000-0002-5312-6729
+   affiliation:  Massachusetts Institute of Technology, Cambridge, MA, USA
 # - name: Pablo Velasco  # 113 commits, issues: opened 6 participated in 22
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
