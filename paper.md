@@ -84,9 +84,6 @@ authors:
 # - name: Darren Lukas  # 4 commits, issues: opened 1 participated in 2
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Matthew Brett  # 5 commits, issues: opened 0 participated in 1
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
 # - name: Sin Kim  # 3 commits, issues: opened 2 participated in 1
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
@@ -218,6 +215,7 @@ HeuDiConv uses specialized tools and libraries:
 # Acknowledgments
 
 We would like to extend our gratitude to
+Matthew Brett,
 ADD YOUR NAME HERE
 for notable contributions to the codebase, bug reports, recommendations, and promotion of HeuDiConv.
 
