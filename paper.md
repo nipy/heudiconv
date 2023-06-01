@@ -90,9 +90,9 @@ authors:
 # - name: Sin Kim  # 3 commits, issues: opened 2 participated in 1
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Ellyn Butler  # 0 commits, issues: opened 4 participated in 2
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Ellyn Butler  # 0 commits, issues: opened 4 participated in 2
+   orcid: 0000-0001-6316-6444
+   affiliation:  Department of Psychology, Northwestern University, Evanston, IL, USA
 # - name: Will Asciutto  # 0 commits, issues: opened 5 participated in 0
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
