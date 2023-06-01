@@ -33,9 +33,9 @@ authors:
 # - name: Michael Hanke  # 32 commits, issues: opened 10 participated in 6
 #   orcid: 0000-0001-6398-6370
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Patrick Sadil  # 18 commits, issues: opened 3 participated in 2
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Patrick Sadil  # 18 commits, issues: opened 3 participated in 2
+   orcid: 0000-0003-4141-1343
+   affiliation: Department of Biostatistics, Johns Hopkins Bloomberg School of Public Health, Baltimore, MD, USA
 # - name: Chris Filo Gorgolewski  # 4 commits, issues: opened 7 participated in 10
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
