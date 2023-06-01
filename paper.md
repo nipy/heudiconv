@@ -21,9 +21,9 @@ authors:
  - name: Pablo Velasco  # 113 commits, issues: opened 6 participated in 22
    orcid: 0000-0002-5749-6049
    affiliation: Flywheel Exchange LLC, Minneapolis, MN, USA
-# - name: Matteo Visconti di Oleggio Castello  # 88 commits, issues: opened 2 participated in 1
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Matteo Visconti di Oleggio Castello  # 88 commits, issues: opened 2 participated in 1
+   orcid: 0000-0001-7931-5272
+   affiliation: University of California, Berkeley, Berkeley, CA, USA
 # - name: Taylor Salo  # 76 commits, issues: opened 11 participated in 4
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
