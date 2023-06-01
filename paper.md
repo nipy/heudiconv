@@ -63,9 +63,6 @@ authors:
 # - name: Michael  # 0 commits, issues: opened 7 participated in 3
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Jörg Stadler  # 6 commits, issues: opened 3 participated in 0
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
 # - name: Basile Pinsard  # 1 commits, issues: opened 6 participated in 1
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
@@ -216,6 +213,7 @@ HeuDiConv uses specialized tools and libraries:
 
 We would like to extend our gratitude to
 Matthew Brett,
+Jörg Stadler,
 ADD YOUR NAME HERE
 for notable contributions to the codebase, bug reports, recommendations, and promotion of HeuDiConv.
 
