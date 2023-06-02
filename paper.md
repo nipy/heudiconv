@@ -156,7 +156,7 @@ Neuroimaging is an empirical research area which relies heavily on efficient dat
 Neuroimaging data sourced from medical imaging equipment, and in particular magnetic resonance imaging (MRI) scanners, can be exported in numerous formats, among which DICOM (Digital Imaging and Communications in Medicine) is most prominent.
 DICOM data are often transmitted to PACS (Picture Archiving and Communication Systems) servers for archiving or further processing.
 Unlike in clinical settings, where data are interfaced with directly from PACS in the DICOM format, in neuroimaging research, tools typically require data files in the NIfTI [@nifticlib] format which directly stores images as 3D or 4D objects and restricts metadata to the most useful attributes.
-Tools such as `dcm2niix` [@Li_2016] can be used to combine DICOM files and convert them into named *individual* NIfTI files, and can extract metadata fields not covered by the NIfTI header into sidecar `.json` files.
+Tools such as `dcm2niix` [@Li_2016] can be used to convert DICOM files into NIfTI files, and can extract metadata fields not covered by the NIfTI header into sidecar `.json` files.
 However, the scope of such tools is limited, as it does not extend to organizing *multiple* NIfTI files within a study.
 
 HeuDiConv was created in 2014 to provide flexible tooling so that labs may rapidly and consistently convert collections of DICOM files into collections of NIfTI files in customizable file system hierarchies.
