@@ -138,7 +138,7 @@ bibliography: paper.bib
 # Summary
 
 In order to support efficient processing, data must be formatted according to standards prevalent in the field, and widely supported among actively developed analysis tools.
-The Brain Imaging Data Structure (BIDS) [@GAC+16] is an open standard designed for computational accessibility, operator legibility, and a wide and easily extendable scope of modalities — and is consequently used by numerous analysis and processing tools as the preferred input format in neuroimaging research.
+The Brain Imaging Data Structure (BIDS) [@GAC+16] is an open standard designed for computational accessibility, operator legibility, and a wide and easily extendable scope of modalities — and is consequently used by numerous analysis and processing tools as the preferred input format in many fields of neuroscience.
 HeuDiConv (Heuristic DICOM Converter) enables flexible and efficient conversion of spatially reconstructed neuroimaging data from the DICOM format (quasi-ubiquitous in biomedical image acquisition systems, particularly in clinical settings) to BIDS, as well as other file layouts.
 HeuDiConv provides a multi-stage operator input workflow (discovery, manual tuning, conversion) where manual tuning step is optional and thus the entire conversion can be seamlessly integrated into a data processing pipeline.
 HeuDiConv is written in Python, and supports the DICOM specification for input parsing, and the BIDS specification for output construction.
