@@ -159,7 +159,7 @@ Since then, DICOM conversion to NIfTI files contained within a BIDS hierarchy ha
 
 # Overview of HeuDiConv functionality
 
-HeuDiConv was initially developed to implement logic commonly used across labs (grouping DICOMs, extracting metadata, converting individual sequences, populating standard BIDS files, etc.) while allowing individual groups to customize **how** files should be organized and named while driving custom decisions through the conventions and desires of those individual groups.
+HeuDiConv has been developed to implement logic commonly used across labs (grouping DICOMs, extracting metadata, converting individual sequences, populating standard BIDS files, etc.) while allowing individual groups to customize **how** files should be organized and named while driving custom decisions through the conventions and desires of those individual groups.
 Such decision making is implemented in *HeuDiConv heuristics*, which are implemented as Python modules following some minimalistic specified interfaces documented in HeuDiConv documentation (https://heudiconv.readthedocs.io/en/latest/heuristics.html).
 HeuDiConv, if instructed to operate in BIDS mode (`--bids` flag) with a heuristic providing base naming instructions, and helpers to organize the files in the hierarchy defined by the BIDS standard.
 It also ensures files are named according to the BIDS specifications, including complex composite recordings such as those associated with multi-echo sequences.
@@ -216,7 +216,7 @@ Russell Poldrack,
 ADD YOUR NAME HERE
 for notable contributions to the codebase, bug reports, recommendations, and promotion of HeuDiConv.
 
-HeuDiConv development was primarily done under the umbrella of the NIH funded ReproNim [1P41EB019936-01A1](https://projectreporter.nih.gov/project_info_details.cfm?aid=8999833&map=y) and [2P41EB019936-06A1](https://projectreporter.nih.gov/project_info_details.cfm?aid=10334133&map=y) (PI: Kennedy).
+HeuDiConv development was primarily done under the umbrella of the NIH funded Nipype [1R01EB020740-01], ReproNim [1P41EB019936-01A1](https://projectreporter.nih.gov/project_info_details.cfm?aid=8999833&map=y) and [2P41EB019936-06A1](https://projectreporter.nih.gov/project_info_details.cfm?aid=10334133&map=y) (PI: Kennedy).
 Contributions of TODO1 were supported by TODO1, ...
 
 # References
