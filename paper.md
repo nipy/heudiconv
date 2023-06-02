@@ -129,7 +129,7 @@ bibliography: paper.bib
 # Summary
 
 In order to support efficient processing, data must be formatted according to standards prevalent in the field, and widely supported among actively developed analysis tools.
-The Brain Imaging Data Structure (BIDS) [@GAC+16] is an open standard designed for computational accessibility, operator legibility, and a wide and easily extendable scope of modalities — and is consequently used by numerous analysis and processing tools as the preferred input format.
+The Brain Imaging Data Structure (BIDS) [@GAC+16] is an open standard designed for computational accessibility, operator legibility, and a wide and easily extendable scope of modalities — and is consequently used by numerous analysis and processing tools as the preferred input format in many fields of neuroscience.
 HeuDiConv (Heuristic DICOM Converter) enables flexible and efficient conversion of spatially reconstructed neuroimaging data from the DICOM format (quasi-ubiquitous in biomedical image acquisition systems, particularly in clinical settings) to BIDS, as well as other file layouts.
 HeuDiConv provides a multi-stage operator input workflow (discovery, manual tuning, conversion) where manual tuning step is optional and thus the entire conversion can be seamlessly integrated into a data processing pipeline.
 HeuDiConv is written in Python, and supports the DICOM specification for input parsing, and the BIDS specification for output construction.
@@ -146,9 +146,9 @@ As a result, given its extensibility, large modality support, and integration wi
 Neuroimaging is an empirical research area which relies heavily on efficient data acquisition, harmonization, and processing.
 Neuroimaging data sourced from medical imaging equipment, and in particular magnetic resonance imaging (MRI) scanners, can be exported in numerous formats, among which DICOM (Digital Imaging and Communications in Medicine) is most prominent.
 DICOM data are often transmitted to PACS (Picture Archiving and Communication Systems) servers for archiving or further processing.
-Unlike in clinical settings, where data are interfaced with directly from PACS in the DICOM format, in neuroimaging research, tools typically require data files in the much simpler (and metadata-restricted) NIfTI [@nifticlib] format.
-Tools such as `dcm2niix` [@Li_2016] can be used to convert *individual* DICOM files into named NIfTI files, and can extract metadata fields not covered by the NIfTI header into sidecar `.json` files.
-However, the scope of such tools is limited, as it does not extend to organizing *multiple* files within a study.
+Unlike in clinical settings, where data are interfaced with directly from PACS in the DICOM format, in neuroimaging research, tools typically require data files in the NIfTI [@nifticlib] format which directly stores images as 3D or 4D objects and restricts metadata to the most useful attributes.
+Tools such as `dcm2niix` [@Li_2016] can be used to convert DICOM files into NIfTI files, and can extract metadata fields not covered by the NIfTI header into sidecar `.json` files.
+However, the scope of such tools is limited, as it does not extend to organizing multiple NIfTI files for different subjects and possibly scanning sessions within a study.
 
 HeuDiConv was created in 2014 to provide flexible tooling so that labs may rapidly and consistently convert collections of DICOM files into collections of NIfTI files in customizable file system hierarchies.
 As manual file renaming and metadata reorganization is tedious and error prone, automation is preferable, and this is a consistent focus of HeuDiConv.
@@ -159,9 +159,10 @@ Since then, DICOM conversion to NIfTI files contained within a BIDS hierarchy ha
 
 # Overview of HeuDiConv functionality
 
-HeuDiConv was initially developed to implement common for every lab logic (groupping DICOMs, extraction of metadata, conversion of individual sequences, populating standard BIDS files, etc.) while allowing individual groups to customize **how** files should be organized and named while driving custom decisions by the conventions and desires of those individual groups.
+HeuDiConv was initially developed to implement logic commonly used across labs (grouping DICOMs, extracting metadata, converting individual sequences, populating standard BIDS files, etc.) while allowing individual groups to customize **how** files should be organized and named while driving custom decisions through the conventions and desires of those individual groups.
 Such decision making is implemented in *HeuDiConv heuristics*, which are implemented as Python modules following some minimalistic specified interfaces documented in HeuDiConv documentation (https://heudiconv.readthedocs.io/en/latest/heuristics.html).
-HeuDiConv, if instructed to operate in BIDS mode (`--bids` flag) after heuristic provides base naming instructions, takes care about correct placement of files in the hierarchy, naming of multi-echo and other split files, etc.
+HeuDiConv, if instructed to operate in BIDS mode (`--bids` flag) with a heuristic providing base naming instructions, and helpers to organize the files in the hierarchy defined by the BIDS standard.
+It also ensures files are named according to the BIDS specifications, including complex composite recordings such as those associated with multi-echo sequences.
 
 ![**HeuDiConv automates the keystone conversion step in reproducible data handling, without compromising operator flexibility.** The showcased set-up depicts a 2-machine infrastructure, with heudiconv operating on the same machine as subsequent analysis steps for data in a standardized and shareable representation. For more advanced usage at institutions with dedicated infrastructure, HeuDiConv can operate on an additional third machine, interfacing between the depicted two, and dedicated to data repositing, versioning, and backup.](figs/workflow.pdf)
 
@@ -169,7 +170,7 @@ HeuDiConv, if instructed to operate in BIDS mode (`--bids` flag) after heuristic
 
 ### Convertall
 
-The [convertall heuristic](https://github.com/nipy/heudiconv/blob/v0.12.2/heudiconv/heuristics/convertall.py) is the simplest heuristic which expresses no knowledge or assumptions about anything and can be used as a template to develop new heuristic or to establish initial mapping for manual naming of the sequences in the "manual curation" step.
+The [convertall heuristic](https://github.com/nipy/heudiconv/blob/v0.12.2/heudiconv/heuristics/convertall.py) is the simplest heuristic which expresses no knowledge or assumptions about anything and can be used as a template to develop new heuristics or to establish initial mapping for manual naming of the sequences in the "manual curation" step.
 
 ### StudyForrest phase 2
 
@@ -185,11 +186,11 @@ In case of correct specification and absent operator errors, such as mis-typed s
 
 # Adoption and usage
 
-HeuDiConv has [RRID:SCR_017427](https://scicrunch.org/resolver/RRID:SCR_017427) as of time of writing mentions already [6 mentions in papers](https://scicrunch.org/resolver/SCR_017427/mentions?q=&i=rrid:scr_017427).
+As a citeable resource [RRID:SCR_017427](https://scicrunch.org/resolver/RRID:SCR_017427), Heudiconv has already [6 mentions in papers](https://scicrunch.org/resolver/SCR_017427/mentions?q=&i=rrid:scr_017427) at time of writing.
 There is a growing number of downloads from PyPI and uses of HeuDiConv (see \autoref{fig:usage}).
-Over 40 BIDS datasets were converted using HeuDiConv with ReproIn heuristic over to BIDS at Dartmouth Brain Imaging Center (DBIC), where ReproIn heuristic being developed.
+Over 40 BIDS datasets were converted over to BIDS with HeuDiConv at Dartmouth Brain Imaging Center (DBIC), using the ReproIn heuristic developed there.
 HeuDiConv was found to be used for PET data conversion [@JZC+21:PET], shared as OpenNeuro ds003382 [@openneuro.ds003382.v1.0.0].
-Moreover, HeuDiConv approach inspired development of `fw-heudiconv` (FlywheelTools: Software for HeuDiConv-Style BIDS Curation On Flywheel) [@TCB+21:fw-heudiconv].
+Moreover, the HeuDiConv approach inspired the development of `fw-heudiconv` (FlywheelTools: Software for HeuDiConv-Style BIDS Curation On Flywheel) [@TCB+21:fw-heudiconv].
 
 ![**\label{fig:usage}Downloads experienced an initial sharp rise after the ReproNim HeuDiconv training event at OHBM in mid 2018, and have subsequently followed a positive trend along with the usage — exceeding 1000 sessions per week — in the data collection interval.** Depicted are weekly download and confirmed session estimates, averaged per month, with a 95% confidence interval. User session estimates for July and August 2022 are linearly extrapolated from the nearest neighbour. Download counts are sourced from PyPI, the Python community repository; whereas user session counts are sourced from Etelemetry, an infrastructure for verifiable research impact, which end-users can disable to protect privacy.](figs/usage.pdf)
 
