@@ -197,7 +197,7 @@ In case of correct specification and absent operator errors, such as mis-typed s
 
 As a citeable resource [RRID:SCR_017427](https://scicrunch.org/resolver/RRID:SCR_017427), Heudiconv has already [6 mentions in papers](https://scicrunch.org/resolver/SCR_017427/mentions?q=&i=rrid:scr_017427) at time of writing.
 There is a growing number of downloads from PyPI and uses of HeuDiConv (see \autoref{fig:usage}).
-Over 40 BIDS datasets were converted over to BIDS with HeuDiConv at Dartmouth Brain Imaging Center (DBIC), using the ReproIn heuristic currently developed there.
+Over 40 BIDS datasets were converted over to BIDS with HeuDiConv at Dartmouth Brain Imaging Center (DBIC), using the ReproIn heuristic developed there.
 HeuDiConv was found to be used for PET data conversion [@JZC+21:PET], shared as OpenNeuro ds003382 [@openneuro.ds003382.v1.0.0].
 Moreover, the HeuDiConv approach inspired the development of `fw-heudiconv` (FlywheelTools: Software for HeuDiConv-Style BIDS Curation On Flywheel) [@TCB+21:fw-heudiconv].
 
