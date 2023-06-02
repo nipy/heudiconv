@@ -102,9 +102,6 @@ authors:
 # - name: Maite Termenon  # 0 commits, issues: opened 5 participated in 0
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Russ Poldrack  # 0 commits, issues: opened 5 participated in 0
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
  - name: David V. Smith  # 0 commits, issues: opened 4 participated in 1
    orcid: 0000-0001-5754-9633
    affiliation: Department of Psychology and Neuroscience, Temple University, PA, USA
@@ -214,6 +211,7 @@ HeuDiConv uses specialized tools and libraries:
 We would like to extend our gratitude to
 Matthew Brett,
 Jörg Stadler,
+Russell Poldrack,
 ADD YOUR NAME HERE
 for notable contributions to the codebase, bug reports, recommendations, and promotion of HeuDiConv.
 
