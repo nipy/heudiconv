@@ -36,7 +36,7 @@ authors:
  - name: Patrick Sadil  # 18 commits, issues: opened 3 participated in 2
    orcid: 0000-0003-4141-1343
    affiliation: Department of Biostatistics, Johns Hopkins Bloomberg School of Public Health, Baltimore, MD, USA
- - name: Chris Filo Gorgolewski  # 4 commits, issues: opened 7 participated in 10
+ - name: Krzysztof Jacek Gorgolewski  # 4 commits, issues: opened 7 participated in 10
    orcid: 0000-0003-3321-7583
  - name: Horea-Ioan Ioanas   # 17 commits, issues: opened 1 participated in 1
    orcid: 0000-0001-7037-2449
