@@ -30,9 +30,9 @@ authors:
  - name: John T. Wodder II  # 58 commits, issues: opened 2 participated in 4
    orcid: 
    affiliation: 1
-# - name: Michael Hanke  # 32 commits, issues: opened 10 participated in 6
-#   orcid: 0000-0001-6398-6370
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Michael Hanke  # 32 commits, issues: opened 10 participated in 6
+   orcid: 0000-0001-6398-6370
+   affiliation: Institute of Neuroscience and Medicine, Brain & Behaviour (INM-7), Research Center Jülich, Jülich, Germany and Institute of Systems Neuroscience, Medical Faculty, Heinrich Heine University Düsseldorf, Düsseldorf, Germany
  - name: Patrick Sadil  # 18 commits, issues: opened 3 participated in 2
    orcid: 0000-0003-4141-1343
    affiliation: Department of Biostatistics, Johns Hopkins Bloomberg School of Public Health, Baltimore, MD, USA
