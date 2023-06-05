@@ -12,9 +12,9 @@ authors:
  - name: Yaroslav Halchenko  # 626 commits, issues: opened 81 participated in 146
    orcid: 0000-0003-3456-2493
    affiliation: 1
-# - name: Mathias Goncalves  # 287 commits, issues: opened 16 participated in 98
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Mathias Goncalves  # 287 commits, issues: opened 16 participated in 98
+   orcid: 0000-0002-7252-7771
+   affiliation: Department of Psychology, Stanford University, CA, USA
  - name: Satrajit Ghosh  # 77 commits, issues: opened 16 participated in 62
    orcid: 0000-0002-5312-6729
    affiliation:  Massachusetts Institute of Technology, Cambridge, MA, USA
