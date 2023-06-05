@@ -80,9 +80,6 @@ authors:
 # - name: Darren Lukas  # 4 commits, issues: opened 1 participated in 2
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Sin Kim  # 3 commits, issues: opened 2 participated in 1
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Ellyn Butler  # 0 commits, issues: opened 4 participated in 2
    orcid: 0000-0001-6316-6444
    affiliation:  Department of Psychology, Northwestern University, Evanston, IL, USA
@@ -212,6 +209,7 @@ We would like to extend our gratitude to
 Matthew Brett,
 Jörg Stadler,
 Russell Poldrack,
+Sin Kim,
 ADD YOUR NAME HERE
 for notable contributions to the codebase, bug reports, recommendations, and promotion of HeuDiConv.
 
