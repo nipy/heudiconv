@@ -101,9 +101,6 @@ authors:
  - name: David V. Smith  # 0 commits, issues: opened 4 participated in 1
    orcid: 0000-0001-5754-9633
    affiliation: Department of Psychology and Neuroscience, Temple University, PA, USA
-# - name: Dan Lurie  # 2 commits, issues: opened 3 participated in 0
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Austin Macdonald  # 2 commits, issues: opened 1 participated in 1 + 1 commit in paper repo
    orcid: 
    affiliation: 1
@@ -210,6 +207,7 @@ Matthew Brett,
 Jörg Stadler,
 Russell Poldrack,
 Sin Kim,
+Dan Lurie,
 ADD YOUR NAME HERE
 for notable contributions to the codebase, bug reports, recommendations, and promotion of HeuDiConv.
 
