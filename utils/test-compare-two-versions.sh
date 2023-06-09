@@ -54,7 +54,7 @@ function show_diff() {
 	#git remote add rolando "$outdir/rolando"
 	#git fetch rolando
 	# git diff --stat rolando/master..
-	if diff  -Naur --exclude=.git --ignore-matching-lines='^\s*id\s*=.*' "$v1" "$v2" >| "$diff_full"; then
+	if diff  -Naur --exclude=.git  --ignore-matching-lines='^\s*\(id\s*=.*\|"HeudiconvVersion": \)' "$v1" "$v2" >| "$diff_full"; then
 		echo "Results are identical"
 	else
 		echo "Results differ: $diff_full"
