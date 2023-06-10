@@ -97,7 +97,7 @@ authors:
 #   affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Maite Termenon  # 0 commits, issues: opened 5 participated in 0
    orcid: 0000-0001-8102-5135
-   affiliation:  Biomedical Engineering Department, Faculty of Engineering, Mondragon Unibertsitatea (MU-ENG), Spain and BCBL, Basque center on Cognition, Brain and Language, Spain.
+   affiliation: Biomedical Engineering Department, Faculty of Engineering, Mondragon Unibertsitatea (MU-ENG), Spain and BCBL, Basque center on Cognition, Brain and Language, Spain.
  - name: David V. Smith  # 0 commits, issues: opened 4 participated in 1
    orcid: 0000-0001-5754-9633
    affiliation: Department of Psychology and Neuroscience, Temple University, PA, USA
