@@ -86,9 +86,6 @@ authors:
 # - name: Will Asciutto  # 0 commits, issues: opened 5 participated in 0
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Henry Braun  # 2 commits, issues: opened 3 participated in 0
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
 # - name: toddt  # 0 commits, issues: opened 5 participated in 0
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
@@ -208,6 +205,7 @@ Jörg Stadler,
 Russell Poldrack,
 Sin Kim,
 Dan Lurie,
+Henry Braun,
 ADD YOUR NAME HERE
 for notable contributions to the codebase, bug reports, recommendations, and promotion of HeuDiConv.
 
