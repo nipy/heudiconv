@@ -231,11 +231,11 @@ def is_deprecated_seriesid(series_id: str, len_hash_hex: int = 8) -> bool:
     # Check at least two '-' in the series_id
     if series_id.count('-') <= 1:
         return True
-    # Check if the first part of the series_id is a number
+    # Check the first part of the series_id is a number
     series_number = series_id.split('-')[0]
     if not series_number.isdigit():
         return True
-    # Check if the last part of the series_id is a hash in hexadecimal format of length 8
+    # Check the last part of the series_id is a hash in hexadecimal format of length len_hash_hex
     hash_hex = series_id.split('-')[-1]
     hex_digits = set(string.hexdigits)
     if len(hash_hex) != len_hash_hex or not all(c in hex_digits for c in hash_hex):

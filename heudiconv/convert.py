@@ -211,7 +211,6 @@ def prep_conversion(
         # DICOMs dumped with SOP UUIDs thus differing across runs etc
         # So either it would need to be brought back or reconsidered altogether
         # (since no sample data to test on etc)
-
     else:
         assure_no_file_exists(target_heuristic_filename)
         safe_copyfile(heuristic.filename, target_heuristic_filename)
