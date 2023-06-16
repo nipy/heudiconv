@@ -68,9 +68,9 @@ authors:
  - name: Ted Strauss  # 0 commits, issues: opened 8 participated in 0
    orcid: 0000-0002-1927-666X
    affiliation:
-# - name: John Lee  # 2 commits, issues: opened 5 participated in 1
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+  - name: John Lee  # 2 commits, issues: opened 5 participated in 1
+    orcid: 0000-0001-5884-4247
+    affiliation:  Data Science and Sharing Team, National Institute of Mental Health, Bethesda, MD, USA
  - name: Isaac To  # 7 commits, issues: opened 0 participated in 0
    orcid: 0000-0002-4740-0824
    affiliation: 1
