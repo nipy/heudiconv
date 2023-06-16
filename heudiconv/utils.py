@@ -226,7 +226,7 @@ def load_json(filename: str | Path, retry: int = 0) -> Any:
 def is_deprecated_seriesid(series_id: str, len_hash_hex: int = 8) -> bool:
     """Return True if series_id is in deprecated format.
     A deprecated series ID is in the format "series_number-protocol_name".
-    A non-deprecated series ID is in the format "series_number-protocol_name-hash8hex(series_UID)"
+    A non-deprecated series ID is in the format "series_number-protocol_name-seriesUID_hash_hex"
     """
     # Check at least two '-' in the series_id
     if series_id.count('-') <= 1:
@@ -251,7 +251,7 @@ def has_deprecated_seriesid(info_file: str) -> bool:
     if any(is_deprecated_seriesid(series_id) for series_id in series_ids):
         lgr.warning(
             "Found deprecated series identifier in info file in the format"
-            "<series num>-<protocol name> instead of <series num>-<protocol name>-<UID hash len 8>"
+            "<series num>-<protocol name> instead of <series num>-<protocol name>-<UID hash>"
             "The existing conversion table will be ignored."
         )
         return True
