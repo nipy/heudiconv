@@ -164,7 +164,8 @@ class SeriesID(NamedTuple):
     file_studyUID: Optional[str] = None
 
     def __str__(self) -> str:
-        suid_hex = hashlib.md5(self.series_uid.encode('utf-8')).hexdigest()[:16]
+        len_hash_hex = 8
+        suid_hex = hashlib.md5(self.series_uid.encode('utf-8')).hexdigest()[:len_hash_hex]
         s = f"{self.series_number}-{self.protocol_name}-{suid_hex}"
         if self.file_studyUID is not None:
             s += f"-{self.file_studyUID}"
