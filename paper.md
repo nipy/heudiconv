@@ -77,9 +77,9 @@ authors:
  - name: Christopher J. Markiewicz  # 4 commits, issues: opened 1 participated in 2
    orcid: 0000-0002-6533-164X
    affiliation: Department of Psychology, Stanford University, CA, USA
-# - name: Darren Lukas  # 4 commits, issues: opened 1 participated in 2
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+- name: Darren Lukas  # 4 commits, issues: opened 1 participated in 2
+  orcid: 0009-0003-6941-0833
+  affiliation: Institute for Glycomics, Griffith University, QLD, Australia
  - name: Ellyn Butler  # 0 commits, issues: opened 4 participated in 2
    orcid: 0000-0001-6316-6444
    affiliation:  Department of Psychology, Northwestern University, Evanston, IL, USA
