@@ -41,9 +41,9 @@ authors:
  - name: Horea-Ioan Ioanas   # 17 commits, issues: opened 1 participated in 1
    orcid: 0000-0001-7037-2449
    affiliation: 1
-# - name: Chris Rorden  # 0 commits, issues: opened 1 participated in 17
-#   orcid: 0000-0002-7554-6142 
-#   affiliation: University of South Carolina: Columbia, SC, US
+ - name: Chris Rorden  # 0 commits, issues: opened 1 participated in 17
+   orcid: 0000-0002-7554-6142 
+   affiliation: University of South Carolina: Columbia, SC, US
  - name: Timothy J. Hendrickson  # 0 commits, issues: opened 10 participated in 4
    orcid: 0000-0001-6862-6526
    affiliation: Masonic Institute for the Developing Brain, University of Minnesota; Minnesota Supercomputing Institute, University of Minnesota
