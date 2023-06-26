@@ -53,9 +53,6 @@ authors:
  - name: Sean Dae Houlihan  # 12 commits, issues: opened 0 participated in 0 # First: Sean Dae; Last: Houlihan
    orcid: 0000-0001-5003-9278
    affiliation:  1, Department of Brain and Cognitive Sciences, Massachusetts Institute of Technology
-# - name: Steven Tilley  # 11 commits, issues: opened 1 participated in 0
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
  - name: James Kent  # 8 commits, issues: opened 3 participated in 0
    orcid: 0000-0002-4892-2659
    affiliation: University of Texas at Austin
