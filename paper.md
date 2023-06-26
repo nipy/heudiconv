@@ -14,25 +14,25 @@ authors:
    affiliation: 1
  - name: Mathias Goncalves  # 287 commits, issues: opened 16 participated in 98
    orcid: 0000-0002-7252-7771
-   affiliation: Department of Psychology, Stanford University, CA, USA
+   affiliation: 2
  - name: Satrajit Ghosh  # 77 commits, issues: opened 16 participated in 62
    orcid: 0000-0002-5312-6729
-   affiliation:  Massachusetts Institute of Technology, Cambridge, MA, USA
+   affiliation: 3
  - name: Pablo Velasco  # 113 commits, issues: opened 6 participated in 22
    orcid: 0000-0002-5749-6049
-   affiliation: Flywheel Exchange LLC, Minneapolis, MN, USA
+   affiliation: 4
  - name: Matteo Visconti di Oleggio Castello  # 88 commits, issues: opened 2 participated in 1
    orcid: 0000-0001-7931-5272
-   affiliation: University of California, Berkeley, Berkeley, CA, USA
+   affiliation: 5
  - name: Taylor Salo  # 76 commits, issues: opened 11 participated in 4
    orcid: 0000-0001-9813-3167
-   affiliation: University of Pennsylvania, Philadelphia, PA, USA
+   affiliation: 6
  - name: John T. Wodder II  # 58 commits, issues: opened 2 participated in 4
    orcid: 
    affiliation: 1
  - name: Michael Hanke  # 32 commits, issues: opened 10 participated in 6
    orcid: 0000-0001-6398-6370
-   affiliation: Institute of Neuroscience and Medicine, Brain & Behaviour (INM-7), Research Center Jülich, Jülich, Germany and Institute of Systems Neuroscience, Medical Faculty, Heinrich Heine University Düsseldorf, Düsseldorf, Germany
+   affiliation: 7, 8
  - name: Patrick Sadil  # 18 commits, issues: opened 3 participated in 2
    orcid: 0000-0003-4141-1343
    affiliation: Department of Biostatistics, Johns Hopkins Bloomberg School of Public Health, Baltimore, MD, USA
@@ -43,59 +43,96 @@ authors:
    affiliation: 1
  - name: Chris Rorden  # 0 commits, issues: opened 1 participated in 17
    orcid: 0000-0002-7554-6142
-   affiliation: University of South Carolina: Columbia, SC, US
+   affiliation: 9
  - name: Timothy J. Hendrickson  # 0 commits, issues: opened 10 participated in 4
    orcid: 0000-0001-6862-6526
-   affiliation: Masonic Institute for the Developing Brain, University of Minnesota; Minnesota Supercomputing Institute, University of Minnesota
+   affiliation: 10, 11
  - name: Michael Dayan  # 12 commits, issues: opened 1 participated in 2
    orcid: 0000-0002-2666-0969
-   affiliation: Human Neuroscience Platform, Fondation Campus Biotech Geneva, Geneva, Switzerland
+   affiliation: 12
  - name: Sean Dae Houlihan  # 12 commits, issues: opened 0 participated in 0 # First: Sean Dae; Last: Houlihan
    orcid: 0000-0001-5003-9278
-   affiliation:  1, Department of Brain and Cognitive Sciences, Massachusetts Institute of Technology
+   affiliation:  1, 13
  - name: James Kent  # 8 commits, issues: opened 3 participated in 0
    orcid: 0000-0002-4892-2659
-   affiliation: University of Texas at Austin
+   affiliation: 14
  - name: Ted Strauss  # 0 commits, issues: opened 8 participated in 0
    orcid: 0000-0002-1927-666X
-   affiliation:
+   affiliation: 15
  - name: John Lee  # 2 commits, issues: opened 5 participated in 1
    orcid: 0000-0001-5884-4247
-   affiliation:  Data Science and Sharing Team, National Institute of Mental Health, Bethesda, MD, USA
+   affiliation: 16
  - name: Isaac To  # 7 commits, issues: opened 0 participated in 0
    orcid: 0000-0002-4740-0824
    affiliation: 1
  - name: Christopher J. Markiewicz  # 4 commits, issues: opened 1 participated in 2
    orcid: 0000-0002-6533-164X
-   affiliation: Department of Psychology, Stanford University, CA, USA
+   affiliation: 2
  - name: Darren Lukas  # 4 commits, issues: opened 1 participated in 2
    orcid: 0009-0003-6941-0833
-   affiliation: Institute for Glycomics, Griffith University, QLD, Australia
+   affiliation: 17
  - name: Ellyn Butler  # 0 commits, issues: opened 4 participated in 2
    orcid: 0000-0001-6316-6444
-   affiliation:  Department of Psychology, Northwestern University, Evanston, IL, USA
+   affiliation: Department of Psychology, Northwestern University, Evanston, IL, USA
  - name: Todd Thompson  # 0 commits, issues: opened 5 participated in 0
    orcid: 
-   affiliation:  Department of Brain and Cognitive Sciences, Massachusetts Institute of Technology
+   affiliation: 13
  - name: Maite Termenon  # 0 commits, issues: opened 5 participated in 0
    orcid: 0000-0001-8102-5135
-   affiliation: Biomedical Engineering Department, Faculty of Engineering, Mondragon Unibertsitatea (MU-ENG), Spain and BCBL, Basque center on Cognition, Brain and Language, Spain.
+   affiliation: 18, 19
  - name: David V. Smith  # 0 commits, issues: opened 4 participated in 1
    orcid: 0000-0001-5754-9633
-   affiliation: Department of Psychology and Neuroscience, Temple University, PA, USA
+   affiliation: 20
  - name: Austin Macdonald  # 2 commits, issues: opened 1 participated in 1 + 1 commit in paper repo
    orcid: 
    affiliation: 1
  - name: David N. Kennedy  # Benevolent leader of ReproNim who holds the umbrella and was brave to try a number of times
    orcid: 0000-0002-9377-0797
-   affiliation: Departments of Psychiatry and Radiology, University of Massachusetts Chan Medical School
+   affiliation: 21
 affiliations:
- - name: Center for Open Neuroscience, Department of Psychological and Brain Sciences, Dartmouth College, Hanover, NH, USA
+ - name: Center for Open Neuroscience, Department of Psychological and Brain Sciences, Dartmouth College, Hanover, US-NH
    index: 1
- - name: Institution Name, Country
+ - name: Department of Psychology, Stanford University, US-CA
    index: 2
- - name: Independent Researcher, Country
+ - name: McGovern Institute, Massachusetts Institute of Technology, Cambridge, US-MA
    index: 3
+ - name: Flywheel Exchange LLC, Minneapolis, US-MN
+   index: 4
+ - name: University of California, Berkeley, Berkeley, US-CA
+   index: 5
+ - name: Perelman School of Medicine, University of Pennsylvania, Philadelphia, US-PA
+   index: 6
+ - name: Institute of Neuroscience and Medicine, Brain & Behaviour (INM-7), Research Center Jülich, Jülich DE-NW
+   index: 7
+ - name: Institute of Systems Neuroscience, Medical Faculty, Heinrich Heine University Düsseldorf, Düsseldorf DE-NW
+   index: 8
+ - name: Department of Psychology, University of South Carolina, Columbia US-SC
+   index: 9
+ - name: Masonic Institute for the Developing Brain, University of Minnesota, Minneapolis US-MN
+   index: 10
+ - name: Minnesota Supercomputing Institute, University of Minnesota, Minneapolis US-MN
+   index: 11
+ - name: Human Neuroscience Platform, Fondation Campus Biotech Geneva CH-GE
+   index: 12
+ - name: Department of Brain and Cognitive Sciences, Massachusetts Institute of Technology, Cambridge US-MA
+   index: 13
+ - name: Department of Psychology, University of Texas at Austin, Austi US-TX
+   index: 14
+ - name: McConnell Brain Imaging Centre, McGill University, Montreal CA-QC
+   index: 15
+ - name: Data Science and Sharing Team, National Institute of Mental Health, Bethesda US-MD
+   index: 16
+ - name: Institute for Glycomics, Griffith University, AU-QLD
+   index: 17
+ - name: Biomedical Engineering Department, Faculty of Engineering, Mondragon University, Mondragon ES-PV
+   index: 18
+ - name: BCBL, Basque center on Cognition, Brain and Language, San Sebastian ES-PV
+   index: 19
+ - name: Department of Psychology and Neuroscience, Temple University, Philadelphia US-PA
+   index: 20
+ - name: Departments of Psychiatry and Radiology, University of Massachusetts Chan Medical School, Worcester US-MA
+   index: 21
+
 date: 2023-01-31
 bibliography: paper.bib
 
