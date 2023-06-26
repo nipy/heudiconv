@@ -56,12 +56,6 @@ authors:
  - name: James Kent  # 8 commits, issues: opened 3 participated in 0
    orcid: 0000-0002-4892-2659
    affiliation: University of Texas at Austin
-# - name: Michael  # 0 commits, issues: opened 7 participated in 3
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Basile Pinsard  # 1 commits, issues: opened 6 participated in 1
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Ted Strauss  # 0 commits, issues: opened 8 participated in 0
    orcid: 0000-0002-1927-666X
    affiliation:
@@ -83,9 +77,6 @@ authors:
  - name: Todd Thompson  # 0 commits, issues: opened 5 participated in 0
    orcid: 
    affiliation:  Department of Brain and Cognitive Sciences, Massachusetts Institute of Technology
-# - name: Maria Isabel Restrepo  # 0 commits, issues: opened 1 participated in 4
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Maite Termenon  # 0 commits, issues: opened 5 participated in 0
    orcid: 0000-0001-8102-5135
    affiliation: Biomedical Engineering Department, Faculty of Engineering, Mondragon Unibertsitatea (MU-ENG), Spain and BCBL, Basque center on Cognition, Brain and Language, Spain.
