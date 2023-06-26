@@ -80,9 +80,9 @@ authors:
  - name: Ellyn Butler  # 0 commits, issues: opened 4 participated in 2
    orcid: 0000-0001-6316-6444
    affiliation:  Department of Psychology, Northwestern University, Evanston, IL, USA
-# - name: toddt  # 0 commits, issues: opened 5 participated in 0
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Todd Thompson  # 0 commits, issues: opened 5 participated in 0
+   orcid: 
+   affiliation:  Department of Brain and Cognitive Sciences, Massachusetts Institute of Technology
 # - name: Maria Isabel Restrepo  # 0 commits, issues: opened 1 participated in 4
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
