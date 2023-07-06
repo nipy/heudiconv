@@ -132,9 +132,9 @@ affiliations:
    index: 20
  - name: Departments of Psychiatry and Radiology, University of Massachusetts Chan Medical School, Worcester, MA, USA
    index: 21
- - name: Department of Biostatistics, Johns Hopkins Bloomberg School of Public Health, Baltimore US-MD
+ - name: Department of Biostatistics, Johns Hopkins Bloomberg School of Public Health, Baltimore, MD, USA
    index: 22
- - name: Department of Psychology, Northwestern University, Evanston, US-IL
+ - name: Department of Psychology, Northwestern University, Evanston, IL, USA
    index: 23
 
 date: 2023-07-06
