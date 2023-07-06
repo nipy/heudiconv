@@ -73,7 +73,7 @@ authors:
    affiliation: 17
  - name: Ellyn Butler  # 0 commits, issues: opened 4 participated in 2
    orcid: 0000-0001-6316-6444
-   affiliation: Department of Psychology, Northwestern University, Evanston, IL, USA
+   affiliation: 23
  - name: Todd Thompson  # 0 commits, issues: opened 5 participated in 0
    orcid: 
    affiliation: 13
@@ -116,7 +116,7 @@ affiliations:
    index: 12
  - name: Department of Brain and Cognitive Sciences, Massachusetts Institute of Technology, Cambridge US-MA
    index: 13
- - name: Department of Psychology, University of Texas at Austin, Austi US-TX
+ - name: Department of Psychology, University of Texas at Austin, Austin US-TX
    index: 14
  - name: McConnell Brain Imaging Centre, McGill University, Montreal CA-QC
    index: 15
@@ -134,6 +134,8 @@ affiliations:
    index: 21
  - name: Department of Biostatistics, Johns Hopkins Bloomberg School of Public Health, Baltimore, MD, USA
    index: 22
+ - name: Department of Psychology, Northwestern University, Evanston, IL, USA
+   index: 23
 
 date: 2023-01-31
 bibliography: paper.bib
