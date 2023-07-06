@@ -231,11 +231,10 @@ Jörg Stadler,
 Russell Poldrack,
 Sin Kim,
 Dan Lurie,
-Henry Braun,
-ADD YOUR NAME HERE
+and Henry Braun
 for notable contributions to the codebase, bug reports, recommendations, and promotion of HeuDiConv.
 
 HeuDiConv development was primarily done under the umbrella of the NIH funded Nipype [1R01EB020740-01](https://reporter.nih.gov/search/ZZFBbUBAxE2obl72ByIn0Q/project-details/9053094), ReproNim [1P41EB019936-01A1](https://projectreporter.nih.gov/project_info_details.cfm?aid=8999833&map=y) and [2P41EB019936-06A1](https://projectreporter.nih.gov/project_info_details.cfm?aid=10334133&map=y) (PI: Kennedy).
-Contributions of TODO1 were supported by TODO1, ...
+
 
 # References
