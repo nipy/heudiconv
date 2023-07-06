@@ -35,7 +35,7 @@ authors:
    affiliation: 7, 8
  - name: Patrick Sadil  # 18 commits, issues: opened 3 participated in 2
    orcid: 0000-0003-4141-1343
-   affiliation: Department of Biostatistics, Johns Hopkins Bloomberg School of Public Health, Baltimore, MD, USA
+   affiliation: 22
  - name: Krzysztof Jacek Gorgolewski  # 4 commits, issues: opened 7 participated in 10
    orcid: 0000-0003-3321-7583
  - name: Horea-Ioan Ioanas   # 17 commits, issues: opened 1 participated in 1
@@ -132,6 +132,8 @@ affiliations:
    index: 20
  - name: Departments of Psychiatry and Radiology, University of Massachusetts Chan Medical School, Worcester US-MA
    index: 21
+ - name: Department of Biostatistics, Johns Hopkins Bloomberg School of Public Health, Baltimore, MD, USA
+   index: 22
 
 date: 2023-01-31
 bibliography: paper.bib
