@@ -90,47 +90,47 @@ authors:
    orcid: 0000-0002-9377-0797
    affiliation: 21
 affiliations:
- - name: Center for Open Neuroscience, Department of Psychological and Brain Sciences, Dartmouth College, Hanover, US-NH
+ - name: Center for Open Neuroscience, Department of Psychological and Brain Sciences, Dartmouth College, Hanover, NH, USA
    index: 1
- - name: Department of Psychology, Stanford University, US-CA
+ - name: Department of Psychology, Stanford University, CA, USA
    index: 2
- - name: McGovern Institute, Massachusetts Institute of Technology, Cambridge, US-MA
+ - name: McGovern Institute, Massachusetts Institute of Technology, Cambridge, MA, USA
    index: 3
- - name: Flywheel Exchange LLC, Minneapolis, US-MN
+ - name: Flywheel Exchange LLC, Minneapolis, MN, USA
    index: 4
- - name: University of California, Berkeley, Berkeley, US-CA
+ - name: University of California, Berkeley, Berkeley, CA, USA
    index: 5
- - name: Perelman School of Medicine, University of Pennsylvania, Philadelphia, US-PA
+ - name: Perelman School of Medicine, University of Pennsylvania, Philadelphia, PA, USA
    index: 6
- - name: Institute of Neuroscience and Medicine, Brain & Behaviour (INM-7), Research Center Jülich, Jülich DE-NW
+ - name: Institute of Neuroscience and Medicine, Brain & Behaviour (INM-7), Research Center Jülich, Jülich, Germany
    index: 7
- - name: Institute of Systems Neuroscience, Medical Faculty, Heinrich Heine University Düsseldorf, Düsseldorf DE-NW
+ - name: Institute of Systems Neuroscience, Medical Faculty, Heinrich Heine University Düsseldorf, Düsseldorf, Germany
    index: 8
- - name: Department of Psychology, University of South Carolina, Columbia US-SC
+ - name: Department of Psychology, University of South Carolina, Columbia, SC, USA
    index: 9
- - name: Masonic Institute for the Developing Brain, University of Minnesota, Minneapolis US-MN
+ - name: Masonic Institute for the Developing Brain, University of Minnesota, Minneapolis, MN, USA
    index: 10
- - name: Minnesota Supercomputing Institute, University of Minnesota, Minneapolis US-MN
+ - name: Minnesota Supercomputing Institute, University of Minnesota, Minneapolis, MN, USA
    index: 11
- - name: Human Neuroscience Platform, Fondation Campus Biotech Geneva CH-GE
+ - name: Human Neuroscience Platform, Fondation Campus Biotech Geneva, Geneva, Switzerland
    index: 12
- - name: Department of Brain and Cognitive Sciences, Massachusetts Institute of Technology, Cambridge US-MA
+ - name: Department of Brain and Cognitive Sciences, Massachusetts Institute of Technology, Cambridge, MA, USA
    index: 13
- - name: Department of Psychology, University of Texas at Austin, Austin US-TX
+ - name: Department of Psychology, University of Texas at Austin, Austin, TX, USA
    index: 14
- - name: McConnell Brain Imaging Centre, McGill University, Montreal CA-QC
+ - name: McConnell Brain Imaging Centre, McGill University, Montreal, QC, Canada
    index: 15
- - name: Data Science and Sharing Team, National Institute of Mental Health, Bethesda US-MD
+ - name: Data Science and Sharing Team, National Institute of Mental Health, Bethesda, MD, USA
    index: 16
- - name: Institute for Glycomics, Griffith University, AU-QLD
+ - name: Institute for Glycomics, Griffith University, QLD, Australia
    index: 17
- - name: Biomedical Engineering Department, Faculty of Engineering, Mondragon University, Mondragon ES-PV
+ - name: Biomedical Engineering Department, Faculty of Engineering, Mondragon University, Mondragon, Spain
    index: 18
- - name: BCBL, Basque center on Cognition, Brain and Language, San Sebastian ES-PV
+ - name: BCBL, Basque center on Cognition, Brain and Language, San Sebastian, Spain
    index: 19
- - name: Department of Psychology and Neuroscience, Temple University, Philadelphia US-PA
+ - name: Department of Psychology and Neuroscience, Temple University, Philadelphia, PA, USA
    index: 20
- - name: Departments of Psychiatry and Radiology, University of Massachusetts Chan Medical School, Worcester US-MA
+ - name: Departments of Psychiatry and Radiology, University of Massachusetts Chan Medical School, Worcester, MA, USA
    index: 21
  - name: Department of Biostatistics, Johns Hopkins Bloomberg School of Public Health, Baltimore US-MD
    index: 22
