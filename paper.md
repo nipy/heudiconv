@@ -9,7 +9,7 @@ tags:
   - open science
   - FOSS
 authors:
- - name: Yaroslav Halchenko  # 626 commits, issues: opened 81 participated in 146
+ - name: Yaroslav O. Halchenko  # 626 commits, issues: opened 81 participated in 146
    orcid: 0000-0003-3456-2493
    affiliation: 1
  - name: Mathias Goncalves  # 287 commits, issues: opened 16 participated in 98
