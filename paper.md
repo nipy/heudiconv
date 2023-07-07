@@ -137,7 +137,7 @@ affiliations:
  - name: Department of Psychology, Northwestern University, Evanston, IL, USA
    index: 23
 
-date: 2023-07-06
+date: 6 July 2023
 bibliography: paper.bib
 
 ---
