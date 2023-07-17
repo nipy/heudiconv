@@ -38,6 +38,7 @@ authors:
    affiliation: 22
  - name: Krzysztof Jacek Gorgolewski  # 4 commits, issues: opened 7 participated in 10
    orcid: 0000-0003-3321-7583
+   affiliation: 24
  - name: Horea-Ioan Ioanas   # 17 commits, issues: opened 1 participated in 1
    orcid: 0000-0001-7037-2449
    affiliation: 1
@@ -136,8 +137,10 @@ affiliations:
    index: 22
  - name: Department of Psychology, Northwestern University, Evanston, IL, USA
    index: 23
+ - name: Emeritus of Department of Psychology, Stanford University, CA, USA
+   index: 24
 
-date: 2023-07-06
+date: 6 July 2023
 bibliography: paper.bib
 
 ---
