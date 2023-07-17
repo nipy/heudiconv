@@ -84,7 +84,7 @@ authors:
    orcid: 0000-0001-5754-9633
    affiliation: 20
  - name: Austin Macdonald  # 2 commits, issues: opened 1 participated in 1 + 1 commit in paper repo
-   orcid: 
+   orcid: 0000-0002-8124-807X
    affiliation: 1
  - name: David N. Kennedy  # Benevolent leader of ReproNim who holds the umbrella and was brave to try a number of times
    orcid: 0000-0002-9377-0797
