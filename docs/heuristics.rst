@@ -109,7 +109,7 @@ or::
         return seqinfos  # ordered dict containing seqinfo objects: list of DICOMs
 
 ---------------------------------------------------------------
-``custom_seqinfo(series_files, wrapper)``
+``custom_seqinfo(wrapper, series_files)``
 ---------------------------------------------------------------
 If present this function will be called on each group of dicoms with
 a sample nibabel dicom wrapper to extract additional information
