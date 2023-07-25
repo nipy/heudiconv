@@ -100,3 +100,9 @@ For a detailed into, see our `contributing guide <CONTRIBUTING.rst>`_.
 
 Our releases are packaged using Intuit auto, with the corresponding workflow including
 Docker image preparation being found in ``.github/workflows/release.yml``.
+
+
+3-rd party heuristics
+---------------------
+
+- https://github.com/courtois-neuromod/ds_prep/blob/main/mri/convert/heuristics_unf.py
