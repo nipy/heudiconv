@@ -744,7 +744,7 @@ def infotoids(seqinfos: Iterable[SeqInfo], outdir: str) -> dict[str, Optional[st
         # Generally it is a ^ but if entered manually, ppl place space in it
         split = re.split("[ ^]", study_description, maxsplit=1)
         # split first one even more, since could be PI_Student or PI-Student
-        split = re.split("-|_", split[0], maxsplit=1) + split[1:]
+        split = re.split("[-_]", split[0], maxsplit=1) + split[1:]
 
         # locator = study_description.replace('^', '/')
         locator = "/".join(split)
