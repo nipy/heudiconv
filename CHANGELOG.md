@@ -1,3 +1,36 @@
+# v1.0.0 (Wed Sep 20 2023)
+
+#### 💥 Breaking Change
+
+- [gh-actions](deps): Bump actions/checkout from 3 to 4 [#703](https://github.com/nipy/heudiconv/pull/703) ([@dependabot[bot]](https://github.com/dependabot[bot]))
+
+#### 🚀 Enhancement
+
+- Fix inconsistent behavior of existing session when using -d compared to --files option: raise an AssertionError instead of just a warning [#682](https://github.com/nipy/heudiconv/pull/682) ([@neurorepro](https://github.com/neurorepro))
+
+#### 🐛 Bug Fix
+
+- Various tiny enhancements flake etc demanded [#702](https://github.com/nipy/heudiconv/pull/702) ([@yarikoptic](https://github.com/yarikoptic))
+- Boost claimed BIDS version to 1.8.0 from 1.4.1 [#699](https://github.com/nipy/heudiconv/pull/699) ([@yarikoptic](https://github.com/yarikoptic))
+- Point to Courtois-neuromod heuristic [#702](https://github.com/nipy/heudiconv/pull/702) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### 🏠 Internal
+
+- Add codespell to lint tox env [#706](https://github.com/nipy/heudiconv/pull/706) ([@yarikoptic](https://github.com/yarikoptic))
+- test-compare-two-versions.sh: also ignore differences in HeudiconvVersion field in jsons since we have it there now [#685](https://github.com/nipy/heudiconv/pull/685) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### 📝 Documentation
+
+- Add description of placeholders which could be used in the produced templates [#681](https://github.com/nipy/heudiconv/pull/681) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 3
+
+- [@dependabot[bot]](https://github.com/dependabot[bot])
+- Michael ([@neurorepro](https://github.com/neurorepro))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v0.13.1 (Tue May 23 2023)
 
 #### 🐛 Bug Fix
