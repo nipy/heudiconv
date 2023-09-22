@@ -26,7 +26,7 @@ function run() {
    shift
    source $heudiconvdir/venvs/dev3/bin/activate
    whichheudiconv=$(which heudiconv)
-   # to get "reproducible" dataset UUIDs (might be detremental if we had multiple datalad calls
+   # to get "reproducible" dataset UUIDs (might be detrimental if we had multiple datalad calls
    # but since we use python API for datalad, should be Ok)
    export DATALAD_SEED=1
 
@@ -54,7 +54,7 @@ function show_diff() {
 	#git remote add rolando "$outdir/rolando"
 	#git fetch rolando
 	# git diff --stat rolando/master..
-	if diff  -Naur --exclude=.git --ignore-matching-lines='^\s*id\s*=.*' "$v1" "$v2" >| "$diff_full"; then
+	if diff  -Naur --exclude=.git  --ignore-matching-lines='^\s*\(id\s*=.*\|"HeudiconvVersion": \)' "$v1" "$v2" >| "$diff_full"; then
 		echo "Results are identical"
 	else
 		echo "Results differ: $diff_full"

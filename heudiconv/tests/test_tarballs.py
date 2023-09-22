@@ -1,39 +1,32 @@
-import os
-import pytest
-import sys
-import time
+from __future__ import annotations
 
-from mock import patch
-from os.path import join as opj
-from os.path import dirname
-from six.moves import StringIO
 from glob import glob
+import os
+from os.path import join as opj
+from pathlib import Path
+import time
 
 from heudiconv.dicoms import compress_dicoms
 from heudiconv.utils import TempDirs, file_md5sum
 
-tests_datadir = opj(dirname(__file__), 'data')
+from .utils import TESTS_DATA_PATH
 
 
-def test_reproducibility(tmpdir):
-    prefix = str(tmpdir.join("precious"))
-    args = [glob(opj(tests_datadir, '01-fmap_acq-3mm', '*')),
-            prefix,
-            TempDirs(),
-            True]
-    tarball = compress_dicoms(*args)
+def test_reproducibility(tmp_path: Path) -> None:
+    dicom_list = glob(opj(TESTS_DATA_PATH, "01-fmap_acq-3mm", "*"))
+    prefix = str(tmp_path / "precious")
+    tempdirs = TempDirs()
+
+    tarball = compress_dicoms(dicom_list, prefix, tempdirs, True)
+    assert tarball is not None
     md5 = file_md5sum(tarball)
-    assert tarball
     # must not override, ensure overwrite is set to False
-    args[-1] = False
-    assert compress_dicoms(*args) is None
-    # reset this
-    args[-1] = True
+    assert compress_dicoms(dicom_list, prefix, tempdirs, False) is None
 
     os.unlink(tarball)
 
     time.sleep(1.1)  # need to guarantee change of time
-    tarball_ = compress_dicoms(*args)
-    md5_ = file_md5sum(tarball_)
+    tarball_ = compress_dicoms(dicom_list, prefix, tempdirs, True)
     assert tarball == tarball_
+    md5_ = file_md5sum(tarball_)
     assert md5 == md5_

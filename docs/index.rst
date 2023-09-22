@@ -4,6 +4,7 @@
    contain the root `toctree` directive.
 
 .. include:: ../README.rst
+.. include:: ../CONTRIBUTING.rst
 
 Contents
 --------

@@ -1,20 +1,35 @@
 # dicom operations
+from __future__ import annotations
+
+from collections.abc import Callable
+import datetime
+import logging
 import os
 import os.path as op
-import logging
-from collections import OrderedDict
+from pathlib import Path
+import sys
 import tarfile
+from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Union, overload
+from unittest.mock import patch
+import warnings
 
-from .external.pydicom import dcm
+import pydicom as dcm
+
 from .utils import (
+    SeqInfo,
+    TempDirs,
     get_typed_attr,
     load_json,
-    save_json,
-    SeqInfo,
     set_readonly,
+    strptime_micr,
 )
 
-import warnings
+if TYPE_CHECKING:
+    if sys.version_info >= (3, 8):
+        from typing import Literal
+    else:
+        from typing_extensions import Literal
+
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     # suppress warning
@@ -22,22 +37,25 @@ with warnings.catch_warnings():
 
 lgr = logging.getLogger(__name__)
 total_files = 0
+# Might be monkey patched by user heuristic to tune desired compression level.
+# Preferably do not move/rename.
+compresslevel = 9
 
 
-def create_seqinfo(mw, series_files, series_id):
+def create_seqinfo(mw: dw.Wrapper, series_files: list[str], series_id: str) -> SeqInfo:
     """Generate sequence info
 
     Parameters
     ----------
-    mw: MosaicWrapper
+    mw: Wrapper
     series_files: list
     series_id: str
     """
     dcminfo = mw.dcm_data
-    accession_number = dcminfo.get('AccessionNumber')
+    accession_number = dcminfo.get("AccessionNumber")
 
     # TODO: do not group echoes by default
-    size = list(mw.image_shape) + [len(series_files)]
+    size: list[int] = list(mw.image_shape) + [len(series_files)]
     if len(size) < 4:
         size.append(1)
 
@@ -46,15 +64,15 @@ def create_seqinfo(mw, series_files, series_id):
     TE = get_typed_attr(dcminfo, "EchoTime", float, -1)
     refphys = get_typed_attr(dcminfo, "ReferringPhysicianName", str, "")
     image_type = get_typed_attr(dcminfo, "ImageType", tuple, ())
-    is_moco = 'MOCO' in image_type
+    is_moco = "MOCO" in image_type
     series_desc = get_typed_attr(dcminfo, "SeriesDescription", str, "")
 
     if dcminfo.get([0x18, 0x24]):
         # GE and Philips
         sequence_name = dcminfo[0x18, 0x24].value
-    elif dcminfo.get([0x19, 0x109c]):
+    elif dcminfo.get([0x19, 0x109C]):
         # Siemens
-        sequence_name = dcminfo[0x19, 0x109c].value
+        sequence_name = dcminfo[0x19, 0x109C].value
     else:
         sequence_name = ""
 
@@ -62,7 +80,7 @@ def create_seqinfo(mw, series_files, series_id):
     global total_files
     total_files += len(series_files)
 
-    seqinfo = SeqInfo(
+    return SeqInfo(
         total_files_till_now=total_files,
         example_dcm_file=op.basename(series_files[0]),
         series_id=series_id,
@@ -77,68 +95,127 @@ def create_seqinfo(mw, series_files, series_id):
         TE=TE,
         protocol_name=dcminfo.ProtocolName,
         is_motion_corrected=is_moco,
-        is_derived='derived' in [x.lower() for x in image_type],
-        patient_id=dcminfo.get('PatientID'),
-        study_description=dcminfo.get('StudyDescription'),
+        is_derived="derived" in [x.lower() for x in image_type],
+        patient_id=dcminfo.get("PatientID"),
+        study_description=dcminfo.get("StudyDescription"),
         referring_physician_name=refphys,
         series_description=series_desc,
         sequence_name=sequence_name,
         image_type=image_type,
         accession_number=accession_number,
         # For demographics to populate BIDS participants.tsv
-        patient_age=dcminfo.get('PatientAge'),
-        patient_sex=dcminfo.get('PatientSex'),
-        date=dcminfo.get('AcquisitionDate'),
-        series_uid=dcminfo.get('SeriesInstanceUID'),
-        time=dcminfo.get('AcquisitionTime'),
+        patient_age=dcminfo.get("PatientAge"),
+        patient_sex=dcminfo.get("PatientSex"),
+        date=dcminfo.get("AcquisitionDate"),
+        series_uid=dcminfo.get("SeriesInstanceUID"),
+        time=dcminfo.get("AcquisitionTime"),
     )
-    return seqinfo
 
 
-def validate_dicom(fl, dcmfilter):
+def validate_dicom(
+    fl: str, dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]]
+) -> Optional[tuple[dw.Wrapper, tuple[int, str], Optional[str]]]:
     """
     Parse DICOM attributes. Returns None if not valid.
     """
     mw = dw.wrapper_from_file(fl, force=True, stop_before_pixels=True)
     # clean series signature
-    for sig in ('iop', 'ICE_Dims', 'SequenceName'):
+    for sig in ("iop", "ICE_Dims", "SequenceName"):
         try:
             del mw.series_signature[sig]
         except KeyError:
             pass
     # Workaround for protocol name in private siemens csa header
-    if not getattr(mw.dcm_data, 'ProtocolName', '').strip():
-        mw.dcm_data.ProtocolName = parse_private_csa_header(
-            mw.dcm_data, 'ProtocolName', 'tProtocolName'
-        ) if mw.is_csa else ''
+    if not getattr(mw.dcm_data, "ProtocolName", "").strip():
+        mw.dcm_data.ProtocolName = (
+            parse_private_csa_header(mw.dcm_data, "ProtocolName", "tProtocolName")
+            if mw.is_csa
+            else ""
+        )
     try:
-        series_id = (
-            int(mw.dcm_data.SeriesNumber), mw.dcm_data.ProtocolName
-        )
+        protocol_name = mw.dcm_data.ProtocolName
+        assert isinstance(protocol_name, str)
+        series_id = (int(mw.dcm_data.SeriesNumber), protocol_name)
     except AttributeError as e:
-        lgr.warning(
-            'Ignoring %s since not quite a "normal" DICOM: %s', fl, e
-        )
-        return
+        lgr.warning('Ignoring %s since not quite a "normal" DICOM: %s', fl, e)
+        return None
     if dcmfilter is not None and dcmfilter(mw.dcm_data):
         lgr.warning("Ignoring %s because of DICOM filter", fl)
-        return
+        return None
     if mw.dcm_data[0x0008, 0x0016].repval in (
-        'Raw Data Storage',
-        'GrayscaleSoftcopyPresentationStateStorage'
+        "Raw Data Storage",
+        "GrayscaleSoftcopyPresentationStateStorage",
     ):
-        return
+        return None
     try:
         file_studyUID = mw.dcm_data.StudyInstanceUID
+        assert isinstance(file_studyUID, str)
     except AttributeError:
         lgr.info("File {} is missing any StudyInstanceUID".format(fl))
         file_studyUID = None
     return mw, series_id, file_studyUID
 
 
-def group_dicoms_into_seqinfos(files, grouping, file_filter=None,
-                               dcmfilter=None, flatten=False,
-                               custom_grouping=None):
+class SeriesID(NamedTuple):
+    series_number: int
+    protocol_name: str
+    file_studyUID: Optional[str] = None
+
+    def __str__(self) -> str:
+        s = f"{self.series_number}-{self.protocol_name}"
+        if self.file_studyUID is not None:
+            s += f"-{self.file_studyUID}"
+        return s
+
+
+@overload
+def group_dicoms_into_seqinfos(
+    files: list[str],
+    grouping: str,
+    file_filter: Optional[Callable[[str], Any]] = None,
+    dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]] = None,
+    flatten: Literal[False] = False,
+    custom_grouping: str
+    | Callable[
+        [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]],
+        dict[SeqInfo, list[str]],
+    ]
+    | None = None,
+) -> dict[Optional[str], dict[SeqInfo, list[str]]]:
+    ...
+
+
+@overload
+def group_dicoms_into_seqinfos(
+    files: list[str],
+    grouping: str,
+    file_filter: Optional[Callable[[str], Any]] = None,
+    dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]] = None,
+    *,
+    flatten: Literal[True],
+    custom_grouping: str
+    | Callable[
+        [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]],
+        dict[SeqInfo, list[str]],
+    ]
+    | None = None,
+) -> dict[SeqInfo, list[str]]:
+    ...
+
+
+def group_dicoms_into_seqinfos(
+    files: list[str],
+    grouping: str,
+    file_filter: Optional[Callable[[str], Any]] = None,
+    dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]] = None,
+    flatten: Literal[False, True] = False,
+    custom_grouping: str
+    | Callable[
+        [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]],
+        dict[SeqInfo, list[str]],
+    ]
+    | None = None,
+) -> dict[Optional[str], dict[SeqInfo, list[str]]] | dict[SeqInfo, list[str]]:
     """Process list of dicoms and return seqinfo and file group
     `seqinfo` contains per-sequence extract of fields from DICOMs which
     will be later provided into heuristics to decide on filenames
@@ -169,27 +246,31 @@ def group_dicoms_into_seqinfos(files, grouping, file_filter=None,
       `seqinfo` is a list of info entries per each sequence (some entry
       there defines a key for `filegrp`)
     filegrp : dict
-      `filegrp` is a dictionary with files groupped per each sequence
+      `filegrp` is a dictionary with files grouped per each sequence
     """
-    allowed_groupings = ['studyUID', 'accession_number', 'all', 'custom']
+    allowed_groupings = ["studyUID", "accession_number", "all", "custom"]
     if grouping not in allowed_groupings:
-        raise ValueError('I do not know how to group by {0}'.format(grouping))
-    per_studyUID = grouping == 'studyUID'
+        raise ValueError("I do not know how to group by {0}".format(grouping))
+    per_studyUID = grouping == "studyUID"
     # per_accession_number = grouping == 'accession_number'
     lgr.info("Analyzing %d dicoms", len(files))
 
-    groups = [[], []]
-    mwgroup = []
-    studyUID = None
+    group_keys: list[SeriesID] = []
+    group_values: list[int] = []
+    mwgroup: list[dw.Wrapper] = []
+    studyUID: Optional[str] = None
 
     if file_filter:
         nfl_before = len(files)
         files = list(filter(file_filter, files))
         nfl_after = len(files)
-        lgr.info('Filtering out {0} dicoms based on their filename'.format(
-            nfl_before-nfl_after))
+        lgr.info(
+            "Filtering out {0} dicoms based on their filename".format(
+                nfl_before - nfl_after
+            )
+        )
 
-    if grouping == 'custom':
+    if grouping == "custom":
         if custom_grouping is None:
             raise RuntimeError("Custom grouping is not defined in heuristic")
         if callable(custom_grouping):
@@ -203,133 +284,226 @@ def group_dicoms_into_seqinfos(files, grouping, file_filter=None,
         if mwinfo is None:
             removeidx.append(idx)
             continue
-        mw, series_id, file_studyUID = mwinfo
+        mw, series_id_, file_studyUID = mwinfo
+        series_id = SeriesID(series_id_[0], series_id_[1])
         if per_studyUID:
-            series_id = series_id + (file_studyUID,)
+            series_id = series_id._replace(file_studyUID=file_studyUID)
 
         if flatten:
             if per_studyUID:
                 if studyUID is None:
                     studyUID = file_studyUID
-                assert studyUID == file_studyUID, (
-                    "Conflicting study identifiers found [{}, {}]."
-                    .format(studyUID, file_studyUID)
+                assert (
+                    studyUID == file_studyUID
+                ), "Conflicting study identifiers found [{}, {}].".format(
+                    studyUID, file_studyUID
                 )
             elif custom_grouping:
                 file_customgroup = mw.dcm_data.get(grouping)
                 if study_customgroup is None:
                     study_customgroup = file_customgroup
-                assert study_customgroup == file_customgroup, (
-                    "Conflicting {0} found: [{1}, {2}]"
-                    .format(grouping, study_customgroup, file_customgroup)
+                assert (
+                    study_customgroup == file_customgroup
+                ), "Conflicting {0} found: [{1}, {2}]".format(
+                    grouping, study_customgroup, file_customgroup
                 )
 
         ingrp = False
         # check if same series was already converted
         for idx in range(len(mwgroup)):
             if mw.is_same_series(mwgroup[idx]):
-                if grouping != 'all':
+                if grouping != "all":
                     assert (
-                        mwgroup[idx].dcm_data.get('StudyInstanceUID') == file_studyUID
+                        mwgroup[idx].dcm_data.get("StudyInstanceUID") == file_studyUID
                     ), "Same series found for multiple different studies"
                 ingrp = True
-                series_id = (
+                series_id = SeriesID(
                     mwgroup[idx].dcm_data.SeriesNumber,
-                    mwgroup[idx].dcm_data.ProtocolName
+                    mwgroup[idx].dcm_data.ProtocolName,
                 )
                 if per_studyUID:
-                    series_id = series_id + (file_studyUID,)
-                groups[0].append(series_id)
-                groups[1].append(idx)
+                    series_id = series_id._replace(file_studyUID=file_studyUID)
+                group_keys.append(series_id)
+                group_values.append(idx)
 
         if not ingrp:
             mwgroup.append(mw)
-            groups[0].append(series_id)
-            groups[1].append(len(mwgroup) - 1)
+            group_keys.append(series_id)
+            group_values.append(len(mwgroup) - 1)
 
-    group_map = dict(zip(groups[0], groups[1]))
+    group_map = dict(zip(group_keys, group_values))
 
     if removeidx:
         # remove non DICOMS from files
         for idx in sorted(removeidx, reverse=True):
             del files[idx]
 
-    seqinfos = OrderedDict()
+    seqinfos: dict[Optional[str], dict[SeqInfo, list[str]]] = {}
+    flat_seqinfos: dict[SeqInfo, list[str]] = {}
     # for the next line to make any sense the series_id needs to
     # be sortable in a way that preserves the series order
     for series_id, mwidx in sorted(group_map.items()):
         mw = mwgroup[mwidx]
-        series_files = [files[i] for i, s in enumerate(groups[0]) if s == series_id]
+        series_files = [files[i] for i, s in enumerate(group_keys) if s == series_id]
         if per_studyUID:
-            studyUID = series_id[2]
-            series_id = series_id[:2]
-        series_id = '-'.join(map(str, series_id))
+            studyUID = series_id.file_studyUID
+            series_id = series_id._replace(file_studyUID=None)
+        series_id_str = str(series_id)
         if mw.image_shape is None:
             # this whole thing has no image data (maybe just PSg DICOMs)
             # If this is a Siemens PhoenixZipReport or PhysioLog, keep it:
-            if mw.dcm_data.SeriesDescription == 'PhoenixZIPReport':
+            if mw.dcm_data.get("SeriesDescription") == "PhoenixZIPReport":
                 # give it a dummy shape, so that we can continue:
                 mw.image_shape = (0, 0, 0)
             else:
                 # nothing to see here, just move on
                 continue
-        seqinfo = create_seqinfo(mw, series_files, series_id)
+        seqinfo = create_seqinfo(mw, series_files, series_id_str)
 
+        key: Optional[str]
         if per_studyUID:
             key = studyUID
-        elif grouping == 'accession_number':
+        elif grouping == "accession_number":
             key = mw.dcm_data.get("AccessionNumber")
-        elif grouping == 'all':
-            key = 'all'
+        elif grouping == "all":
+            key = "all"
         elif custom_grouping:
             key = mw.dcm_data.get(custom_grouping)
         else:
-            key = ''
-        lgr.debug("%30s %30s %27s %27s %5s nref=%-2d nsrc=%-2d %s" % (
-            key,
-            seqinfo.series_id,
-            seqinfo.series_description,
-            mw.dcm_data.ProtocolName,
-            seqinfo.is_derived,
-            len(mw.dcm_data.get('ReferencedImageSequence', '')),
-            len(mw.dcm_data.get('SourceImageSequence', '')),
-            seqinfo.image_type
-        ))
+            key = ""
+        lgr.debug(
+            "%30s %30s %27s %27s %5s nref=%-2d nsrc=%-2d %s"
+            % (
+                key,
+                seqinfo.series_id,
+                seqinfo.series_description,
+                mw.dcm_data.ProtocolName,
+                seqinfo.is_derived,
+                len(mw.dcm_data.get("ReferencedImageSequence", "")),
+                len(mw.dcm_data.get("SourceImageSequence", "")),
+                seqinfo.image_type,
+            )
+        )
 
         if not flatten:
-            if key not in seqinfos:
-                seqinfos[key] = OrderedDict()
-            seqinfos[key][seqinfo] = series_files
+            seqinfos.setdefault(key, {})[seqinfo] = series_files
         else:
-            seqinfos[seqinfo] = series_files
+            flat_seqinfos[seqinfo] = series_files
+
+    if not flatten:
+        entries = len(seqinfos)
+        subentries = sum(map(len, seqinfos.values()))
+    else:
+        entries = len(flat_seqinfos)
+        subentries = sum(map(len, flat_seqinfos.values()))
 
     if per_studyUID:
-        lgr.info("Generated sequence info for %d studies with %d entries total",
-                 len(seqinfos), sum(map(len, seqinfos.values())))
-    elif grouping == 'accession_number':
-        lgr.info("Generated sequence info for %d accession numbers with %d "
-                 "entries total", len(seqinfos), sum(map(len, seqinfos.values())))
+        lgr.info(
+            "Generated sequence info for %d studies with %d entries total",
+            entries,
+            subentries,
+        )
+    elif grouping == "accession_number":
+        lgr.info(
+            "Generated sequence info for %d accession numbers with %d entries total",
+            entries,
+            subentries,
+        )
     else:
-        lgr.info("Generated sequence info with %d entries", len(seqinfos))
-    return seqinfos
+        lgr.info("Generated sequence info with %d entries", entries)
+    if not flatten:
+        return seqinfos
+    else:
+        return flat_seqinfos
 
 
-def get_dicom_series_time(dicom_list):
-    """Get time in seconds since epoch from dicom series date and time
-    Primarily to be used for reproducible time stamping
+def get_reproducible_int(dicom_list: list[str]) -> int:
+    """Get integer that can be used to reproducibly sort input DICOMs, which is based on when they were acquired.
+
+    Parameters
+    ----------
+    dicom_list : list[str]
+        Paths to existing DICOM files
+
+    Returns
+    -------
+    int
+        An integer relating to when the DICOM was acquired
+
+    Raises
+    ------
+    AssertionError
+
+    Notes
+    -----
+
+    1. When date and time for can be read (see :func:`get_datetime_from_dcm`), return
+        that value as time in seconds since epoch (i.e., Jan 1 1970).
+    2. In cases where a date/time/datetime is not available (e.g., anonymization stripped this info), return
+        epoch + AcquisitionNumber (in seconds), which is AcquisitionNumber as an integer
+    3. If 1 and 2 are not possible, then raise AssertionError and provide message about missing information
+
+    Cases are based on only the first element of the dicom_list.
+
     """
-    import time
     import calendar
 
-    dicom = dcm.read_file(dicom_list[0], stop_before_pixels=True, force=True)
-    dcm_date = dicom.SeriesDate  # YYYYMMDD
-    dcm_time = dicom.SeriesTime  # HHMMSS.MICROSEC
-    dicom_time_str = dcm_date + dcm_time.split('.', 1)[0]  # YYYYMMDDHHMMSS
-    # convert to epoch
-    return calendar.timegm(time.strptime(dicom_time_str, '%Y%m%d%H%M%S'))
+    dicom = dcm.dcmread(dicom_list[0], stop_before_pixels=True, force=True)
+    dicom_datetime = get_datetime_from_dcm(dicom)
+    if dicom_datetime:
+        return calendar.timegm(dicom_datetime.timetuple())
+
+    acquisition_number = dicom.get("AcquisitionNumber")
+    if acquisition_number:
+        return int(acquisition_number)
+
+    raise AssertionError(
+        "No metadata found that can be used to sort DICOMs reproducibly. Was header information erased?"
+    )
 
 
-def compress_dicoms(dicom_list, out_prefix, tempdirs, overwrite):
+def get_datetime_from_dcm(dcm_data: dcm.FileDataset) -> Optional[datetime.datetime]:
+    """Extract datetime from filedataset, or return None is no datetime information found.
+
+    Parameters
+    ----------
+    dcm_data : dcm.FileDataset
+        DICOM with header, e.g., as ready by pydicom.dcmread.
+        Objects with __getitem__ and have those keys with values properly formatted may also work
+
+    Returns
+    -------
+    Optional[datetime.datetime]
+        One of several datetimes that are related to when the scan occurred, or None if no datetime can be found
+
+    Notes
+    ------
+    The following fields are checked in order
+
+    1. AcquisitionDate & AcquisitionTime  (0008,0022); (0008,0032)
+    2. AcquisitionDateTime (0008,002A);
+    3. SeriesDate & SeriesTime  (0008,0021); (0008,0031)
+
+    """
+    acq_date = dcm_data.get("AcquisitionDate")
+    acq_time = dcm_data.get("AcquisitionTime")
+    if not (acq_date is None or acq_time is None):
+        return strptime_micr(acq_date + acq_time, "%Y%m%d%H%M%S[.%f]")
+
+    acq_dt = dcm_data.get("AcquisitionDateTime")
+    if acq_dt is not None:
+        return strptime_micr(acq_dt, "%Y%m%d%H%M%S[.%f]")
+
+    series_date = dcm_data.get("SeriesDate")
+    series_time = dcm_data.get("SeriesTime")
+    if not (series_date is None or series_time is None):
+        return strptime_micr(series_date + series_time, "%Y%m%d%H%M%S[.%f]")
+    return None
+
+
+def compress_dicoms(
+    dicom_list: list[str], out_prefix: str, tempdirs: TempDirs, overwrite: bool
+) -> Optional[str]:
     """Archives DICOMs into a tarball
 
     Also tries to do it reproducibly, so takes the date for files
@@ -342,7 +516,7 @@ def compress_dicoms(dicom_list, out_prefix, tempdirs, overwrite):
     out_prefix : str
       output path prefix, including the portion of the output file name
       before .dicom.tgz suffix
-    tempdirs : object
+    tempdirs : TempDirs
       TempDirs object to handle multiple tmpdirs
     overwrite : bool
       Overwrite existing tarfiles
@@ -353,52 +527,62 @@ def compress_dicoms(dicom_list, out_prefix, tempdirs, overwrite):
       Result tarball
     """
 
-    tmpdir = tempdirs(prefix='dicomtar')
-    outtar = out_prefix + '.dicom.tgz'
+    tmpdir = tempdirs(prefix="dicomtar")
+    outtar = out_prefix + ".dicom.tgz"
 
     if op.exists(outtar) and not overwrite:
         lgr.info("File {} already exists, will not overwrite".format(outtar))
-        return
+        return None
     # tarfile encodes current time.time inside making those non-reproducible
     # so we should choose which date to use.
     # Solution from DataLad although ugly enough:
 
     dicom_list = sorted(dicom_list)
-    dcm_time = get_dicom_series_time(dicom_list)
+    dcm_time = get_reproducible_int(dicom_list)
 
-    def _assign_dicom_time(ti):
-        # Reset the date to match the one of the last commit, not from the
-        # filesystem since git doesn't track those at all
+    def _assign_dicom_time(ti: tarfile.TarInfo) -> tarfile.TarInfo:
+        # Reset the date to match the one from the dicom, not from the
+        # filesystem so we could sort reproducibly
         ti.mtime = dcm_time
         return ti
 
-    # poor man mocking since can't rely on having mock
-    try:
-        import time
-        _old_time = time.time
-        time.time = lambda: dcm_time
-        if op.lexists(outtar):
-            os.unlink(outtar)
-        with tarfile.open(outtar, 'w:gz', dereference=True) as tar:
-            for filename in dicom_list:
-                outfile = op.join(tmpdir, op.basename(filename))
-                if not op.islink(outfile):
-                    os.symlink(op.realpath(filename), outfile)
-                # place into archive stripping any lead directories and
-                # adding the one corresponding to prefix
-                tar.add(outfile,
-                        arcname=op.join(op.basename(out_prefix),
-                                        op.basename(outfile)),
+    with patch("time.time", lambda: dcm_time):
+        try:
+            if op.lexists(outtar):
+                os.unlink(outtar)
+            with tarfile.open(
+                outtar, "w:gz", compresslevel=compresslevel, dereference=True
+            ) as tar:
+                for filename in dicom_list:
+                    outfile = op.join(tmpdir, op.basename(filename))
+                    if not op.islink(outfile):
+                        os.symlink(op.realpath(filename), outfile)
+                    # place into archive stripping any lead directories and
+                    # adding the one corresponding to prefix
+                    tar.add(
+                        outfile,
+                        arcname=op.join(op.basename(out_prefix), op.basename(outfile)),
                         recursive=False,
-                        filter=_assign_dicom_time)
-    finally:
-        time.time = _old_time
-        tempdirs.rmtree(tmpdir)
+                        filter=_assign_dicom_time,
+                    )
+        finally:
+            tempdirs.rmtree(tmpdir)
 
     return outtar
 
 
-def embed_dicom_and_nifti_metadata(dcmfiles, niftifile, infofile, bids_info):
+# Note: This function is passed to nipype by `embed_metadata_from_dicoms()`,
+# and nipype reparses the function source in a clean namespace that does not
+# have `from __future__ import annotations` enabled.  Thus, we need to use
+# Python 3.7-compatible annotations on this function, and any non-builtin types
+# used in the annotations need to be included by import statements passed to
+# the `nipype.Function` constructor.
+def embed_dicom_and_nifti_metadata(
+    dcmfiles: List[str],
+    niftifile: str,
+    infofile: Union[str, Path],
+    bids_info: Optional[Dict[str, Any]],
+) -> None:
     """Embed metadata from nifti (affine etc) and dicoms into infofile (json)
 
     `niftifile` should exist. Its affine's orientation information is used while
@@ -417,35 +601,37 @@ def embed_dicom_and_nifti_metadata(dcmfiles, niftifile, infofile, bids_info):
       from nifti and dicoms
 
     """
-    # imports for nipype
-    import nibabel as nb
-    import os.path as op
+    # These imports need to be within the body of the function so that they
+    # will be available when executed by nipype:
     import json
-    import re
+    import os.path
+
+    import dcmstack as ds
+    import nibabel as nb
+
     from heudiconv.utils import save_json
 
-    from heudiconv.external.dcmstack import ds
     stack = ds.parse_and_stack(dcmfiles, force=True).values()
     if len(stack) > 1:
-        raise ValueError('Found multiple series')
+        raise ValueError("Found multiple series")
     # may be odict now - iter to be safe
     stack = next(iter(stack))
 
-    if not op.exists(niftifile):
+    if not os.path.exists(niftifile):
         raise NotImplementedError(
             "%s does not exist. "
             "We are not producing new nifti files here any longer. "
-            "Use dcm2niix directly or .convert.nipype_convert helper ."
-            % niftifile
+            "Use dcm2niix directly or .convert.nipype_convert helper ." % niftifile
         )
 
     orig_nii = nb.load(niftifile)
-    aff = orig_nii.affine
+    aff = orig_nii.affine  # type: ignore[attr-defined]
     ornt = nb.orientations.io_orientation(aff)
     axcodes = nb.orientations.ornt2axcodes(ornt)
-    new_nii = stack.to_nifti(voxel_order=''.join(axcodes), embed_meta=True)
-    meta_info = ds.NiftiWrapper(new_nii).meta_ext.to_json()
-    meta_info = json.loads(meta_info)
+    new_nii = stack.to_nifti(voxel_order="".join(axcodes), embed_meta=True)
+    meta_info_str = ds.NiftiWrapper(new_nii).meta_ext.to_json()
+    meta_info = json.loads(meta_info_str)
+    assert isinstance(meta_info, dict)
 
     if bids_info:
         meta_info.update(bids_info)
@@ -454,8 +640,16 @@ def embed_dicom_and_nifti_metadata(dcmfiles, niftifile, infofile, bids_info):
     save_json(infofile, meta_info)
 
 
-def embed_metadata_from_dicoms(bids_options, item_dicoms, outname, outname_bids,
-                               prov_file, scaninfo, tempdirs, with_prov):
+def embed_metadata_from_dicoms(
+    bids_options: Optional[str],
+    item_dicoms: list[str],
+    outname: str,
+    outname_bids: str,
+    prov_file: Optional[str],
+    scaninfo: str,
+    tempdirs: TempDirs,
+    with_prov: bool,
+) -> None:
     """
     Enhance sidecar information file with more information from DICOMs
 
@@ -474,25 +668,45 @@ def embed_metadata_from_dicoms(bids_options, item_dicoms, outname, outname_bids,
     -------
 
     """
-    from nipype import Node, Function
-    tmpdir = tempdirs(prefix='embedmeta')
+    from nipype import Function, Node
+
+    tmpdir = tempdirs(prefix="embedmeta")
 
     # We need to assure that paths are absolute if they are relative
-    item_dicoms = list(map(op.abspath, item_dicoms))
+    # <https://github.com/python/mypy/issues/9864>
+    item_dicoms = list(map(op.abspath, item_dicoms))  # type: ignore[arg-type]
 
-    embedfunc = Node(Function(input_names=['dcmfiles', 'niftifile', 'infofile',
-                                           'bids_info',],
-                              function=embed_dicom_and_nifti_metadata),
-                     name='embedder')
+    embedfunc = Node(
+        Function(
+            input_names=[
+                "dcmfiles",
+                "niftifile",
+                "infofile",
+                "bids_info",
+            ],
+            function=embed_dicom_and_nifti_metadata,
+            imports=[
+                "from pathlib import Path",
+                "from typing import Any, Dict, List, Optional, Union",
+            ],
+        ),
+        name="embedder",
+    )
     embedfunc.inputs.dcmfiles = item_dicoms
     embedfunc.inputs.niftifile = op.abspath(outname)
     embedfunc.inputs.infofile = op.abspath(scaninfo)
-    embedfunc.inputs.bids_info = load_json(op.abspath(outname_bids)) if (bids_options is not None) else None
+    embedfunc.inputs.bids_info = (
+        load_json(op.abspath(outname_bids)) if (bids_options is not None) else None
+    )
     embedfunc.base_dir = tmpdir
     cwd = os.getcwd()
 
-    lgr.debug("Embedding into %s based on dicoms[0]=%s for nifti %s",
-              scaninfo, item_dicoms[0], outname)
+    lgr.debug(
+        "Embedding into %s based on dicoms[0]=%s for nifti %s",
+        scaninfo,
+        item_dicoms[0],
+        outname,
+    )
     try:
         if op.lexists(scaninfo):
             # TODO: handle annexed file case
@@ -501,16 +715,22 @@ def embed_metadata_from_dicoms(bids_options, item_dicoms, outname, outname_bids,
         res = embedfunc.run()
         set_readonly(scaninfo)
         if with_prov:
+            assert isinstance(prov_file, str)
             g = res.provenance.rdf()
-            g.parse(prov_file,
-                    format='turtle')
-            g.serialize(prov_file, format='turtle')
+            g.parse(prov_file, format="turtle")
+            g.serialize(prov_file, format="turtle")
             set_readonly(prov_file)
     except Exception as exc:
         lgr.error("Embedding failed: %s", str(exc))
         os.chdir(cwd)
 
-def parse_private_csa_header(dcm_data, public_attr, private_attr, default=None):
+
+def parse_private_csa_header(
+    dcm_data: dcm.dataset.Dataset,
+    _public_attr: str,
+    private_attr: str,
+    default: Optional[str] = None,
+) -> str:
     """
     Parses CSA header in cases where value is not defined publicly
 
@@ -531,15 +751,19 @@ def parse_private_csa_header(dcm_data, public_attr, private_attr, default=None):
         private attribute value or default
     """
     # TODO: provide mapping to private_attr from public_attr
-    from nibabel.nicom import csareader
     import dcmstack.extract as dsextract
+    from nibabel.nicom import csareader
+
     try:
         # TODO: test with attr besides ProtocolName
-        csastr = csareader.get_csa_header(dcm_data, 'series')['tags']['MrPhoenixProtocol']['items'][0]
+        csastr = csareader.get_csa_header(dcm_data, "series")["tags"][
+            "MrPhoenixProtocol"
+        ]["items"][0]
         csastr = csastr.replace("### ASCCONV BEGIN", "### ASCCONV BEGIN ### ")
-        parsedhdr = dsextract.parse_phoenix_prot('MrPhoenixProtocol', csastr)
-        val = parsedhdr[private_attr].replace(' ', '')
+        parsedhdr = dsextract.parse_phoenix_prot("MrPhoenixProtocol", csastr)
+        val = parsedhdr[private_attr].replace(" ", "")
     except Exception as e:
         lgr.debug("Failed to parse CSA header: %s", str(e))
         val = default or ""
+    assert isinstance(val, str)
     return val

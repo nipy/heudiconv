@@ -21,27 +21,49 @@ Components
 
 The only required function for a heuristic, `infotodict` is used to both define
 the conversion outputs and specify the criteria for scan to output association.
-Conversion outputs are defined as keys, a `tuple` consisting of a template path
-used for the basis of outputs, as well as a `tuple` of output types. Valid types
-include `nii`, `nii.gz`, and `dicom`.
+Conversion outputs are defined as keys, a `tuple` consisting of three elements:
+
+- a template path used for the basis of outputs
+- `tuple` of output types. Valid types include `nii`, `nii.gz`, and `dicom`.
+- `None` - a historical artifact (corresponds to some notion of
+  ``annotation_class`` no living human is aware about)
+
+The following details of the sequences could also be used as a ``{detail}`` in the conversion keys:
+
+- ``item``: an index of seqinfo (e.g., ``1``),
+- ``subject``: a subject label (e.g., ``qa``)
+- ``seqitem``: sequence item, index with a sequence/protocol name (e.g., ``3-anat-scout_ses-{date}``)
+- ``subindex``: an index within the ``seqinfo`` (e.g., ``1``),
+- ``session``: empty (no session) or a session entity (along with ``ses-``, e.g., ``ses-20191216``),
+- ``bids_subject_session_prefix``: shortcut for BIDS file name prefix combining subject and optional session (e.g., ``sub-qa_ses-20191216``),
+- ``bids_subject_session_dir``: shortcut for BIDS file path combining subject and optional session (e.g., ``sub-qa/ses-20191216``).
 
 .. note:: An example conversion key
 
-    ``('sub-{subject}/func/sub-{subject}_task-test_run-{item}_bold', ('nii.gz', 'dicom'))``
+    ``('sub-{subject}/func/sub-{subject}_task-test_run-{item}_bold', ('nii.gz', 'dicom'), None)``
 
+	or equivalent in `--bids` mode which would work also if there is a specified session
+
+    ``('{bids_subject_session_dir}/func/{bids_subject_session_prefix}_task-test_run-{item}_bold', ('nii.gz', 'dicom'), None)``
 
 The ``seqinfos`` parameter is a list of namedtuples which serves as a grouped and
 stacked record of the DICOMs passed in. Each item in `seqinfo` contains DICOM
 metadata that can be used to isolate the series, and assign it to a conversion
 key.
 
-A dictionary of {``conversion key``: ``seqinfo``} is returned.
+A function ``create_key`` is commonly defined by heuristics (internally)
+to assist in creating the key, and to be used inside ``infotodict``.
+
+A dictionary of {``conversion key``: ``series_id``} is returned, where
+``series_id`` is the 3rd (indexes as ``[2]`` or accessed as ``.series_id`` from
+``seqinfo``).
 
 ---------------------------------
 ``create_key(template, outtype)``
 ---------------------------------
 
 A common helper function used to create the conversion key in ``infotodict``.
+But it is not used directly by HeuDiConv.
 
 --------------------
 ``filter_files(fl)``

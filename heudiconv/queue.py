@@ -1,13 +1,19 @@
+from __future__ import annotations
+
+import logging
+import os
 import subprocess
 import sys
-import os
-import logging
+from typing import Optional
 
-from .utils import which
+from nipype.utils.filemanip import which
 
 lgr = logging.getLogger(__name__)
 
-def queue_conversion(queue, iterarg, iterables, queue_args=None):
+
+def queue_conversion(
+    queue: str, iterarg: str, iterables: int, queue_args: Optional[str] = None
+) -> None:
     """
     Write out conversion arguments to file and submit to a job scheduler.
     Parses `sys.argv` for heudiconv arguments.
@@ -25,7 +31,7 @@ def queue_conversion(queue, iterarg, iterables, queue_args=None):
 
     """
 
-    SUPPORTED_QUEUES = {'SLURM': 'sbatch'}
+    SUPPORTED_QUEUES = {"SLURM": "sbatch"}
     if queue not in SUPPORTED_QUEUES:
         raise NotImplementedError("Queuing with %s is not supported", queue)
 
@@ -37,8 +43,8 @@ def queue_conversion(queue, iterarg, iterables, queue_args=None):
         convertcmd = " ".join(args)
 
         # will overwrite across subjects
-        queue_file = os.path.abspath('heudiconv-%s.sh' % queue)
-        with open(queue_file, 'wt') as fp:
+        queue_file = os.path.abspath("heudiconv-%s.sh" % queue)
+        with open(queue_file, "wt") as fp:
             fp.write("#!/bin/bash\n")
             if queue_args:
                 for qarg in queue_args.split():
@@ -46,10 +52,11 @@ def queue_conversion(queue, iterarg, iterables, queue_args=None):
             fp.write(convertcmd + "\n")
 
         cmd = [SUPPORTED_QUEUES[queue], queue_file]
-        proc = subprocess.call(cmd)
+        subprocess.call(cmd)
     lgr.info("Submitted %d jobs", iterables)
 
-def clean_args(hargs, iterarg, iteridx):
+
+def clean_args(hargs: list[str], iterarg: str, iteridx: int) -> list[str]:
     """
     Filters arguments for batch submission.
 
@@ -78,14 +85,14 @@ def clean_args(hargs, iterarg, iteridx):
     """
 
     if iterarg == "subjects":
-        iterarg = ['-s', '--subjects']
+        iterargs = ["-s", "--subjects"]
     elif iterarg == "files":
-        iterarg = ['--files']
+        iterargs = ["--files"]
     else:
         raise ValueError("Cannot index %s" % iterarg)
 
     # remove these or cause an infinite loop
-    queue_args = ['-q', '--queue', '--queue-args']
+    queue_args = ["-q", "--queue", "--queue-args"]
 
     # control variables for multi-argument parsing
     is_iterarg = False
@@ -95,17 +102,17 @@ def clean_args(hargs, iterarg, iteridx):
     cmdargs = hargs[:]
 
     for i, arg in enumerate(hargs):
-        if arg.startswith('-') and is_iterarg:
+        if arg.startswith("-") and is_iterarg:
             # moving on to another argument
             is_iterarg = False
         if is_iterarg:
             if iteridx != itercount:
                 indices.append(i)
             itercount += 1
-        if arg in iterarg:
+        if arg in iterargs:
             is_iterarg = True
         if arg in queue_args:
-            indices.extend([i, i+1])
+            indices.extend([i, i + 1])
 
     for j in sorted(indices, reverse=True):
         del cmdargs[j]
