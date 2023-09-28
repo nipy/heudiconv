@@ -370,7 +370,12 @@ def workflow(
     )
 
     if command:
-        assert dicom_dir_template is None
+        if dicom_dir_template:
+            lgr.warning(
+                f"DICOM directory template {dicom_dir_template!r} was provided but will be ignored since "
+                f"commands do not care about it ATM"
+            )
+
         process_extra_commands(
             outdir,
             command,
