@@ -69,6 +69,10 @@ class SeqInfo(NamedTuple):
     date: Optional[str]  # 24
     series_uid: Optional[str]  # 25
     time: Optional[str]  # 26
+    # additional ASL supported files
+    image_orientation_patient: Optional[tuple]
+    in_plane_phase_encoding_direction: Optional[str]
+    acquisition_number: Optional[str] 
 
 
 class StudySessionInfo(NamedTuple):
