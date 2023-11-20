@@ -637,12 +637,14 @@ def infotodict(
         # For scouts -- we want only dicoms
         # https://github.com/nipy/heudiconv/issues/145
         outtype: tuple[str, ...]
-        if "_Scout" in s.series_description or (
-            datatype == "anat"
-            and datatype_suffix
-            and datatype_suffix.startswith("scout")
-        ) or (
-            s.series_description.lower() == s.protocol_name.lower() + "_setter"
+        if (
+            "_Scout" in s.series_description
+            or (
+                datatype == "anat"
+                and datatype_suffix
+                and datatype_suffix.startswith("scout")
+            )
+            or (s.series_description.lower() == s.protocol_name.lower() + "_setter")
         ):
             outtype = ("dicom",)
         else:
@@ -725,7 +727,11 @@ def get_unique(seqinfos: list[SeqInfo], attr: str) -> Any:
 
     """
     values = set(getattr(si, attr) for si in seqinfos)
-    assert len(values) == 1
+    if len(values) != 1:
+        raise AssertionError(
+            f"Was expecting a single value for attribute {attr!r} "
+            f"but got: {', '.join(sorted(values))}"
+        )
     return values.pop()
 
 
