@@ -7,6 +7,8 @@ import re
 from typing import NamedTuple
 from unittest.mock import patch
 
+import pytest
+
 from . import reproin
 from .reproin import (
     filter_files,
@@ -14,10 +16,18 @@ from .reproin import (
     fix_dbic_protocol,
     fixup_subjectid,
     get_dups_marked,
+    get_unique,
     md5sum,
     parse_series_spec,
     sanitize_str,
 )
+
+
+class FakeSeqInfo(NamedTuple):
+    accession_number: str
+    study_description: str
+    field1: str
+    field2: str
 
 
 def test_get_dups_marked() -> None:
@@ -97,12 +107,6 @@ def test_fix_canceled_runs() -> None:
 
 
 def test_fix_dbic_protocol() -> None:
-    class FakeSeqInfo(NamedTuple):
-        accession_number: str
-        study_description: str
-        field1: str
-        field2: str
-
     accession_number = "A003"
     seq1 = FakeSeqInfo(
         accession_number,
@@ -235,3 +239,19 @@ def test_parse_series_spec() -> None:
         "session": "01",
         "dir": "AP",
     }
+
+
+def test_get_unique() -> None:
+    accession_number = "A003"
+    acqs = [
+        FakeSeqInfo(accession_number, "mystudy", "nochangeplease", "nochangeeither"),
+        FakeSeqInfo(accession_number, "mystudy2", "nochangeplease", "nochangeeither"),
+    ]
+
+    assert get_unique(acqs, "accession_number") == accession_number  # type: ignore[arg-type]
+    with pytest.raises(AssertionError) as ce:
+        get_unique(acqs, "study_description")  # type: ignore[arg-type]
+    assert (
+        str(ce.value)
+        == "Was expecting a single value for attribute 'study_description' but got: mystudy, mystudy2"
+    )
