@@ -7,8 +7,15 @@ show_usage() {
     echo "Usage: $0 [--dry-run|-n] --move-to DIRNAME directory [directory2 ...]"
 }
 
+# On OSX we better use GNU one
+if [ -e /usr/local/opt/gnu-getopt/bin/getopt ]; then
+    getopt=/usr/local/opt/gnu-getopt/bin/getopt
+else
+    getopt=getopt
+fi
+
 # Parsing options
-TEMP=$(getopt -o 'n' --long move-to:,dry-run -n "$(basename "$0")" -- "$@")
+TEMP=$("$getopt" -o 'n' --long move-to:,dry-run -n "$(basename "$0")" -- "$@")
 # shellcheck disable=SC2181
 if [ $? != 0 ]; then echo "Terminating..." >&2; exit 1; fi
 
