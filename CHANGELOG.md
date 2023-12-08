@@ -1,3 +1,27 @@
+# v1.0.1 (Fri Dec 08 2023)
+
+#### 🐛 Bug Fix
+
+- Drop Python 3.7 support [#722](https://github.com/nipy/heudiconv/pull/722) ([@yarikoptic](https://github.com/yarikoptic))
+- ReproIn: give an informative assertion message when multiple values are found [#718](https://github.com/nipy/heudiconv/pull/718) ([@yarikoptic](https://github.com/yarikoptic))
+- Convert assertion into a warning that we would not use dicom dir tempate option [#709](https://github.com/nipy/heudiconv/pull/709) ([@yarikoptic](https://github.com/yarikoptic))
+- Do not demand --files for all commands, even those which do not care about it (like populate-intended-for) [#708](https://github.com/nipy/heudiconv/pull/708) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### ⚠️ Pushed to `master`
+
+- Add script to sensor dicoms -- for the error where dcm2niix might or might not fail but issues an Error ([@yarikoptic](https://github.com/yarikoptic))
+
+#### 🏠 Internal
+
+- Ran pre-commit on everything, black decided to adjust some formatting [#721](https://github.com/nipy/heudiconv/pull/721) ([@yarikoptic](https://github.com/yarikoptic))
+- Make sensor-dicoms use gnu-getopt if present (on OSX) [#721](https://github.com/nipy/heudiconv/pull/721) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 1
+
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v1.0.0 (Wed Sep 20 2023)
 
 #### 💥 Breaking Change
