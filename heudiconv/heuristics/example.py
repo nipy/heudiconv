@@ -72,11 +72,12 @@ def infotodict(
     }
     last_run = len(seqinfo)
     for s in seqinfo:
-        series_num_str = s.series_id.split('-', 1)[0]
+        series_num_str = s.series_id.split("-", 1)[0]
         if not series_num_str.isdecimal():
             raise ValueError(
                 f"This heuristic can operate only on data when series_id has form <series-number>-<something else>, "
-                f"and <series-number> is a numeric number. Got series_id={s.series_id}")
+                f"and <series-number> is a numeric number. Got series_id={s.series_id}"
+            )
         series_num: int = int(series_num_str)
         sl, nt = (s.dim3, s.dim4)
         if (sl == 176) and (nt == 1) and ("MPRAGE" in s.protocol_name):
