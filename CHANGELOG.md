@@ -4,7 +4,7 @@
 
 - Drop Python 3.7 support [#722](https://github.com/nipy/heudiconv/pull/722) ([@yarikoptic](https://github.com/yarikoptic))
 - ReproIn: give an informative assertion message when multiple values are found [#718](https://github.com/nipy/heudiconv/pull/718) ([@yarikoptic](https://github.com/yarikoptic))
-- Convert assertion into a warning that we would not use dicom dir tempate option [#709](https://github.com/nipy/heudiconv/pull/709) ([@yarikoptic](https://github.com/yarikoptic))
+- Convert assertion into a warning that we would not use dicom dir template option [#709](https://github.com/nipy/heudiconv/pull/709) ([@yarikoptic](https://github.com/yarikoptic))
 - Do not demand --files for all commands, even those which do not care about it (like populate-intended-for) [#708](https://github.com/nipy/heudiconv/pull/708) ([@yarikoptic](https://github.com/yarikoptic))
 
 #### ⚠️ Pushed to `master`
