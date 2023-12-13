@@ -60,13 +60,13 @@ on heudiconv.readthedocs.io .
 HOWTO 101
 ---------
 
-In a nutshell -- ``heudiconv`` operates using a heuristic which, given metadata from DICOMs, would decide how to name
-resultant (from conversion using `dcm2niix`_) files. Heuristic `convertall <https://github
-.com/nipy/heudiconv/blob/master/heudiconv/heuristics/convertall.py>`_ could actually be used with no real
-heuristic and by simply establish your own conversion mapping through editing produced mapping files.
-In most use-cases of retrospective study data conversion, you would need to create your custom heuristic following
-`existing heuristics as examples <https://github.com/nipy/heudiconv/tree/master/heudiconv/heuristics>`_ and/or
-referring to `"Heuristic" section <https://heudiconv.readthedocs.io/en/latest/heuristics.html>`_ in the documentation.
+In a nutshell -- ``heudiconv`` is given a file tree of DICOMs, and it produces a restructured file tree of NifTI files (conversion handled by `dcm2niix`_) with accompanying metadata files.
+The input and output structure is as flexible as your data, which is accomplished by using a Python file called a ``heuristic`` that knows how to read your input structure and decides how to name the resultant files.
+``heudiconv`` comes with `existing heuristics <https://github.com/nipy/heudiconv/tree/master/heudiconv/heuristics>`_ which can be used as is, or as examples. 
+For instance, the Heuristic `convertall <https://github.com/nipy/heudiconv/blob/master/heudiconv/heuristics/convertall.py>`_ extracts standard metadata from all matching DICOMs.
+``heudiconv`` creates mapping files, ``<something>.edit.text`` which lets researchers simply establish their own conversion mapping.
+
+In most use-cases of retrospective study data conversion, you would need to create your custom heuristic following the examples and the `"Heuristic" section <https://heudiconv.readthedocs.io/en/latest/heuristics.html>`_ in the documentation.
 **Note** that `ReproIn heuristic <https://github.com/nipy/heudiconv/blob/master/heudiconv/heuristics/reproin.py>`_ is
 generic and powerful enough to be adopted virtually for *any* study: For prospective studies, you would just need
 to name your sequences following the `ReproIn convention <https://github.com/nipy/heudiconv/blob/master/heudiconv/heuristics/reproin.py#L26>`_, and for
