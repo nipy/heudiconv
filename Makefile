@@ -1,6 +1,10 @@
-paper.pdf: paper.md paper.bib
-	docker run --rm --volume ${PWD}:/data:Z --user $(shell id -u):$(shell id -g) --env JOURNAL=joss openjournals/inara
+OCI_BINARY?=docker
 
+.PHONY: paper
+paper: paper.md paper.bib
+	$(OCI_BINARY) run --rm --volume ${PWD}:/data:Z --user $(shell id -u):$(shell id -g) --env JOURNAL=joss openjournals/inara
+
+.PHONY: clean
 clean:
 	rm -rf paper/
 	paper.jats
