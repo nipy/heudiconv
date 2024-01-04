@@ -2,97 +2,24 @@ digraph graphname {
     newrank = true;
     size="26,10";
     rankdir="LR";
-    splines=ortho;
     graph [fontname = "sans"];
     node [fontname = "sans", style=filled];
     edge [fontname = "sans", color=gray50];
-    raw_share[
-        label="Shareable",
-        shape=diamond, color="#C7E8CA", fillcolor="#C7E8CA"
-        ];
-    pre_share[
-        label="Shareable",
-        shape=diamond, color="#C7E8CA", fillcolor="#C7E8CA"
-        ];
-    ana_share[
-        label="Shareable",
-        shape=diamond, color="#C7E8CA", fillcolor="#C7E8CA"
-        ];
-    plo_share[
-        label="Shareable",
-        shape=diamond, color="#C7E8CA", fillcolor="#C7E8CA"
-        ];
-    a[label="Analog  ", shape=cds, color="#BBBBBB", fillcolor=grey93, fontcolor="#999998"];
-    tim[label="Time-domain\nk-space Data", shape=folder, color="#BBBBBB", fillcolor=grey93];
-    vol[label="Volumetric\nReconstruction", shape=folder, color="#BBBBBB", fillcolor=grey93];
-    dic[
-        label="DICOM",
-        shape=folder, color="#BBBBBB", fillcolor=grey93
-        ];
-    heh[
-        label="Heuristic\n(built-in or user-defined)",
-        shape=note, color="#F7D060", fillcolor=grey93
-        ];
-    heu[
-        label="Heudiconv",
-        shape=doubleoctagon, color="#F7D060", fillcolor="#FFF2B2", fontcolor="#F05555"
-        ];
-    raw[
-        label="Standardized Raw Data\n(e.g. BIDS NIfTI)",
-        shape=folder, color="#BBBBBB", fillcolor=grey93
-        ];
-    pre[
-        label="Preprocessed Data\n(e.g. BIDS NIfTI)",
-        shape=folder, color="#BBBBBB", fillcolor=grey93
-        ];
-    ana[
-        label="Analysis Summaries\n(e.g. CSV)",
-        shape=folder, color="#BBBBBB", fillcolor=grey93
-        ];
-    plo[
-        label="Plots\n(e.g. PDF)",
-        shape=folder, color="#BBBBBB", fillcolor=grey93
-        ];
-    mai[label="Operator Input", shape=signature, color="#BBBBBB", fillcolor=grey93, fontcolor="#DD5353"];
-    met[label="Metadata", shape=folder, color="#BBBBBB", fillcolor=grey93];
-    fake[label="", shape=point, style=invis, width=0, height=0];
-    mai -> fake:e[arrowhead=none];
-    fake:s -> met[tailclip=false];
-    fake:w -> heh[tailclip=false];
-    a -> tim;
-    subgraph cluster1 {
-        tim -> vol;
-        label = "Acquisition System (e.g. fMRI)";
-        labelloc = "t";
-        labeljust = "l";
-        fontcolor = "#35589A";
-        color = "#35589A";
-        met -> dic [color="#9D3C72"];
-        met -> dic [color="#F0A0BA"];
-        met -> dic [color="#7B2869"];
-        met -> dic [color="#C85C8E"];
-        vol -> dic;
-    }
-    dic -> heu [constraint=false] ;
-    subgraph cluster2 {
-        heh -> heu ;
-        heu -> raw ;
-        raw -> pre ;
-        pre -> ana ;
-        ana -> plo ;
-        label = "Analysis System";
-        labelloc = "t";
-        labeljust = "l";
-        fontcolor = "#FC9918";
-        color = "#FC9918";
-    }
-    raw:s -> raw_share:n[constraint=false];
-    pre:s -> pre_share:n[constraint=false];
-    ana:s -> ana_share:n[constraint=false];
-    plo:s -> plo_share:n[constraint=false];
-    {rank=same; plo; plo_share; mai; a}
-    {rank=same; met; vol}
-    {rank=same; dic; raw; raw_share; heu}
-    {rank=same; pre; pre_share; vol}
-    {rank=same; ana; ana_share; tim}
+    _heu[label=".heudiconv", fontsize="16", shape=folder, color="#DDDDDD", fillcolor=grey99, fontcolor="#AEAEAE"];
+    dic[label="DICOM", shape=folder, fontsize="16", color="#BBBBBB", fillcolor=grey93];
+    non[label="heudiconv -c none ", fontsize="11", fontname="monospace", shape=cds, color="#66CC66", fillcolor="#66CC66", fontcolor="#FFFFFF"];
+    dcm[label="heudiconv -c dcm2niix ", fontsize="11", fontname="monospace", shape=cds, color="#66CC66", fillcolor="#66CC66", fontcolor="#FFFFFF"];
+    _dcm[label="heudiconv -c dcm2niix ", fontsize="11", fontname="monospace", shape=cds, color="#66CC66", fillcolor="#66CC66", fontcolor="#FFFFFF"];
+    heu[label=".heudiconv", fontsize="16", shape=folder, color="#BBBBBB", fillcolor=grey93];
+    nif[label="NIfTI\n(e.g. BIDS)", fontsize="16", shape=folder, color="#BBBBBB", fillcolor=grey93];
+    dic:e -> non:w [arrowhead=none, color="#66CC66"];
+    non -> heu [color="#66CC66"];
+    heu:e -> dcm:w [arrowhead=none, color="#66CC66"];
+    dcm:e -> nif:w [color="#66CC66"];
+    dic:e -> _dcm:w [arrowhead=none, color="#66CC66"];
+    dic:e -> dcm:w [color="#66CC66"];
+    _dcm:e -> nif:w [color="#66CC66"];
+    _dcm:e -> _heu:e [color="#BBBBBB"];
+    //{rank=same; _dcm; _heu; dcm}
+    {rank=same; non; _heu; _dcm}
 }

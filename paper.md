@@ -183,8 +183,10 @@ Such decision making is implemented in *HeuDiConv heuristics*, which are impleme
 HeuDiConv, if instructed to operate in BIDS mode (`--bids` flag) with a heuristic providing base naming instructions, and helpers to organize the files in the hierarchy defined by the BIDS standard.
 It also ensures files are named according to the BIDS specifications, including complex composite recordings such as those associated with multi-echo sequences.
 
-![**HeuDiConv automates the keystone conversion step in reproducible data handling, without compromising operator flexibility.** The showcased set-up depicts a 2-machine infrastructure, with heudiconv operating on the same machine as subsequent analysis steps for data in a standardized and shareable representation. For more advanced usage at institutions with dedicated infrastructure, HeuDiConv can operate on an additional third machine, interfacing between the depicted two, and dedicated to data repositing, versioning, and backup.](figs/workflow.pdf)
+![**HeuDiConv automates the keystone conversion step in reproducible data handling, without compromising operator flexibility.** The showcased set-up depicts a 2-machine infrastructure, with heudiconv operating on the same machine as subsequent analysis steps for data in a standardized and shareable representation. For more advanced usage at institutions with dedicated infrastructure, HeuDiConv can operate on an additional third machine, interfacing between the depicted two, and dedicated to data repositing, versioning, and backup.](figs/environment.pdf)
 
+
+![**Heudicom conversion and layout can be controled via custom heuristiscs or by selecting buit-in presets.** The heudicom application can be used with the `-c none` parameter to generate a heuristic tamplate for the user to edit, before conversion is performed e.g. via the `-c dcm2niix` parameter which uses the eponymous external application. The process is itempotent, and specifying the `-c dcm2niix` parameter will automatically convert based on a default layout and produce a heuristic directory for the user to inspect post hoc.](figs/workflow.pdf)
 ## Exemplar heuristics
 
 ### Convertall
