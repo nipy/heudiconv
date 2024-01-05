@@ -2,7 +2,7 @@ OCI_BINARY?=docker
 
 .PHONY: paper
 paper: paper.md paper.bib
-	$(OCI_BINARY) run --rm --volume ${PWD}:/data:Z --user $(shell id -u):$(shell id -g) --env JOURNAL=joss openjournals/inara
+	$(OCI_BINARY) run --rm --volume ${PWD}:/data:Z --user $(shell id -u):$(shell id -g) --env JOURNAL=joss docker.io/openjournals/inara
 
 .PHONY: clean
 clean:
