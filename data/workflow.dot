@@ -2,6 +2,7 @@ digraph graphname {
     newrank = true;
     size="26,10";
     rankdir="LR";
+    splines=line;
     graph [fontname = "sans"];
     node [fontname = "sans", style=filled];
     edge [fontname = "sans", color=gray50];
@@ -17,9 +18,9 @@ digraph graphname {
     heu:e -> dcm:w [arrowhead=none, color="#66CC66"];
     dcm:e -> nif:w [color="#66CC66"];
     dic:e -> _dcm:w [arrowhead=none, color="#66CC66"];
-    dic:e -> dcm:w [color="#66CC66"];
+    dic:e -> dcm:w [arrowhead=none, color="#66CC66"];
     _dcm:e -> nif:w [color="#66CC66"];
-    _dcm:e -> _heu:e [color="#BBBBBB"];
+    _dcm:s -> _heu:n [color="#BBBBBB"];
     //{rank=same; _dcm; _heu; dcm}
-    {rank=same; non; _heu; _dcm}
+    {rank=same; heu; _heu; _dcm}
 }
