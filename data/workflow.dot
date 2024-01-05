@@ -8,6 +8,7 @@ digraph graphname {
     edge [fontname = "sans", color=gray50];
     _heu[label=".heudiconv", fontsize="16", shape=folder, color="#DDDDDD", fillcolor=grey99, fontcolor="#AEAEAE"];
     dic[shape=folder, fontsize="16", color="#BBBBBB", fillcolor=grey93, imagescale=true,
+            label=<
             <table border="0" cellspacing="0" cellborder="1">
                 <tr>
                     <td border="0">DICOMs</td>
@@ -18,9 +19,9 @@ digraph graphname {
             </table>
             >
     ];
-    non[label="heudiconv -c none ", fontsize="14", fontname="monospace", shape=cds, color="#66CC66", fillcolor="#66CC66", fontcolor="#FFFFFF"];
-    dcm[label="heudiconv -c dcm2niix ", fontsize="14", fontname="monospace", shape=cds, color="#66CC66", fillcolor="#66CC66", fontcolor="#FFFFFF"];
-    _dcm[label="heudiconv -c dcm2niix ", fontsize="14", fontname="monospace", shape=cds, color="#66CC66", fillcolor="#66CC66", fontcolor="#FFFFFF"];
+    non[label="heudiconv -c none ", fontsize="12", fontname="monospace", shape=cds, color="#66CC66", fillcolor="#66CC66", fontcolor="#FFFFFF"];
+    dcm[label="heudiconv -c dcm2niix ", fontsize="12", fontname="monospace", shape=cds, color="#66CC66", fillcolor="#66CC66", fontcolor="#FFFFFF"];
+    _dcm[label="heudiconv -c dcm2niix ", fontsize="12", fontname="monospace", shape=cds, color="#66CC66", fillcolor="#66CC66", fontcolor="#FFFFFF"];
     heu[label=".heudiconv", fontsize="16", shape=folder, color="#BBBBBB", fillcolor=grey93];
     nif[shape=folder, fontsize="16", color="#BBBBBB", fillcolor=grey93,
         label=<
