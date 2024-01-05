@@ -2,25 +2,56 @@ digraph graphname {
     newrank = true;
     size="26,10";
     rankdir="LR";
-    splines=line;
+    dpi=120;
     graph [fontname = "sans"];
     node [fontname = "sans", style=filled];
     edge [fontname = "sans", color=gray50];
     _heu[label=".heudiconv", fontsize="16", shape=folder, color="#DDDDDD", fillcolor=grey99, fontcolor="#AEAEAE"];
-    dic[label="DICOM", shape=folder, fontsize="16", color="#BBBBBB", fillcolor=grey93];
-    non[label="heudiconv -c none ", fontsize="11", fontname="monospace", shape=cds, color="#66CC66", fillcolor="#66CC66", fontcolor="#FFFFFF"];
-    dcm[label="heudiconv -c dcm2niix ", fontsize="11", fontname="monospace", shape=cds, color="#66CC66", fillcolor="#66CC66", fontcolor="#FFFFFF"];
-    _dcm[label="heudiconv -c dcm2niix ", fontsize="11", fontname="monospace", shape=cds, color="#66CC66", fillcolor="#66CC66", fontcolor="#FFFFFF"];
+    dic[shape=folder, fontsize="16", color="#BBBBBB", fillcolor=grey93, imagescale=true,
+            <table border="0" cellspacing="0" cellborder="1">
+                <tr>
+                    <td border="0">DICOMs</td>
+                </tr>
+                <tr>
+                    <td border="0" cellpadding="10"><img src="../figs/dicom.png"/></td>
+                </tr>
+            </table>
+            >
+    ];
+    non[label="heudiconv -c none ", fontsize="14", fontname="monospace", shape=cds, color="#66CC66", fillcolor="#66CC66", fontcolor="#FFFFFF"];
+    dcm[label="heudiconv -c dcm2niix ", fontsize="14", fontname="monospace", shape=cds, color="#66CC66", fillcolor="#66CC66", fontcolor="#FFFFFF"];
+    _dcm[label="heudiconv -c dcm2niix ", fontsize="14", fontname="monospace", shape=cds, color="#66CC66", fillcolor="#66CC66", fontcolor="#FFFFFF"];
     heu[label=".heudiconv", fontsize="16", shape=folder, color="#BBBBBB", fillcolor=grey93];
-    nif[label="NIfTI\n(e.g. BIDS)", fontsize="16", shape=folder, color="#BBBBBB", fillcolor=grey93];
+    nif[shape=folder, fontsize="16", color="#BBBBBB", fillcolor=grey93,
+        label=<
+            <table border="0" cellspacing="0" cellborder="1">
+                <tr>
+                    <td border="0">NIfTI (e.g. BIDS)</td>
+                </tr>
+                <tr>
+                    <td border="0" cellpadding="10"><img src="../figs/bids.png"/></td>
+                </tr>
+            </table>
+            >
+    ];
     dic:e -> non:w [arrowhead=none, color="#66CC66"];
-    non -> heu [color="#66CC66"];
-    heu:e -> dcm:w [arrowhead=none, color="#66CC66"];
-    dcm:e -> nif:w [color="#66CC66"];
-    dic:e -> _dcm:w [arrowhead=none, color="#66CC66"];
     dic:e -> dcm:w [arrowhead=none, color="#66CC66"];
+    subgraph cluster0{
+        color=gray80;
+        label="Approach 1: Edit proposed names, then convert.";
+        labeljust=l;
+        non -> heu [color="#66CC66"];
+        heu:e -> dcm:w [arrowhead=none, color="#66CC66"];
+    }
+    dic:e -> _dcm:w [arrowhead=none, color="#66CC66"];
+    subgraph cluster1{
+        label="Approach 2: Automatically use proposed names.";
+        color=gray80;
+        labeljust=l;
+        _dcm;
+        _heu;
+    }
     _dcm:e -> nif:w [color="#66CC66"];
-    _dcm:s -> _heu:n [color="#BBBBBB"];
-    //{rank=same; _dcm; _heu; dcm}
-    {rank=same; heu; _heu; _dcm}
+    dcm:e -> nif:w [color="#66CC66"];
+    {rank=same; heu; _heu;}
 }

@@ -26,7 +26,7 @@ digraph graphname {
     tim[label="Time-domain\nk-space Data", shape=folder, color="#BBBBBB", fillcolor=grey93];
     vol[label="Volumetric\nReconstruction", shape=folder, color="#BBBBBB", fillcolor=grey93];
     dic[
-        label="DICOM",
+        label="DICOMs",
         shape=folder, color="#BBBBBB", fillcolor=grey93
         ];
     heh[
