@@ -886,8 +886,13 @@ def save_converted_files(
             safe_movefile(res.outputs.bvals, outname_bvals, overwrite)
         else:
             if bvals_are_zero(res.outputs.bvals):
-                os.remove(res.outputs.bvecs)
-                os.remove(res.outputs.bvals)
+                to_remove = []
+                if isinstance(res.outputs.bvals, str):
+                    to_remove = [res.outputs.bvals, res.outputs.bvecs]
+                else:
+                    to_remove = list(res.outputs.bvals) + list(res.outputs.bvecs)
+                for ftr in to_remove:
+                    os.remove(ftr)
                 lgr.debug(
                     "%s and %s were removed since not dwi",
                     res.outputs.bvecs,
@@ -1076,6 +1081,10 @@ def bvals_are_zero(bval_file: str) -> bool:
     -------
     True if all are all 0 or 5; False otherwise.
     """
+
+    # GE hyperband multi-echo containing diffusion info
+    if isinstance(bval_file, TraitListObject):
+        return all([bvals_are_zero(bvf) for bvf in bval_file])
 
     with open(bval_file) as f:
         bvals = f.read().split()
