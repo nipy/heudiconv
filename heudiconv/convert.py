@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, List, Optional, cast
 
 import filelock
 from nipype import Node
-from traits.trait_list_object import TraitListObject
+from nipype.interfaces.base import TraitListObject
 
 from .bids import (
     BIDS_VERSION,
