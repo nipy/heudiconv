@@ -187,6 +187,7 @@ It also ensures files are named according to the BIDS specifications, including 
 
 
 ![**Heudicom conversion and layout can be controled via custom heuristiscs or by selecting buit-in presets.** The heudicom application can be used with the `-c none` parameter to generate a heuristic tamplate for the user to edit, before conversion is performed e.g. via the `-c dcm2niix` parameter which uses the eponymous external application. The process is itempotent, and specifying the `-c dcm2niix` parameter will automatically convert based on a default layout and produce a heuristic directory for the user to inspect post hoc.](figs/workflow.pdf)
+
 ## Exemplar heuristics
 
 ### Convertall
