@@ -78,6 +78,18 @@ This is best accomplished via::
   pip install -e .[all]
 
 
+Documentation
+-------------
+
+To contribute to the documentation, we recommend building the docs
+locally prior to submitting a patch.
+
+To build the docs locally:
+
+ 1. From the root of the heudiconv repository, `pip install -r docs/requirements.txt`
+ 2. From the `docs/` directory, run `make html`
+
+
 Additional Hints
 ----------------
 
