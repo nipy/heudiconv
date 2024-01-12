@@ -53,7 +53,7 @@ into structured directory layouts.
 
 Heudiconv can be inserted into your workflow to provide automatic conversion as part of a data acquisition pipeline, as seen in the figure below:
 
-.. image:: figs/environment.png
+.. image:: ../figs/environment.png
 
 Installation
 ------------
