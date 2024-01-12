@@ -51,6 +51,10 @@ into structured directory layouts.
 - It integrates with `DataLad <https://www.datalad.org/>`_ to place converted and original data under git/git-annex
   version control while automatically annotating files with sensitive information (e.g., non-defaced anatomicals, etc).
 
+Heudiconv can be inserted into your workflow to provide automatic conversion as part of a data acquisition pipeline, as seen in the figure below:
+
+.. image:: figs/environment.png
+
 Installation
 ------------
 
