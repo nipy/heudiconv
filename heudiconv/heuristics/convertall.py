@@ -26,7 +26,7 @@ def custom_seqinfo(wrapper: dw.Wrapper, series_files: list[str], **kw: Any) -> t
     # in https://github.com/nipy/heudiconv/pull/333
     from nibabel.nicom.dicomwrappers import WrapperError
     try:
-        affine = wrapper.affine.tostring()
+        affine = wrapper.affine.tobytes()
     except WrapperError:
         lgr.exception("Errored out while obtaining/converting affine")
         affine = None
