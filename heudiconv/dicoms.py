@@ -43,7 +43,8 @@ compresslevel = 9
 
 
 class CustomSeqinfoT(Protocol):
-    def __call__(self, wrapper: dw.Wrapper, series_files: list[str]) -> Hashable: ...
+    def __call__(self, wrapper: dw.Wrapper, series_files: list[str]) -> Hashable:
+        ...
 
 
 def create_seqinfo(

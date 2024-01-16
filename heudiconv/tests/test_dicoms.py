@@ -119,6 +119,7 @@ def test_custom_seqinfo() -> None:
     assert len(seqinfo.custom) == 2
     assert seqinfo.custom[1] == dcmfiles[0]
 
+
 def test_get_datetime_from_dcm_from_acq_date_time() -> None:
     typical_dcm = dcm.dcmread(
         op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import Optional
 
 from heudiconv.dicoms import dw
 from heudiconv.utils import SeqInfo
@@ -19,7 +19,7 @@ def create_key(
     return (template, outtype, annotation_classes)
 
 
-def custom_seqinfo(wrapper: dw.Wrapper, series_files: list[str], **kw: Any) -> tuple[str, str]:
+def custom_seqinfo(wrapper: dw.Wrapper, series_files: list[str]) -> tuple[str, str]:
     # Just a dummy demo for what custom_seqinfo could get/do
     # for already loaded DICOM data, and including storing/returning
     # the sample series file as was requested
