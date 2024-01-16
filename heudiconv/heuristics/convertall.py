@@ -6,7 +6,7 @@ from typing import Optional
 from heudiconv.dicoms import dw
 from heudiconv.utils import SeqInfo
 
-lgr = logging.getLogger('heudiconv')
+lgr = logging.getLogger("heudiconv")
 
 
 def create_key(
@@ -25,6 +25,7 @@ def custom_seqinfo(wrapper: dw.Wrapper, series_files: list[str]) -> tuple[str, s
     # the sample series file as was requested
     # in https://github.com/nipy/heudiconv/pull/333
     from nibabel.nicom.dicomwrappers import WrapperError
+
     try:
         affine = wrapper.affine.tobytes()
     except WrapperError:

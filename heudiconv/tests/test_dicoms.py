@@ -107,14 +107,12 @@ def test_custom_seqinfo() -> None:
     dcmfiles = glob(op.join(TESTS_DATA_PATH, "phantom.dcm"))
 
     seqinfos = group_dicoms_into_seqinfos(
-        dcmfiles,
-        "studyUID",
-        flatten=True,
-        custom_seqinfo=custom_seqinfo)
+        dcmfiles, "studyUID", flatten=True, custom_seqinfo=custom_seqinfo
+    )
 
     seqinfo = list(seqinfos.keys())[0]
 
-    assert hasattr(seqinfo, 'custom')
+    assert hasattr(seqinfo, "custom")
     assert isinstance(seqinfo.custom, tuple)
     assert len(seqinfo.custom) == 2
     assert seqinfo.custom[1] == dcmfiles[0]
