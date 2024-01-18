@@ -81,8 +81,8 @@ This section demonstrates how to use the heudiconv tool with `heuristic.py` to c
     # output (-o) will  be placed in the directory labeled Nifti
     # The conversion file is in Nifti/code 
     # dcm2niix is the engine that does the conversion
-    # --minmeta gaurantees that meta-information in the dcms does not get inserted into the JSON sidecar.
-    # This is good becuase the information is not needed but can overflow the JSON file causing some BIDS apps to crash.
+    # --minmeta guarantees that meta-information in the dcms does not get inserted into the JSON sidecar.
+    # This is good because the information is not needed but can overflow the JSON file causing some BIDS apps to crash.
     
     docker run --rm -it -v ${PWD}:/base nipy/heudiconv:latest -d /base/dicom/{subject}/{session}/*/*.dcm -o /base/Nifti/ -f /base/Nifti/code/${converter} -s ${subject} -ss ${session} -c dcm2niix -b --minmeta --overwrite
 
