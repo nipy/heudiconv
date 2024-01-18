@@ -2,6 +2,8 @@
 Reproin 
 ================
 
+This tutorial is based on https://neuroimaging-core-docs.readthedocs.io/en/latest/pages/heudiconv.html#lesson-3-reproin-py
+
 If you don't want to modify a Python file as you did for *heuristic.py*, an alternative is to name your image sequences at the scanner using the *reproin* naming convention. Take some time getting the scanner protocol right, because it is the critical job for running *reproin*. Then a single Docker command converts your DICOMS to the BIDS data structure. There are more details about *reproin* in the 
 .. TODO new link ref:`Links <heudiconv_links>` section above.
 

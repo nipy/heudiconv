@@ -2,6 +2,8 @@
 Custom Heuristics
 =========================
 
+This tutorial is based on https://neuroimaging-core-docs.readthedocs.io/en/latest/pages/heudiconv.html#running-heudiconv-is-a-3-step-process
+
 
 Running HeuDiConv is a 3-step process
 *************************************

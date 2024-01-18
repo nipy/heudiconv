@@ -1,6 +1,8 @@
 Quickstart
 ==========
 
+This tutorial is based on https://neuroimaging-core-docs.readthedocs.io/en/latest/pages/heudiconv.html#lesson-1-running-heuristic-py
+
 Heudiconv Hello World: Using `heuristic.py`
 
 .. TODO convert to a datalad dataset 
