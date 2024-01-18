@@ -1,6 +1,6 @@
-========================
-Heuristic File Reference
-========================
+===============
+Heuristics File
+===============
 
 The heuristic file controls how information about the DICOMs is used to convert
 to a file system layout (e.g., BIDS). ``heudiconv`` includes some built-in
