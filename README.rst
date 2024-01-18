@@ -115,3 +115,17 @@ Docker image preparation being found in ``.github/workflows/release.yml``.
 ---------------------
 
 - https://github.com/courtois-neuromod/ds_prep/blob/main/mri/convert/heuristics_unf.py
+
+
+Support
+-------
+
+All bugs, concerns and enhancement requests for this software can be submitted here:
+https://github.com/nipy/heudiconv/issues.
+
+If you have a problem or would like to ask a question about how to use ``heudiconv``,
+please submit a question to `NeuroStars.org <http://neurostars.org/tags/heudiconv>`_ with a ``heudiconv`` tag.
+NeuroStars.org is a platform similar to StackOverflow but dedicated to neuroinformatics.
+
+All previous ``heudiconv`` questions are available here:
+http://neurostars.org/tags/heudiconv/

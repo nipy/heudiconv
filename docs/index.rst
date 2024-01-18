@@ -14,7 +14,8 @@ Contents
 
    installation
    changes
-   usage
-   heuristics
    tutorials
+   heuristics
+   commandline
    api
+
