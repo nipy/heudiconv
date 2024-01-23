@@ -1085,7 +1085,7 @@ def bvals_are_zero(bval_file: str) -> bool:
 
     # GE hyperband multi-echo containing diffusion info
     if isinstance(bval_file, TraitListObject):
-        return all([bvals_are_zero(bvf) for bvf in bval_file])
+        return all(map(bvals_are_zero, bval_file))
 
     with open(bval_file) as f:
         bvals = f.read().split()
