@@ -881,24 +881,19 @@ def save_converted_files(
         return []
 
     if isdefined(res.outputs.bvecs) and isdefined(res.outputs.bvals):
+        bvals, bvecs = res.outputs.bvals, res.outputs.bvecs
+        bvals = list(bvals) if isinstance(bvals, TraitListObject) else bvals
+        bvecs = list(bvecs) if isinstance(bvecs, TraitListObject) else bvecs
         if prefix_dirname.endswith("dwi"):
             outname_bvecs, outname_bvals = prefix + ".bvec", prefix + ".bval"
-            safe_movefile(res.outputs.bvecs, outname_bvecs, overwrite)
-            safe_movefile(res.outputs.bvals, outname_bvals, overwrite)
+            safe_movefile(bvecs, outname_bvecs, overwrite)
+            safe_movefile(bvals, outname_bvals, overwrite)
         else:
-            if bvals_are_zero(res.outputs.bvals):
-                to_remove = []
-                if isinstance(res.outputs.bvals, str):
-                    to_remove = [res.outputs.bvals, res.outputs.bvecs]
-                else:
-                    to_remove = list(res.outputs.bvals) + list(res.outputs.bvecs)
+            if bvals_are_zero(bvals):
+                to_remove = bvals + bvecs if isinstance(bvals, list) else [bvals, bvecs]
                 for ftr in to_remove:
                     os.remove(ftr)
-                lgr.debug(
-                    "%s and %s were removed since not dwi",
-                    res.outputs.bvecs,
-                    res.outputs.bvals,
-                )
+                lgr.debug("%s and %s were removed since not dwi", bvecs, bvals)
             else:
                 lgr.warning(
                     DW_IMAGE_IN_FMAP_FOLDER_WARNING.format(folder=prefix_dirname)
@@ -907,8 +902,8 @@ def save_converted_files(
                     ".bvec and .bval files will be generated. This is NOT BIDS compliant"
                 )
                 outname_bvecs, outname_bvals = prefix + ".bvec", prefix + ".bval"
-                safe_movefile(res.outputs.bvecs, outname_bvecs, overwrite)
-                safe_movefile(res.outputs.bvals, outname_bvals, overwrite)
+                safe_movefile(bvecs, outname_bvecs, overwrite)
+                safe_movefile(bvals, outname_bvals, overwrite)
 
     if isinstance(res_files, list):
         res_files = sorted(res_files)
@@ -1070,7 +1065,7 @@ def add_taskname_to_infofile(infofiles: str | list[str]) -> None:
         save_json(infofile, meta_info)
 
 
-def bvals_are_zero(bval_file: str) -> bool:
+def bvals_are_zero(bval_file: str | list) -> bool:
     """Checks if all entries in a bvals file are zero (or 5, for Siemens files).
 
     Parameters
@@ -1084,7 +1079,7 @@ def bvals_are_zero(bval_file: str) -> bool:
     """
 
     # GE hyperband multi-echo containing diffusion info
-    if isinstance(bval_file, TraitListObject):
+    if isinstance(bval_file, list):
         return all(map(bvals_are_zero, bval_file))
 
     with open(bval_file) as f:
