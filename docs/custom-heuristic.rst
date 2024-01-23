@@ -2,7 +2,7 @@
 Custom Heuristics
 =========================
 
-In this tutorial we will:
+In this tutorial we go more in depth, creating our own *heuristic.py* and modifying it for our needs:
 
 1. :ref:`Step1 <heudiconv_step1>` Generate a heuristic (translation) file skeleton and some associated descriptor text files.
 2. :ref:`Step2 <heudiconv_step2>` Modify the *heuristic.py* to specify BIDS output names and directories, and the input DICOM characteristics.
@@ -22,7 +22,8 @@ Prerequisites
 Step 1: Generate Skeleton
 *************************
 
-.. note:: Step 1 only needs to be completed once correctly for each project.
+.. note:: Step 1 only needs to be completed once for each project.
+   If repeating this step, ensure that the .heudiconv directory is removed.
 
 From the *MRIS* directory, run the following command to process the ``dcm`` files that you downloaded and unzipped for this tutorial.::
 
@@ -56,8 +57,10 @@ Step 2: Modify Heuristic
 .. TODO Lets remove heuristic1 and heuristic2 and create a 2nd example
    dataset? or branch?
 
-* You will modify three sections in *heuristic.py*. It is okay to rename this file, or to have several versions with different names. You just don't want to mix up your new *heuristic.py* and the finished *heuristic1.py* while you are learning.
-* Your goal is to produce a working *heuristic.py* that will arrange the output in a BIDS directory structure. Once you create a working *heuristic.py*, you can run it for different subjects and sessions (keep reading).
+We will modify the generated *heuristic.py* so heudiconv will arrange the output in a BIDS directory structure.
+
+It is okay to rename this file, or to have several versions with different names, just be sure to pass the intended filename with `-f`. See :doc:`heuristics` docs for more info.
+
 * I provide three section labels (1, 1b and 2) to facilitate exposition here. Each of these sections should be manually modified by you for your project.
 
 Section 1
@@ -117,7 +120,7 @@ Section 1
   * Define the output directories and file names according to the `BIDS specification <https://bids-specification.readthedocs.io/en/stable/04-modality-specific-files/01-magnetic-resonance-imaging-data.html>`_
   * Note the output names for the fieldmap images (e.g., *sub-219_ses-itbs_dir-PA_epi.nii.gz*, *sub-219_ses-itbs_magnitude1.nii.gz*, *sub-219_ses-itbs_magnitude2.nii.gz*, *sub-219_ses-itbs_phasediff.nii.gz*).
   * The reverse_phase encode dwi image (e.g., *sub-219_ses-itbs_dir-PA_epi.nii.gz*) is grouped with the fieldmaps because it is used to correct other images.
-  * Data that is not yet defined in the BIDS specification will cause the bids-validator to produce an error unless you include it in a 
+  * Data that is not yet defined in the BIDS specification will cause the bids-validator to produce an error unless you include it in a
 
 .. TODO new link :ref:`.bidsignore <bidsignore>` file.
 
@@ -219,22 +222,21 @@ Section 2
 
 .. _heudiconv_step3:
 
-Step 3: 
+Step 3:
 *******************
 
 * You have now done all the hard work for your project. When you want to add a subject or session, you only need to run this third step for that subject or session (A record of each run is kept in .heudiconv for you)::
 
-    docker run --rm -it -v ${PWD}:/base nipy/heudiconv:latest -d /base/dicom/{subject}/*/*.dcm -o /base/Nifti/ -f /base/Nifti/code/heuristic.py -s 219 -ss itbs -c dcm2niix -b --minmeta --overwrite
+    heudiconv --files dicom/{subject}/*/*.dcm -o Nifti/ -f Nifti/code/heuristic.py -s 219 -ss itbs -c dcm2niix -b --minmeta --overwrite
 
-.. Warning:: The above Docker command WORKS IN BASH, but may not work in other shells! For example, zsh is upset by the form ``{subject}`` but bash actually doesn't mind.
-
-* The first time you run this step, several important text files are generated (e.g., CHANGES, dataset_description.json, participants.tsv, README etc.). On subsequent runs, information may be added (e.g., *participants.tsv* will be updated). Other files, like the *README* and *dataset_description.json* should be filled in manually after they are first generated.
+* The first time you run this step, several important text files are generated (e.g., CHANGES, dataset_description.json, participants.tsv, README etc.).
+  On subsequent runs, information may be added (e.g., *participants.tsv* will be updated).
+  Other files, like the *README* and *dataset_description.json* should be updated manually.
 * This Docker command is slightly different from the previous Docker command you ran.
 
-  * ``-f /base/Nifti/code/heuristic.py`` now tells HeuDiConv to use your revised *heuristic.py* in the *code* directory.
+  * ``-f Nifti/code/heuristic.py`` now tells HeuDiConv to use your revised *heuristic.py* in the *code* directory.
   * In this case, we specify the subject we wish to process ``-s 219`` and the name of the session ``-ss itbs``.
-
-    * We could specify multiple subjects like this: ``-s 219 220 -ss itbs``
+  * We could specify multiple subjects like this: ``-s 219 220 -ss itbs``
   * ``-c dcm2niix -b`` indicates that we want to use the dcm2niix converter with the -b flag (which creates BIDS).
   * ``--minmeta`` ensures that only the minimum necessary amount of data gets added to the JSON file when created.  On the off chance that there is a LOT of meta-information in the DICOM header, the JSON file will not get swamped by it. fmriprep and mriqc are very sensitive to this information overload and will crash, so *minmeta* provides a layer of protection against such corruption.
   * ``--overwrite`` This is a peculiar option. Without it, I have found the second run of a sequence does not get generated. But with it, everything gets written again (even if it already exists).  I don't know if this is my problem or the tool...but for now, I'm using ``--overwrite``.
@@ -293,7 +295,6 @@ TIPS
 * **Don't assume all your subjects' dicoms have the same names or that the sequences were always run in the same order**: If you develop a *heuristic.py* on one subject, try it and carefully evaluate the results on your other subjects.  This is especially true if you already collected the data before you started thinking about automating the output.  Every time you run HeuDiConv with *heuristic.py*, a new *dicominfo.tsv* file is generated.  Inspect this for differences in protocol names and series descriptions etc.
 * **Decompressing DICOMS**: Decompress your data, heudiconv does not yet support compressed DICOM conversion. https://github.com/nipy/heudiconv/issues/287
 * **Create unique DICOM protocol names at the scanner** If you have the opportunity to influence the DICOM naming strategies, then try to ensure that there is a unique protocol name for every run.  For example, if you repeat the fmri protocol three times, name the first one fmri_1, the next fmri_2, and the last fmri_3 (or any variation on this theme).  This will make it much easier to uniquely specify the sequences when you convert and reduce your chance of errors.
-
 
 
 Exploring Criteria
