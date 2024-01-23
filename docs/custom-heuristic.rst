@@ -2,65 +2,59 @@
 Custom Heuristics
 =========================
 
+In this tutorial we will:
+
+1. :ref:`Step1 <heudiconv_step1>` Generate a heuristic (translation) file skeleton and some associated descriptor text files.
+2. :ref:`Step2 <heudiconv_step2>` Modify the *heuristic.py* to specify BIDS output names and directories, and the input DICOM characteristics.
+3. :ref:`Step3 <heudiconv_step3>` Call HeuDiConv to run on more subjects and sessions.
+
 This tutorial is based on https://neuroimaging-core-docs.readthedocs.io/en/latest/pages/heudiconv.html#running-heudiconv-is-a-3-step-process
 
+Prerequisites
+**************
 
-Running HeuDiConv is a 3-step process
-*************************************
+1. :ref:`Prepare the dataset <prepare_dataset>` used in the quickstart.
+2. Ensure :ref:`dcm2niix <install_prerequisites>` is installed.
 
-* :ref:`Step1 <heudiconv_step1>` By passing some path information and flags to HeuDiConv, you generate a heuristic (translation) file skeleton and some associated descriptor text files.  These all get placed in a hidden directory, *.heudiconv* under the *Nifti* directory.
-* :ref:`Step2 <heudiconv_step2>` Copy *MRIS/Nifti/.heudiconv/heuristic.py* to *MRIS/Nifti/code/heuristic.py*. You will modify the copied *heuristic.py* to specify BIDS output names and directories, and the input DICOM characteristics.  Available input DICOM characteristics are listed in *MRIS/Nifti/.heudiconv/dicominfo.tsv*.
-* :ref:`Step3 <heudiconv_step3>` Having revised *MRIS/Nifti/code/heuristic.py*, you can now call HeuDiConv to run on more subjects and sessions. Each time you run it, additional subdirectories are created under *.heudiconv* that record the details of each subject (and session) conversion. Detailed provenance information is retained in the *.heudiconv* hidden directory. You can rename your heuristic file, which may be useful if you have multiple heuristic files for the same dataset.
-
-TIPS
-======
-
-* **Name Directories as you wish**: You can name the project directory (e.g., **MRIS**)  and the output directory (e.g., **Nifti**) as you wish (just don't put spaces in the names!).
-* **Age and Sex Extraction**: Heudiconv will extract age and sex info from the DICOM header.  If there is any reason to believe this information is wrong in the DICOM header (for example, it was made-up because no one knew how old the subject was, or it was considered a privacy concern), then you need to check the output.  If you have Horos (or another DICOM editor), you can edit the values in the DICOM headers, otherwise you need to edit the values in the BIDS text file *participants.tsv*.
-* **Separating Sessions**: If you have multiple sessions at the scanner, you should create an *Exam* folder for each session.  This will help you to keep the data organized and *Exam* will be reported in the *study_description* in your *dicominfo.tsv*, so that you can use it as a criterion.
-* **Don't manually combine DICOMS from different sessions**: If you combine multiple sessions in one subject DICOM folder, heudiconv will fail to run and will complain about ``conflicting study identifiers``. You can get around the problem by figuring out which DICOMs are from different sessions and separating them so you deal with one set at a time.  This may mean you have to manually edit the BIDS output.
-
-    * Why might you manually combine sessions you ask? Because you never intended to have multiple sessions, but the subject had to complete some scans the next day. Or, because the scanner had to be rebooted.
-* **Don't assume all your subjects' dicoms have the same names or that the sequences were always run in the same order**: If you develop a *heuristic.py* on one subject, try it and carefully evaluate the results on your other subjects.  This is especially true if you already collected the data before you started thinking about automating the output.  Every time you run HeuDiConv with *heuristic.py*, a new *dicominfo.tsv* file is generated.  Inspect this for differences in protocol names and series descriptions etc.
-* **Decompressing DICOMS**: Decompress your data, heudiconv does not yet support compressed DICOM conversion. https://github.com/nipy/heudiconv/issues/287
-* **Create unique DICOM protocol names at the scanner** If you have the opportunity to influence the DICOM naming strategies, then try to ensure that there is a unique protocol name for every run.  For example, if you repeat the fmri protocol three times, name the first one fmri_1, the next fmri_2, and the last fmri_3 (or any variation on this theme).  This will make it much easier to uniquely specify the sequences when you convert and reduce your chance of errors.
 
 .. _heudiconv_step1:
 
 Step 1: Generate Skeleton
 *************************
 
-From the *MRIS* directory, run the following Docker command to process the ``dcm`` files that you downloaded and unzipped for this tutorial. The subject number is 219::
+.. note:: Step 1 only needs to be completed once correctly for each project.
 
-    docker run --rm -it -v ${PWD}:/base nipy/heudiconv:latest -d /base/dicom/{subject}/*/*/*.dcm -o /base/Nifti/ -f convertall -s 219 -c none
+From the *MRIS* directory, run the following command to process the ``dcm`` files that you downloaded and unzipped for this tutorial.::
 
-.. Warning:: The above Docker command works in bash, but may not work in other shells, (e.g., zsh)
+    heudiconv --files dicom/219/*/*/*.dcm -o Nifti/ -f convertall -s 219 -c none
 
-* ``--rm`` means Docker should cleanup after itself
-* ``-it`` means Docker should run interactively
-* ``-v ${PWD}:/base`` binds your current directory to ``/base`` inside the container.  You could also provide an **absolute path** to the *MRIS* directory.
-* ``nipy/heudiconv:latest`` identifies the Docker container to run (the latest version of heudiconv).
-* ``-d /base/dicom/{subject}/*/*/*.dcm`` identifies the path to the DICOM files and specifies that they have the extension ``.dcm`` in this case.
-* ``-o /base/Nifti/`` is the output in *Nifti*.  If the output directory does not exist, it will be created.
-* ``-f convertall`` This creates a *heuristic.py* template from an existing heuristic module. There are `other heuristic modules <https://github.com/nipy/heudiconv/tree/master/heudiconv/heuristics>`_ , e.g., banda-bids.py, bids_with_ses.py, cmrr_heuristic.py, example.py, multires_7Tbold.py, reproin.py, studyforrest_phase2.py, test_reproin.py, uc_bids.py. *heuristic.py* is a good default though.
-* ``-s 219`` specifies the subject number. ``219`` will replace {subject} in the ``-d`` argument when Docker actually runs.
+* ``--files dicom/{subject}/*/*/*.dcm`` identifies the path to the DICOM files and specifies that they have the extension ``.dcm`` in this case.
+* ``-o Nifti/`` is the output in *Nifti*.  If the output directory does not exist, it will be created.
+* ``-f convertall`` This creates a *heuristic.py* template from an existing heuristic module. There are `other heuristic modules <https://github.com/nipy/heudiconv/tree/master/heudiconv/heuristics>`_ , but *convertall* is a good default.
+* ``-s 219`` specifies the subject number.
 * ``-c none`` indicates you are not actually doing any conversion right now.
-* Heudiconv generates a hidden directory *MRIS/Nifti/.heudiconv/219/info* and populates it with two files of interest: a skeleton *heuristic.py* and a *dicominfo.tsv* file.
-* After Step 1, the *heuristic.py* template contains explanatory text for you to read. I have removed this from *heuristic1.py* to keep it short.
+
+You will now have a heudiconv skeleton in the `<output_dir>/.heudiconv` directory, in our case `Nifti/.heudiconv`
 
 The ``.heudiconv`` hidden directory
 ======================================
 
+Take a look at *MRIS/Nifti/.heudiconv/219/info/*, heudiconv has produced two files of interest: a skeleton *heuristic.py* and a *dicominfo.tsv* file.
+The generated heuristic file template contains comments explaining usage.
+
+.. warning::
     * **The Good** Every time you run conversion to create the BIDS NIfTI files and directories, a detailed record of what you did is recorded in the *.heudiconv* directory.  This includes a copy of the *heuristic.py* module that you ran for each subject and session. Keep in mind that the hidden *.heudiconv* directory gets updated every time you run heudiconv. Together your *code* and *.heudiconv* directories provide valuable provenance information that should remain with your data.
     * **The Bad** If you rerun *heuristic.py* for some subject and session that has already been run, heudiconv quietly uses the conversion routines it stored in *.heudiconv*.  This can be really annoying if you are troubleshooting *heuristic.py*.
     * **More Good** You can remove subject and session information from *.heudiconv* and run it fresh.  In fact, you can entirely remove the *.heudiconv* directory and still run the *heuristic.py* you put in the *code* directory.
 
-* Step 1 only needs to be completed once correctly for each project.
 
 .. _heudiconv_step2:
 
 Step 2: Modify Heuristic
 ************************
+
+.. TODO Lets remove heuristic1 and heuristic2 and create a 2nd example
+   dataset? or branch?
 
 * You will modify three sections in *heuristic.py*. It is okay to rename this file, or to have several versions with different names. You just don't want to mix up your new *heuristic.py* and the finished *heuristic1.py* while you are learning.
 * Your goal is to produce a working *heuristic.py* that will arrange the output in a BIDS directory structure. Once you create a working *heuristic.py*, you can run it for different subjects and sessions (keep reading).
@@ -286,6 +280,20 @@ Step 3:
       │       ├── sub-219_ses-itbs_scans.json
       │       └── sub-219_ses-itbs_scans.tsv
       └── task-rest_bold.json
+
+TIPS
+======
+
+* **Name Directories as you wish**: You can name the project directory (e.g., **MRIS**)  and the output directory (e.g., **Nifti**) as you wish (just don't put spaces in the names!).
+* **Age and Sex Extraction**: Heudiconv will extract age and sex info from the DICOM header.  If there is any reason to believe this information is wrong in the DICOM header (for example, it was made-up because no one knew how old the subject was, or it was considered a privacy concern), then you need to check the output.  If you have Horos (or another DICOM editor), you can edit the values in the DICOM headers, otherwise you need to edit the values in the BIDS text file *participants.tsv*.
+* **Separating Sessions**: If you have multiple sessions at the scanner, you should create an *Exam* folder for each session.  This will help you to keep the data organized and *Exam* will be reported in the *study_description* in your *dicominfo.tsv*, so that you can use it as a criterion.
+* **Don't manually combine DICOMS from different sessions**: If you combine multiple sessions in one subject DICOM folder, heudiconv will fail to run and will complain about ``conflicting study identifiers``. You can get around the problem by figuring out which DICOMs are from different sessions and separating them so you deal with one set at a time.  This may mean you have to manually edit the BIDS output.
+
+    * Why might you manually combine sessions you ask? Because you never intended to have multiple sessions, but the subject had to complete some scans the next day. Or, because the scanner had to be rebooted.
+* **Don't assume all your subjects' dicoms have the same names or that the sequences were always run in the same order**: If you develop a *heuristic.py* on one subject, try it and carefully evaluate the results on your other subjects.  This is especially true if you already collected the data before you started thinking about automating the output.  Every time you run HeuDiConv with *heuristic.py*, a new *dicominfo.tsv* file is generated.  Inspect this for differences in protocol names and series descriptions etc.
+* **Decompressing DICOMS**: Decompress your data, heudiconv does not yet support compressed DICOM conversion. https://github.com/nipy/heudiconv/issues/287
+* **Create unique DICOM protocol names at the scanner** If you have the opportunity to influence the DICOM naming strategies, then try to ensure that there is a unique protocol name for every run.  For example, if you repeat the fmri protocol three times, name the first one fmri_1, the next fmri_2, and the last fmri_3 (or any variation on this theme).  This will make it much easier to uniquely specify the sequences when you convert and reduce your chance of errors.
+
 
 
 Exploring Criteria

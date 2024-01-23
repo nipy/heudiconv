@@ -5,12 +5,16 @@ This section demonstrates how to use the heudiconv tool with a provided `heurist
 
 This tutorial is based on https://neuroimaging-core-docs.readthedocs.io/en/latest/pages/heudiconv.html#lesson-1-running-heuristic-py
 
+.. _install_prerequisites:
+
 Install Prerequisites
 *********************
 
 `dcm2niix` is the engine that will do the DICOM conversion, so make sure it is installed (or use a heudiconv container TODO link)::
 
     pip install dcm2niix
+
+.. _prepare_dataset:
 
 Prepare Dataset
 ***************
