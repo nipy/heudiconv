@@ -4,6 +4,7 @@ Installation
 
 ``Heudiconv`` is packaged and available from many different sources.
 
+.. _install_local:
 
 Local
 =====

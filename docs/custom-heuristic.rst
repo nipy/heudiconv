@@ -2,13 +2,14 @@
 Custom Heuristics
 =========================
 
+This tutorial is based on `Dianne Patterson's University of Arizona tutorials <https://neuroimaging-core-docs.readthedocs.io/en/latest/pages/heudiconv.html#lesson-3-reproin-py>`_
+
+
 In this tutorial we go more in depth, creating our own *heuristic.py* and modifying it for our needs:
 
 1. :ref:`Step1 <heudiconv_step1>` Generate a heuristic (translation) file skeleton and some associated descriptor text files.
 2. :ref:`Step2 <heudiconv_step2>` Modify the *heuristic.py* to specify BIDS output names and directories, and the input DICOM characteristics.
 3. :ref:`Step3 <heudiconv_step3>` Call HeuDiConv to run on more subjects and sessions.
-
-This tutorial is based on https://neuroimaging-core-docs.readthedocs.io/en/latest/pages/heudiconv.html#running-heudiconv-is-a-3-step-process
 
 Prerequisites
 **************

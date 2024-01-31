@@ -1,18 +1,10 @@
 Quickstart
 ==========
 
-This section demonstrates how to use the heudiconv tool with a provided `heuristic.py` to convert DICOMS into the BIDS data structure.
+This tutorial is based on `Dianne Patterson's University of Arizona tutorials <https://neuroimaging-core-docs.readthedocs.io/en/latest/pages/heudiconv.html#lesson-3-reproin-py>`_
 
-This tutorial is based on https://neuroimaging-core-docs.readthedocs.io/en/latest/pages/heudiconv.html#lesson-1-running-heuristic-py
-
-.. _install_prerequisites:
-
-Install Prerequisites
-*********************
-
-`dcm2niix` is the engine that will do the DICOM conversion, so make sure it is installed (or use a heudiconv container TODO link)::
-
-    pip install dcm2niix
+This guide assumes you have already :ref:`installed heudiconv and dcm2niix <install_local>` and 
+demonstrates how to use the heudiconv tool with a provided `heuristic.py` to convert DICOMS into the BIDS data structure.
 
 .. _prepare_dataset:
 
