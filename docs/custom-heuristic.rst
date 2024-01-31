@@ -14,9 +14,8 @@ In this tutorial we go more in depth, creating our own *heuristic.py* and modify
 Prerequisites
 **************
 
+1. Ensure :ref:`heudiconv and dcm2niix <install_local>` is installed.
 1. :ref:`Prepare the dataset <prepare_dataset>` used in the quickstart.
-2. Ensure :ref:`dcm2niix <install_prerequisites>` is installed.
-
 
 .. _heudiconv_step1:
 
