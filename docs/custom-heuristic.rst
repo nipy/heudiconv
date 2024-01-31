@@ -11,11 +11,10 @@ In this tutorial we go more in depth, creating our own *heuristic.py* and modify
 2. :ref:`Step2 <heudiconv_step2>` Modify the *heuristic.py* to specify BIDS output names and directories, and the input DICOM characteristics.
 3. :ref:`Step3 <heudiconv_step3>` Call HeuDiConv to run on more subjects and sessions.
 
-Prerequisites
-**************
+**Prerequisites**:
 
 1. Ensure :ref:`heudiconv and dcm2niix <install_local>` is installed.
-1. :ref:`Prepare the dataset <prepare_dataset>` used in the quickstart.
+2. :ref:`Prepare the dataset <prepare_dataset>` used in the quickstart.
 
 .. _heudiconv_step1:
 
