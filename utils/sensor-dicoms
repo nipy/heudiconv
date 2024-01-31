@@ -76,6 +76,9 @@ for dir in "$@"; do
     if grep "Error: Check sorted order: 4D dataset has" "$TEMP/stderr"; then
         failed=1
     fi
+    if grep "Error: Missing images." "$TEMP/stderr"; then
+        failed=1
+    fi
     if [ -n "$failed" ]; then
         if [ -n "$DRY_RUN" ]; then
             echo mv "$dir" "$MOVE_TO_DIR"
