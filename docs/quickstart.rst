@@ -37,9 +37,8 @@ Basic Conversion
 
 Next we will use heudiconv convert DICOMS into the BIDS data structure.
 The example dataset includes an example heuristic file, `heuristic1.py`.
-Typical use of heudiconv will require the creation
-and/or editing of your heuristic file (TODO link), which we will cover
-in the later tutorials (TODO link).
+Typical use of heudiconv will require the creation and editing of your :doc:`heuristics file <heuristics>`, which we will cover
+in a :doc:`later tutorial <custom-heuristic>`.
 
     .. note:: Heudiconv requires you to run the command from the parent
               directory of both the Dicom and Nifti directories, which is `MRIS` in
