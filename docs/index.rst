@@ -17,5 +17,6 @@ Contents
    tutorials
    heuristics
    commandline
+   container
    api
 

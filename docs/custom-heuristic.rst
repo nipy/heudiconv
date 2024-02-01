@@ -113,15 +113,12 @@ Section 1
     * Once you use the variable ``{session}``:
     * Ensure that a session gets added to the **output path**, e.g., ``sub-{subject}/{session}/anat/`` AND
     * Session gets added to the **output filename**: ``sub-{subject}_{session}_T1w`` for every image in the session.
+    * Otherwise you will get `bids validator errors <https://bids-standard.github.io/bids-validator/>`_
 
-.. TODO new link * Otherwise you will get :ref:`bids-validator errors <bidsvalidator>`.
-
-  * Define the output directories and file names according to the `BIDS specification <https://bids-specification.readthedocs.io/en/stable/04-modality-specific-files/01-magnetic-resonance-imaging-data.html>`_
+  * Define the output directories and file names according to the `BIDS specification <https://bids-specification.readthedocs.io/en/stable/modality-specific-files/magnetic-resonance-imaging-data.html>`_
   * Note the output names for the fieldmap images (e.g., *sub-219_ses-itbs_dir-PA_epi.nii.gz*, *sub-219_ses-itbs_magnitude1.nii.gz*, *sub-219_ses-itbs_magnitude2.nii.gz*, *sub-219_ses-itbs_phasediff.nii.gz*).
   * The reverse_phase encode dwi image (e.g., *sub-219_ses-itbs_dir-PA_epi.nii.gz*) is grouped with the fieldmaps because it is used to correct other images.
-  * Data that is not yet defined in the BIDS specification will cause the bids-validator to produce an error unless you include it in a
-
-.. TODO new link :ref:`.bidsignore <bidsignore>` file.
+  * Data that is not yet defined in the BIDS specification will cause the bids-validator to produce an error unless you include it in a `.bidsignore <https://github.com/bids-standard/bids-validator?#bidsignore>`_ file.
 
 * **data**
 
