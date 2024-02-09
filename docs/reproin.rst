@@ -8,8 +8,9 @@ This tutorial is based on `Dianne Patterson's University of Arizona tutorials <h
 automatic generation of sharable, version-controlled BIDS datasets from
 MR scanners.
 
-If can control how your image sequences are named at the scanner you can
-use the *reproin* naming convention.  
+If you can control how your image sequences are named at the scanner, you can use the *reproin* naming convention.
+If you cannot control such naming, or already have collected data, you can provide your custom heuristic mapping into *reproin* and thus in effect use reproin heuristic.
+That will be a topic for another tutorial but meanwhile you can checkout `reproin/issues/18 <https://github.com/ReproNim/reproin/issues/18#issuecomment-834598084>`_ for a brief HOWTO. 
 
 Get Example Dataset
 -------------------
@@ -44,13 +45,13 @@ From the ``REPROIN`` directory::
 * ``-f reproin`` specifies the converter file to use
 * ``-o data/`` specifies the output directory *data*.  If the output directory does not exist, it will be created.
 * ``--files dicom/001`` identifies the path to the DICOM files.
-*  ``--minmeta`` ensures that only the minimum necessary amount of data gets added to the JSON file when created.  On the off chance that there is a LOT of meta-information in the DICOM header, the JSON file will not get swamped by it. fmriprep and mriqc are very sensitive to this information overload and will crash, so minmeta provides a layer of protection against such corruption.
+*  ``--minmeta`` ensures that only the minimum necessary amount of data gets added to the JSON file when created.  On the off chance that there is a LOT of meta-information in the DICOM header, the JSON file will not get swamped by it. Rumors are that fMRIPrep and MRIQC might be sensitive to excess of metadata and might crash crash, so minmeta provides a layer of protection against such corruption.
 
 
 Output Directory Structure
 --------------------------
 
-Heudiconv's Reproin converter produces a hierarchy of BIDS directories::
+Heudiconv's Reproin converter produces a hierarchy of directories with the BIDS dataset (here - `Cohen`) at the bottom::
 
     data
     └── Patterson
@@ -67,31 +68,24 @@ Heudiconv's Reproin converter produces a hierarchy of BIDS directories::
                 ├── fmap
                 └── func
 
-**TODO --- WHAT IS A REGION AND EXAM???**
+The specific value for the hierarchy can be specified to HeuDiConv via `--locator PATH` option.
+If not, ReproIn heuristic bases it on the value of the DICOM "Study Description"  field which is populated when user selects a specific *Exam* card located within some *Region* (see `ReproIn Walkthrough "Organization" <https://github.com/ReproNim/reproin/blob/master/docs/walkthrough-1.md#organization>`_).
 
 * The dataset is nested under two levels in the output directory: *Region* (Patterson) and *Exam* (Coben). *Tree* is reserved for other purposes at the UA research scanner.
 * Although the Program *Patient* is not visible in the output hierarchy, it is important.  If you have separate sessions, then each session should have its own Program name.
-* **sourcedata** contains tarred gzipped (tgz) sets of DICOM images corresponding to each NIFTI image.
-* **sub-001** contains the BIDS dataset.
-* The hidden directory is generated: *REPROIN/data/Patterson/Coben/.heudiconv*.
-
-At the Scanner
-**************
-
-**TODO --- Is this generally useful or should be cut???**
-
-Here is this phantom dataset displayed in the scanner dot cockpit.  The directory structure is defined at the top: *Patterson >> Coben >> Patient*
-
-* *Region* = *Patterson*
-* *Exam* = *Coben*
-* *Program* = *Patient*
+* **sourcedata** contains tarred gzipped (`.tgz`) sets of DICOM images corresponding to NIfTI images.
+* **sub-001/** contains a single subject data within this BIDS dataset.
+* The hidden directory is generated: *REPROIN/data/Patterson/Coben/.heudiconv* to contain derived mapping data, which could potentially be inspected or adjusted/used for re-conversion.
 
 
 
 Reproin Scanner File Names
 ****************************
 
-* For both BIDS and *reproin*, names are composed of an ordered series of key-value pairs.  Each key and its value are joined with a dash ``-`` (e.g., ``acq-MPRAGE``, ``dir-AP``).  These key-value pairs are joined to other key-value pairs with underscores ``_``. The exception is the modality label, which is discussed more below.
+* For both BIDS and *reproin*, names are composed of an ordered series of key-value pairs, called [*entities*](https://github.com/bids-standard/bids-specification/blob/master/src/schema/objects/entities.yaml).
+   Each key and its value are joined with a dash ``-`` (e.g., ``acq-MPRAGE``, ``dir-AP``).
+   These key-value pairs are joined to other key-value pairs with underscores ``_``.
+   The exception is the modality label, which is discussed more below.
 * *Reproin* scanner sequence names are simplified relative to the final BIDS output and generally conform to this scheme (but consult the `reproin heuristics file <https://github.com/nipy/heudiconv/blob/master/heudiconv/heuristics/reproin.py>`_ for additional options): ``sequence type-modality label`` _ ``session-session name`` _ ``task-task name`` _ ``acquisition-acquisition detail`` _ ``run-run number`` _ ``direction-direction label``::
 
     | func-bold_ses-pre_task-faces_acq-1mm_run-01_dir-AP

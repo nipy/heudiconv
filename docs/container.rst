@@ -2,7 +2,7 @@
 Using heudiconv in a Container
 ==============================
 
-If heudiconv is :ref:`installed via container <install_container>`, you
+If heudiconv is :ref:`installed via a Docker container <install_container>`, you
 can run the commands in the following format::
    
     docker run nipy/heudiconv:latest [heudiconv options]
