@@ -11,7 +11,7 @@ demonstrates how to use the heudiconv tool with a provided `heuristic.py` to con
 Prepare Dataset
 ***************
 
-Download and unzip `sub-219_dicom.zip <https://osf.io/mqgzh/>`_. 
+Download and unzip `sub-219_dicom.zip <https://datasets.datalad.org/?dir=/repronim/heudiconv-tutorial-example/>`_. 
 
 We will be working from a directory called MRIS. Under the MRIS directory is the *dicom* subdirectory: Under the subject number *219* the session *itbs* is nested.  Each dicom sequence folder is nested under the session::
 
