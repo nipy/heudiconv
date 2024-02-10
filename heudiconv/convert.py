@@ -519,6 +519,26 @@ def update_uncombined_name(
     return filename
 
 
+def update_multiorient_name(bids_meta, this_prefix_basename):
+    if 'acq-' in this_prefix_basename:
+        lgr.warning('Not embedding multi-orientation information as prefix already uses acq- parameter.')
+        return this_prefix_basename
+    iop = bids_meta.get('ImageOrientationPatientDICOM')
+    iop = [round(x) for x in iop]
+    cross_prod = [
+        iop[1]*iop[5]-iop[2]*iop[4],
+        iop[2]*iop[3]-iop[0]*iop[5],
+        iop[0]*iop[4]-iop[1]*iop[3]]
+    cross_prod = [abs(x) for x in cross_prod]
+    slice_orient = ['sagittal', 'coronal', 'axial'][cross_prod.index(1)]
+    bids_pairs = this_prefix_basename.split('_')
+    # acq needs to be inserted right after sub- or ses-
+    ses_or_sub_idx = sum([bids_pair.split('-')[0] in ['sub', 'ses'] for bids_pair in bids_pairs])
+    bids_pairs.insert(ses_or_sub_idx, 'acq-%s'%slice_orient)
+    this_prefix_basename = '_'.join(bids_pairs)
+    return this_prefix_basename
+
+
 def convert(
     items: list[tuple[str, tuple[str, ...], list[str]]],
     converter: str,
@@ -977,6 +997,14 @@ def save_converted_files(
         echo_times_lst = sorted(echo_times)  # also converts to list
         channel_names_lst = sorted(channel_names)  # also converts to list
 
+        iops = sorted(list(set(
+            str(b.get('ImageOrientationPatientDICOM', ''))
+            for b in bids_metas
+            if b
+        )))
+
+        is_multiorient = len(iops) > 1
+
         ### Loop through the bids_files, set the output name and save files
         for fl, suffix, bids_file, bids_meta in zip(
             res_files, suffixes, bids_files, bids_metas
@@ -1002,6 +1030,11 @@ def save_converted_files(
                 if is_uncombined:
                     this_prefix_basename = update_uncombined_name(
                         bids_meta, this_prefix_basename, channel_names_lst
+                    )
+
+                if is_multiorient:
+                    this_prefix_basename = update_multiorient_name(
+                        bids_meta, this_prefix_basename
                     )
 
             # Fallback option:
