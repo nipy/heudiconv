@@ -4,6 +4,7 @@ Installation
 
 ``Heudiconv`` is packaged and available from many different sources.
 
+.. _install_local:
 
 Local
 =====
@@ -21,22 +22,23 @@ subsequently it would be able to download and install dcm2niix binary.
 On Debian-based systems, we recommend using `NeuroDebian <http://neuro.debian.net>`_,
 which provides the `heudiconv package <http://neuro.debian.net/pkgs/heudiconv.html>`_.
 
+.. _install_container:
 
-Docker
-======
-If `Docker <https://docs.docker.com/install/>`_ is available on your system, you
-can visit `our page on Docker Hub <https://hub.docker.com/r/nipy/heudiconv/tags>`_
-to view available releases. To pull the latest release, run::
+Containers
+==========
+
+Our container image releases are availe on `our Docker Hub <https://hub.docker.com/r/nipy/heudiconv/tags>`_
+
+If `Docker <https://docs.docker.com/install/>`_ is available on your system, you can pull the latest release::
 
     $ docker pull nipy/heudiconv:latest
 
-Note that when using HeuDiConv via ``docker run``, you might need to provide your user and group IDs so they map correspondingly
-within the container, i.e.::
-
-    $ docker run --user=$(id -u):$(id -g) -e "UID=$(id -u)" -e "GID=$(id -g)" --rm -t -v $PWD:$PWD nipy/heudiconv:latest [OPTIONS TO FOLLOW]
-
 Additionally, HeuDiConv is available through the Docker image at `repronim/reproin <https://hub.docker.com/r/repronim/reproin>`_ provided by
 `ReproIn heuristic project <http://reproin.repronim.org>`_, which develops the ``reproin`` heuristic.
+
+To maintain provenance, it is recommended that you use the ``latest`` tag only when testing out heudiconv. 
+Otherwise, it is recommended that you use an explicit version and record that information alongside the produced data.
+
 
 Singularity
 ===========
