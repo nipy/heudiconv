@@ -102,7 +102,7 @@ def test_group_dicoms_into_seqinfos() -> None:
 def test_custom_seqinfo() -> None:
     """Tests for custom seqinfo extraction"""
 
-    from heudiconv.heuristics.convertall import custom_seqinfo
+    from heudiconv.heuristics.convertall_custom import custom_seqinfo
 
     dcmfiles = glob(op.join(TESTS_DATA_PATH, "phantom.dcm"))
 

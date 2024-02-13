@@ -18,7 +18,7 @@ def custom_seqinfo(series_files, wrapper, **kw):  # noqa: U100
     from nibabel.nicom.dicomwrappers import WrapperError
 
     try:
-        affine = wrapper.affine.tostring()
+        affine = str(wrapper.affine)
     except WrapperError:
         lgr.exception("Errored out while obtaining/converting affine")  # noqa: F405
         affine = None
