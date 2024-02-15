@@ -58,10 +58,10 @@ If you are unsure what that means, here is a set-up workflow you may wish to fol
 Releases and Changelog
 ----------------------
 
-Heudiconv uses the `auto <https://intuit.github.io/auto/>`_ tool to generate the changelog and automatically release the project.
+HeuDiConv uses the `auto <https://intuit.github.io/auto/>`_ tool to generate the changelog and automatically release the project.
 
-`auto` is used in the heudiconv github actions, which monitors the labels on the pull request.
-Heudiconv automation can add entries to the changelog, cut releases, and
+`auto` is used in the HeuDiConv GitHub actions, which monitors the labels on the pull request.
+HeuDiConv automation can add entries to the changelog, cut releases, and
 push new images to `dockerhub <https://hub.docker.com/r/nipy/heudiconv>`_.
 
 The following pull request labels are respected:
