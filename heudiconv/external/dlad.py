@@ -153,16 +153,16 @@ def add_to_datalad(
         # annex_add_opts=['--include-dotfiles']
     )
 
-    # TODO: filter for only changed files?
     # Provide metadata for sensitive information
-    mark_sensitive(ds, "sourcedata")
-    mark_sensitive(ds, "*_scans.tsv")  # top level
-    mark_sensitive(ds, "*/*_scans.tsv")  # within subj
-    mark_sensitive(ds, "*/*/*_scans.tsv")  # within sess/subj
-    mark_sensitive(ds, "*/anat")  # within subj
-    mark_sensitive(ds, "*/*/anat")  # within ses/subj
+    last_commit = "HEAD"
+    mark_sensitive(ds, "sourcedata", last_commit)
+    mark_sensitive(ds, "*_scans.tsv", last_commit)  # top level
+    mark_sensitive(ds, "*/*_scans.tsv", last_commit)  # within subj
+    mark_sensitive(ds, "*/*/*_scans.tsv", last_commit)  # within sess/subj
+    mark_sensitive(ds, "*/anat", last_commit)  # within subj
+    mark_sensitive(ds, "*/*/anat", last_commit)  # within ses/subj
     if dsh_path:
-        mark_sensitive(ds, ".heudiconv")  # entire .heudiconv!
+        mark_sensitive(ds, ".heudiconv", last_commit)  # entire .heudiconv!
     superds.save(path=ds.path, message=msg, recursive=True)
 
     assert not ds.repo.dirty
@@ -178,7 +178,7 @@ def add_to_datalad(
     """
 
 
-def mark_sensitive(ds: Dataset, path_glob: str) -> None:
+def mark_sensitive(ds: Dataset, path_glob: str, commit: str = None) -> None:
     """
 
     Parameters
@@ -186,18 +186,28 @@ def mark_sensitive(ds: Dataset, path_glob: str) -> None:
     ds : Dataset to operate on
     path_glob : str
       glob of the paths within dataset to work on
+    commit : str
+      commit which files to mark
 
     Returns
     -------
     None
     """
     paths = glob(op.join(ds.path, path_glob))
+    if commit:
+        paths_in_commit = [
+            op.join(ds.path, nf)
+            for nf in ds.repo.call_git(
+                ["show", "--name-only", commit, "--format=oneline"]
+            ).split("\n")[1:]
+        ]
+        paths = [p for p in paths if p in paths_in_commit]
     if not paths:
         return
     lgr.debug("Marking %d files with distribution-restrictions field", len(paths))
     # set_metadata can be a bloody generator
     res = ds.repo.set_metadata(
-        paths, init=dict([("distribution-restrictions", "sensitive")]), recursive=True
+        paths, add=dict([("distribution-restrictions", "sensitive")]), recursive=True
     )
     if inspect.isgenerator(res):
         res = list(res)
