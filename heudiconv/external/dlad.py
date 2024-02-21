@@ -152,7 +152,7 @@ def add_to_datalad(
         # not in effect! ?
         # annex_add_opts=['--include-dotfiles']
     )
-    annexed_files = [sr["path"] for sr in save_res if sr["key"]]
+    annexed_files = [sr["path"] for sr in save_res if sr.get("key", None)]
 
     # Provide metadata for sensitive information
     sensitive_patterns = [
