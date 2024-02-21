@@ -146,23 +146,27 @@ def add_to_datalad(
                 message="Added gitattributes to place all .heudiconv content"
                 " under annex",
             )
-    ds.save(
+    save_res = ds.save(
         ".",
         recursive=True
         # not in effect! ?
         # annex_add_opts=['--include-dotfiles']
     )
+    annexed_files = [sr["path"] for sr in save_res if sr["key"]]
 
     # Provide metadata for sensitive information
-    last_commit = "HEAD"
-    mark_sensitive(ds, "sourcedata", last_commit)
-    mark_sensitive(ds, "*_scans.tsv", last_commit)  # top level
-    mark_sensitive(ds, "*/*_scans.tsv", last_commit)  # within subj
-    mark_sensitive(ds, "*/*/*_scans.tsv", last_commit)  # within sess/subj
-    mark_sensitive(ds, "*/anat", last_commit)  # within subj
-    mark_sensitive(ds, "*/*/anat", last_commit)  # within ses/subj
+    sensitive_patterns = [
+        "sourcedata",
+        "*_scans.tsv",  # top level
+        "*/*_scans.tsv",  # within subj
+        "*/*/*_scans.tsv",  # within sess/subj
+        "*/anat",  # within subj
+        "*/*/anat",  # within ses/subj
+    ]
+    for sp in sensitive_patterns:
+        mark_sensitive(ds, sp, annexed_files)
     if dsh_path:
-        mark_sensitive(ds, ".heudiconv", last_commit)  # entire .heudiconv!
+        mark_sensitive(ds, ".heudiconv")  # entire .heudiconv!
     superds.save(path=ds.path, message=msg, recursive=True)
 
     assert not ds.repo.dirty
@@ -178,7 +182,7 @@ def add_to_datalad(
     """
 
 
-def mark_sensitive(ds: Dataset, path_glob: str, commit: str = None) -> None:
+def mark_sensitive(ds: Dataset, path_glob: str, files: list[str] = None) -> None:
     """
 
     Parameters
@@ -186,22 +190,16 @@ def mark_sensitive(ds: Dataset, path_glob: str, commit: str = None) -> None:
     ds : Dataset to operate on
     path_glob : str
       glob of the paths within dataset to work on
-    commit : str
-      commit which files to mark
+    files : list[str]
+      subset of files to mark
 
     Returns
     -------
     None
     """
     paths = glob(op.join(ds.path, path_glob))
-    if commit:
-        paths_in_commit = [
-            op.join(ds.path, nf)
-            for nf in ds.repo.call_git(
-                ["show", "--name-only", commit, "--format=oneline"]
-            ).split("\n")[1:]
-        ]
-        paths = [p for p in paths if p in paths_in_commit]
+    if files:
+        paths = [p for p in paths if p in files]
     if not paths:
         return
     lgr.debug("Marking %d files with distribution-restrictions field", len(paths))

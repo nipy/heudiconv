@@ -30,7 +30,7 @@ def test_mark_sensitive(tmp_path: Path) -> None:
     assert all_meta == {"f1": target_rec, "f2": target_rec, "g2": target_rec}
 
 
-def test_mark_sensitive_last_commit(tmp_path: Path) -> None:
+def test_mark_sensitive_subset(tmp_path: Path) -> None:
     ds = dl.Dataset(tmp_path).create(force=True)
     create_tree(
         str(tmp_path),
@@ -42,9 +42,10 @@ def test_mark_sensitive_last_commit(tmp_path: Path) -> None:
         },
     )
     ds.save(".")
-    mark_sensitive(ds, "f*", "HEAD")
+    mark_sensitive(ds, "f*", [str(tmp_path / "f1")])
     all_meta = dict(ds.repo.get_metadata("."))
     target_rec = {"distribution-restrictions": ["sensitive"]}
     # g2 since the same content
     assert not all_meta.pop("g1", None)  # nothing or empty record
-    assert all_meta == {"f1": target_rec, "f2": target_rec, "g2": target_rec}
+    assert not all_meta.pop("f2", None)  # nothing or empty record
+    assert all_meta == {"f1": target_rec, "g2": target_rec}
