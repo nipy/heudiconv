@@ -182,7 +182,7 @@ def add_to_datalad(
     """
 
 
-def mark_sensitive(ds: Dataset, path_glob: str, files: list[str] = None) -> None:
+def mark_sensitive(ds: Dataset, path_glob: str, files: list[str] | None = None) -> None:
     """
 
     Parameters
