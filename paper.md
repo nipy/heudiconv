@@ -176,6 +176,13 @@ Since the inception of HeuDiConv in 2014, the BIDS standard [@GAC+16] was establ
 BIDS standard formalizes data file hierarchies and metadata storage in a fashion which, due to its community-driven nature, is both highly optimized and widely understood by analysis tools.
 Since then, DICOM conversion to NIfTI files contained within a BIDS hierarchy has emerged as the most frequent use-case for HeuDiConv.
 
+# State of the Field
+
+Conversion of data to BIDS is acknowledged [@PMA+arXiv2024:bids-past] to remain one of the challenges which lead to the proliferation of converters to BIDS (see https://bids.neuroimaging.io/benefits#converters).
+As BIDS grows and evolves, so do the requirements for conversion tools.
+New converters are being developed, and existing ones are being updated to accommodate new data types and modalities.
+HeuDiConv is one of the most widely used converters, and is actively maintained and developed to keep up with the latest BIDS standards and community needs.
+
 # Overview of HeuDiConv functionality
 
 HeuDiConv has been developed to implement logic commonly used across labs (grouping DICOMs, extracting metadata, converting individual sequences, populating standard BIDS files, etc.) while allowing individual groups to customize **how** files should be organized and named while driving custom decisions through the conventions and desires of those individual groups.
