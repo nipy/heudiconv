@@ -160,7 +160,7 @@ HeuDiConv further integrates with DataLad [@datalad], and can automatically prep
 As a result, given its extensibility, large modality support, and integration with advanced data management technologies, HeuDiConv has become a mainstay in numerous neuroimaging workflows, and constitutes a powerful and highly adaptable tool of potential interest to large swathes of the neuroimaging community.
 
 
-# Statement of Need
+# Statement of need
 
 Neuroimaging is an empirical research area which relies heavily on efficient data acquisition, harmonization, and processing.
 Neuroimaging data sourced from medical imaging equipment, and in particular magnetic resonance imaging (MRI) scanners, can be exported in numerous formats, among which DICOM (Digital Imaging and Communications in Medicine) is most prominent.
@@ -176,7 +176,7 @@ Since the inception of HeuDiConv in 2014, the BIDS standard [@GAC+16] was establ
 BIDS standard formalizes data file hierarchies and metadata storage in a fashion which, due to its community-driven nature, is both highly optimized and widely understood by analysis tools.
 Since then, DICOM conversion to NIfTI files contained within a BIDS hierarchy has emerged as the most frequent use-case for HeuDiConv.
 
-# State of the Field
+# State of the field
 
 Conversion of data to BIDS is acknowledged [@PMA+arXiv2024:bids-past] to remain one of the challenges which lead to the proliferation of converters to BIDS (see [https://bids.neuroimaging.io/benefits#converters](https://bids.neuroimaging.io/benefits#converters)).
 As BIDS grows and evolves, so do the requirements for conversion tools.
