@@ -181,7 +181,8 @@ Since then, DICOM conversion to NIfTI files contained within a BIDS hierarchy ha
 Conversion of data to BIDS is acknowledged [@PMA+arXiv2024:bids-past] to remain one of the challenges which lead to the proliferation of converters to BIDS (see [https://bids.neuroimaging.io/benefits#converters](https://bids.neuroimaging.io/benefits#converters)).
 As BIDS grows and evolves, so do the requirements for conversion tools.
 New converters are being developed, and existing ones are being updated to accommodate new data types and modalities.
-HeuDiConv is one of the most widely used converters, and is actively maintained and developed to keep up with the latest BIDS standards and community needs.
+HeuDiConv is one of the most widely used converters, and its use stats keep growing (see \autoref{fig:usage}.
+It is actively maintained and developed to keep up with the latest BIDS standards and community needs.
 
 # Overview of HeuDiConv functionality
 
