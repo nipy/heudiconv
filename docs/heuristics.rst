@@ -3,22 +3,25 @@ Heuristics File
 ===============
 
 The heuristic file controls how information about the DICOMs is used to convert
-to a file system layout (e.g., BIDS). ``heudiconv`` includes some built-in
-heuristics, including `ReproIn <https://github.com/ReproNim/reproin/blob/master/README.md>`_
-(which is great to adopt if you will be starting your data collection!).
-
-However, there is a large variety of data out there, and not all DICOMs will be
-covered by the existing heuristics. This section will outline what makes up a
-heuristic file, and some useful functions available when making one.
+to a file system layout (e.g., BIDS).
 
 
 Provided Heuristics
 -------------------
 
-Running ``heudiconv`` without a heuristic file results in the generation of a skeleton for the user to customize to their needs. 
+``heudiconv`` provides over 10 pre-created heuristics, which can be seen `here <https://github.com/nipy/heudiconv/tree/master/heudiconv/heuristics>`_ .
 
-``heudiconv`` also provides more than 10 additional heuristics, which can be seen `here <https://github.com/nipy/heudiconv/tree/master/heudiconv/heuristics>`_
 These heuristic files are documented in their code comments.
+Some of them, like `convertall <https://github.com/nipy/heudiconv/blob/master/heudiconv/heuristics/convertall.py>`_ or `ReproIn <https://github.com/nipy/heudiconv/blob/master/heudiconv/heuristics/reproin.py>`__ could be immediately reused and represent two ends of the spectrum in heuristics:
+
+- ``convertall`` is very simple and does not automate anything -- it is for a user to modify filenames in the prepared conversion table, and then rerun with ``-c dcm2niix``.
+- ``reproin`` can be used fully automated, if original sequences were named according to its ReproIn convention.
+
+Discover more on their user in the :ref:`Tutorials` section.
+
+However, there is a large variety of data out there, and not all DICOMs
+will be covered by the existing heuristics. This section will outline what
+makes up a heuristic file, and some useful functions available when making one.
 
 Components
 ==========
