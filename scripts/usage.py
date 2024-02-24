@@ -39,7 +39,7 @@ df_et['Year'] = pd.to_datetime(df_et['Year'], infer_datetime_format=True)
 df_et = df_et.drop(columns=['year-week', 'year', 'month'])
 df_et = df_et.set_index(['date']).sort_index()
 ## Filter data by date cap:
-df_et = df_et.loc[:'2023-04-01']
+df_et = df_et.loc[:'2024-02-20']
 
 
 # Merge data and reformat to long
