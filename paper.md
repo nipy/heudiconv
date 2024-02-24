@@ -183,6 +183,8 @@ As BIDS grows and evolves, so do the requirements for conversion tools.
 New converters are being developed, and existing ones are being updated to accommodate new data types and modalities.
 HeuDiConv is one of the most widely used converters, and its use stats keep growing (see \autoref{fig:usage}.
 It is actively maintained and developed to keep up with the latest BIDS standards and community needs.
+Although it could be used without any knowledge of Python programming, it is designed to be extensible and customizable, and to allow for the development of custom heuristics to handle specific data types and modalities.
+Unlike GUI- or Web-UI based tools, such as EZ-BIDS [@ezbids], which might be easier for novices to use, HeuDiConv is designed to be used in a command-line environment, and is thus well-suited for integration into automated data processing pipelines.
 
 # Overview of HeuDiConv functionality
 
@@ -213,6 +215,16 @@ The core principle behind ReproIn is the reduction of operator interaction requi
 It is achieved by ensuring that reference MRI sequences on the instrumentation are organized and named in a consistent and flexible way, such that upon usage in any experimental protocol they will encode the information required for fully automatic conversion and repositing of the resulting data.
 
 In case of correct specification and absent operator errors, such as mis-typed subject or session IDs, it can be fully automated, and work is ongoing to make such deployments turnkey. Visit ReproIn project page [http://reproin.repronim.org](http://reproin.repronim.org) to discover more.
+
+To try it out, one can download sample [`reproin_dicom.zip`](https://datasets.datalad.org/repronim/heudiconv-reproin-example/reproin_dicom.zip) and use the following command:
+
+```bash
+heudiconv --files reproin_dicom.zip -f reproin --bids -o bids_datasets 
+```
+
+to produce a BIDS dataset in the `bids_datasets/output/Patterson/Coben/` sub-directory. 
+This demonstrates ability to automate conversion using ReproIn for all studies in the center.
+[Tutorials section](https://heudiconv.readthedocs.io/en/latest/tutorials.html) in the HeuDiConv documentation provides more examples across for different scenarios. 
 
 # Adoption and usage
 
