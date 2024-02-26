@@ -27,7 +27,9 @@ jobs:
       - name: Check whether a release is due
         id: auto-version
         run: |
-          version="$(~/auto version)"
+          # to be able to debug if something goes wrong
+          auto version -v | tee /tmp/auto-version
+          version="$(tail -n 1 /tmp/auto-version)"
           echo "version=$version" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
