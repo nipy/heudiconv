@@ -29,7 +29,7 @@ jobs:
         run: |
           # to be able to debug if something goes wrong
           set -o pipefail
-          auto version -v | tee /tmp/auto-version
+          auto version -vv | tee /tmp/auto-version
           version=$(sed -ne '/Calculated SEMVER bump:/s,.*: *,,p' < /tmp/auto-version)
           echo "version=$version" >> "$GITHUB_OUTPUT"
         env:
