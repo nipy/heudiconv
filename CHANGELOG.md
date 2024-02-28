@@ -1,3 +1,17 @@
+# v1.1.0 (Wed Feb 28 2024)
+
+#### 🚀 Enhancement
+
+- Add support for a  custom seqinfo to extract from DICOMs any additional metadata desired for a heuristic [#581](https://github.com/nipy/heudiconv/pull/581) ([@yarikoptic](https://github.com/yarikoptic) [@bpinsard](https://github.com/bpinsard))
+- codespell: ignore "build" folder which might be on the system [#581](https://github.com/nipy/heudiconv/pull/581) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 2
+
+- Basile ([@bpinsard](https://github.com/bpinsard))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v1.0.2 (Mon Feb 26 2024)
 
 #### 🐛 Bug Fix
