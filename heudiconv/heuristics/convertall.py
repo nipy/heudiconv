@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 from heudiconv.utils import SeqInfo
+
+lgr = logging.getLogger("heudiconv")
 
 
 def create_key(

@@ -99,6 +99,25 @@ def test_group_dicoms_into_seqinfos() -> None:
     ]
 
 
+def test_custom_seqinfo() -> None:
+    """Tests for custom seqinfo extraction"""
+
+    from heudiconv.heuristics.convertall_custom import custom_seqinfo
+
+    dcmfiles = glob(op.join(TESTS_DATA_PATH, "phantom.dcm"))
+
+    seqinfos = group_dicoms_into_seqinfos(
+        dcmfiles, "studyUID", flatten=True, custom_seqinfo=custom_seqinfo
+    )  # type: ignore
+
+    seqinfo = list(seqinfos.keys())[0]
+
+    assert hasattr(seqinfo, "custom")
+    assert isinstance(seqinfo.custom, tuple)
+    assert len(seqinfo.custom) == 2
+    assert seqinfo.custom[1] == dcmfiles[0]
+
+
 def test_get_datetime_from_dcm_from_acq_date_time() -> None:
     typical_dcm = dcm.dcmread(
         op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
