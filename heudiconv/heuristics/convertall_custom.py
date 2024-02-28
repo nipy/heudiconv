@@ -4,11 +4,18 @@ This heuristic also demonstrates on how to create a "derived" heuristic which wo
 behavior of an already existing heuristic without complete rewrite.  Such approach could be
 useful for heuristic like  reproin  to overload mapping etc.
 """
+from __future__ import annotations
+
+from typing import Any
+
+import nibabel.nicom.dicomwrappers as dw
 
 from .convertall import *  # noqa: F403
 
 
-def custom_seqinfo(series_files, wrapper, **kw):  # noqa: U100
+def custom_seqinfo(
+    series_files: list[str], wrapper: dw.Wrapper, **kw: Any  # noqa: U100
+) -> tuple[str | None, str]:
     """Demo for extracting custom header fields into custom_seqinfo field
 
     Operates on already loaded DICOM data.

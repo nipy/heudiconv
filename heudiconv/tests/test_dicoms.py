@@ -108,7 +108,7 @@ def test_custom_seqinfo() -> None:
 
     seqinfos = group_dicoms_into_seqinfos(
         dcmfiles, "studyUID", flatten=True, custom_seqinfo=custom_seqinfo
-    )
+    )  # type: ignore
 
     seqinfo = list(seqinfos.keys())[0]
 
