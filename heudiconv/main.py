@@ -56,7 +56,7 @@ def setup_exceptionhook() -> None:
 def process_extra_commands(
     outdir: str,
     command: str,
-    files: list[str],
+    files: Optional[list[str]],
     heuristic: Optional[str],
     session: Optional[str],
     subjs: Optional[list[str]],
@@ -72,8 +72,8 @@ def process_extra_commands(
         Output directory
     command : {'treat-json', 'ls', 'populate-templates', 'populate-intended-for'}
         Heudiconv command to run
-    files : list of str
-        List of files
+    files : list of str or None
+        List of files if command needs/expects it
     heuristic : str or None
         Path to heuristic file or name of builtin heuristic.
     session : str or None
@@ -83,12 +83,21 @@ def process_extra_commands(
     grouping : {'studyUID', 'accession_number', 'all', 'custom'}
         How to group dicoms.
     """
+
+    def ensure_has_files() -> None:
+        if files is None:
+            raise ValueError(f"command {command} expects --files being provided")
+
     if command == "treat-jsons":
+        ensure_has_files()
+        assert files is not None  # for mypy now
         for fname in files:
             treat_infofile(fname)
     elif command == "ls":
         ensure_heuristic_arg(heuristic)
         assert heuristic is not None
+        ensure_has_files()
+        assert files is not None  # for mypy now
         heuristic_mod = load_heuristic(heuristic)
         heuristic_ls = getattr(heuristic_mod, "ls", None)
         for fname in files:
@@ -111,10 +120,14 @@ def process_extra_commands(
     elif command == "populate-templates":
         ensure_heuristic_arg(heuristic)
         assert heuristic is not None
+        ensure_has_files()
+        assert files is not None  # for mypy now
         heuristic_mod = load_heuristic(heuristic)
         for fname in files:
             populate_bids_templates(fname, getattr(heuristic_mod, "DEFAULT_FIELDS", {}))
     elif command == "sanitize-jsons":
+        ensure_has_files()
+        assert files is not None  # for mypy now
         tuneup_bids_json_files(files)
     elif command == "heuristics":
         from .utils import get_known_heuristics_with_descriptions
@@ -357,9 +370,12 @@ def workflow(
     )
 
     if command:
-        if files is None:
-            raise ValueError("'command' given but 'files' is None")
-        assert dicom_dir_template is None
+        if dicom_dir_template:
+            lgr.warning(
+                f"DICOM directory template {dicom_dir_template!r} was provided but will be ignored since "
+                f"commands do not care about it ATM"
+            )
+
         process_extra_commands(
             outdir,
             command,

@@ -1,4 +1,4 @@
-Copyright [2014-2019] [Heudiconv developers]
+Copyright [2014-2024] [HeuDiConv developers]
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -11,3 +11,10 @@ Copyright [2014-2019] [Heudiconv developers]
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+
+
+Some parts of the codebase/documentation are borrowed from other sources:
+
+- HeuDiConv tutorial from https://bitbucket.org/dpat/neuroimaging_core_docs/src
+
+  Copyright 2023 Dianne Patterson

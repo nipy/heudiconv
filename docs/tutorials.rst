@@ -1,6 +1,18 @@
-==============
-User Tutorials
-==============
+.. _Tutorials:
+
+=========
+Tutorials
+=========
+
+.. toctree::
+
+  quickstart
+  custom-heuristic
+  reproin
+
+
+External Tutorials
+******************
 
 Luckily(?), we live in an era of plentiful information. Below are some links to
 other users' tutorials covering their experience with ``heudiconv``.

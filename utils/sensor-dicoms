@@ -1,0 +1,90 @@
+#!/bin/bash
+
+set -eu
+
+# Function to show usage
+show_usage() {
+    echo "Usage: $0 [--dry-run|-n] --move-to DIRNAME directory [directory2 ...]"
+}
+
+# On OSX we better use GNU one
+if [ -e /usr/local/opt/gnu-getopt/bin/getopt ]; then
+    getopt=/usr/local/opt/gnu-getopt/bin/getopt
+else
+    getopt=getopt
+fi
+
+# Parsing options
+TEMP=$("$getopt" -o 'n' --long move-to:,dry-run -n "$(basename "$0")" -- "$@")
+# shellcheck disable=SC2181
+if [ $? != 0 ]; then echo "Terminating..." >&2; exit 1; fi
+
+# Note the quotes around `$TEMP`: they are essential!
+eval set -- "$TEMP"
+
+# Initialize variables
+MOVE_TO_DIR=""
+DRY_RUN=""
+
+# Extract options and their arguments into variables
+while true; do
+    case "$1" in
+        --move-to)
+            MOVE_TO_DIR="$2"
+            shift 2
+            ;;
+        -n|--dry-run)
+            DRY_RUN=1
+            shift
+            ;;
+        --)
+            shift
+            break
+            ;;
+        *)
+            echo "Internal error!"
+            exit 1
+            ;;
+    esac
+done
+
+# Check for mandatory option
+if [ -z "$MOVE_TO_DIR" ]; then
+    echo "Error: --move-to option is required."
+    show_usage
+    exit 1
+fi
+
+# Create MOVE_TO_DIR if it does not exist
+if [ ! -d "$MOVE_TO_DIR" ]; then
+    mkdir -p "$MOVE_TO_DIR"
+fi
+
+TEMP=$(mktemp -d "${TMPDIR:-/tmp}/dl-XXXXXXX")
+
+# Process the remaining arguments (directories)
+for dir in "$@"; do
+    echo ""
+    echo "Processing directory: $dir"
+    rm -rf "${TEMP:?}/*"
+    failed=
+    dcm2niix -z y -b y -o "$TEMP/" "$dir" 2>"$TEMP/stderr" >"$TEMP/stdout" || {
+        echo "  Exited with $?;  We will proceed with the analysis. Standard error output was:"
+        sed -e 's,^,  ,g' "$TEMP/stderr"
+    }
+
+    if grep "Error: Check sorted order: 4D dataset has" "$TEMP/stderr"; then
+        failed=1
+    fi
+    if grep "Error: Missing images." "$TEMP/stderr"; then
+        failed=1
+    fi
+    if [ -n "$failed" ]; then
+        if [ -n "$DRY_RUN" ]; then
+            echo mv "$dir" "$MOVE_TO_DIR"
+        else
+            echo "  Moving $dir to $MOVE_TO_DIR"
+            mv "$dir" "$MOVE_TO_DIR"
+        fi
+    fi
+done

@@ -224,6 +224,7 @@ def get_study_sessions(
             file_filter=getattr(heuristic, "filter_files", None),
             dcmfilter=getattr(heuristic, "filter_dicom", None),
             custom_grouping=getattr(heuristic, "grouping", None),
+            custom_seqinfo=getattr(heuristic, "custom_seqinfo", None),
         )
 
         if sids:
@@ -279,8 +280,9 @@ def get_study_sessions(
             lgr.info("Study session for %r", study_session_info)
 
             if grouping != "all":
-                assert (study_session_info not in study_sessions), (
+                assert study_session_info not in study_sessions, (
                     f"Existing study session {study_session_info} "
-                    f"already in analyzed sessions {study_sessions.keys()}")
+                    f"already in analyzed sessions {study_sessions.keys()}"
+                )
             study_sessions[study_session_info] = seqinfo
     return study_sessions

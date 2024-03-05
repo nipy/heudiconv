@@ -19,24 +19,28 @@ jobs:
       - name: Download auto
         run: |
           #curl -vL -o - "$(curl -fsSL https://api.github.com/repos/intuit/auto/releases/latest | jq -r '.assets[] | select(.name == "auto-linux.gz") | .browser_download_url')" | gunzip > ~/auto
-          # Pin to 10.16.1 so we don't break if & when
+          # Pin so we don't break if & when
           # <https://github.com/intuit/auto/issues/1778> is fixed.
-          wget -O- https://github.com/intuit/auto/releases/download/v10.16.1/auto-linux.gz | gunzip > ~/auto
+          # 11.0.5 is needed for <https://github.com/intuit/auto/issues/2432>
+          wget -O- https://github.com/intuit/auto/releases/download/v11.0.5/auto-linux.gz | gunzip > ~/auto
           chmod a+x ~/auto
 
-      - name: Check whether a release is due
+      - name: Query 'auto' on type of the release
         id: auto-version
         run: |
-          version="$(~/auto version)"
+          # to be able to debug if something goes wrong
+          set -o pipefail
+          ~/auto version -vv | tee /tmp/auto-version
+          version="$(sed -ne '/Calculated SEMVER bump:/s,.*: *,,p' /tmp/auto-version)"
           echo "version=$version" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
         if: steps.auto-version.outputs.version != ''
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '^3.7'
+          python-version: '^3.8'
 
       - name: Install Python dependencies
         if: steps.auto-version.outputs.version != ''

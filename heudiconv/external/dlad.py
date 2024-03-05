@@ -146,21 +146,25 @@ def add_to_datalad(
                 message="Added gitattributes to place all .heudiconv content"
                 " under annex",
             )
-    ds.save(
+    save_res = ds.save(
         ".",
         recursive=True
         # not in effect! ?
         # annex_add_opts=['--include-dotfiles']
     )
+    annexed_files = [sr["path"] for sr in save_res if sr.get("key", None)]
 
-    # TODO: filter for only changed files?
     # Provide metadata for sensitive information
-    mark_sensitive(ds, "sourcedata")
-    mark_sensitive(ds, "*_scans.tsv")  # top level
-    mark_sensitive(ds, "*/*_scans.tsv")  # within subj
-    mark_sensitive(ds, "*/*/*_scans.tsv")  # within sess/subj
-    mark_sensitive(ds, "*/anat")  # within subj
-    mark_sensitive(ds, "*/*/anat")  # within ses/subj
+    sensitive_patterns = [
+        "sourcedata",
+        "*_scans.tsv",  # top level
+        "*/*_scans.tsv",  # within subj
+        "*/*/*_scans.tsv",  # within sess/subj
+        "*/anat",  # within subj
+        "*/*/anat",  # within ses/subj
+    ]
+    for sp in sensitive_patterns:
+        mark_sensitive(ds, sp, annexed_files)
     if dsh_path:
         mark_sensitive(ds, ".heudiconv")  # entire .heudiconv!
     superds.save(path=ds.path, message=msg, recursive=True)
@@ -178,7 +182,7 @@ def add_to_datalad(
     """
 
 
-def mark_sensitive(ds: Dataset, path_glob: str) -> None:
+def mark_sensitive(ds: Dataset, path_glob: str, files: list[str] | None = None) -> None:
     """
 
     Parameters
@@ -186,18 +190,22 @@ def mark_sensitive(ds: Dataset, path_glob: str) -> None:
     ds : Dataset to operate on
     path_glob : str
       glob of the paths within dataset to work on
+    files : list[str]
+      subset of files to mark
 
     Returns
     -------
     None
     """
     paths = glob(op.join(ds.path, path_glob))
+    if files:
+        paths = [p for p in paths if p in files]
     if not paths:
         return
     lgr.debug("Marking %d files with distribution-restrictions field", len(paths))
     # set_metadata can be a bloody generator
     res = ds.repo.set_metadata(
-        paths, init=dict([("distribution-restrictions", "sensitive")]), recursive=True
+        paths, add=dict([("distribution-restrictions", "sensitive")]), recursive=True
     )
     if inspect.isgenerator(res):
         res = list(res)

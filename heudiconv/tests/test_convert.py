@@ -14,6 +14,7 @@ from heudiconv.cli.run import main as runner
 import heudiconv.convert
 from heudiconv.convert import (
     DW_IMAGE_IN_FMAP_FOLDER_WARNING,
+    bvals_are_zero,
     update_complex_name,
     update_multiecho_name,
     update_uncombined_name,
@@ -287,3 +288,16 @@ def test_populate_intended_for(
     else:
         # If there was no heuristic, make sure populate_intended_for was not called
         assert not output.out
+
+
+def test_bvals_are_zero() -> None:
+    """Unit testing for heudiconv.convert.bvals_are_zero(),
+    which checks if non-dwi bvals are all zeros and can be removed
+    """
+    zero_bvals = op.join(TESTS_DATA_PATH, "zeros.bval")
+    non_zero_bvals = op.join(TESTS_DATA_PATH, "non_zeros.bval")
+
+    assert bvals_are_zero(zero_bvals)
+    assert not bvals_are_zero(non_zero_bvals)
+    assert bvals_are_zero([zero_bvals, zero_bvals])
+    assert not bvals_are_zero([non_zero_bvals, zero_bvals])

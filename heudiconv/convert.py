@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, List, Optional, cast
 
 import filelock
 from nipype import Node
+from nipype.interfaces.base import TraitListObject
 
 from .bids import (
     BIDS_VERSION,
@@ -220,6 +221,9 @@ def prep_conversion(
                 dcmfilter=getattr(heuristic, "filter_dicom", None),
                 flatten=True,
                 custom_grouping=getattr(heuristic, "grouping", None),
+                # callable which will be provided dcminfo and returned
+                # structure extend seqinfo
+                custom_seqinfo=getattr(heuristic, "custom_seqinfo", None),
             )
         elif seqinfo is None:
             raise ValueError("Neither 'dicoms' nor 'seqinfo' is given")
@@ -880,19 +884,19 @@ def save_converted_files(
         return []
 
     if isdefined(res.outputs.bvecs) and isdefined(res.outputs.bvals):
+        bvals, bvecs = res.outputs.bvals, res.outputs.bvecs
+        bvals = list(bvals) if isinstance(bvals, TraitListObject) else bvals
+        bvecs = list(bvecs) if isinstance(bvecs, TraitListObject) else bvecs
         if prefix_dirname.endswith("dwi"):
             outname_bvecs, outname_bvals = prefix + ".bvec", prefix + ".bval"
-            safe_movefile(res.outputs.bvecs, outname_bvecs, overwrite)
-            safe_movefile(res.outputs.bvals, outname_bvals, overwrite)
+            safe_movefile(bvecs, outname_bvecs, overwrite)
+            safe_movefile(bvals, outname_bvals, overwrite)
         else:
-            if bvals_are_zero(res.outputs.bvals):
-                os.remove(res.outputs.bvecs)
-                os.remove(res.outputs.bvals)
-                lgr.debug(
-                    "%s and %s were removed since not dwi",
-                    res.outputs.bvecs,
-                    res.outputs.bvals,
-                )
+            if bvals_are_zero(bvals):
+                to_remove = bvals + bvecs if isinstance(bvals, list) else [bvals, bvecs]
+                for ftr in to_remove:
+                    os.remove(ftr)
+                lgr.debug("%s and %s were removed since not dwi", bvecs, bvals)
             else:
                 lgr.warning(
                     DW_IMAGE_IN_FMAP_FOLDER_WARNING.format(folder=prefix_dirname)
@@ -901,8 +905,8 @@ def save_converted_files(
                     ".bvec and .bval files will be generated. This is NOT BIDS compliant"
                 )
                 outname_bvecs, outname_bvals = prefix + ".bvec", prefix + ".bval"
-                safe_movefile(res.outputs.bvecs, outname_bvecs, overwrite)
-                safe_movefile(res.outputs.bvals, outname_bvals, overwrite)
+                safe_movefile(bvecs, outname_bvecs, overwrite)
+                safe_movefile(bvals, outname_bvals, overwrite)
 
     if isinstance(res_files, list):
         res_files = sorted(res_files)
@@ -1064,7 +1068,7 @@ def add_taskname_to_infofile(infofiles: str | list[str]) -> None:
         save_json(infofile, meta_info)
 
 
-def bvals_are_zero(bval_file: str) -> bool:
+def bvals_are_zero(bval_file: str | list) -> bool:
     """Checks if all entries in a bvals file are zero (or 5, for Siemens files).
 
     Parameters
@@ -1076,6 +1080,10 @@ def bvals_are_zero(bval_file: str) -> bool:
     -------
     True if all are all 0 or 5; False otherwise.
     """
+
+    # GE hyperband multi-echo containing diffusion info
+    if isinstance(bval_file, list):
+        return all(map(bvals_are_zero, bval_file))
 
     with open(bval_file) as f:
         bvals = f.read().split()

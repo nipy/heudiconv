@@ -11,7 +11,6 @@ CLASSIFIERS = [
     "Environment :: Console",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: Apache Software License",
-    "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
@@ -20,7 +19,7 @@ CLASSIFIERS = [
     "Typing :: Typed",
 ]
 
-PYTHON_REQUIRES = ">=3.7"
+PYTHON_REQUIRES = ">=3.8"
 
 REQUIRES = [
     # not usable in some use cases since might be just a downloader, not binary

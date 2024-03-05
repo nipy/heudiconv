@@ -1,3 +1,83 @@
+# v1.1.0 (Wed Feb 28 2024)
+
+#### 🚀 Enhancement
+
+- Add support for a  custom seqinfo to extract from DICOMs any additional metadata desired for a heuristic [#581](https://github.com/nipy/heudiconv/pull/581) ([@yarikoptic](https://github.com/yarikoptic) [@bpinsard](https://github.com/bpinsard))
+- codespell: ignore "build" folder which might be on the system [#581](https://github.com/nipy/heudiconv/pull/581) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 2
+
+- Basile ([@bpinsard](https://github.com/bpinsard))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
+# v1.0.2 (Mon Feb 26 2024)
+
+#### 🐛 Bug Fix
+
+- properly remove GE multiecho bvals/bvecs [#728](https://github.com/nipy/heudiconv/pull/728) ([@bpinsard](https://github.com/bpinsard))
+- datalad sensitive marking fixes [#739](https://github.com/nipy/heudiconv/pull/739) ([@bpinsard](https://github.com/bpinsard))
+- Reject "Missing images" in sensor-dicoms [#735](https://github.com/nipy/heudiconv/pull/735) ([@chaselgrove](https://github.com/chaselgrove))
+
+#### ⚠️ Pushed to `master`
+
+- Adding workflow figure ([@TheChymera](https://github.com/TheChymera))
+- Added figures to master branch ([@TheChymera](https://github.com/TheChymera))
+
+#### 🏠 Internal
+
+- auto 11.0.5 is needed to avoid hitting some "Error: fatal: ... not an integer" bug [#746](https://github.com/nipy/heudiconv/pull/746) ([@yarikoptic](https://github.com/yarikoptic))
+- Fix - auto is in ~/, not in the PATH [#745](https://github.com/nipy/heudiconv/pull/745) ([@yarikoptic](https://github.com/yarikoptic))
+- Make it possible to review auto version -v output during release + adjust that workflow step description [#743](https://github.com/nipy/heudiconv/pull/743) ([@yarikoptic](https://github.com/yarikoptic))
+- [gh-actions](deps): Bump codecov/codecov-action from 3 to 4 [#736](https://github.com/nipy/heudiconv/pull/736) ([@dependabot[bot]](https://github.com/dependabot[bot]) [@yarikoptic](https://github.com/yarikoptic))
+- [gh-actions](deps): Bump actions/setup-python from 4 to 5 [#723](https://github.com/nipy/heudiconv/pull/723) ([@dependabot[bot]](https://github.com/dependabot[bot]))
+
+#### 📝 Documentation
+
+- Adjust wording on heuristics page -- do not claim creating some skeleton [#741](https://github.com/nipy/heudiconv/pull/741) ([@yarikoptic](https://github.com/yarikoptic))
+- Document how to release and add changelog entries [#737](https://github.com/nipy/heudiconv/pull/737) ([@asmacdo](https://github.com/asmacdo) [@yarikoptic](https://github.com/yarikoptic))
+- Add dianne tutorials [#734](https://github.com/nipy/heudiconv/pull/734) ([@asmacdo](https://github.com/asmacdo) [@yarikoptic](https://github.com/yarikoptic))
+- Add documentation building instructions [#730](https://github.com/nipy/heudiconv/pull/730) ([@asmacdo](https://github.com/asmacdo))
+- Allowing RTD to access images under the same path as README [#734](https://github.com/nipy/heudiconv/pull/734) ([@TheChymera](https://github.com/TheChymera))
+- Using environment figure in about section [#730](https://github.com/nipy/heudiconv/pull/730) ([@TheChymera](https://github.com/TheChymera))
+- Make README more concrete [#724](https://github.com/nipy/heudiconv/pull/724) ([@asmacdo](https://github.com/asmacdo))
+
+#### Authors: 6
+
+- [@chaselgrove](https://github.com/chaselgrove)
+- [@dependabot[bot]](https://github.com/dependabot[bot])
+- Austin Macdonald ([@asmacdo](https://github.com/asmacdo))
+- Basile ([@bpinsard](https://github.com/bpinsard))
+- Horea Christian ([@TheChymera](https://github.com/TheChymera))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
+# v1.0.1 (Fri Dec 08 2023)
+
+#### 🐛 Bug Fix
+
+- Drop Python 3.7 support [#722](https://github.com/nipy/heudiconv/pull/722) ([@yarikoptic](https://github.com/yarikoptic))
+- ReproIn: give an informative assertion message when multiple values are found [#718](https://github.com/nipy/heudiconv/pull/718) ([@yarikoptic](https://github.com/yarikoptic))
+- Convert assertion into a warning that we would not use dicom dir template option [#709](https://github.com/nipy/heudiconv/pull/709) ([@yarikoptic](https://github.com/yarikoptic))
+- Do not demand --files for all commands, even those which do not care about it (like populate-intended-for) [#708](https://github.com/nipy/heudiconv/pull/708) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### ⚠️ Pushed to `master`
+
+- Add script to sensor dicoms -- for the error where dcm2niix might or might not fail but issues an Error ([@yarikoptic](https://github.com/yarikoptic))
+
+#### 🏠 Internal
+
+- Ran pre-commit on everything, black decided to adjust some formatting [#721](https://github.com/nipy/heudiconv/pull/721) ([@yarikoptic](https://github.com/yarikoptic))
+- Make sensor-dicoms use gnu-getopt if present (on OSX) [#721](https://github.com/nipy/heudiconv/pull/721) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 1
+
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v1.0.0 (Wed Sep 20 2023)
 
 #### 💥 Breaking Change

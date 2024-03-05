@@ -1,16 +1,27 @@
-=========
-Heuristic
-=========
+===============
+Heuristics File
+===============
 
 The heuristic file controls how information about the DICOMs is used to convert
-to a file system layout (e.g., BIDS). ``heudiconv`` includes some built-in
-heuristics, including `ReproIn <https://github.com/ReproNim/reproin/blob/master/README.md>`_
-(which is great to adopt if you will be starting your data collection!).
+to a file system layout (e.g., BIDS).
 
-However, there is a large variety of data out there, and not all DICOMs will be
-covered by the existing heuristics. This section will outline what makes up a
-heuristic file, and some useful functions available when making one.
 
+Provided Heuristics
+-------------------
+
+``heudiconv`` provides over 10 pre-created heuristics, which can be seen `here <https://github.com/nipy/heudiconv/tree/master/heudiconv/heuristics>`_ .
+
+These heuristic files are documented in their code comments.
+Some of them, like `convertall <https://github.com/nipy/heudiconv/blob/master/heudiconv/heuristics/convertall.py>`_ or `ReproIn <https://github.com/nipy/heudiconv/blob/master/heudiconv/heuristics/reproin.py>`__ could be immediately reused and represent two ends of the spectrum in heuristics:
+
+- ``convertall`` is very simple and does not automate anything -- it is for a user to modify filenames in the prepared conversion table, and then rerun with ``-c dcm2niix``.
+- ``reproin`` can be used fully automated, if original sequences were named according to its ReproIn convention.
+
+Discover more on their user in the :ref:`Tutorials` section.
+
+However, there is a large variety of data out there, and not all DICOMs
+will be covered by the existing heuristics. This section will outline what
+makes up a heuristic file, and some useful functions available when making one.
 
 Components
 ==========
@@ -108,6 +119,19 @@ or::
         ...
         return seqinfos  # ordered dict containing seqinfo objects: list of DICOMs
 
+---------------------------------------------------------------
+``custom_seqinfo(wrapper, series_files)``
+---------------------------------------------------------------
+If present this function will be called on each group of dicoms with
+a sample nibabel dicom wrapper to extract additional information
+to be used in ``infotodict``.
+
+Importantly the return value of that function needs to be hashable.
+For instance the following non-hashable types can be converted to an alternative
+hashable type:
+- list > tuple
+- dict > frozendict
+- arrays > bytes (tobytes(), or pickle.dumps), str or tuple of tuples.
 
 -------------------------------
 ``POPULATE_INTENDED_FOR_OPTS``

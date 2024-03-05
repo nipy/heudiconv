@@ -51,9 +51,31 @@ If you are unsure what that means, here is a set-up workflow you may wish to fol
 
      git push -u origin topic_of_your_contribution
 
-
 (If any of the above seems overwhelming, you can look up the `Git documentation
 <http://git-scm.com/documentation>`_ on the web.)
+
+
+Releases and Changelog
+----------------------
+
+HeuDiConv uses the `auto <https://intuit.github.io/auto/>`_ tool to generate the changelog and automatically release the project.
+
+`auto` is used in the HeuDiConv GitHub actions, which monitors the labels on the pull request.
+HeuDiConv automation can add entries to the changelog, cut releases, and
+push new images to `dockerhub <https://hub.docker.com/r/nipy/heudiconv>`_.
+
+The following pull request labels are respected:
+
+    * major: Increment the major version when merged
+    * minot: Increment the minot version when merged
+    * patch: Increment the patch version when merged
+    * skip-release: Preserve the current version when merged
+    * release: Create a release when this pr is merged
+    * internal: Changes only affect the internal API
+    * documentation: Changes only affect the documentation
+    * tests: Add or improve existing tests
+    * dependencies: Update one or more dependencies version
+    * performance: Improve performance of an existing feature
 
 
 Development environment
@@ -76,6 +98,18 @@ This is best accomplished via::
   python -m venv venvs/dev
   source venvs/dev/bin/activate
   pip install -e .[all]
+
+
+Documentation
+-------------
+
+To contribute to the documentation, we recommend building the docs
+locally prior to submitting a patch.
+
+To build the docs locally:
+
+ 1. From the root of the heudiconv repository, `pip install -r docs/requirements.txt`
+ 2. From the `docs/` directory, run `make html`
 
 
 Additional Hints

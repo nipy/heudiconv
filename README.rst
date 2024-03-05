@@ -51,6 +51,10 @@ into structured directory layouts.
 - It integrates with `DataLad <https://www.datalad.org/>`_ to place converted and original data under git/git-annex
   version control while automatically annotating files with sensitive information (e.g., non-defaced anatomicals, etc).
 
+Heudiconv can be inserted into your workflow to provide automatic conversion as part of a data acquisition pipeline, as seen in the figure below:
+
+.. image:: figs/environment.png
+
 Installation
 ------------
 
@@ -60,13 +64,18 @@ on heudiconv.readthedocs.io .
 HOWTO 101
 ---------
 
-In a nutshell -- ``heudiconv`` operates using a heuristic which, given metadata from DICOMs, would decide how to name
-resultant (from conversion using `dcm2niix`_) files. Heuristic `convertall <https://github
-.com/nipy/heudiconv/blob/master/heudiconv/heuristics/convertall.py>`_ could actually be used with no real
-heuristic and by simply establish your own conversion mapping through editing produced mapping files.
-In most use-cases of retrospective study data conversion, you would need to create your custom heuristic following
-`existing heuristics as examples <https://github.com/nipy/heudiconv/tree/master/heudiconv/heuristics>`_ and/or
-referring to `"Heuristic" section <https://heudiconv.readthedocs.io/en/latest/heuristics.html>`_ in the documentation.
+In a nutshell -- ``heudiconv`` is given a file tree of DICOMs, and it produces a restructured file tree of NifTI files (conversion handled by `dcm2niix`_) with accompanying metadata files.
+The input and output structure is as flexible as your data, which is accomplished by using a Python file called a ``heuristic`` that knows how to read your input structure and decides how to name the resultant files.
+You can run your conversion automatically (which will produce a ``.heudiconv`` directory storing the used parameters), or generate the default parameters, edit them to customize file naming, and continue conversion via an additional invocation of `heudiconv`:
+
+.. image:: figs/workflow.png
+
+
+``heudiconv`` comes with `existing heuristics <https://github.com/nipy/heudiconv/tree/master/heudiconv/heuristics>`_ which can be used as is, or as examples.
+For instance, the Heuristic `convertall <https://github.com/nipy/heudiconv/blob/master/heudiconv/heuristics/convertall.py>`_ extracts standard metadata from all matching DICOMs.
+``heudiconv`` creates mapping files, ``<something>.edit.text`` which lets researchers simply establish their own conversion mapping.
+
+In most use-cases of retrospective study data conversion, you would need to create your custom heuristic following the examples and the `"Heuristic" section <https://heudiconv.readthedocs.io/en/latest/heuristics.html>`_ in the documentation.
 **Note** that `ReproIn heuristic <https://github.com/nipy/heudiconv/blob/master/heudiconv/heuristics/reproin.py>`_ is
 generic and powerful enough to be adopted virtually for *any* study: For prospective studies, you would just need
 to name your sequences following the `ReproIn convention <https://github.com/nipy/heudiconv/blob/master/heudiconv/heuristics/reproin.py#L26>`_, and for
@@ -106,3 +115,17 @@ Docker image preparation being found in ``.github/workflows/release.yml``.
 ---------------------
 
 - https://github.com/courtois-neuromod/ds_prep/blob/main/mri/convert/heuristics_unf.py
+
+
+Support
+-------
+
+All bugs, concerns and enhancement requests for this software can be submitted here:
+https://github.com/nipy/heudiconv/issues.
+
+If you have a problem or would like to ask a question about how to use ``heudiconv``,
+please submit a question to `NeuroStars.org <http://neurostars.org/tags/heudiconv>`_ with a ``heudiconv`` tag.
+NeuroStars.org is a platform similar to StackOverflow but dedicated to neuroinformatics.
+
+All previous ``heudiconv`` questions are available here:
+http://neurostars.org/tags/heudiconv/
