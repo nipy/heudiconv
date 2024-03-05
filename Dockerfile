@@ -19,7 +19,7 @@ RUN apt-get update -qq \
     && git checkout v1.0.20220720 \
     && mkdir /tmp/dcm2niix/build \
     && cd /tmp/dcm2niix/build \
-    && cmake  -DCMAKE_INSTALL_PREFIX:PATH=/opt/dcm2niix-v1.0.20220720 .. \
+    && cmake -DZLIB_IMPLEMENTATION=Cloudflare -DUSE_JPEGLS=ON -DUSE_OPENJPEG=ON -DCMAKE_INSTALL_PREFIX:PATH=/opt/dcm2niix-v1.0.20220720 .. \
     && make -j1 \
     && make install \
     && rm -rf /tmp/dcm2niix
@@ -68,6 +68,7 @@ RUN apt-get update -qq \
            "numpy" \
            "nomkl" \
            "pandas" \
+           "gdcm" \
     && bash -c "source activate base \
     &&   python -m pip install --no-cache-dir --editable \
              "/src/heudiconv[all]"" \
@@ -98,7 +99,7 @@ RUN printf '{ \
     { \
       "name": "run", \
       "kwds": { \
-        "command": "apt-get update -qq\\napt-get install -y -q --no-install-recommends \\\\\\n    ca-certificates \\\\\\n    cmake \\\\\\n    g++ \\\\\\n    gcc \\\\\\n    git \\\\\\n    make \\\\\\n    pigz \\\\\\n    zlib1g-dev\\nrm -rf /var/lib/apt/lists/*\\ngit clone https://github.com/rordenlab/dcm2niix /tmp/dcm2niix\\ncd /tmp/dcm2niix\\ngit fetch --tags\\ngit checkout v1.0.20220720\\nmkdir /tmp/dcm2niix/build\\ncd /tmp/dcm2niix/build\\ncmake  -DCMAKE_INSTALL_PREFIX:PATH=/opt/dcm2niix-v1.0.20220720 ..\\nmake -j1\\nmake install\\nrm -rf /tmp/dcm2niix" \
+        "command": "apt-get update -qq\\napt-get install -y -q --no-install-recommends \\\\\\n    ca-certificates \\\\\\n    cmake \\\\\\n    g++ \\\\\\n    gcc \\\\\\n    git \\\\\\n    make \\\\\\n    pigz \\\\\\n    zlib1g-dev\\nrm -rf /var/lib/apt/lists/*\\ngit clone https://github.com/rordenlab/dcm2niix /tmp/dcm2niix\\ncd /tmp/dcm2niix\\ngit fetch --tags\\ngit checkout v1.0.20220720\\nmkdir /tmp/dcm2niix/build\\ncd /tmp/dcm2niix/build\\ncmake -DZLIB_IMPLEMENTATION=Cloudflare -DUSE_JPEGLS=ON -DUSE_OPENJPEG=ON -DCMAKE_INSTALL_PREFIX:PATH=/opt/dcm2niix-v1.0.20220720 ..\\nmake -j1\\nmake install\\nrm -rf /tmp/dcm2niix" \
       } \
     }, \
     { \
@@ -142,7 +143,7 @@ RUN printf '{ \
     { \
       "name": "run", \
       "kwds": { \
-        "command": "apt-get update -qq\\napt-get install -y -q --no-install-recommends \\\\\\n    bzip2 \\\\\\n    ca-certificates \\\\\\n    curl\\nrm -rf /var/lib/apt/lists/*\\n# Install dependencies.\\nexport PATH=\\"/opt/miniconda-py39_4.12.0/bin:$PATH\\"\\necho \\"Downloading Miniconda installer ...\\"\\nconda_installer=\\"/tmp/miniconda.sh\\"\\ncurl -fsSL -o \\"$conda_installer\\" https://repo.continuum.io/miniconda/Miniconda3-py39_4.12.0-Linux-x86_64.sh\\nbash \\"$conda_installer\\" -b -p /opt/miniconda-py39_4.12.0\\nrm -f \\"$conda_installer\\"\\n# Prefer packages in conda-forge\\nconda config --system --prepend channels conda-forge\\n# Packages in lower-priority channels not considered if a package with the same\\n# name exists in a higher priority channel. Can dramatically speed up installations.\\n# Conda recommends this as a default\\n# https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-channels.html\\nconda config --set channel_priority strict\\nconda config --system --set auto_update_conda false\\nconda config --system --set show_channel_urls true\\n# Enable `conda activate`\\nconda init bash\\nconda install -y  --name base \\\\\\n    \\"python=3.9\\" \\\\\\n    \\"traits>=4.6.0\\" \\\\\\n    \\"scipy\\" \\\\\\n    \\"numpy\\" \\\\\\n    \\"nomkl\\" \\\\\\n    \\"pandas\\"\\nbash -c \\"source activate base\\n  python -m pip install --no-cache-dir --editable \\\\\\n      \\"/src/heudiconv[all]\\"\\"\\n# Clean up\\nsync && conda clean --all --yes && sync\\nrm -rf ~/.cache/pip/*" \
+        "command": "apt-get update -qq\\napt-get install -y -q --no-install-recommends \\\\\\n    bzip2 \\\\\\n    ca-certificates \\\\\\n    curl\\nrm -rf /var/lib/apt/lists/*\\n# Install dependencies.\\nexport PATH=\\"/opt/miniconda-py39_4.12.0/bin:$PATH\\"\\necho \\"Downloading Miniconda installer ...\\"\\nconda_installer=\\"/tmp/miniconda.sh\\"\\ncurl -fsSL -o \\"$conda_installer\\" https://repo.continuum.io/miniconda/Miniconda3-py39_4.12.0-Linux-x86_64.sh\\nbash \\"$conda_installer\\" -b -p /opt/miniconda-py39_4.12.0\\nrm -f \\"$conda_installer\\"\\n# Prefer packages in conda-forge\\nconda config --system --prepend channels conda-forge\\n# Packages in lower-priority channels not considered if a package with the same\\n# name exists in a higher priority channel. Can dramatically speed up installations.\\n# Conda recommends this as a default\\n# https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-channels.html\\nconda config --set channel_priority strict\\nconda config --system --set auto_update_conda false\\nconda config --system --set show_channel_urls true\\n# Enable `conda activate`\\nconda init bash\\nconda install -y  --name base \\\\\\n    \\"python=3.9\\" \\\\\\n    \\"traits>=4.6.0\\" \\\\\\n    \\"scipy\\" \\\\\\n    \\"numpy\\" \\\\\\n    \\"nomkl\\" \\\\\\n    \\"pandas\\" \\\\\\n    \\"gdcm\\"\\nbash -c \\"source activate base\\n  python -m pip install --no-cache-dir --editable \\\\\\n      \\"/src/heudiconv[all]\\"\\"\\n# Clean up\\nsync && conda clean --all --yes && sync\\nrm -rf ~/.cache/pip/*" \
       } \
     }, \
     { \
