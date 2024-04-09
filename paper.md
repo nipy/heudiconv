@@ -72,7 +72,7 @@ authors:
  - name: Darren Lukas  # 4 commits, issues: opened 1 participated in 2
    orcid: 0009-0003-6941-0833
    affiliation: 17
- - name: Ellyn Butler  # 0 commits, issues: opened 4 participated in 2
+ - name: Ellyn R. Butler  # 0 commits, issues: opened 4 participated in 2
    orcid: 0000-0001-6316-6444
    affiliation: 23
  - name: Todd Thompson  # 0 commits, issues: opened 5 participated in 0
