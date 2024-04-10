@@ -147,12 +147,12 @@ bibliography: paper.bib
 
 # Summary
 
-In order to support efficient processing, data must be formatted according to standards prevalent in the field, and widely supported among actively developed analysis tools.
+In order to support efficient processing, data must be formatted according to standards that are prevalent in the field and widely supported among actively developed analysis tools.
 The Brain Imaging Data Structure (BIDS) [@GAC+16] is an open standard designed for computational accessibility, operator legibility, and a wide and easily extendable scope of modalities — and is consequently used by numerous analysis and processing tools as the preferred input format in many fields of neuroscience.
 HeuDiConv (Heuristic DICOM Converter) enables flexible and efficient conversion of spatially reconstructed neuroimaging data from the DICOM format (quasi-ubiquitous in biomedical image acquisition systems, particularly in clinical settings) to BIDS, as well as other file layouts.
-HeuDiConv provides a multi-stage operator input workflow (discovery, manual tuning, conversion) where manual tuning step is optional and thus the entire conversion can be seamlessly integrated into a data processing pipeline.
+HeuDiConv provides a multi-stage operator input workflow (discovery, manual tuning, conversion) where a manual tuning step is optional and the entire conversion can thus be seamlessly integrated into a data processing pipeline.
 HeuDiConv is written in Python, and supports the DICOM specification for input parsing, and the BIDS specification for output construction.
-The support for these standards is extensive, and HeuDiConv can handle complex organization scenarios such as arise for specific data types (e.g., multi-echo sequences, or single-band reference volumes).
+The support for these standards is extensive, and HeuDiConv can handle complex organization scenarios that arise for specific data types (e.g., multi-echo sequences, or single-band reference volumes).
 In addition to generating valid BIDS outputs, additional support is offered for custom output layouts.
 This is obtained via a set of built-in fully functional or example heuristics expressed as simple Python functions.
 Those heuristics could be taken as a template or as a base for developing custom heuristics, thus providing full flexibility and maintaining user accessibility.
@@ -167,13 +167,13 @@ Neuroimaging data sourced from medical imaging equipment, and in particular magn
 DICOM data are often transmitted to PACS (Picture Archiving and Communication Systems) servers for archiving or further processing.
 Unlike in clinical settings, where data are interfaced with directly from PACS in the DICOM format, in neuroimaging research, tools typically require data files in the NIfTI [@nifticlib] format which directly stores images as 3D or 4D objects and restricts metadata to the most useful attributes.
 Tools such as `dcm2niix` [@Li_2016] can be used to convert DICOM files into NIfTI files, and can extract metadata fields not covered by the NIfTI header into sidecar `.json` files.
-However, the scope of such tools is limited, as it does not extend to organizing multiple NIfTI files for different subjects and possibly scanning sessions within a study.
+However, the scope of such tools is limited, as they do not extend to organizing multiple NIfTI files for different subjects and scanning sessions within a study.
 
 HeuDiConv was created in 2014 to provide flexible tooling so that labs may rapidly and consistently convert collections of DICOM files into collections of NIfTI files in customizable file system hierarchies.
 As manual file renaming and metadata reorganization is tedious and error prone, automation is preferable, and this is a consistent focus of HeuDiConv.
 
 Since the inception of HeuDiConv in 2014, the BIDS standard [@GAC+16] was established.
-BIDS standard formalizes data file hierarchies and metadata storage in a fashion which, due to its community-driven nature, is both highly optimized and widely understood by analysis tools.
+The BIDS standard formalizes data file hierarchies and metadata storage in a fashion which, due to its community-driven nature, is both highly optimized and widely understood by analysis tools.
 Since then, DICOM conversion to NIfTI files contained within a BIDS hierarchy has emerged as the most frequent use-case for HeuDiConv.
 
 # State of the field
@@ -181,7 +181,7 @@ Since then, DICOM conversion to NIfTI files contained within a BIDS hierarchy ha
 Conversion of data to BIDS is acknowledged [@PMA+arXiv2024:bids-past] to remain one of the challenges which lead to the proliferation of converters to BIDS (see [https://bids.neuroimaging.io/benefits#converters](https://bids.neuroimaging.io/benefits#converters)).
 As BIDS grows and evolves, so do the requirements for conversion tools.
 New converters are being developed, and existing ones are being updated to accommodate new data types and modalities.
-HeuDiConv is one of the most widely used converters, and its use stats keep growing (see \autoref{fig:usage}.
+HeuDiConv is one of the most widely used converters, and its usage statistics keep growing (see \autoref{fig:usage}.
 It is actively maintained and developed to keep up with the latest BIDS standards and community needs.
 Although it could be used without any knowledge of Python programming, it is designed to be extensible and customizable, and to allow for the development of custom heuristics to handle specific data types and modalities.
 Unlike GUI- or Web-UI based tools, such as EZ-BIDS [@ezbids], which might be easier for novices to use, HeuDiConv is designed to be used in a command-line environment, and is thus well-suited for integration into automated data processing pipelines.
@@ -206,7 +206,7 @@ The [convertall heuristic](https://github.com/nipy/heudiconv/blob/v0.12.2/heudic
 
 ### StudyForrest phase 2
 
-The [studyforrest_phase2 heuristic](https://github.com/nipy/heudiconv/blob/v0.12.2/heudiconv/heuristics/studyforrest_phase2.py) is a small sample heuristic developed for the StudyForrest [@studyforrest] project, and demonstrates custom conversion into BIDS dataset.
+The [studyforrest_phase2 heuristic](https://github.com/nipy/heudiconv/blob/v0.12.2/heudiconv/heuristics/studyforrest_phase2.py) is a small sample heuristic developed for the StudyForrest [@studyforrest] project, and demonstrates custom conversion into BIDS datasets.
 
 ### ReproIn
 
@@ -214,7 +214,7 @@ The [ReproIn heuristic](https://github.com/nipy/heudiconv/blob/v0.12.2/heudiconv
 The core principle behind ReproIn is the reduction of operator interaction required to obtain BIDS datasets for acquired data.
 It is achieved by ensuring that reference MRI sequences on the instrumentation are organized and named in a consistent and flexible way, such that upon usage in any experimental protocol they will encode the information required for fully automatic conversion and repositing of the resulting data.
 
-In case of correct specification and absent operator errors, such as mis-typed subject or session IDs, it can be fully automated, and work is ongoing to make such deployments turnkey. Visit ReproIn project page [http://reproin.repronim.org](http://reproin.repronim.org) to discover more.
+In case of correct specification and absent operator errors, such as mis-typed subject or session IDs, it can be fully automated, and work is ongoing to make such deployments turnkey. Visit the ReproIn project page [http://reproin.repronim.org](http://reproin.repronim.org) to discover more.
 
 To try it out, one can download sample [`reproin_dicom.zip`](https://datasets.datalad.org/repronim/heudiconv-reproin-example/reproin_dicom.zip) and use the following command:
 
@@ -223,8 +223,8 @@ heudiconv --files reproin_dicom.zip -f reproin --bids -o bids_datasets
 ```
 
 to produce a BIDS dataset in the `bids_datasets/output/Patterson/Coben/` sub-directory. 
-This demonstrates ability to automate conversion using ReproIn for all studies in the center.
-[Tutorials section](https://heudiconv.readthedocs.io/en/latest/tutorials.html) in the HeuDiConv documentation provides more examples across for different scenarios. 
+This demonstrates the ability to automate conversion using ReproIn for all studies in the center.
+The [Tutorials section](https://heudiconv.readthedocs.io/en/latest/tutorials.html) in the HeuDiConv documentation provides more examples across for different scenarios. 
 
 # Adoption and usage
 
