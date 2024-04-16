@@ -92,6 +92,7 @@ def create_seqinfo(
     image_type = get_typed_attr(dcminfo, "ImageType", tuple, ())
     is_moco = "MOCO" in image_type
     series_desc = get_typed_attr(dcminfo, "SeriesDescription", str, "")
+    protocol_name = get_typed_attr(dcminfo, "ProtocolName", str, "")
 
     if dcminfo.get([0x18, 0x24]):
         # GE and Philips
@@ -99,6 +100,9 @@ def create_seqinfo(
     elif dcminfo.get([0x19, 0x109C]):
         # Siemens
         sequence_name = dcminfo[0x19, 0x109C].value
+    elif dcminfo.get([0x18, 0x9005]):
+        # Siemens XA
+        sequence_name = dcminfo[0x18, 0x9005].value
     else:
         sequence_name = ""
 
@@ -133,7 +137,7 @@ def create_seqinfo(
         dim4=size[3],
         TR=TR,
         TE=TE,
-        protocol_name=dcminfo.ProtocolName,
+        protocol_name=protocol_name,
         is_motion_corrected=is_moco,
         is_derived="derived" in [x.lower() for x in image_type],
         patient_id=dcminfo.get("PatientID"),
