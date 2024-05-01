@@ -528,16 +528,16 @@ def get_datetime_from_dcm(dcm_data: dcm.FileDataset) -> Optional[datetime.dateti
     """
     acq_date = dcm_data.get("AcquisitionDate", "").strip()
     acq_time = dcm_data.get("AcquisitionTime", "").strip()
-    if len(acq_date) > 0 and len(acq_time) > 0:
+    if acq_date and acq_time:
         return strptime_micr(acq_date + acq_time, "%Y%m%d%H%M%S[.%f]")
 
     acq_dt = dcm_data.get("AcquisitionDateTime", "").strip()
-    if len(acq_dt) > 0:
+    if acq_dt:
         return strptime_micr(acq_dt, "%Y%m%d%H%M%S[.%f]")
 
     series_date = dcm_data.get("SeriesDate", "").strip()
     series_time = dcm_data.get("SeriesTime", "").strip()
-    if len(series_date) > 0 and len(series_time) > 0:
+    if series_date and series_time:
         return strptime_micr(series_date + series_time, "%Y%m%d%H%M%S[.%f]")
     return None
 
