@@ -528,7 +528,7 @@ def get_datetime_from_dcm(dcm_data: dcm.FileDataset) -> Optional[datetime.dateti
     """
     acq_date = dcm_data.get("AcquisitionDate", "").strip()
     acq_time = dcm_data.get("AcquisitionTime", "").strip()
-    if len(acq_date) > 0 and len(acq_time) > 0:
+    if acq_date and acq_time:
         return strptime_micr(acq_date + acq_time, "%Y%m%d%H%M%S[.%f]")
 
     acq_dt = dcm_data.get("AcquisitionDateTime", "").strip()
