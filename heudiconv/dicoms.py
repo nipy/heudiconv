@@ -537,7 +537,7 @@ def get_datetime_from_dcm(dcm_data: dcm.FileDataset) -> Optional[datetime.dateti
 
     series_date = dcm_data.get("SeriesDate", "").strip()
     series_time = dcm_data.get("SeriesTime", "").strip()
-    if len(series_date) > 0 and len(series_time) > 0:
+    if series_date and series_time:
         return strptime_micr(series_date + series_time, "%Y%m%d%H%M%S[.%f]")
     return None
 
