@@ -1,3 +1,16 @@
+# v1.1.1 (Thu May 02 2024)
+
+#### 🐛 Bug Fix
+
+- Handle cases where dates/times in DICOM are empty strings, not Nones (e.g. after some anonymization) [#756](https://github.com/nipy/heudiconv/pull/756) ([@jennan](https://github.com/jennan) [@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 2
+
+- Maxime Rio ([@jennan](https://github.com/jennan))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v1.1.0 (Wed Feb 28 2024)
 
 #### 🚀 Enhancement
