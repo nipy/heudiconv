@@ -526,18 +526,18 @@ def get_datetime_from_dcm(dcm_data: dcm.FileDataset) -> Optional[datetime.dateti
     3. SeriesDate & SeriesTime  (0008,0021); (0008,0031)
 
     """
-    acq_date = dcm_data.get("AcquisitionDate")
-    acq_time = dcm_data.get("AcquisitionTime")
-    if not (acq_date is None or acq_time is None):
+    acq_date = dcm_data.get("AcquisitionDate", "").strip()
+    acq_time = dcm_data.get("AcquisitionTime", "").strip()
+    if acq_date and acq_time:
         return strptime_micr(acq_date + acq_time, "%Y%m%d%H%M%S[.%f]")
 
-    acq_dt = dcm_data.get("AcquisitionDateTime")
-    if acq_dt is not None:
+    acq_dt = dcm_data.get("AcquisitionDateTime", "").strip()
+    if acq_dt:
         return strptime_micr(acq_dt, "%Y%m%d%H%M%S[.%f]")
 
-    series_date = dcm_data.get("SeriesDate")
-    series_time = dcm_data.get("SeriesTime")
-    if not (series_date is None or series_time is None):
+    series_date = dcm_data.get("SeriesDate", "").strip()
+    series_time = dcm_data.get("SeriesTime", "").strip()
+    if series_date and series_time:
         return strptime_micr(series_date + series_time, "%Y%m%d%H%M%S[.%f]")
     return None
 
