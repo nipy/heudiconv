@@ -1,0 +1,61 @@
+#!/usr/bin/env python
+
+import yaml
+import sys
+
+def parse_markdown_file(file_path):
+    """ Parses the YAML front matter from a Markdown file. """
+    with open(file_path, 'r') as file:
+        # Read lines until the second '---'
+        lines = []
+        for line in file:
+            if line.strip() == '---' and lines:
+                break
+            if line.strip() != '---':
+                lines.append(line)
+        yaml_content = yaml.safe_load("\n".join(lines))
+    return yaml_content
+
+def create_cff_record(yaml_data):
+    """ Generates a dictionary for a CITATION.cff file from parsed YAML data. """
+    cff = {
+        'cff-version': '1.2.0',
+        'message': 'If you use this software, please cite it using these metadata.',
+        'title': yaml_data['title'],
+        # 'date-released': yaml_data['date'],
+        'authors': [],
+        'keywords': yaml_data['tags'],
+    }
+    
+    # Prepare affiliations map
+    affiliations = {aff['index']: aff['name'] for aff in yaml_data['affiliations']}
+    
+    # Populate authors, de-referencing affiliations
+    for author in yaml_data['authors']:
+        author_entry = {}
+        author['name']
+        author_entry['given-names'], author_entry['family-names'] = author['name'].rsplit(' ', 1)
+        if orcid := author.get('orcid'):
+            if not orcid.startswith('http'):
+                orcid = f"https://orcid.org/{orcid}"
+            author_entry['orcid'] = orcid
+
+        # Resolve affiliations
+        author_affiliations = [int(a.strip()) for a in str(author['affiliation']).split(',')]
+        # CFF does not yet support multiple affiliations, so join via &
+        author_entry['affiliation'] = ' & '.join(
+            affiliations[aff] for aff in author_affiliations
+        )
+        cff['authors'].append(author_entry)
+    return cff
+
+def save_cff_file(cff_data, output_path='CITATION.cff'):
+    """ Saves the CITATION.cff data to a file. """
+    with open(output_path, 'w') as file:
+        yaml.dump(cff_data, file)
+
+# Usage
+markdown_file_path = sys.argv[1]
+yaml_data = parse_markdown_file(markdown_file_path)
+cff_data = create_cff_record(yaml_data)
+save_cff_file(cff_data)
