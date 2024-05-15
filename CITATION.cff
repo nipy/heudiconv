@@ -1,0 +1,149 @@
+authors:
+- affiliation: Center for Open Neuroscience, Department of Psychological and Brain
+    Sciences, Dartmouth College, Hanover, NH, USA
+  family-names: Halchenko
+  given-names: Yaroslav O.
+  orcid: https://orcid.org/0000-0003-3456-2493
+- affiliation: Department of Psychology, Stanford University, CA, USA
+  family-names: Goncalves
+  given-names: Mathias
+  orcid: https://orcid.org/0000-0002-7252-7771
+- affiliation: McGovern Institute, Massachusetts Institute of Technology, Cambridge,
+    MA, USA
+  family-names: Ghosh
+  given-names: Satrajit
+  orcid: https://orcid.org/0000-0002-5312-6729
+- affiliation: Flywheel Exchange LLC, Minneapolis, MN, USA
+  family-names: Velasco
+  given-names: Pablo
+  orcid: https://orcid.org/0000-0002-5749-6049
+- affiliation: University of California, Berkeley, Berkeley, CA, USA
+  family-names: Visconti di Oleggio Castello
+  given-names: Matteo
+  orcid: https://orcid.org/0000-0001-7931-5272
+- affiliation: Perelman School of Medicine, University of Pennsylvania, Philadelphia,
+    PA, USA
+  family-names: Salo
+  given-names: Taylor
+  orcid: https://orcid.org/0000-0001-9813-3167
+- affiliation: Center for Open Neuroscience, Department of Psychological and Brain
+    Sciences, Dartmouth College, Hanover, NH, USA
+  family-names: Wodder II
+  given-names: John T.
+- affiliation: "Institute of Neuroscience and Medicine, Brain & Behaviour (INM-7),\
+    \ Research Center J\xFClich, J\xFClich, Germany & Institute of Systems Neuroscience,\
+    \ Medical Faculty, Heinrich Heine University D\xFCsseldorf, D\xFCsseldorf, Germany"
+  family-names: Hanke
+  given-names: Michael
+  orcid: https://orcid.org/0000-0001-6398-6370
+- affiliation: Department of Biostatistics, Johns Hopkins Bloomberg School of Public
+    Health, Baltimore, MD, USA
+  family-names: Sadil
+  given-names: Patrick
+  orcid: https://orcid.org/0000-0003-4141-1343
+- affiliation: Emeritus of Department of Psychology, Stanford University, CA, USA
+  family-names: Gorgolewski
+  given-names: Krzysztof Jacek
+  orcid: https://orcid.org/0000-0003-3321-7583
+- affiliation: Center for Open Neuroscience, Department of Psychological and Brain
+    Sciences, Dartmouth College, Hanover, NH, USA
+  family-names: Ioanas
+  given-names: Horea-Ioan
+  orcid: https://orcid.org/0000-0001-7037-2449
+- affiliation: Department of Psychology, University of South Carolina, Columbia, SC,
+    USA
+  family-names: Rorden
+  given-names: Chris
+  orcid: https://orcid.org/0000-0002-7554-6142
+- affiliation: "Masonic Institute\_for the Developing Brain, University of Minnesota,\
+    \ Minneapolis, MN, USA & Minnesota Supercomputing Institute, University of Minnesota,\
+    \ Minneapolis, MN, USA"
+  family-names: Hendrickson
+  given-names: Timothy J.
+  orcid: https://orcid.org/0000-0001-6862-6526
+- affiliation: Human Neuroscience Platform, Fondation Campus Biotech Geneva, Geneva,
+    Switzerland
+  family-names: Dayan
+  given-names: Michael
+  orcid: https://orcid.org/0000-0002-2666-0969
+- affiliation: Center for Open Neuroscience, Department of Psychological and Brain
+    Sciences, Dartmouth College, Hanover, NH, USA & Department of Brain and Cognitive
+    Sciences, Massachusetts Institute of Technology, Cambridge, MA, USA
+  family-names: Houlihan
+  given-names: Sean Dae
+  orcid: https://orcid.org/0000-0001-5003-9278
+- affiliation: Department of Psychology, University of Texas at Austin, Austin, TX,
+    USA
+  family-names: Kent
+  given-names: James
+  orcid: https://orcid.org/0000-0002-4892-2659
+- affiliation: McConnell Brain Imaging Centre, McGill University, Montreal, QC, Canada
+  family-names: Strauss
+  given-names: Ted
+  orcid: https://orcid.org/0000-0002-1927-666X
+- affiliation: Data Science and Sharing Team, National Institute of Mental Health,
+    Bethesda, MD, USA
+  family-names: Lee
+  given-names: John
+  orcid: https://orcid.org/0000-0001-5884-4247
+- affiliation: Center for Open Neuroscience, Department of Psychological and Brain
+    Sciences, Dartmouth College, Hanover, NH, USA
+  family-names: To
+  given-names: Isaac
+  orcid: https://orcid.org/0000-0002-4740-0824
+- affiliation: Department of Psychology, Stanford University, CA, USA
+  family-names: Markiewicz
+  given-names: Christopher J.
+  orcid: https://orcid.org/0000-0002-6533-164X
+- affiliation: Institute for Glycomics, Griffith University, QLD, Australia
+  family-names: Lukas
+  given-names: Darren
+  orcid: https://orcid.org/0009-0003-6941-0833
+- affiliation: Department of Psychology, Northwestern University, Evanston, IL, USA
+  family-names: Butler
+  given-names: Ellyn R.
+  orcid: https://orcid.org/0000-0001-6316-6444
+- affiliation: Department of Brain and Cognitive Sciences, Massachusetts Institute
+    of Technology, Cambridge, MA, USA
+  family-names: Thompson
+  given-names: Todd
+- affiliation: Biomedical Engineering Department, Faculty of Engineering, Mondragon
+    University, Mondragon, Spain & BCBL, Basque center on Cognition, Brain and Language,
+    San Sebastian, Spain
+  family-names: Termenon
+  given-names: Maite
+  orcid: https://orcid.org/0000-0001-8102-5135
+- affiliation: Department of Psychology and Neuroscience, Temple University, Philadelphia,
+    PA, USA
+  family-names: Smith
+  given-names: David V.
+  orcid: https://orcid.org/0000-0001-5754-9633
+- affiliation: Center for Open Neuroscience, Department of Psychological and Brain
+    Sciences, Dartmouth College, Hanover, NH, USA
+  family-names: Macdonald
+  given-names: Austin
+  orcid: https://orcid.org/0000-0002-8124-807X
+- affiliation: Departments of Psychiatry and Radiology, University of Massachusetts
+    Chan Medical School, Worcester, MA, USA
+  family-names: Kennedy
+  given-names: David N.
+  orcid: https://orcid.org/0000-0002-9377-0797
+cff-version: 1.2.0
+identifiers:
+- type: other
+  value: RRID:SCR_017427
+  description: Research Resource Identifier - https://scicrunch.org/resolver/RRID:SCR_017427
+- type: doi
+  value: 10.5281/zenodo.1012598
+  description: The concept DOI for the collection containing all versions of the HeuDiConv
+keywords:
+- Python
+- neuroscience
+- standardization
+- DICOM
+- BIDS
+- open science
+- FOSS
+message: If you use this software, please cite it using these metadata.
+title: >-
+  HeuDiConv: flexible DICOM conversion into structured directory layouts
