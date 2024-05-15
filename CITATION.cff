@@ -129,6 +129,13 @@ authors:
   given-names: David N.
   orcid: https://orcid.org/0000-0002-9377-0797
 cff-version: 1.2.0
+identifiers:
+- type: other
+  value: RRID:SCR_017427
+  description: Research Resource Identifier - https://scicrunch.org/resolver/RRID:SCR_017427
+- type: doi
+  value: 10.5281/zenodo.1012598
+  description: The concept DOI for the collection containing all versions of the HeuDiConv
 keywords:
 - Python
 - neuroscience
@@ -138,4 +145,5 @@ keywords:
 - open science
 - FOSS
 message: If you use this software, please cite it using these metadata.
-title: "HeuDiConv \u2014 flexible DICOM conversion into structured directory layouts"
+title: >-
+  HeuDiConv: flexible DICOM conversion into structured directory layouts
