@@ -67,7 +67,7 @@ push new images to `dockerhub <https://hub.docker.com/r/nipy/heudiconv>`_.
 The following pull request labels are respected:
 
     * major: Increment the major version when merged
-    * minot: Increment the minot version when merged
+    * minor: Increment the minor version when merged
     * patch: Increment the patch version when merged
     * skip-release: Preserve the current version when merged
     * release: Create a release when this pr is merged
