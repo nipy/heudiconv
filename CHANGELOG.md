@@ -1,3 +1,22 @@
+# v1.1.2 (Wed May 15 2024)
+
+#### 🏠 Internal
+
+- Add CITATION.cff based on JOSS paper.md [#758](https://github.com/nipy/heudiconv/pull/758) ([@yarikoptic](https://github.com/yarikoptic))
+- Add Jpeg2000 to Docker container [#747](https://github.com/nipy/heudiconv/pull/747) ([@jennan](https://github.com/jennan))
+
+#### 📝 Documentation
+
+- Fix typo [#757](https://github.com/nipy/heudiconv/pull/757) ([@asmacdo](https://github.com/asmacdo))
+
+#### Authors: 3
+
+- Austin Macdonald ([@asmacdo](https://github.com/asmacdo))
+- Maxime Rio ([@jennan](https://github.com/jennan))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v1.1.1 (Thu May 02 2024)
 
 #### 🐛 Bug Fix
