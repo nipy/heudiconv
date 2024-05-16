@@ -147,3 +147,4 @@ keywords:
 message: If you use this software, please cite it using these metadata.
 title: >-
   HeuDiConv: flexible DICOM conversion into structured directory layouts
+license: Apache-2.0
