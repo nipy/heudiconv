@@ -1,3 +1,16 @@
+# v1.1.3 (Thu May 16 2024)
+
+#### 📝 Documentation
+
+- Specify license in CITATION.cff [#760](https://github.com/nipy/heudiconv/pull/760) ([@yarikoptic](https://github.com/yarikoptic))
+- Replace one rogue markdown [ref](url) to `ref <url>`_ RST [#759](https://github.com/nipy/heudiconv/pull/759) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 1
+
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v1.1.2 (Wed May 15 2024)
 
 #### 🏠 Internal
