@@ -299,8 +299,8 @@ def prep_conversion(
 
 def update_complex_name(metadata: dict[str, Any], filename: str) -> str:
     """
-    Insert `_part-<mag|phase>` entity into filename if data are from a
-    sequence with magnitude/phase part.
+    Insert `_part-<mag|phase|real|imag>` entity into filename if data are from a
+    sequence with magnitude/phase/real/imaginary part.
 
     Parameters
     ----------
@@ -333,9 +333,13 @@ def update_complex_name(metadata: dict[str, Any], filename: str) -> str:
     # Check to see if it is magnitude or phase part:
     img_type = cast(List[str], metadata.get("ImageType", []))
     if "M" in img_type:
-        mag_or_phase = "mag"
+        part = "mag"
     elif "P" in img_type:
-        mag_or_phase = "phase"
+        part = "phase"
+    elif "REAL" in img_type:
+        part = "real"
+    elif "IMAGINARY" in img_type:
+        part = "imag"
     else:
         raise RuntimeError("Data type could not be inferred from the metadata.")
 
@@ -343,7 +347,7 @@ def update_complex_name(metadata: dict[str, Any], filename: str) -> str:
     filetype = "_" + filename.split("_")[-1]
 
     # Insert part label
-    if not ("_part-%s" % mag_or_phase) in filename:
+    if not ("_part-%s" % part) in filename:
         # If "_part-" is specified, prepend the 'mag_or_phase' value.
         if "_part-" in filename:
             raise BIDSError(
@@ -368,7 +372,7 @@ def update_complex_name(metadata: dict[str, Any], filename: str) -> str:
         ]
         for label in entities_after_part:
             if (label == filetype) or (label in filename):
-                filename = filename.replace(label, "_part-%s%s" % (mag_or_phase, label))
+                filename = filename.replace(label, "_part-%s%s" % (part, label))
                 break
 
     return filename
@@ -984,8 +988,9 @@ def save_converted_files(
         is_uncombined = (
             len(set(filter(bool, channel_names))) > 1
         )  # Check for uncombined data
+        PARTS = ["M", "P", "IMAGINARY", "REAL"]
         is_complex = (
-            "M" in image_types and "P" in image_types
+            len(set(filter(lambda x: [part in x for part in PARTS], image_types))) > 1
         )  # Determine if data are complex (magnitude + phase)
         echo_times_lst = sorted(echo_times)  # also converts to list
         channel_names_lst = sorted(channel_names)  # also converts to list
