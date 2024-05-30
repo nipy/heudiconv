@@ -385,7 +385,7 @@ def add_participant_record(
         if participant_id in known_subjects:
             return
     else:
-        # Populate particpants.json (an optional file to describe column names in
+        # Populate participants.json (an optional file to describe column names in
         # participant.tsv). This auto generation will make BIDS-validator happy.
         participants_json = op.join(studydir, "participants.json")
         if not op.lexists(participants_json):
