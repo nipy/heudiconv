@@ -988,10 +988,10 @@ def save_converted_files(
         is_uncombined = (
             len(set(filter(bool, channel_names))) > 1
         )  # Check for uncombined data
-        PARTS = ["M", "P", "IMAGINARY", "REAL"]
-        is_complex = (
-            len(set(filter(lambda x: [part in x for part in PARTS], image_types))) > 1
-        )  # Determine if data are complex (magnitude + phase)
+        CPLX_PARTS = ["MAGNITUDE", "PHASE", "IMAGINARY", "REAL"]
+        is_complex = len(set([
+            it for its in image_types for part in CPLX_PARTS if 'part'
+        ])) # Determine if data are complex (magnitude + phase or real + imag or all-4)
         echo_times_lst = sorted(echo_times)  # also converts to list
         channel_names_lst = sorted(channel_names)  # also converts to list
 
