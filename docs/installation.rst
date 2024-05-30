@@ -27,7 +27,7 @@ which provides the `heudiconv package <http://neuro.debian.net/pkgs/heudiconv.ht
 Containers
 ==========
 
-Our container image releases are availe on `our Docker Hub <https://hub.docker.com/r/nipy/heudiconv/tags>`_
+Our container image releases are available on `our Docker Hub <https://hub.docker.com/r/nipy/heudiconv/tags>`_
 
 If `Docker <https://docs.docker.com/install/>`_ is available on your system, you can pull the latest release::
 
@@ -36,7 +36,7 @@ If `Docker <https://docs.docker.com/install/>`_ is available on your system, you
 Additionally, HeuDiConv is available through the Docker image at `repronim/reproin <https://hub.docker.com/r/repronim/reproin>`_ provided by
 `ReproIn heuristic project <http://reproin.repronim.org>`_, which develops the ``reproin`` heuristic.
 
-To maintain provenance, it is recommended that you use the ``latest`` tag only when testing out heudiconv. 
+To maintain provenance, it is recommended that you use the ``latest`` tag only when testing out heudiconv.
 Otherwise, it is recommended that you use an explicit version and record that information alongside the produced data.
 
 
