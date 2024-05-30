@@ -332,9 +332,9 @@ def update_complex_name(metadata: dict[str, Any], filename: str) -> str:
 
     # Check to see if it is magnitude or phase part:
     img_type = cast(List[str], metadata.get("ImageType", []))
-    if "M" in img_type:
+    if "M" in img_type or "MAGNITUDE" in img_type:
         part = "mag"
-    elif "P" in img_type:
+    elif "P" in img_type or "PHASE" in img_type:
         part = "phase"
     elif "REAL" in img_type:
         part = "real"
@@ -989,9 +989,16 @@ def save_converted_files(
             len(set(filter(bool, channel_names))) > 1
         )  # Check for uncombined data
         CPLX_PARTS = ["MAGNITUDE", "PHASE", "IMAGINARY", "REAL"]
-        is_complex = len(set([
-            it for its in image_types for part in CPLX_PARTS if 'part'
-        ])) # Determine if data are complex (magnitude + phase or real + imag or all-4)
+        is_complex = len(
+            set(
+                [
+                    part
+                    for its in image_types
+                    for part in CPLX_PARTS
+                    if part in its or part[0] in its
+                ]
+            )
+        )  # Determine if data are complex (magnitude + phase or real + imag or all-4)
         echo_times_lst = sorted(echo_times)  # also converts to list
         channel_names_lst = sorted(channel_names)  # also converts to list
 

@@ -114,7 +114,7 @@ def create_seqinfo(
     # GE data
     # see https://github.com/rordenlab/dcm2niix/tree/master/GE#complex-image-component
     if dcminfo.get([0x43, 0x102F]):
-        GE_CPLX_CODING = ["PHASE", "MAGNITUDE", "REAL", "IMAGINARY"]
+        GE_CPLX_CODING = ["MAGNITUDE", "PHASE", "REAL", "IMAGINARY"]
         cplx_idx = int(dcminfo.get([0x43, 0x102F]).value)
         part = GE_CPLX_CODING[cplx_idx]
         if part not in image_type:
