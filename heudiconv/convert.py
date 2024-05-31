@@ -341,7 +341,7 @@ def update_complex_name(metadata: dict[str, Any], filename: str) -> str:
     elif "IMAGINARY" in img_type:
         part = "imag"
     else:
-        raise RuntimeError("Data type could not be inferred from the metadata.")
+        raise RuntimeError(f"Data type could not be inferred from the ImageType={img_type}.")
 
     # Determine scan suffix
     filetype = "_" + filename.split("_")[-1]
