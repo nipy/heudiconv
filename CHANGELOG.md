@@ -1,3 +1,16 @@
+# v1.1.4 (Wed Jun 05 2024)
+
+#### 🏠 Internal
+
+- Replace CITATION.cff with .zenodo.json for correct (split) affiliations on Zenodo [#764](https://github.com/nipy/heudiconv/pull/764) ([@yarikoptic](https://github.com/yarikoptic))
+- Codespell tuneup: no dedicated workflow (part of tox -e lint), and fix few freshly detected typos [#762](https://github.com/nipy/heudiconv/pull/762) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 1
+
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v1.1.3 (Thu May 16 2024)
 
 #### 📝 Documentation
