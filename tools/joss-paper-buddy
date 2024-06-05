@@ -60,34 +60,36 @@ def save_cff_file(cff_data, output_path='CITATION.cff'):
 
 def fixup_affiliations(yaml_data):
     """ Normalizes and sorts the affiliations to ensure sequential indices without gaps. """
-    affiliations = yaml_data['affiliations']
-    affiliations.sort(key=lambda x: x['index'])
-    
-    new_index = 1
-    index_map = {}
-    for affiliation in affiliations:
-        old_index = affiliation['index']
-        affiliation['index'] = new_index
-        index_map[old_index] = new_index
-        new_index += 1
 
-    author_affiliations = set()
-    for author in yaml_data['authors']:
-        author_affiliations.update([int(a.strip()) for a in str(author['affiliation']).split(',')])
-    
-    highest_index = max(index_map.values())
-    missing_indices = set(range(1, highest_index + 1)) - set(index_map.values())
-    
+    reindex_map = {}
+    highest_seen = 0
     for author in yaml_data['authors']:
         author_affiliations = [int(a.strip()) for a in str(author['affiliation']).split(',')]
         fixed_affiliations = []
         for aff in author_affiliations:
-            if aff in index_map:
-                fixed_affiliations.append(index_map[aff])
+            if aff in reindex_map:
+                fixed_affiliations.append(reindex_map[aff])
             else:
-                fixed_affiliations.append(missing_indices.pop())
-        author['affiliation'] = ', '.join(map(str, fixed_affiliations))
-    
+                # It will become the new highest seen
+                highest_seen += 1
+                reindex_map[aff] = highest_seen
+                fixed_affiliations.append(highest_seen)
+        new_aff = ', '.join(map(str, fixed_affiliations)).strip()
+        author['affiliation'] = int(new_aff) if new_aff.isdigit() else new_aff
+
+    affiliations = yaml_data['affiliations']
+    index_map = {
+        aff['index']: aff['name']
+        for aff in yaml_data['affiliations']
+    }
+
+    # now create new affiliations
+    yaml_data['affiliations'] = [
+        {'name': index_map[old_index],
+         'index': int(new_index)}
+        for old_index, new_index in reindex_map.items()
+    ]
+
     return yaml_data
 
 def main():
@@ -110,7 +112,7 @@ def main():
         yaml_buffer = StringIO()
         yaml.dump(fixed_yaml_data, yaml_buffer)
         fixed_yaml_str = yaml_buffer.getvalue()
-        
+
         with open(args.markdown_file_path, 'w') as file:
             file.write(pre_yaml + '---\n' + fixed_yaml_str + '---\n' + post_yaml)
         print("Affiliations have been fixed and saved.")
