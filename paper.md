@@ -1,13 +1,13 @@
 ---
-title: 'HeuDiConv — flexible DICOM conversion into structured directory layouts'
+title: HeuDiConv — flexible DICOM conversion into structured directory layouts
 tags:
-  - Python
-  - neuroscience
-  - standardization
-  - DICOM
-  - BIDS
-  - open science
-  - FOSS
+ - Python
+ - neuroscience
+ - standardization
+ - DICOM
+ - BIDS
+ - open science
+ - FOSS
 authors:
  - name: Yaroslav O. Halchenko  # 626 commits, issues: opened 81 participated in 146
    orcid: 0000-0003-3456-2493
@@ -28,41 +28,41 @@ authors:
    orcid: 0000-0001-9813-3167
    affiliation: 6
  - name: John T. Wodder II  # 58 commits, issues: opened 2 participated in 4
-   orcid: 
+   orcid:
    affiliation: 1
  - name: Michael Hanke  # 32 commits, issues: opened 10 participated in 6
    orcid: 0000-0001-6398-6370
    affiliation: 7, 8
  - name: Patrick Sadil  # 18 commits, issues: opened 3 participated in 2
    orcid: 0000-0003-4141-1343
-   affiliation: 22
+   affiliation: 9
  - name: Krzysztof Jacek Gorgolewski  # 4 commits, issues: opened 7 participated in 10
    orcid: 0000-0003-3321-7583
-   affiliation: 24
+   affiliation: 10
  - name: Horea-Ioan Ioanas   # 17 commits, issues: opened 1 participated in 1
    orcid: 0000-0001-7037-2449
    affiliation: 1
  - name: Chris Rorden  # 0 commits, issues: opened 1 participated in 17
    orcid: 0000-0002-7554-6142
-   affiliation: 9
+   affiliation: 11
  - name: Timothy J. Hendrickson  # 0 commits, issues: opened 10 participated in 4
    orcid: 0000-0001-6862-6526
-   affiliation: 10, 11
+   affiliation: 12, 13
  - name: Michael Dayan  # 12 commits, issues: opened 1 participated in 2
    orcid: 0000-0002-2666-0969
-   affiliation: 12
+   affiliation: 14
  - name: Sean Dae Houlihan  # 12 commits, issues: opened 0 participated in 0 # First: Sean Dae; Last: Houlihan
    orcid: 0000-0001-5003-9278
-   affiliation:  1, 13
+   affiliation: 1, 15
  - name: James Kent  # 8 commits, issues: opened 3 participated in 0
    orcid: 0000-0002-4892-2659
-   affiliation: 14
+   affiliation: 16
  - name: Ted Strauss  # 0 commits, issues: opened 8 participated in 0
    orcid: 0000-0002-1927-666X
-   affiliation: 15
+   affiliation: 17
  - name: John Lee  # 2 commits, issues: opened 5 participated in 1
    orcid: 0000-0001-5884-4247
-   affiliation: 16
+   affiliation: 18
  - name: Isaac To  # 7 commits, issues: opened 0 participated in 0
    orcid: 0000-0002-4740-0824
    affiliation: 1
@@ -71,25 +71,25 @@ authors:
    affiliation: 2
  - name: Darren Lukas  # 4 commits, issues: opened 1 participated in 2
    orcid: 0009-0003-6941-0833
-   affiliation: 17
+   affiliation: 19
  - name: Ellyn R. Butler  # 0 commits, issues: opened 4 participated in 2
    orcid: 0000-0001-6316-6444
-   affiliation: 23
+   affiliation: 20
  - name: Todd Thompson  # 0 commits, issues: opened 5 participated in 0
-   orcid: 
-   affiliation: 13
+   orcid:
+   affiliation: 15
  - name: Maite Termenon  # 0 commits, issues: opened 5 participated in 0
    orcid: 0000-0001-8102-5135
-   affiliation: 18, 19
+   affiliation: 21, 22
  - name: David V. Smith  # 0 commits, issues: opened 4 participated in 1
    orcid: 0000-0001-5754-9633
-   affiliation: 20
+   affiliation: 23
  - name: Austin Macdonald  # 2 commits, issues: opened 1 participated in 1 + 1 commit in paper repo
    orcid: 0000-0002-8124-807X
    affiliation: 1
  - name: David N. Kennedy  # Benevolent leader of ReproNim who holds the umbrella and was brave to try a number of times
    orcid: 0000-0002-9377-0797
-   affiliation: 21
+   affiliation: 24
 affiliations:
  - name: Center for Open Neuroscience, Department of Psychological and Brain Sciences, Dartmouth College, Hanover, NH, USA
    index: 1
@@ -107,43 +107,43 @@ affiliations:
    index: 7
  - name: Institute of Systems Neuroscience, Medical Faculty, Heinrich Heine University Düsseldorf, Düsseldorf, Germany
    index: 8
- - name: Department of Psychology, University of South Carolina, Columbia, SC, USA
-   index: 9
- - name: Masonic Institute for the Developing Brain, University of Minnesota, Minneapolis, MN, USA
-   index: 10
- - name: Minnesota Supercomputing Institute, University of Minnesota, Minneapolis, MN, USA
-   index: 11
- - name: Human Neuroscience Platform, Fondation Campus Biotech Geneva, Geneva, Switzerland
-   index: 12
- - name: Department of Brain and Cognitive Sciences, Massachusetts Institute of Technology, Cambridge, MA, USA
-   index: 13
- - name: Department of Psychology, University of Texas at Austin, Austin, TX, USA
-   index: 14
- - name: McConnell Brain Imaging Centre, McGill University, Montreal, QC, Canada
-   index: 15
- - name: Data Science and Sharing Team, National Institute of Mental Health, Bethesda, MD, USA
-   index: 16
- - name: Institute for Glycomics, Griffith University, QLD, Australia
-   index: 17
- - name: Biomedical Engineering Department, Faculty of Engineering, Mondragon University, Mondragon, Spain
-   index: 18
- - name: BCBL, Basque center on Cognition, Brain and Language, San Sebastian, Spain
-   index: 19
- - name: Department of Psychology and Neuroscience, Temple University, Philadelphia, PA, USA
-   index: 20
- - name: Departments of Psychiatry and Radiology, University of Massachusetts Chan Medical School, Worcester, MA, USA
-   index: 21
  - name: Department of Biostatistics, Johns Hopkins Bloomberg School of Public Health, Baltimore, MD, USA
-   index: 22
- - name: Department of Psychology, Northwestern University, Evanston, IL, USA
-   index: 23
+   index: 9
  - name: Emeritus of Department of Psychology, Stanford University, CA, USA
+   index: 10
+ - name: Department of Psychology, University of South Carolina, Columbia, SC, USA
+   index: 11
+ - name: Masonic Institute for the Developing Brain, University of Minnesota, Minneapolis, MN, USA
+   index: 12
+ - name: Minnesota Supercomputing Institute, University of Minnesota, Minneapolis, MN, USA
+   index: 13
+ - name: Human Neuroscience Platform, Fondation Campus Biotech Geneva, Geneva, Switzerland
+   index: 14
+ - name: Department of Brain and Cognitive Sciences, Massachusetts Institute of Technology, Cambridge, MA, USA
+   index: 15
+ - name: Department of Psychology, University of Texas at Austin, Austin, TX, USA
+   index: 16
+ - name: McConnell Brain Imaging Centre, McGill University, Montreal, QC, Canada
+   index: 17
+ - name: Data Science and Sharing Team, National Institute of Mental Health, Bethesda, MD, USA
+   index: 18
+ - name: Institute for Glycomics, Griffith University, QLD, Australia
+   index: 19
+ - name: Department of Psychology, Northwestern University, Evanston, IL, USA
+   index: 20
+ - name: Biomedical Engineering Department, Faculty of Engineering, Mondragon University, Mondragon, Spain
+   index: 21
+ - name: BCBL, Basque center on Cognition, Brain and Language, San Sebastian, Spain
+   index: 22
+ - name: Department of Psychology and Neuroscience, Temple University, Philadelphia, PA, USA
+   index: 23
+ - name: Departments of Psychiatry and Radiology, University of Massachusetts Chan Medical School, Worcester, MA, USA
    index: 24
-
 date: 6 July 2023
 bibliography: paper.bib
 
 ---
+
 
 # Summary
 
