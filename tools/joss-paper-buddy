@@ -92,6 +92,44 @@ def fixup_affiliations(yaml_data):
 
     return yaml_data
 
+def create_zenodo_record(yaml_data):
+    """ Generates a dictionary for a zenodo.json file from parsed YAML data. """
+
+    zenodo = {
+        "creators": [],
+        "grants": [],
+        "keywords": yaml_data['tags'],
+        "access_right": "open",
+        "license": "Apache-2.0",
+        "upload_type": "software"
+    }
+
+    # Prepare affiliations map
+    affiliations = {aff['index']: aff['name'] for aff in yaml_data['affiliations']}
+
+    # Populate creators, de-referencing affiliations
+    for author in yaml_data['authors']:
+        creator_entry = {}
+        creator_entry['name'] = author['name']
+        if orcid := author.get('orcid'):
+            if not orcid.startswith('http'):
+                orcid = f"https://orcid.org/{orcid}"
+            creator_entry['orcid'] = orcid
+
+        # Resolve affiliations
+        author_affiliations = [int(a.strip()) for a in str(author['affiliation']).split(',')]
+        creator_entry['affiliation'] = ' and '.join(
+            affiliations[aff] for aff in author_affiliations
+        )
+        zenodo['creators'].append(creator_entry)
+    return zenodo
+
+def save_zenodo_file(zenodo_data, output_path='.zenodo.json'):
+    """ Saves the zenodo.json data to a file. """
+    import json
+    with open(output_path, 'w') as file:
+        json.dump(zenodo_data, file, indent=4)
+
 def main():
     parser = argparse.ArgumentParser(description="Process markdown files and produce metadata files.")
     parser.add_argument("command", choices=["produce-citation.cff", "produce-zenodo.json", "fixup-affiliations"], help="Command to execute.")
@@ -105,8 +143,8 @@ def main():
         cff_data = create_cff_record(yaml_data)
         save_cff_file(cff_data)
     elif args.command == "produce-zenodo.json":
-        # Placeholder for produce-zenodo.json implementation
-        print("produce-zenodo.json not implemented yet.")
+        zenodo_data = create_zenodo_record(yaml_data)
+        save_zenodo_file(zenodo_data)
     elif args.command == "fixup-affiliations":
         fixed_yaml_data = fixup_affiliations(yaml_data)
         yaml_buffer = StringIO()
