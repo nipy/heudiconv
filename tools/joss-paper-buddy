@@ -1,21 +1,23 @@
 #!/usr/bin/env python
 
-import yaml
 import sys
 import argparse
+from ruamel.yaml import YAML
+from io import StringIO
+
+yaml = YAML()
 
 def parse_markdown_file(file_path):
-    """ Parses the YAML front matter from a Markdown file. """
+    """ Parses the YAML front matter from a Markdown file, preserving comments. """
     with open(file_path, 'r') as file:
-        # Read lines until the second '---'
-        lines = []
-        for line in file:
-            if line.strip() == '---' and lines:
-                break
-            if line.strip() != '---':
-                lines.append(line)
-        yaml_content = yaml.safe_load("\n".join(lines))
-    return yaml_content
+        content = file.read()
+
+    parts = content.split('---', 2)
+    if len(parts) < 3:
+        raise ValueError("Invalid Markdown file format. Missing '---' delimiters.")
+    
+    yaml_content = yaml.load(parts[1])
+    return yaml_content, parts[0], parts[2]
 
 def create_cff_record(yaml_data):
     """ Generates a dictionary for a CITATION.cff file from parsed YAML data. """
@@ -54,23 +56,62 @@ def save_cff_file(cff_data, output_path='CITATION.cff'):
     with open(output_path, 'w') as file:
         yaml.dump(cff_data, file)
 
+def fixup_affiliations(yaml_data):
+    """ Normalizes and sorts the affiliations to ensure sequential indices without gaps. """
+    affiliations = yaml_data['affiliations']
+    affiliations.sort(key=lambda x: x['index'])
+    
+    new_index = 1
+    index_map = {}
+    for affiliation in affiliations:
+        old_index = affiliation['index']
+        affiliation['index'] = new_index
+        index_map[old_index] = new_index
+        new_index += 1
+
+    author_affiliations = set()
+    for author in yaml_data['authors']:
+        author_affiliations.update([int(a.strip()) for a in str(author['affiliation']).split(',')])
+    
+    highest_index = max(index_map.values())
+    missing_indices = set(range(1, highest_index + 1)) - set(index_map.values())
+    
+    for author in yaml_data['authors']:
+        author_affiliations = [int(a.strip()) for a in str(author['affiliation']).split(',')]
+        fixed_affiliations = []
+        for aff in author_affiliations:
+            if aff in index_map:
+                fixed_affiliations.append(index_map[aff])
+            else:
+                fixed_affiliations.append(missing_indices.pop())
+        author['affiliation'] = ', '.join(map(str, fixed_affiliations))
+    
+    return yaml_data
+
 def main():
     parser = argparse.ArgumentParser(description="Process markdown files and produce metadata files.")
     parser.add_argument("command", choices=["produce-citation.cff", "produce-zenodo.json", "fixup-affiliations"], help="Command to execute.")
-    parser.add_argument("markdown_file_path", help="Path to the markdown file.")
+    parser.add_argument("markdown_file_path", nargs='?', default='paper.md', help="Path to the markdown file (default: paper.md)")
 
     args = parser.parse_args()
 
+    yaml_data, pre_yaml, post_yaml = parse_markdown_file(args.markdown_file_path)
+
     if args.command == "produce-citation.cff":
-        yaml_data = parse_markdown_file(args.markdown_file_path)
         cff_data = create_cff_record(yaml_data)
         save_cff_file(cff_data)
     elif args.command == "produce-zenodo.json":
         # Placeholder for produce-zenodo.json implementation
         print("produce-zenodo.json not implemented yet.")
     elif args.command == "fixup-affiliations":
-        # Placeholder for fixup-affiliations implementation
-        print("fixup-affiliations not implemented yet.")
+        fixed_yaml_data = fixup_affiliations(yaml_data)
+        yaml_buffer = StringIO()
+        yaml.dump(fixed_yaml_data, yaml_buffer)
+        fixed_yaml_str = yaml_buffer.getvalue()
+        
+        with open(args.markdown_file_path, 'w') as file:
+            file.write(pre_yaml + '---\n' + fixed_yaml_str + '---\n' + post_yaml)
+        print("Affiliations have been fixed and saved.")
 
 if __name__ == "__main__":
     main()
