@@ -6,6 +6,8 @@ from ruamel.yaml import YAML
 from io import StringIO
 
 yaml = YAML()
+yaml.indent(mapping=2, sequence=3, offset=1)
+yaml.width = 1000  # Set a high value to prevent wrapping
 
 def parse_markdown_file(file_path):
     """ Parses the YAML front matter from a Markdown file, preserving comments. """
