@@ -1,0 +1,152 @@
+{
+    "creators": [
+        {
+            "name": "Yaroslav O. Halchenko",
+            "orcid": "0000-0003-3456-2493",
+            "affiliation": "Center for Open Neuroscience, Department of Psychological and Brain Sciences, Dartmouth College, Hanover, NH, USA"
+        },
+        {
+            "name": "Mathias Goncalves",
+            "orcid": "0000-0002-7252-7771",
+            "affiliation": "Department of Psychology, Stanford University, CA, USA"
+        },
+        {
+            "name": "Satrajit Ghosh",
+            "orcid": "0000-0002-5312-6729",
+            "affiliation": "McGovern Institute, Massachusetts Institute of Technology, Cambridge, MA, USA"
+        },
+        {
+            "name": "Pablo Velasco",
+            "orcid": "0000-0002-5749-6049",
+            "affiliation": "Flywheel Exchange LLC, Minneapolis, MN, USA"
+        },
+        {
+            "name": "Matteo Visconti di Oleggio Castello",
+            "orcid": "0000-0001-7931-5272",
+            "affiliation": "University of California, Berkeley, Berkeley, CA, USA"
+        },
+        {
+            "name": "Taylor Salo",
+            "orcid": "0000-0001-9813-3167",
+            "affiliation": "Perelman School of Medicine, University of Pennsylvania, Philadelphia, PA, USA"
+        },
+        {
+            "name": "John T. Wodder II",
+            "affiliation": "Center for Open Neuroscience, Department of Psychological and Brain Sciences, Dartmouth College, Hanover, NH, USA"
+        },
+        {
+            "name": "Michael Hanke",
+            "orcid": "0000-0001-6398-6370",
+            "affiliation": "Institute of Neuroscience and Medicine, Brain & Behaviour (INM-7), Research Center J\u00fclich, J\u00fclich, Germany and Institute of Systems Neuroscience, Medical Faculty, Heinrich Heine University D\u00fcsseldorf, D\u00fcsseldorf, Germany"
+        },
+        {
+            "name": "Patrick Sadil",
+            "orcid": "0000-0003-4141-1343",
+            "affiliation": "Department of Biostatistics, Johns Hopkins Bloomberg School of Public Health, Baltimore, MD, USA"
+        },
+        {
+            "name": "Krzysztof Jacek Gorgolewski",
+            "orcid": "0000-0003-3321-7583",
+            "affiliation": "Emeritus of Department of Psychology, Stanford University, CA, USA"
+        },
+        {
+            "name": "Horea-Ioan Ioanas",
+            "orcid": "0000-0001-7037-2449",
+            "affiliation": "Center for Open Neuroscience, Department of Psychological and Brain Sciences, Dartmouth College, Hanover, NH, USA"
+        },
+        {
+            "name": "Chris Rorden",
+            "orcid": "0000-0002-7554-6142",
+            "affiliation": "Department of Psychology, University of South Carolina, Columbia, SC, USA"
+        },
+        {
+            "name": "Timothy J. Hendrickson",
+            "orcid": "0000-0001-6862-6526",
+            "affiliation": "Masonic Institute\u00a0for the Developing Brain, University of Minnesota, Minneapolis, MN, USA and Minnesota Supercomputing Institute, University of Minnesota, Minneapolis, MN, USA"
+        },
+        {
+            "name": "Michael Dayan",
+            "orcid": "0000-0002-2666-0969",
+            "affiliation": "Human Neuroscience Platform, Fondation Campus Biotech Geneva, Geneva, Switzerland"
+        },
+        {
+            "name": "Sean Dae Houlihan",
+            "orcid": "0000-0001-5003-9278",
+            "affiliation": "Center for Open Neuroscience, Department of Psychological and Brain Sciences, Dartmouth College, Hanover, NH, USA and Department of Brain and Cognitive Sciences, Massachusetts Institute of Technology, Cambridge, MA, USA"
+        },
+        {
+            "name": "James Kent",
+            "orcid": "0000-0002-4892-2659",
+            "affiliation": "Department of Psychology, University of Texas at Austin, Austin, TX, USA"
+        },
+        {
+            "name": "Ted Strauss",
+            "orcid": "0000-0002-1927-666X",
+            "affiliation": "McConnell Brain Imaging Centre, McGill University, Montreal, QC, Canada"
+        },
+        {
+            "name": "John Lee",
+            "orcid": "0000-0001-5884-4247",
+            "affiliation": "Data Science and Sharing Team, National Institute of Mental Health, Bethesda, MD, USA"
+        },
+        {
+            "name": "Isaac To",
+            "orcid": "0000-0002-4740-0824",
+            "affiliation": "Center for Open Neuroscience, Department of Psychological and Brain Sciences, Dartmouth College, Hanover, NH, USA"
+        },
+        {
+            "name": "Christopher J. Markiewicz",
+            "orcid": "0000-0002-6533-164X",
+            "affiliation": "Department of Psychology, Stanford University, CA, USA"
+        },
+        {
+            "name": "Darren Lukas",
+            "orcid": "0009-0003-6941-0833",
+            "affiliation": "Institute for Glycomics, Griffith University, QLD, Australia"
+        },
+        {
+            "name": "Ellyn R. Butler",
+            "orcid": "0000-0001-6316-6444",
+            "affiliation": "Department of Psychology, Northwestern University, Evanston, IL, USA"
+        },
+        {
+            "name": "Todd Thompson",
+            "affiliation": "Department of Brain and Cognitive Sciences, Massachusetts Institute of Technology, Cambridge, MA, USA"
+        },
+        {
+            "name": "Maite Termenon",
+            "orcid": "0000-0001-8102-5135",
+            "affiliation": "Biomedical Engineering Department, Faculty of Engineering, Mondragon University, Mondragon, Spain and BCBL, Basque center on Cognition, Brain and Language, San Sebastian, Spain"
+        },
+        {
+            "name": "David V. Smith",
+            "orcid": "0000-0001-5754-9633",
+            "affiliation": "Department of Psychology and Neuroscience, Temple University, Philadelphia, PA, USA"
+        },
+        {
+            "name": "Austin Macdonald",
+            "orcid": "0000-0002-8124-807X",
+            "affiliation": "Center for Open Neuroscience, Department of Psychological and Brain Sciences, Dartmouth College, Hanover, NH, USA"
+        },
+        {
+            "name": "David N. Kennedy",
+            "orcid": "0000-0002-9377-0797",
+            "affiliation": "Departments of Psychiatry and Radiology, University of Massachusetts Chan Medical School, Worcester, MA, USA"
+        }
+    ],
+    "grants": [
+        { "id": "10.13039/100000002::2P41EB019936" }
+    ],
+    "keywords": [
+        "Python",
+        "neuroscience",
+        "standardization",
+        "DICOM",
+        "BIDS",
+        "open science",
+        "FOSS"
+    ],
+    "access_right": "open",
+    "license": "Apache-2.0",
+    "upload_type": "software"
+}
