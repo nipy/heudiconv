@@ -2,6 +2,7 @@
 
 import yaml
 import sys
+import argparse
 
 def parse_markdown_file(file_path):
     """ Parses the YAML front matter from a Markdown file. """
@@ -22,7 +23,6 @@ def create_cff_record(yaml_data):
         'cff-version': '1.2.0',
         'message': 'If you use this software, please cite it using these metadata.',
         'title': yaml_data['title'],
-        # 'date-released': yaml_data['date'],
         'authors': [],
         'keywords': yaml_data['tags'],
     }
@@ -54,8 +54,23 @@ def save_cff_file(cff_data, output_path='CITATION.cff'):
     with open(output_path, 'w') as file:
         yaml.dump(cff_data, file)
 
-# Usage
-markdown_file_path = sys.argv[1]
-yaml_data = parse_markdown_file(markdown_file_path)
-cff_data = create_cff_record(yaml_data)
-save_cff_file(cff_data)
+def main():
+    parser = argparse.ArgumentParser(description="Process markdown files and produce metadata files.")
+    parser.add_argument("command", choices=["produce-citation.cff", "produce-zenodo.json", "fixup-affiliations"], help="Command to execute.")
+    parser.add_argument("markdown_file_path", help="Path to the markdown file.")
+
+    args = parser.parse_args()
+
+    if args.command == "produce-citation.cff":
+        yaml_data = parse_markdown_file(args.markdown_file_path)
+        cff_data = create_cff_record(yaml_data)
+        save_cff_file(cff_data)
+    elif args.command == "produce-zenodo.json":
+        # Placeholder for produce-zenodo.json implementation
+        print("produce-zenodo.json not implemented yet.")
+    elif args.command == "fixup-affiliations":
+        # Placeholder for fixup-affiliations implementation
+        print("fixup-affiliations not implemented yet.")
+
+if __name__ == "__main__":
+    main()
