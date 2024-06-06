@@ -1,3 +1,15 @@
+# v1.1.6 (Thu Jun 06 2024)
+
+#### 🏠 Internal
+
+- Remove grants from .zenodo.json for now [#766](https://github.com/nipy/heudiconv/pull/766) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 1
+
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v1.1.5 (Thu Jun 06 2024)
 
 #### 🏠 Internal
