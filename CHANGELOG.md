@@ -1,3 +1,15 @@
+# v1.1.5 (Thu Jun 06 2024)
+
+#### 🏠 Internal
+
+- Revert "Add CITATION.cff validation to lint workflow" [#765](https://github.com/nipy/heudiconv/pull/765) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 1
+
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v1.1.4 (Wed Jun 05 2024)
 
 #### 🏠 Internal
