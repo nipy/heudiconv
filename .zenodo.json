@@ -134,9 +134,6 @@
             "affiliation": "Departments of Psychiatry and Radiology, University of Massachusetts Chan Medical School, Worcester, MA, USA"
         }
     ],
-    "grants": [
-        { "id": "10.13039/100000002::2P41EB019936" }
-    ],
     "keywords": [
         "Python",
         "neuroscience",
