@@ -77,6 +77,7 @@ AllowedFmapParameterMatching = [
     "ImagingVolume",
     "ModalityAcquisitionLabel",
     "CustomAcquisitionLabel",
+    "PlainAcquisitionLabel",
     "Force",
 ]
 # Key info returned by get_key_info_for_fmap_assignment when
@@ -755,6 +756,10 @@ def get_key_info_for_fmap_assignment(
             custom_label = BIDSFile.parse(op.basename(json_file))["acq"]
         # Get the custom acquisition label, acq_label is None if no custom field found
         key_info = [custom_label]
+    elif matching_parameter == "PlainAcquisitionLabel":
+        # always base the decision on <acq> label
+        plain_label = BIDSFile.parse(op.basename(json_file))["acq"]
+        key_info = [plain_label]
     elif matching_parameter == "Force":
         # We want to force the matching, so just return some string
         # regardless of the image
