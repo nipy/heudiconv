@@ -89,6 +89,15 @@ _acq-<ACQLABEL> (optional)
 _run-<RUNID> (optional)
     a (typically functional) run. The same idea as with SESID.
 
+_run{+,=,+?} (optional) (not recommended)
+    Not recommended since disallows detection of canceled runs.
+    You can use "+" to increment run id from the previous (through out all
+    sequences), or starting from 1.
+    "=" would use the same run as the previous known.
+    "+?" would make that run ID increment specific to that particular sequence,
+    so that e.g. func_run+?_task-1 and func_run+?_task-2 would both have _run-1
+    for the first sequence in each task, and then run-2 and so on.
+
 _dir-[AP,PA,LR,RL,VD,DV] (optional)
     to be used for fmap images, whenever a pair of the SE images is collected
     to be used to estimate the fieldmap
@@ -113,7 +122,7 @@ __<custom> (optional)
   __dup0<number>  suffix.
 
 Although we still support "-" and "+" used within SESID and TASKID, their use is
-not recommended, thus not listed here
+not recommended, thus not listed here.
 
 ## Scanner specifics
 
@@ -128,6 +137,7 @@ generally to accommodate limitations imposed by different manufacturers/models:
 
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Iterable
 from glob import glob
 import hashlib
@@ -398,7 +408,9 @@ def infotodict(
     info: dict[tuple[str, tuple[str, ...], None], list[str]] = {}
     skipped: list[str] = []
     skipped_unknown: list[str] = []
-    current_run = 0
+    # Incremented runs specific to each seqinfo (casted as a tuple of tuples for hashability)
+    # and of an empty dict for the throughout "run" index
+    current_runs: dict[tuple, int] = defaultdict(int)
     run_label: Optional[str] = None  # run-
     dcm_image_iod_spec: Optional[str] = None
     skip_derived = False
@@ -540,8 +552,15 @@ def infotodict(
 
         run = series_info.get("run")
         if run is not None:
+            # +? would make it within that particular series_info, whenever
+            # + - global.  Global would be done via hashdict of an empty dict.
+            def hashdict(d: dict) -> tuple[tuple, ...]:
+                """Helper to get a hashable "view" of a dict so we could use it as a key"""
+                return tuple(sorted(d.items()))
+
+            run_key = hashdict(series_info if run == "+?" else {})
             # so we have an indicator for a run
-            if run == "+":
+            if run in ("+", "+?"):
                 # some sequences, e.g.  fmap, would generate two (or more?)
                 # sequences -- e.g. one for magnitude(s) and other ones for
                 # phases.  In those we must not increment run!
@@ -549,9 +568,9 @@ def infotodict(
                     if prev_dcm_image_iod_spec != "M":
                         # XXX if we have a known earlier study, we need to always
                         # increase the run counter for phasediff because magnitudes
-                        # were not acquired
+                        # were not acquired (that was dbic/pulse_sequences)
                         if get_study_hash([s]) == "9d148e2a05f782273f6343507733309d":
-                            current_run += 1
+                            current_runs[run_key] += 1
                         else:
                             raise RuntimeError(
                                 "Was expecting phase image to follow magnitude "
@@ -560,24 +579,25 @@ def infotodict(
                             )
                         # else we do nothing special
                 else:  # and otherwise we go to the next run
-                    current_run += 1
+                    current_runs[run_key] += 1
             elif run == "=":
-                if not current_run:
-                    current_run = 1
+                if not current_runs[run_key]:
+                    current_runs[run_key] = 1
             elif run.isdigit():
                 current_run_ = int(run)
-                if current_run_ < current_run:
+                if current_run_ < current_runs[run_key]:
                     lgr.warning(
                         "Previous run (%s) was larger than explicitly specified %s",
-                        current_run,
+                        current_runs[run_key],
                         current_run_,
                     )
-                current_run = current_run_
+                current_runs[run_key] = current_run_
+                del current_run_
             else:
                 raise ValueError(
                     "Don't know how to deal with run specification %s" % repr(run)
                 )
-            run_label = "run-%02d" % current_run
+            run_label = "run-%02d" % current_runs[run_key]
         else:
             # if there is no _run -- no run label added
             run_label = None
@@ -914,10 +934,13 @@ def parse_series_spec(series_spec: str) -> dict[str, str]:
     bids_leftovers = []
     for s in split[1:]:
         key, value = split2(s)
-        if value is None and key[-1] in "+=":
-            value = key[-1]
-            key = key[:-1]
-
+        if value is None:
+            if key[-1] in "+=":
+                value = key[-1]
+                key = key[:-1]
+            if key[-2:] == "+?":
+                value = key[-2:]
+                key = key[:-2]
         # sanitize values, which must not have _ and - is undesirable ATM as well
         # TODO: BIDSv2.0 -- allows "-" so replace with it instead
         value = (
