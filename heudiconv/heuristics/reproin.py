@@ -61,6 +61,7 @@ where
             (e.g. _task-memory_run-01, _task-oddball_run-02)
      fmap - field maps
      dwi  - diffusion weighted imaging (also can as well have runs)
+     perf - perfusion imaging
 
    The other BIDS modalities are not known ATM and their data will not be
    converted and will be just skipped (with a warning). Full list of datatypes
@@ -217,7 +218,7 @@ POPULATE_INTENDED_FOR_OPTS = {
 }
 
 
-KNOWN_DATATYPES = {"anat", "func", "dwi", "behav", "fmap"}
+KNOWN_DATATYPES = {"anat", "func", "dwi", "behav", "fmap", "perf"}
 
 
 def _delete_chars(from_str: str, deletechars: str) -> str:
@@ -402,7 +403,7 @@ def infotodict(
     run_label: Optional[str] = None  # run-
     dcm_image_iod_spec: Optional[str] = None
     skip_derived = False
-    for s in seqinfo:
+    for i_acq, s in enumerate(seqinfo):
         # XXX: skip derived sequences, we don't store them to avoid polluting
         # the directory, unless it is the motion corrected ones
         # (will get _rec-moco suffix)
@@ -410,6 +411,38 @@ def infotodict(
             skipped.append(s.series_id)
             lgr.debug("Ignoring derived data %s", s.series_id)
             continue
+
+        if i_acq == 0:
+            prev_dcm_image_iod_spec = None
+            prev_image_type_datatype = None
+        else:
+            prev_dcm_image_iod_spec = seqinfo[i_acq - 1].image_type[2]
+            prev_image_type_datatype = {
+                # Note: P and M are too generic to make a decision here, could be
+                #  for different datatypes (bold, fmap, etc)
+                "FMRI": "func",
+                "MPR": "anat",
+                "DIFFUSION": "dwi",
+                "MIP_SAG": "anat",  # angiography
+                "MIP_COR": "anat",  # angiography
+                "MIP_TRA": "anat",  # angiography
+            }.get(prev_dcm_image_iod_spec, None)
+
+        if i_acq == (len(seqinfo) - 1):
+            next_dcm_image_iod_spec = None
+            next_image_type_datatype = None
+        else:
+            next_dcm_image_iod_spec = seqinfo[i_acq + 1].image_type[2]
+            next_image_type_datatype = {
+                # Note: P and M are too generic to make a decision here, could be
+                #  for different datatypes (bold, fmap, etc)
+                "FMRI": "func",
+                "MPR": "anat",
+                "DIFFUSION": "dwi",
+                "MIP_SAG": "anat",  # angiography
+                "MIP_COR": "anat",  # angiography
+                "MIP_TRA": "anat",  # angiography
+            }.get(next_dcm_image_iod_spec, None)
 
         # possibly apply present formatting in the series_description or protocol name
         for f in "series_description", "protocol_name":
@@ -499,9 +532,11 @@ def infotodict(
                 if "_pace_" in series_spec:
                     datatype_suffix = "pace"  # or should it be part of seq-
                 elif "P" in s.image_type:
-                    datatype_suffix = "phase"
+                    datatype_suffix = "bold"
+                    series_info["part"] = "phase"
                 elif "M" in s.image_type:
                     datatype_suffix = "bold"
+                    series_info["part"] = "mag"
                 else:
                     # assume bold by default
                     datatype_suffix = "bold"
@@ -615,8 +650,10 @@ def infotodict(
             from_series_info("dir"),
             series_info.get("bids"),
             run_label,
+            from_series_info("part"),
             datatype_suffix,
         ]
+
         # filter those which are None, and join with _
         suffix = "_".join(filter(bool, filename_suffix_parts))  # type: ignore[arg-type]
 
@@ -641,8 +678,8 @@ def infotodict(
             "_Scout" in s.series_description
             or (
                 datatype == "anat"
-                and datatype_suffix
-                and datatype_suffix.startswith("scout")
+                and filename_suffix_parts[-1]
+                and filename_suffix_parts[-1].startswith("scout")
             )
             or (s.series_description.lower() == s.protocol_name.lower() + "_setter")
         ):
