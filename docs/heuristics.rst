@@ -173,6 +173,9 @@ The parameters that can be specified and the allowed options are defined in ``bi
      - the corresponding modality image ``_acq-`` label for modalities other than ``func``
      (e.g. ``_acq-XYZ42`` for ``dwi`` images)
      - the corresponding image ``_task-`` label for the ``func`` modality (e.g. ``_task-XYZ42``)
+   * ``'PlainAcquisitionLabel'``: similar to ``'CustomAcquisitionLabel'``, but does not change
+     behavior for ``func`` modality and always bases decision on the ``_acq-`` label. Helps in
+     cases when there are multiple tasks and a shared ``fmap`` for some of them.
    * ``'Force'``: forces ``heudiconv`` to consider any ``fmaps`` in the session to be
      suitable for any image, no matter what the imaging parameters are.
 
