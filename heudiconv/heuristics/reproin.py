@@ -403,64 +403,61 @@ def infotodict(
     run_label: Optional[str] = None  # run-
     dcm_image_iod_spec: Optional[str] = None
     skip_derived = False
-    for i_acq, s in enumerate(seqinfo):
+    for i_acq, curr_seqinfo in enumerate(seqinfo):
         # XXX: skip derived sequences, we don't store them to avoid polluting
         # the directory, unless it is the motion corrected ones
         # (will get _rec-moco suffix)
-        if skip_derived and s.is_derived and not s.is_motion_corrected:
-            skipped.append(s.series_id)
-            lgr.debug("Ignoring derived data %s", s.series_id)
+        if (
+            skip_derived
+            and curr_seqinfo.is_derived
+            and not curr_seqinfo.is_motion_corrected
+        ):
+            skipped.append(curr_seqinfo.series_id)
+            lgr.debug("Ignoring derived data %s", curr_seqinfo.series_id)
             continue
 
         if i_acq == 0:
+            prev_seqinfo = None
             prev_dcm_image_iod_spec = None
-            prev_image_type_datatype = None
         else:
-            prev_dcm_image_iod_spec = seqinfo[i_acq - 1].image_type[2]
-            prev_image_type_datatype = {
-                # Note: P and M are too generic to make a decision here, could be
-                #  for different datatypes (bold, fmap, etc)
-                "FMRI": "func",
-                "MPR": "anat",
-                "DIFFUSION": "dwi",
-                "MIP_SAG": "anat",  # angiography
-                "MIP_COR": "anat",  # angiography
-                "MIP_TRA": "anat",  # angiography
-            }.get(prev_dcm_image_iod_spec, None)
+            prev_seqinfo = seqinfo[i_acq - 1]
+            for f in "series_description", "protocol_name":
+                prev_seqinfo = prev_seqinfo._replace(
+                    **{f: getattr(prev_seqinfo, f).format(**prev_seqinfo._asdict())}
+                )
+
+            prev_dcm_image_iod_spec = prev_seqinfo.image_type[2]
 
         if i_acq == (len(seqinfo) - 1):
+            next_seqinfo = None
             next_dcm_image_iod_spec = None
-            next_image_type_datatype = None
         else:
-            next_dcm_image_iod_spec = seqinfo[i_acq + 1].image_type[2]
-            next_image_type_datatype = {
-                # Note: P and M are too generic to make a decision here, could be
-                #  for different datatypes (bold, fmap, etc)
-                "FMRI": "func",
-                "MPR": "anat",
-                "DIFFUSION": "dwi",
-                "MIP_SAG": "anat",  # angiography
-                "MIP_COR": "anat",  # angiography
-                "MIP_TRA": "anat",  # angiography
-            }.get(next_dcm_image_iod_spec, None)
+            next_seqinfo = seqinfo[i_acq + 1]
+            for f in "series_description", "protocol_name":
+                next_seqinfo = next_seqinfo._replace(
+                    **{f: getattr(next_seqinfo, f).format(**next_seqinfo._asdict())}
+                )
+
+            next_dcm_image_iod_spec = next_seqinfo.image_type[2]
 
         # possibly apply present formatting in the series_description or protocol name
         for f in "series_description", "protocol_name":
-            s = s._replace(**{f: getattr(s, f).format(**s._asdict())})
+            curr_seqinfo = curr_seqinfo._replace(
+                **{f: getattr(curr_seqinfo, f).format(**curr_seqinfo._asdict())}
+            )
 
         template = None
         suffix = ""
         # seq = []
 
-        # figure out type of image from s.image_info -- just for checking ATM
+        # figure out type of image from curr_seqinfo.image_info -- just for checking ATM
         # since we primarily rely on encoded in the protocol name information
-        prev_dcm_image_iod_spec = dcm_image_iod_spec
-        if len(s.image_type) > 2:
+        if len(curr_seqinfo.image_type) > 2:
             # https://dicom.innolitics.com/ciods/cr-image/general-image/00080008
             # 0 - ORIGINAL/DERIVED
             # 1 - PRIMARY/SECONDARY
             # 3 - Image IOD specific specialization (optional)
-            dcm_image_iod_spec = s.image_type[2]
+            dcm_image_iod_spec = curr_seqinfo.image_type[2]
             image_type_datatype = {
                 # Note: P and M are too generic to make a decision here, could be
                 #  for different datatypes (bold, fmap, etc)
@@ -476,7 +473,7 @@ def infotodict(
 
         series_info = {}  # For please lintian and its friends
         for sfield in series_spec_fields:
-            svalue = getattr(s, sfield)
+            svalue = getattr(curr_seqinfo, sfield)
             series_info = parse_series_spec(svalue)
             if series_info:  # looks like a valid spec - we are done
                 series_spec = svalue
@@ -487,10 +484,10 @@ def infotodict(
         if not series_info:
             series_spec = None  # we cannot know better
             lgr.warning(
-                "Could not determine the series name by looking at " "%s fields",
+                "Could not determine the series name by looking at %s fields",
                 ", ".join(series_spec_fields),
             )
-            skipped_unknown.append(s.series_id)
+            skipped_unknown.append(curr_seqinfo.series_id)
             continue
 
         if dcm_image_iod_spec and dcm_image_iod_spec.startswith("MIP"):
@@ -509,14 +506,14 @@ def infotodict(
                 series_spec,
             )
 
-        # if s.is_derived:
+        # if curr_seqinfo.is_derived:
         #     # Let's for now stash those close to original images
         #     # TODO: we might want a separate tree for all of this!?
         #     # so more of a parameter to the create_key
         #     #datatype += '/derivative'
         #     # just keep it lower case and without special characters
         #     # XXXX what for???
-        #     #seq.append(s.series_description.lower())
+        #     #seq.append(curr_seqinfo.series_description.lower())
         #     prefix = os.path.join('derivatives', 'scanner')
         # else:
         #     prefix = ''
@@ -526,17 +523,30 @@ def infotodict(
         # Figure out the datatype_suffix (BIDS _suffix)
         #
         # If none was provided -- let's deduce it from the information we find:
-        # analyze s.protocol_name (series_id is based on it) for full name mapping etc
+        # analyze curr_seqinfo.protocol_name (series_id is based on it) for full name mapping etc
         if not datatype_suffix:
             if datatype == "func":
                 if "_pace_" in series_spec:
                     datatype_suffix = "pace"  # or should it be part of seq-
-                elif "P" in s.image_type:
+                elif (
+                    "P" in curr_seqinfo.image_type
+                    and not curr_seqinfo.series_description.endswith("_SBRef")
+                ):
                     datatype_suffix = "bold"
                     series_info["part"] = "phase"
-                elif "M" in s.image_type:
+                elif "M" in curr_seqinfo.image_type:
                     datatype_suffix = "bold"
-                    series_info["part"] = "mag"
+
+                    # if next one is phase fMRI, we should set part to mag
+                    if (
+                        (
+                            next_seqinfo.series_description
+                            == curr_seqinfo.series_description
+                        )
+                        and (next_dcm_image_iod_spec == "P")
+                        and not curr_seqinfo.series_description.endswith("_SBRef")
+                    ):
+                        series_info["part"] = "mag"
                 else:
                     # assume bold by default
                     datatype_suffix = "bold"
@@ -561,7 +571,7 @@ def infotodict(
         # since they are complementary files produced along-side with original
         # ones.
         #
-        if s.series_description.endswith("_SBRef"):
+        if curr_seqinfo.series_description.endswith("_SBRef"):
             datatype_suffix = "sbref"
 
         if not datatype_suffix:
@@ -585,7 +595,10 @@ def infotodict(
                         # XXX if we have a known earlier study, we need to always
                         # increase the run counter for phasediff because magnitudes
                         # were not acquired
-                        if get_study_hash([s]) == "9d148e2a05f782273f6343507733309d":
+                        if (
+                            get_study_hash([curr_seqinfo])
+                            == "9d148e2a05f782273f6343507733309d"
+                        ):
                             current_run += 1
                         else:
                             raise RuntimeError(
@@ -618,10 +631,10 @@ def infotodict(
             run_label = None
 
         # yoh: had a wrong assumption
-        # if s.is_motion_corrected:
-        #     assert s.is_derived, "Motion corrected images must be 'derived'"
+        # if curr_seqinfo.is_motion_corrected:
+        #     assert curr_seqinfo.is_derived, "Motion corrected images must be 'derived'"
 
-        if s.is_motion_corrected and "rec-" in series_info.get("bids", ""):
+        if curr_seqinfo.is_motion_corrected and "rec-" in series_info.get("bids", ""):
             raise NotImplementedError(
                 "want to add _rec-moco but there is _rec- already"
             )
@@ -646,7 +659,7 @@ def infotodict(
             from_series_info("acq"),
             # But we want to add an indicator in case it was motion corrected
             # in the magnet. ref sample  /2017/01/03/qa
-            None if not s.is_motion_corrected else "rec-moco",
+            None if not curr_seqinfo.is_motion_corrected else "rec-moco",
             from_series_info("dir"),
             series_info.get("bids"),
             run_label,
@@ -658,7 +671,7 @@ def infotodict(
         suffix = "_".join(filter(bool, filename_suffix_parts))  # type: ignore[arg-type]
 
         # # .series_description in case of
-        # sdesc = s.study_description
+        # sdesc = curr_seqinfo.study_description
         # # temporary aliases for those phantoms which we already collected
         # # so we rename them into this
         # #MAPPING
@@ -675,13 +688,16 @@ def infotodict(
         # https://github.com/nipy/heudiconv/issues/145
         outtype: tuple[str, ...]
         if (
-            "_Scout" in s.series_description
+            "_Scout" in curr_seqinfo.series_description
             or (
                 datatype == "anat"
                 and filename_suffix_parts[-1]
                 and filename_suffix_parts[-1].startswith("scout")
             )
-            or (s.series_description.lower() == s.protocol_name.lower() + "_setter")
+            or (
+                curr_seqinfo.series_description.lower()
+                == curr_seqinfo.protocol_name.lower() + "_setter"
+            )
         ):
             outtype = ("dicom",)
         else:
@@ -691,7 +707,7 @@ def infotodict(
         # we wanted ordered dict for consistent demarcation of dups
         if template not in info:
             info[template] = []
-        info[template].append(s.series_id)
+        info[template].append(curr_seqinfo.series_id)
 
     if skipped:
         lgr.info("Skipped %d sequences: %s" % (len(skipped), skipped))
