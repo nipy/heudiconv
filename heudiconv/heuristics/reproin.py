@@ -527,25 +527,6 @@ def infotodict(
             if datatype == "func":
                 if "_pace_" in series_spec:
                     datatype_suffix = "pace"  # or should it be part of seq-
-                elif (
-                    "P" in curr_seqinfo.image_type
-                    and not curr_seqinfo.series_description.endswith("_SBRef")
-                ):
-                    datatype_suffix = "bold"
-                    series_info["part"] = "phase"
-                elif "M" in curr_seqinfo.image_type:
-                    datatype_suffix = "bold"
-
-                    # if next one is phase fMRI, we should set part to mag
-                    if (
-                        (
-                            next_seqinfo.series_description
-                            == curr_seqinfo.series_description
-                        )
-                        and (next_dcm_image_iod_spec == "P")
-                        and not curr_seqinfo.series_description.endswith("_SBRef")
-                    ):
-                        series_info["part"] = "mag"
                 else:
                     # assume bold by default
                     datatype_suffix = "bold"
@@ -564,6 +545,20 @@ def infotodict(
             elif datatype == "dwi":
                 # label for dwi as well
                 datatype_suffix = "dwi"
+
+            # Add "part" entity as needed
+            if datatype != "fmap" and not curr_seqinfo.series_description.endswith(
+                "_SBRef"
+            ):
+                if "P" in curr_seqinfo.image_type:
+                    series_info["part"] = "phase"
+                elif "M" in curr_seqinfo.image_type:
+                    # if next one is phase from same scan, we should set part to mag
+                    if (
+                        next_seqinfo.series_description
+                        == curr_seqinfo.series_description
+                    ) and (next_dcm_image_iod_spec == "P"):
+                        series_info["part"] = "mag"
 
         #
         # Even if datatype_suffix was provided, for some data we might need to override,
