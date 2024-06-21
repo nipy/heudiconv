@@ -61,7 +61,6 @@ where
             (e.g. _task-memory_run-01, _task-oddball_run-02)
      fmap - field maps
      dwi  - diffusion weighted imaging (also can as well have runs)
-     perf - perfusion imaging
 
    The other BIDS modalities are not known ATM and their data will not be
    converted and will be just skipped (with a warning). Full list of datatypes
@@ -218,7 +217,7 @@ POPULATE_INTENDED_FOR_OPTS = {
 }
 
 
-KNOWN_DATATYPES = {"anat", "func", "dwi", "behav", "fmap", "perf"}
+KNOWN_DATATYPES = {"anat", "func", "dwi", "behav", "fmap"}
 
 
 def _delete_chars(from_str: str, deletechars: str) -> str:
