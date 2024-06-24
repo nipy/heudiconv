@@ -416,7 +416,6 @@ def infotodict(
             continue
 
         if i_acq == 0:
-            prev_seqinfo = None
             prev_dcm_image_iod_spec = None
         else:
             prev_seqinfo = seqinfo[i_acq - 1]
@@ -428,7 +427,7 @@ def infotodict(
             prev_dcm_image_iod_spec = prev_seqinfo.image_type[2]
 
         if i_acq == (len(seqinfo) - 1):
-            next_seqinfo = None
+            next_series_description = None
             next_dcm_image_iod_spec = None
         else:
             next_seqinfo = seqinfo[i_acq + 1]
@@ -437,6 +436,7 @@ def infotodict(
                     **{f: getattr(next_seqinfo, f).format(**next_seqinfo._asdict())}
                 )
 
+            next_series_description = next_seqinfo.series_description
             next_dcm_image_iod_spec = next_seqinfo.image_type[2]
 
         # possibly apply present formatting in the series_description or protocol name
@@ -555,8 +555,7 @@ def infotodict(
                 elif "M" in curr_seqinfo.image_type:
                     # if next one is phase from same scan, we should set part to mag
                     if (
-                        next_seqinfo.series_description
-                        == curr_seqinfo.series_description
+                        next_series_description == curr_seqinfo.series_description
                     ) and (next_dcm_image_iod_spec == "P"):
                         series_info["part"] = "mag"
 
