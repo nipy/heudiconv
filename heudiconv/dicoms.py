@@ -94,6 +94,9 @@ def create_seqinfo(
     elif dcminfo.get([0x19, 0x109C]):
         # Siemens
         sequence_name = dcminfo[0x19, 0x109C].value
+    elif dcminfo.get([0x18, 0x9005]):
+        # Siemens XA
+        sequence_name = dcminfo[0x18, 0x9005].value
     else:
         sequence_name = ""
 
