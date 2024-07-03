@@ -9,85 +9,113 @@ tags:
  - open science
  - FOSS
 authors:
- - name: Yaroslav O. Halchenko  # 626 commits, issues: opened 81 participated in 146
+ - given-names: Yaroslav O.
+   surname: Halchenko # 626 commits, issues: opened 81 participated in 146
    orcid: 0000-0003-3456-2493
    affiliation: 1
- - name: Mathias Goncalves  # 287 commits, issues: opened 16 participated in 98
+ - given-names: Mathias
+   surname: Goncalves # 287 commits, issues: opened 16 participated in 98
    orcid: 0000-0002-7252-7771
    affiliation: 2
- - name: Satrajit Ghosh  # 77 commits, issues: opened 16 participated in 62
+ - given-names: Satrajit
+   surname: Ghosh  # 77 commits, issues: opened 16 participated in 62
    orcid: 0000-0002-5312-6729
    affiliation: 3
- - name: Pablo Velasco  # 113 commits, issues: opened 6 participated in 22
+ - given-names: Pablo
+   surname: Velasco  # 113 commits, issues: opened 6 participated in 22
    orcid: 0000-0002-5749-6049
    affiliation: 4
- - name: Matteo Visconti di Oleggio Castello  # 88 commits, issues: opened 2 participated in 1
+ - given-names: Matteo
+   surname: Visconti di Oleggio Castello  # 88 commits, issues: opened 2 participated in 1
    orcid: 0000-0001-7931-5272
    affiliation: 5
- - name: Taylor Salo  # 76 commits, issues: opened 11 participated in 4
+ - given-names: Taylor
+   surname: Salo  # 76 commits, issues: opened 11 participated in 4
    orcid: 0000-0001-9813-3167
    affiliation: 6
- - name: John T. Wodder II  # 58 commits, issues: opened 2 participated in 4
+ - given-names: John T.
+   surname: Wodder # 58 commits, issues: opened 2 participated in 4
+   suffix: II
    orcid:
    affiliation: 1
- - name: Michael Hanke  # 32 commits, issues: opened 10 participated in 6
+ - given-names: Michael
+   surname: Hanke  # 32 commits, issues: opened 10 participated in 6
    orcid: 0000-0001-6398-6370
    affiliation: 7, 8
- - name: Patrick Sadil  # 18 commits, issues: opened 3 participated in 2
+ - given-names: Patrick
+   surname: Sadil  # 18 commits, issues: opened 3 participated in 2
    orcid: 0000-0003-4141-1343
    affiliation: 9
- - name: Krzysztof Jacek Gorgolewski  # 4 commits, issues: opened 7 participated in 10
+ - given-names: Krzysztof Jacek
+   surname: Gorgolewski  # 4 commits, issues: opened 7 participated in 10
    orcid: 0000-0003-3321-7583
    affiliation: 10
- - name: Horea-Ioan Ioanas   # 17 commits, issues: opened 1 participated in 1
+ - given-names: Horea-Ioan
+   surname: Ioanas   # 17 commits, issues: opened 1 participated in 1
    orcid: 0000-0001-7037-2449
    affiliation: 1
- - name: Chris Rorden  # 0 commits, issues: opened 1 participated in 17
+ - given-names: Chris
+   surname: Rorden  # 0 commits, issues: opened 1 participated in 17
    orcid: 0000-0002-7554-6142
    affiliation: 11
- - name: Timothy J. Hendrickson  # 0 commits, issues: opened 10 participated in 4
+ - given-names: Timothy J.
+   surname: Hendrickson  # 0 commits, issues: opened 10 participated in 4
    orcid: 0000-0001-6862-6526
    affiliation: 12, 13
- - name: Michael Dayan  # 12 commits, issues: opened 1 participated in 2
+ - given-names: Michael
+   surname: Dayan  # 12 commits, issues: opened 1 participated in 2
    orcid: 0000-0002-2666-0969
    affiliation: 14
- - name: Sean Dae Houlihan  # 12 commits, issues: opened 0 participated in 0 # First: Sean Dae; Last: Houlihan
+ - given-names: Sean Dae
+   surmame: Houlihan  # 12 commits, issues: opened 0 participated in 0 # First: Sean Dae; Last: Houlihan
    orcid: 0000-0001-5003-9278
    affiliation: 1, 15
- - name: James Kent  # 8 commits, issues: opened 3 participated in 0
+ - given-names: James
+   surname: Kent  # 8 commits, issues: opened 3 participated in 0
    orcid: 0000-0002-4892-2659
    affiliation: 16
- - name: Ted Strauss  # 0 commits, issues: opened 8 participated in 0
+ - given-names: Ted
+   surname: Strauss  # 0 commits, issues: opened 8 participated in 0
    orcid: 0000-0002-1927-666X
    affiliation: 17
- - name: John Lee  # 2 commits, issues: opened 5 participated in 1
+ - given-names: John
+   surname: Lee  # 2 commits, issues: opened 5 participated in 1
    orcid: 0000-0001-5884-4247
    affiliation: 18
- - name: Isaac To  # 7 commits, issues: opened 0 participated in 0
+ - given-names: Isaac
+   surname: To  # 7 commits, issues: opened 0 participated in 0
    orcid: 0000-0002-4740-0824
    affiliation: 1
- - name: Christopher J. Markiewicz  # 4 commits, issues: opened 1 participated in 2
+ - given-names: Christopher J.
+   surname: Markiewicz  # 4 commits, issues: opened 1 participated in 2
    orcid: 0000-0002-6533-164X
    affiliation: 2
- - name: Darren Lukas  # 4 commits, issues: opened 1 participated in 2
+ - given-names: Darren
+   surname: Lukas  # 4 commits, issues: opened 1 participated in 2
    orcid: 0009-0003-6941-0833
    affiliation: 19
- - name: Ellyn R. Butler  # 0 commits, issues: opened 4 participated in 2
+ - given-names: Ellyn R.
+   surname: Butler  # 0 commits, issues: opened 4 participated in 2
    orcid: 0000-0001-6316-6444
    affiliation: 20
- - name: Todd Thompson  # 0 commits, issues: opened 5 participated in 0
+ - given-names: Todd
+   surname: Thompson  # 0 commits, issues: opened 5 participated in 0
    orcid:
    affiliation: 15
- - name: Maite Termenon  # 0 commits, issues: opened 5 participated in 0
+ - given-names: Maite
+   surname: Termenon  # 0 commits, issues: opened 5 participated in 0
    orcid: 0000-0001-8102-5135
    affiliation: 21, 22
- - name: David V. Smith  # 0 commits, issues: opened 4 participated in 1
+ - given-names: David V.
+   surname: Smith  # 0 commits, issues: opened 4 participated in 1
    orcid: 0000-0001-5754-9633
    affiliation: 23
- - name: Austin Macdonald  # 2 commits, issues: opened 1 participated in 1 + 1 commit in paper repo
+ - given-names: Austin
+   surname: Macdonald  # 2 commits, issues: opened 1 participated in 1 + 1 commit in paper repo
    orcid: 0000-0002-8124-807X
    affiliation: 1
- - name: David N. Kennedy  # Benevolent leader of ReproNim who holds the umbrella and was brave to try a number of times
+ - given-names: David N.
+   surname: Kennedy  # Benevolent leader of ReproNim who holds the umbrella and was brave to try a number of times
    orcid: 0000-0002-9377-0797
    affiliation: 24
 affiliations:
