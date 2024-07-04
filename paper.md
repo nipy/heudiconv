@@ -67,7 +67,7 @@ authors:
    orcid: 0000-0002-2666-0969
    affiliation: 14
  - given-names: Sean Dae
-   surmame: Houlihan  # 12 commits, issues: opened 0 participated in 0 # First: Sean Dae; Last: Houlihan
+   surname: Houlihan  # 12 commits, issues: opened 0 participated in 0 # First: Sean Dae; Last: Houlihan
    orcid: 0000-0001-5003-9278
    affiliation: 1, 15
  - given-names: James
