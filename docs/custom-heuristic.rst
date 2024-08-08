@@ -316,4 +316,3 @@ Suppose you want to use the values in the field ``image_type``?  It is not a num
 Note that this differs from testing for a string because you cannot test for any substring (e.g., 'TEST' would not work).  String tests will not work on a tuple datatype.
 
 .. Note:: *image_type* is described in the `DICOM specification <https://dicom.innolitics.com/ciods/mr-image/general-image/00080008>`_
-

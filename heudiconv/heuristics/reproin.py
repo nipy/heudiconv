@@ -280,8 +280,8 @@ def fix_canceled_runs(seqinfo: list[SeqInfo]) -> list[SeqInfo]:
     """Function that adds cancelme_ to known bad runs which were forgotten"""
     if not fix_accession2run:
         return seqinfo  # nothing to do
-    for i, s in enumerate(seqinfo):
-        accession_number = s.accession_number
+    for i, curr_seqinfo in enumerate(seqinfo):
+        accession_number = curr_seqinfo.accession_number
         if accession_number and accession_number in fix_accession2run:
             lgr.info(
                 "Considering some runs possibly marked to be "
@@ -292,12 +292,12 @@ def fix_canceled_runs(seqinfo: list[SeqInfo]) -> list[SeqInfo]:
             # a single accession, but left as is for now
             badruns = fix_accession2run[accession_number]
             badruns_pattern = "|".join(badruns)
-            if re.match(badruns_pattern, s.series_id):
-                lgr.info("Fixing bad run {0}".format(s.series_id))
+            if re.match(badruns_pattern, curr_seqinfo.series_id):
+                lgr.info("Fixing bad run {0}".format(curr_seqinfo.series_id))
                 fixedkwargs = dict()
                 for key in series_spec_fields:
-                    fixedkwargs[key] = "cancelme_" + getattr(s, key)
-                seqinfo[i] = s._replace(**fixedkwargs)
+                    fixedkwargs[key] = "cancelme_" + getattr(curr_seqinfo, key)
+                seqinfo[i] = curr_seqinfo._replace(**fixedkwargs)
     return seqinfo
 
 
@@ -341,11 +341,11 @@ def _apply_substitutions(
     seqinfo: list[SeqInfo], substitutions: list[tuple[str, str]], subs_scope: str
 ) -> None:
     lgr.info("Considering %s substitutions", subs_scope)
-    for i, s in enumerate(seqinfo):
+    for i, curr_seqinfo in enumerate(seqinfo):
         fixed_kwargs = dict()
         # need to replace both protocol_name series_description
         for key in series_spec_fields:
-            oldvalue = value = getattr(s, key)
+            oldvalue = value = getattr(curr_seqinfo, key)
             # replace all I need to replace
             for substring, replacement in substitutions:
                 value = re.sub(substring, replacement, value)
@@ -353,7 +353,7 @@ def _apply_substitutions(
                 lgr.info(" %s: %r -> %r", key, oldvalue, value)
             fixed_kwargs[key] = value
         # namedtuples are immutable
-        seqinfo[i] = s._replace(**fixed_kwargs)
+        seqinfo[i] = curr_seqinfo._replace(**fixed_kwargs)
 
 
 def fix_seqinfo(seqinfo: list[SeqInfo]) -> list[SeqInfo]:
@@ -588,10 +588,7 @@ def infotodict(
                         # XXX if we have a known earlier study, we need to always
                         # increase the run counter for phasediff because magnitudes
                         # were not acquired
-                        if (
-                            get_study_hash([curr_seqinfo])
-                            == "9d148e2a05f782273f6343507733309d"
-                        ):
+                        if get_study_hash([curr_seqinfo]) == "9d148e2a05f782273f6343507733309d":
                             current_run += 1
                         else:
                             raise RuntimeError(
@@ -808,7 +805,7 @@ def infotoids(seqinfos: Iterable[SeqInfo], outdir: str) -> dict[str, Optional[st
 
     # So -- use `outdir` and locator etc to see if for a given locator/subject
     # and possible ses+ in the sequence names, so we would provide a sequence
-    # So might need to go through  parse_series_spec(s.protocol_name)
+    # So might need to go through  parse_series_spec(curr_seqinfo.protocol_name)
     # to figure out presence of sessions.
     ses_markers: list[str] = []
 

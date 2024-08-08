@@ -3,7 +3,7 @@ Quickstart
 
 This tutorial is based on `Dianne Patterson's University of Arizona tutorials <https://neuroimaging-core-docs.readthedocs.io/en/latest/pages/heudiconv.html#lesson-3-reproin-py>`_
 
-This guide assumes you have already :ref:`installed heudiconv and dcm2niix <install_local>` and 
+This guide assumes you have already :ref:`installed heudiconv and dcm2niix <install_local>` and
 demonstrates how to use the heudiconv tool with a provided `heuristic.py` to convert DICOMS into the BIDS data structure.
 
 .. _prepare_dataset:
@@ -11,7 +11,7 @@ demonstrates how to use the heudiconv tool with a provided `heuristic.py` to con
 Prepare Dataset
 ***************
 
-Download and unzip `sub-219_dicom.zip <https://datasets.datalad.org/?dir=/repronim/heudiconv-tutorial-example/>`_. 
+Download and unzip `sub-219_dicom.zip <https://datasets.datalad.org/?dir=/repronim/heudiconv-tutorial-example/>`_.
 
 We will be working from a directory called MRIS. Under the MRIS directory is the *dicom* subdirectory: Under the subject number *219* the session *itbs* is nested.  Each dicom sequence folder is nested under the session::
 
@@ -29,7 +29,7 @@ We will be working from a directory called MRIS. Under the MRIS directory is the
             ├── field_mapping_21
             └── restingstate_18
     Nifti
-    └── code 
+    └── code
         └── heuristic1.py
 
 Basic Conversion
@@ -57,36 +57,36 @@ Run the following command::
 
 Output
 ******
-    
+
 The *Nifti* directory will contain a bids-compliant subject directory::
-    
-    
+
+
         └── sub-219
             └── ses-itbs
                 ├── anat
                 ├── dwi
                 ├── fmap
                 └── func
-    
+
 The following required BIDS text files are also created in the Nifti directory. Details for filling in these skeleton text files can be found under `tabular files <https://bids-specification.readthedocs.io/en/stable/02-common-principles.html#tabular-files>`_ in the BIDS specification::
-    
+
         CHANGES
         README
         dataset_description.json
         participants.json
         participants.tsv
         task-rest_bold.json
-    
+
 Validation
 **********
 
-Ensure that everything is according to spec by using `bids validator <https://bids-standard.github.io/bids-validator/>`_ 
+Ensure that everything is according to spec by using `bids validator <https://bids-standard.github.io/bids-validator/>`_
 
 Click `Choose File` and then select the *Nifti* directory.  There should be no errors (though there are a couple of warnings).
-    
+
       .. Note:: Your files are not uploaded to the BIDS validator, so there are no privacy concerns!
-    
-Next 
+
+Next
 ****
 
 In the following sections, you will modify *heuristic.py* yourself so you can test different options and understand how to work with your own data.

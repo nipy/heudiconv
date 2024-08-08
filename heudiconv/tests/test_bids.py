@@ -179,6 +179,24 @@ def test_get_key_info_for_fmap_assignment(
             json_name, matching_parameter="CustomAcquisitionLabel"
         )
 
+    # 7) matching_parameter = 'PlainAcquisitionLabel'
+    A_LABEL = gen_rand_label(label_size, label_seed)
+    for d in ["fmap", "func", "dwi", "anat"]:
+        (tmp_path / d).mkdir(parents=True, exist_ok=True)
+
+    for dirname, fname, expected_key_info in [
+        ("fmap", f"sub-foo_acq-{A_LABEL}_epi.json", A_LABEL),
+        ("func", f"sub-foo_task-foo_acq-{A_LABEL}_bold.json", A_LABEL),
+        ("func", f"sub-foo_task-bar_acq-{A_LABEL}_bold.json", A_LABEL),
+        ("dwi", f"sub-foo_acq-{A_LABEL}_dwi.json", A_LABEL),
+        ("anat", f"sub-foo_acq-{A_LABEL}_T1w.json", A_LABEL),
+    ]:
+        json_name = op.join(tmp_path, dirname, fname)
+        save_json(json_name, {SHIM_KEY: A_SHIM})
+        assert [expected_key_info] == get_key_info_for_fmap_assignment(
+            json_name, matching_parameter="PlainAcquisitionLabel"
+        )
+
     # Finally: invalid matching_parameters:
     assert (
         get_key_info_for_fmap_assignment(json_name, matching_parameter="Invalid") == []

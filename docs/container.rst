@@ -4,7 +4,7 @@ Using heudiconv in a Container
 
 If heudiconv is :ref:`installed via a Docker container <install_container>`, you
 can run the commands in the following format::
-   
+
     docker run nipy/heudiconv:latest [heudiconv options]
 
 So a user running via container would check the version with this command::
@@ -46,4 +46,3 @@ We typically recommend users make use of the following flags to Docker and Podma
 
 * ``-it`` Interactive terminal
 * ``--rm`` Remove the changes to the container when it completes
-

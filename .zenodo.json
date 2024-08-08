@@ -145,5 +145,6 @@
     ],
     "access_right": "open",
     "license": "Apache-2.0",
-    "upload_type": "software"
+    "upload_type": "software",
+    "title": "HeuDiConv — flexible DICOM conversion into structured directory layouts"
 }
