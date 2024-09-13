@@ -1,3 +1,36 @@
+# v1.2.0 (Fri Sep 13 2024)
+
+#### 🚀 Enhancement
+
+- [ENH] add PlainAcquisitionLabel IntendedFor method [#768](https://github.com/nipy/heudiconv/pull/768) ([@octomike](https://github.com/octomike))
+
+#### 🐛 Bug Fix
+
+- Fixup testing: kludge for pydicom 3.0.0 in dcmstack, ignore some warnings from nipype for python 3.12 [#782](https://github.com/nipy/heudiconv/pull/782) ([@yarikoptic](https://github.com/yarikoptic))
+- Add JOSS paper badge to README.md (leading) ([@yarikoptic](https://github.com/yarikoptic))
+- Provide title matching JOSS publication as the title in .zenodo.json ([@yarikoptic](https://github.com/yarikoptic))
+
+#### 🏠 Internal
+
+- Rename s variable to curr_seqinfo in reproin heuristic [#779](https://github.com/nipy/heudiconv/pull/779) ([@tsalo](https://github.com/tsalo))
+
+#### 📝 Documentation
+
+- run pre-commit on all files to avoid unrelated errors in other PRs. [#778](https://github.com/nipy/heudiconv/pull/778) ([@bpinsard](https://github.com/bpinsard))
+
+#### 🧪 Tests
+
+- Run tests weekly to ensure we are still good [#781](https://github.com/nipy/heudiconv/pull/781) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 4
+
+- Basile ([@bpinsard](https://github.com/bpinsard))
+- Michael ([@octomike](https://github.com/octomike))
+- Taylor Salo ([@tsalo](https://github.com/tsalo))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v1.1.6 (Thu Jun 06 2024)
 
 #### 🏠 Internal
