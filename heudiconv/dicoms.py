@@ -46,6 +46,11 @@ with warnings.catch_warnings():
     # suppress warning
     import nibabel.nicom.dicomwrappers as dw
 
+# TODO: remove the kludge whenever
+# https://github.com/moloney/dcmstack/pull/90 is merged and released
+if not hasattr(dcm, "read_file"):
+    dcm.read_file = dcm.dcmread
+
 lgr = logging.getLogger(__name__)
 total_files = 0
 # Might be monkey patched by user heuristic to tune desired compression level.
