@@ -3,6 +3,9 @@ name: Test
 on:
   pull_request:
   push:
+  schedule:
+    # run weekly to ensure that we are still good
+    - cron: '1 2 * * 3'
 
 jobs:
   test:
