@@ -247,7 +247,7 @@ def get_study_sessions(
                     "`infotoids` to heuristic file or "
                     "provide `--subjects` option"
                 )
-            lgr.warning(
+            lgr.info(
                 "Heuristic is missing an `infotoids` method, assigning "
                 "empty method and using provided subject id %s. "
                 "Provide `session` and `locator` fields for best results.",
