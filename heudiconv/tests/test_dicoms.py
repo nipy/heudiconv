@@ -189,9 +189,8 @@ def test_create_seqinfo(
     assert seqinfo.sequence_name
 
 
-def test_get_reproducible_int() -> None:
-    dcmfile = op.join(TESTS_DATA_PATH, "phantom.dcm")
-
+@pytest.mark.parametrize("dcmfile", TEST_DICOM_PATHS)
+def test_get_reproducible_int(dcmfile) -> None:
     assert type(get_reproducible_int([dcmfile])) is int
 
 
