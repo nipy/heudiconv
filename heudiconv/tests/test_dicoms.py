@@ -21,7 +21,7 @@ from heudiconv.dicoms import (
     parse_private_csa_header,
 )
 
-from .utils import TESTS_DATA_PATH
+from .utils import TEST_DICOM_PATHS, TESTS_DATA_PATH
 
 # Public: Private DICOM tags
 DICOM_FIELDS_TO_TEST = {"ProtocolName": "tProtocolName"}
@@ -180,21 +180,13 @@ def test_get_datetime_from_dcm_wo_dt() -> None:
     assert get_datetime_from_dcm(XA30_enhanced_dcm) is None
 
 
-dicom_test_data = [
-    (dw.wrapper_from_file(d_file), [d_file], op.basename(d_file))
-    for d_file in glob(op.join(TESTS_DATA_PATH, "*.dcm"))
-]
-
-
-@pytest.mark.parametrize("mw,series_files,series_id", dicom_test_data)
+@pytest.mark.parametrize("dcmfile", TEST_DICOM_PATHS)
 def test_create_seqinfo(
-    mw: dw.Wrapper,
-    series_files: list[str],
-    series_id: str,
+    dcmfile,
 ) -> None:
-    seqinfo = create_seqinfo(mw, series_files, series_id)
-    assert seqinfo.sequence_name != ""
-    pass
+    mw = dw.wrapper_from_file(dcmfile)
+    seqinfo = create_seqinfo(mw, [dcmfile], op.basename(dcmfile))
+    assert seqinfo.sequence_name
 
 
 def test_get_reproducible_int() -> None:
