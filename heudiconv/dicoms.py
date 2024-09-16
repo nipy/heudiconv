@@ -94,15 +94,19 @@ def create_seqinfo(
     series_desc = get_typed_attr(dcminfo, "SeriesDescription", str, "")
     protocol_name = get_typed_attr(dcminfo, "ProtocolName", str, "")
 
-    if dcminfo.get([0x18, 0x24]):
-        # GE and Philips
-        sequence_name = dcminfo[0x18, 0x24].value
-    elif dcminfo.get([0x19, 0x109C]):
-        # Siemens
-        sequence_name = dcminfo[0x19, 0x109C].value
-    elif dcminfo.get([0x18, 0x9005]):
-        # Siemens XA
-        sequence_name = dcminfo[0x18, 0x9005].value
+    for k, m in (
+        ([0x18, 0x24], "GE and Philips"),
+        ([0x19, 0x109C], "Siemens"),
+        ([0x18, 0x9005], "Siemens XA"),
+    ):
+        if v := dcminfo.get(k):
+            sequence_name = v.value
+            lgr.debug(
+                "Identified sequence name as %s coming from the %r family of MR scanners",
+                sequence_name,
+                m,
+            )
+            break
     else:
         sequence_name = ""
 
