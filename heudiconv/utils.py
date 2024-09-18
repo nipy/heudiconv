@@ -713,10 +713,7 @@ def strptime(datetime_string: str, fmts: list[str]) -> datetime:
     datetime_str = datetime_string.strip()
     for fmt in fmts:
         try:
-            #return datetime.datetime.strptime(datetime_str, fmt)
-            retval = datetime.datetime.strptime(datetime_str, fmt)
-            print(retval)
-            return retval
+            return datetime.datetime.strptime(datetime_str, fmt)
         except ValueError:
             pass
     raise ValueError(f"Unable to parse datetime string: {datetime_str}")
@@ -741,9 +738,8 @@ def strptime_dcm_da_tm(dcm_data: dcm.Dataset, da_tag: TagType, tm_tag: TagType) 
 
     Parameters
     ----------
-    dcm_data : dcm.FileDataset
+    dcm_data : dcm.Dataset
         DICOM with header, e.g., as read by pydicom.dcmread.
-        Objects with __getitem__ and have those keys with values properly formatted may also work
     da_tag: str
       Dicom tag with DA value representation
     tm_tag: str
@@ -760,8 +756,8 @@ def strptime_dcm_da_tm(dcm_data: dcm.Dataset, da_tag: TagType, tm_tag: TagType) 
 
     datetime_obj = datetime.datetime.combine(date.date(), time.time())
 
-    if (0x0008, 0x0201) in dcm_data:
-        utc_offset = dcm_data[0x0008, 0x0201].value
+    if utc_offset_dcm := dcm_data.get([0x0008, 0x0201]):
+        utc_offset = utc_offset_dcm.value
         datetime_obj = datetime_utc_offset(datetime_obj, utc_offset) if utc_offset else datetime_obj
     return datetime_obj
 
@@ -783,9 +779,13 @@ def strptime_dcm_dt(dcm_data: dcm.Dataset, dt_tag: TagType) -> datetime:
             "%Y", "%Y%m", "%Y%m%d", "%Y%m%d%H", "%Y%m%d%H%M", "%Y%m%d%H%M%S", "%Y%m%d%H%M%S.%f"]
     datetime_obj = strptime(datetime_str, fmts)
 
-    if not datetime_obj.tzinfo and (0x0008, 0x0201) in dcm_data:
-        utc_offset = dcm_data[0x0008, 0x0201].value
-        datetime_obj = datetime_utc_offset(datetime_obj, utc_offset) if utc_offset else datetime_obj
+    if utc_offset_dcm := dcm_data.get([0x0008, 0x0201]):
+        if utc_offset := utc_offset_dcm.value:
+             datetime_obj2 = datetime_utc_offset(datetime_obj, utc_offset)
+             if datetime_obj.tzinfo and datetime_obj2 != datetime_obj:
+                 lgr.warning("Unexpectedly previously parsed datetime %s contains zoneinfo which is different from the one obtained from DICOMs UTFOffset field: %s", datetime_obj, datetime_obj2)
+             else:
+                 datetime_obj = datetime_obj2 
     return datetime_obj
 
 
