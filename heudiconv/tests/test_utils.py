@@ -229,7 +229,7 @@ def test_strptime_dcm_da_tm(tm: str, tm_fmt: str, offset: str, offset_fmt: str) 
     da_fmt = "%Y%m%d"
     target = datetime.strptime(da + tm + offset, da_fmt + tm_fmt + offset_fmt)
     ds = dcm.dataset.Dataset()
-    ds["AcquisitionDate"] = dcm.DataElement("AcquisitionDate","DA",da)
+    ds["AcquisitionDate"] = dcm.DataElement("AcquisitionDate", "DA", da)
     ds["AcquisitionTime"] = dcm.DataElement("AcquisitionTime", "TM", tm)
     if offset:
         ds[(0x0008, 0x0201)] = dcm.DataElement((0x0008, 0x0201), "SH", offset)
@@ -269,7 +269,7 @@ def test_strptime_dcm_dt(dt: str, dt_fmt: str, offset: str, offset_fmt: str) -> 
     else:
         target = datetime.strptime(dt + offset, dt_fmt + offset_fmt)
     ds = dcm.dataset.Dataset()
-    ds["AcquisitionDateTime"] = dcm.DataElement("AcquisitionDateTime","DT", dt)
+    ds["AcquisitionDateTime"] = dcm.DataElement("AcquisitionDateTime", "DT", dt)
     if offset:
         ds[(0x0008, 0x0201)] = dcm.DataElement((0x0008, 0x0201), "SH", offset)
     assert strptime_dcm_dt(ds, "AcquisitionDateTime") == target
