@@ -746,18 +746,18 @@ def strptime_dcm_da_tm(dcm_data: dcm.Dataset, da_tag: TagType, tm_tag: TagType) 
       Dicom tag with TM value representation
     """
     # https://dicom.nema.org/medical/dicom/current/output/chtml/part05/sect_6.2.html
-    date_str = dcm_data[da_tag].value
+    date_str = dcm_data[da_tag].value.strip()
     fmts = ["%Y%m%d",]
     date = strptime(date_str, fmts)
 
-    time_str = dcm_data[tm_tag].value
+    time_str = dcm_data[tm_tag].value.strip()
     fmts = ["%H", "%H%M", "%H%M%S", "%H%M%S.%f"]
     time = strptime(time_str, fmts)
 
     datetime_obj = datetime.datetime.combine(date.date(), time.time())
 
     if utc_offset_dcm := dcm_data.get([0x0008, 0x0201]):
-        utc_offset = utc_offset_dcm.value
+        utc_offset = utc_offset_dcm.value.strip()
         datetime_obj = datetime_utc_offset(datetime_obj, utc_offset) if utc_offset else datetime_obj
     return datetime_obj
 
@@ -774,13 +774,13 @@ def strptime_dcm_dt(dcm_data: dcm.Dataset, dt_tag: TagType) -> datetime:
       Dicom tag with DT value representation
     """
     # https://dicom.nema.org/medical/dicom/current/output/chtml/part05/sect_6.2.html
-    datetime_str = dcm_data.get(dt_tag)
+    datetime_str = dcm_data[dt_tag].value.strip()
     fmts = ["%Y%z", "%Y%m%z", "%Y%m%d%z", "%Y%m%d%H%z", "%Y%m%d%H%M%z", "%Y%m%d%H%M%S%z", "%Y%m%d%H%M%S.%f%z",
             "%Y", "%Y%m", "%Y%m%d", "%Y%m%d%H", "%Y%m%d%H%M", "%Y%m%d%H%M%S", "%Y%m%d%H%M%S.%f"]
     datetime_obj = strptime(datetime_str, fmts)
 
     if utc_offset_dcm := dcm_data.get([0x0008, 0x0201]):
-        if utc_offset := utc_offset_dcm.value:
+        if utc_offset := utc_offset_dcm.value.strip():
              datetime_obj2 = datetime_utc_offset(datetime_obj, utc_offset)
              if datetime_obj.tzinfo and datetime_obj2 != datetime_obj:
                  lgr.warning("Unexpectedly previously parsed datetime %s contains zoneinfo which is different from the one obtained from DICOMs UTFOffset field: %s", datetime_obj, datetime_obj2)
