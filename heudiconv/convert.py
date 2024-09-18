@@ -562,6 +562,15 @@ def convert(
 
     for item in items:
         prefix, outtypes, item_dicoms = item
+        if isinstance(outtypes, str):  # type: ignore[unreachable]
+            lgr.warning(  # type: ignore[unreachable]
+                "Provided output types %r of type 'str' instead "
+                "of a tuple for prefix %r. Likely need to fix-up your heuristic. "
+                "Meanwhile we are 'manually' converting to 'tuple'",
+                outtypes,
+                prefix,
+            )
+            outtypes = (outtypes,)
         prefix_dirname = op.dirname(prefix)
         outname_bids = prefix + ".json"
         bids_outfiles = []
