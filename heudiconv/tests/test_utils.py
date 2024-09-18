@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import IO, Any
 from unittest.mock import patch
 
+import pydicom as dcm
 import pytest
 
 from heudiconv.utils import (
@@ -23,6 +24,9 @@ from heudiconv.utils import (
     remove_suffix,
     save_json,
     strptime_micr,
+    strptime_bids,
+    strptime_dcm_da_tm,
+    strptime_dcm_dt,
     update_json,
 )
 
@@ -186,6 +190,89 @@ def test_strptime_micr(dt: str, fmt: str) -> None:
     assert strptime_micr(dt + ".1", fmt + "[.%f]") == datetime.strptime(
         dt + ".1", fmt + ".%f"
     )
+
+
+@pytest.mark.parametrize(
+    "dt, fmt",
+    [
+        ("2023-04-02T11:47:09", "%Y-%m-%dT%H:%M:%S"),
+        ("2023-04-02T11:47:09.0", "%Y-%m-%dT%H:%M:%S.%f"),
+        ("2023-04-02T11:47:09.000000", "%Y-%m-%dT%H:%M:%S.%f"),
+        ("2023-04-02T11:47:09.1", "%Y-%m-%dT%H:%M:%S.%f"),
+        ("2023-04-02T11:47:09-0900", "%Y-%m-%dT%H:%M:%S%z"),
+        ("2023-04-02T11:47:09.1-0900", "%Y-%m-%dT%H:%M:%S.%f%z"),
+    ],
+)
+def test_strptime_bids(dt: str, fmt: str) -> None:
+    target = datetime.strptime(dt, fmt)
+    assert strptime_bids(dt) == target
+
+
+@pytest.mark.parametrize(
+    "tm, tm_fmt",
+    [
+        ("114709.1", "%H%M%S.%f"),
+        ("114709", "%H%M%S"),
+        ("1147", "%H%M"),
+        ("11", "%H"),
+    ],
+)
+@pytest.mark.parametrize(
+    "offset, offset_fmt",
+    [
+        ("-0900", "%z"),
+        ('', ''),
+    ],
+)
+def test_strptime_dcm_da_tm(tm: str, tm_fmt: str, offset: str, offset_fmt: str) -> None:
+    da = "20230402"
+    da_fmt = "%Y%m%d"
+    target = datetime.strptime(da + tm + offset, da_fmt + tm_fmt + offset_fmt)
+    ds = dcm.dataset.Dataset()
+    ds["AcquisitionDate"] = dcm.DataElement("AcquisitionDate","DA",da)
+    ds["AcquisitionTime"] = dcm.DataElement("AcquisitionTime", "TM", tm)
+    if offset:
+        ds[(0x0008, 0x0201)] = dcm.DataElement((0x0008, 0x0201), "SH", offset)
+    assert strptime_dcm_da_tm(ds, "AcquisitionDate", "AcquisitionTime") == target
+
+
+@pytest.mark.parametrize(
+    "dt, dt_fmt",
+    [
+        ("20230402114709.1-0400", "%Y%m%d%H%M%S.%f%z"),
+        ("20230402114709-0400", "%Y%m%d%H%M%S%z"),
+        ("202304021147-0400", "%Y%m%d%H%M%z"),
+        ("2023040211-0400", "%Y%m%d%H%z"),
+        ("20230402-0400", "%Y%m%d%z"),
+        ("202304-0400", "%Y%m%z"),
+        ("2023-0400", "%Y%z"),
+        ("20230402114709.1", "%Y%m%d%H%M%S.%f"),
+        ("20230402114709", "%Y%m%d%H%M%S"),
+        ("202304021147", "%Y%m%d%H%M"),
+        ("2023040211", "%Y%m%d%H"),
+        ("20230402", "%Y%m%d"),
+        ("202304", "%Y%m"),
+        ("2023", "%Y"),
+    ],
+)
+@pytest.mark.parametrize(
+    "offset, offset_fmt",
+    [
+        ("-0900", "%z"),
+        ('', ''),
+    ],
+)
+def test_strptime_dcm_dt(dt: str, dt_fmt: str, offset: str, offset_fmt: str) -> None:
+    target = None
+    if dt_fmt[-2:] == "%z" and offset:
+        target = datetime.strptime(dt, dt_fmt)
+    else:
+        target = datetime.strptime(dt + offset, dt_fmt + offset_fmt)
+    ds = dcm.dataset.Dataset()
+    ds["AcquisitionDateTime"] = dcm.DataElement("AcquisitionDateTime","DT", dt)
+    if offset:
+        ds[(0x0008, 0x0201)] = dcm.DataElement((0x0008, 0x0201), "SH", offset)
+    assert strptime_dcm_dt(ds, "AcquisitionDateTime") == target
 
 
 def test_remove_suffix() -> None:

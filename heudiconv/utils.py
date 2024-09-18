@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from collections.abc import Mapping as MappingABC
 import copy
-from datetime import datetime
+import datetime
 from glob import glob
 import hashlib
 import json
@@ -13,6 +13,8 @@ import logging
 import os
 import os.path as op
 from pathlib import Path
+import pydicom as dcm
+from pydicom.tag import TagType
 import re
 import shutil
 import stat
@@ -662,7 +664,7 @@ def get_datetime(date: str, time: str, *, microseconds: bool = True) -> str:
         # add dummy microseconds if not available for strptime to parse
         time += ".000000"
     td = time + ":" + date
-    datetime_str = datetime.strptime(td, "%H%M%S.%f:%Y%m%d").isoformat()
+    datetime_str = datetime.datetime.strptime(td, "%H%M%S.%f:%Y%m%d").isoformat()
     if not microseconds:
         datetime_str = datetime_str.split(".", 1)[0]
     return datetime_str
@@ -686,7 +688,105 @@ def strptime_micr(date_string: str, fmt: str) -> datetime:
         fmt = fmt[: -len(optional_micr)]
         if re.search(r"\.\d+$", date_string):
             fmt += ".%f"
-    return datetime.strptime(date_string, fmt)
+    return datetime.datetime.strptime(date_string, fmt)
+
+
+def datetime_utc_offset(datetime_obj: datetime, utc_offset: str):
+    """set the datetime's tzinfo by parsing an utc offset string"""
+    sign, hours, minutes = re.match(r"([+\-]?)(\d{2})(\d{2})", utc_offset).groups()
+    sign = -1 if sign == '-' else 1
+    hours, minutes = int(hours), int(minutes)
+    tzinfo = datetime.timezone(sign * datetime.timedelta(hours=hours, minutes=minutes))
+    return datetime_obj.replace(tzinfo=tzinfo)
+
+def strptime(datetime_string: str, fmts: list[str]) -> datetime:
+    r"""
+    Try datetime.strptime on a list of formats returning the first successful attempt.
+
+    Parameters
+    ----------
+    datetime_string: str
+      Datetime string to parse
+    fmts: list[str]
+      List of format strings
+    """
+    datetime_str = datetime_string.strip()
+    for fmt in fmts:
+        try:
+            #return datetime.datetime.strptime(datetime_str, fmt)
+            retval = datetime.datetime.strptime(datetime_str, fmt)
+            print(retval)
+            return retval
+        except ValueError:
+            pass
+    raise ValueError(f"Unable to parse datetime string: {datetime_str}")
+
+def strptime_bids(datetime_string: str) -> datetime:
+    r"""
+    Create a datetime object from a bids datetime string.
+
+    Parameters
+    ----------
+    date_string: str
+      Datetime string to parse
+    """
+    # https://bids-specification.readthedocs.io/en/stable/common-principles.html#units
+    fmts = ["%Y-%m-%dT%H:%M:%S.%f%z", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S"]
+    datetime_obj = strptime(datetime_string, fmts)
+    return datetime_obj
+
+def strptime_dcm_da_tm(dcm_data: dcm.Dataset, da_tag: TagType, tm_tag: TagType) -> datetime:
+    r"""
+    Create a datetime object from a dicom DA tag and TM tag.
+
+    Parameters
+    ----------
+    dcm_data : dcm.FileDataset
+        DICOM with header, e.g., as read by pydicom.dcmread.
+        Objects with __getitem__ and have those keys with values properly formatted may also work
+    da_tag: str
+      Dicom tag with DA value representation
+    tm_tag: str
+      Dicom tag with TM value representation
+    """
+    # https://dicom.nema.org/medical/dicom/current/output/chtml/part05/sect_6.2.html
+    date_str = dcm_data[da_tag].value
+    fmts = ["%Y%m%d",]
+    date = strptime(date_str, fmts)
+
+    time_str = dcm_data[tm_tag].value
+    fmts = ["%H", "%H%M", "%H%M%S", "%H%M%S.%f"]
+    time = strptime(time_str, fmts)
+
+    datetime_obj = datetime.datetime.combine(date.date(), time.time())
+
+    if (0x0008, 0x0201) in dcm_data:
+        utc_offset = dcm_data[0x0008, 0x0201].value
+        datetime_obj = datetime_utc_offset(datetime_obj, utc_offset) if utc_offset else datetime_obj
+    return datetime_obj
+
+def strptime_dcm_dt(dcm_data: dcm.Dataset, dt_tag: TagType) -> datetime:
+    r"""
+    Create a datetime object from a dicom DT tag.
+
+    Parameters
+    ----------
+    dcm_data : dcm.FileDataset
+        DICOM with header, e.g., as read by pydicom.dcmread.
+        Objects with __getitem__ and have those keys with values properly formatted may also work
+    da_tag: str
+      Dicom tag with DT value representation
+    """
+    # https://dicom.nema.org/medical/dicom/current/output/chtml/part05/sect_6.2.html
+    datetime_str = dcm_data.get(dt_tag)
+    fmts = ["%Y%z", "%Y%m%z", "%Y%m%d%z", "%Y%m%d%H%z", "%Y%m%d%H%M%z", "%Y%m%d%H%M%S%z", "%Y%m%d%H%M%S.%f%z",
+            "%Y", "%Y%m", "%Y%m%d", "%Y%m%d%H", "%Y%m%d%H%M", "%Y%m%d%H%M%S", "%Y%m%d%H%M%S.%f"]
+    datetime_obj = strptime(datetime_str, fmts)
+
+    if not datetime_obj.tzinfo and (0x0008, 0x0201) in dcm_data:
+        utc_offset = dcm_data[0x0008, 0x0201].value
+        datetime_obj = datetime_utc_offset(datetime_obj, utc_offset) if utc_offset else datetime_obj
+    return datetime_obj
 
 
 def remove_suffix(s: str, suf: str) -> str:

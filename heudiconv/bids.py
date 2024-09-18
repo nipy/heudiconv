@@ -31,7 +31,7 @@ from .utils import (
     remove_suffix,
     save_json,
     set_readonly,
-    strptime_micr,
+    strptime_bids,
     update_json,
 )
 
@@ -952,17 +952,16 @@ def select_fmap_from_compatible_groups(
             k for k, v in acq_times_fmaps.items() if v == first_acq_time
         ][0]
     elif criterion == "Closest":
-        json_acq_time = strptime_micr(
+        json_acq_time = strptime_bids(
             acq_times[
                 # remove session folder and '.json', add '.nii.gz':
                 remove_suffix(remove_prefix(json_file, sess_folder + op.sep), ".json")
                 + ".nii.gz"
-            ],
-            "%Y-%m-%dT%H:%M:%S[.%f]",
+            ]
         )
         # differences in acquisition time (abs value):
         diff_fmaps_acq_times = {
-            k: abs(strptime_micr(v, "%Y-%m-%dT%H:%M:%S[.%f]") - json_acq_time)
+            k: abs(strptime_bids(v) - json_acq_time)
             for k, v in acq_times_fmaps.items()
         }
         min_diff_acq_times = sorted(diff_fmaps_acq_times.values())[0]
