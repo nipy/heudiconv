@@ -13,8 +13,6 @@ import logging
 import os
 import os.path as op
 from pathlib import Path
-import pydicom as dcm
-from pydicom.tag import TagType
 import re
 import shutil
 import stat
@@ -38,6 +36,9 @@ from typing import (
     overload,
 )
 import warnings
+
+import pydicom as dcm
+from pydicom.tag import TagType
 
 lgr = logging.getLogger(__name__)
 
@@ -697,21 +698,23 @@ def strptime_micr(date_string: str, fmt: str) -> datetime.datetime:
     return datetime.datetime.strptime(date_string, fmt)
 
 
-def datetime_utc_offset(datetime_obj: datetime.datetime, utc_offset: str) -> datetime.datetime:
+def datetime_utc_offset(
+    datetime_obj: datetime.datetime, utc_offset: str
+) -> datetime.datetime:
     """set the datetime's tzinfo by parsing an utc offset string"""
     # https://dicom.innolitics.com/ciods/electromyogram/sop-common/00080201
     extract_offset = re.match(r"([+\-]?)(\d{2})(\d{2})", utc_offset)
     if extract_offset is None:
         raise ValueError(f"utc offset {utc_offset} is not valid")
     sign, hours, minutes = extract_offset.groups()
-    sign = -1 if sign == '-' else 1
+    sign = -1 if sign == "-" else 1
     hours, minutes = int(hours), int(minutes)
     tzinfo = datetime.timezone(sign * datetime.timedelta(hours=hours, minutes=minutes))
     return datetime_obj.replace(tzinfo=tzinfo)
 
 
 def strptime(datetime_string: str, fmts: list[str]) -> datetime.datetime:
-    r"""
+    """
     Try datetime.strptime on a list of formats returning the first successful attempt.
 
     Parameters
@@ -731,7 +734,7 @@ def strptime(datetime_string: str, fmts: list[str]) -> datetime.datetime:
 
 
 def strptime_bids(datetime_string: str) -> datetime.datetime:
-    r"""
+    """
     Create a datetime object from a bids datetime string.
 
     Parameters
@@ -740,13 +743,20 @@ def strptime_bids(datetime_string: str) -> datetime.datetime:
       Datetime string to parse
     """
     # https://bids-specification.readthedocs.io/en/stable/common-principles.html#units
-    fmts = ["%Y-%m-%dT%H:%M:%S.%f%z", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S"]
+    fmts = [
+        "%Y-%m-%dT%H:%M:%S.%f%z",
+        "%Y-%m-%dT%H:%M:%S%z",
+        "%Y-%m-%dT%H:%M:%S.%f",
+        "%Y-%m-%dT%H:%M:%S",
+    ]
     datetime_obj = strptime(datetime_string, fmts)
     return datetime_obj
 
 
-def strptime_dcm_da_tm(dcm_data: dcm.Dataset, da_tag: TagType, tm_tag: TagType) -> datetime.datetime:
-    r"""
+def strptime_dcm_da_tm(
+    dcm_data: dcm.Dataset, da_tag: TagType, tm_tag: TagType
+) -> datetime.datetime:
+    """
     Create a datetime object from a dicom DA tag and TM tag.
 
     Parameters
@@ -760,7 +770,9 @@ def strptime_dcm_da_tm(dcm_data: dcm.Dataset, da_tag: TagType, tm_tag: TagType) 
     """
     # https://dicom.nema.org/medical/dicom/current/output/chtml/part05/sect_6.2.html
     date_str = dcm_data[da_tag].value.strip()
-    fmts = ["%Y%m%d",]
+    fmts = [
+        "%Y%m%d",
+    ]
     date = strptime(date_str, fmts)
 
     time_str = dcm_data[tm_tag].value.strip()
@@ -771,12 +783,16 @@ def strptime_dcm_da_tm(dcm_data: dcm.Dataset, da_tag: TagType, tm_tag: TagType) 
 
     if utc_offset_dcm := dcm_data.get((0x0008, 0x0201)):
         utc_offset = utc_offset_dcm.value.strip()
-        datetime_obj = datetime_utc_offset(datetime_obj, utc_offset) if utc_offset else datetime_obj
+        datetime_obj = (
+            datetime_utc_offset(datetime_obj, utc_offset)
+            if utc_offset
+            else datetime_obj
+        )
     return datetime_obj
 
 
 def strptime_dcm_dt(dcm_data: dcm.Dataset, dt_tag: TagType) -> datetime.datetime:
-    r"""
+    """
     Create a datetime object from a dicom DT tag.
 
     Parameters
@@ -789,15 +805,33 @@ def strptime_dcm_dt(dcm_data: dcm.Dataset, dt_tag: TagType) -> datetime.datetime
     """
     # https://dicom.nema.org/medical/dicom/current/output/chtml/part05/sect_6.2.html
     datetime_str = dcm_data[dt_tag].value.strip()
-    fmts = ["%Y%z", "%Y%m%z", "%Y%m%d%z", "%Y%m%d%H%z", "%Y%m%d%H%M%z", "%Y%m%d%H%M%S%z", "%Y%m%d%H%M%S.%f%z",
-            "%Y", "%Y%m", "%Y%m%d", "%Y%m%d%H", "%Y%m%d%H%M", "%Y%m%d%H%M%S", "%Y%m%d%H%M%S.%f"]
+    fmts = [
+        "%Y%z",
+        "%Y%m%z",
+        "%Y%m%d%z",
+        "%Y%m%d%H%z",
+        "%Y%m%d%H%M%z",
+        "%Y%m%d%H%M%S%z",
+        "%Y%m%d%H%M%S.%f%z",
+        "%Y",
+        "%Y%m",
+        "%Y%m%d",
+        "%Y%m%d%H",
+        "%Y%m%d%H%M",
+        "%Y%m%d%H%M%S",
+        "%Y%m%d%H%M%S.%f",
+    ]
     datetime_obj = strptime(datetime_str, fmts)
 
     if utc_offset_dcm := dcm_data.get((0x0008, 0x0201)):
         if utc_offset := utc_offset_dcm.value.strip():
             datetime_obj2 = datetime_utc_offset(datetime_obj, utc_offset)
             if datetime_obj.tzinfo and datetime_obj2 != datetime_obj:
-                lgr.warning("Unexpectedly previously parsed datetime %s contains zoneinfo which is different from the one obtained from DICOMs UTFOffset field: %s", datetime_obj, datetime_obj2)
+                lgr.warning(
+                    "Unexpectedly previously parsed datetime %s contains zoneinfo which is different from the one obtained from DICOMs UTFOffset field: %s",
+                    datetime_obj,
+                    datetime_obj2,
+                )
             else:
                 datetime_obj = datetime_obj2
     return datetime_obj

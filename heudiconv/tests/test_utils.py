@@ -23,10 +23,10 @@ from heudiconv.utils import (
     remove_prefix,
     remove_suffix,
     save_json,
-    strptime_micr,
     strptime_bids,
     strptime_dcm_da_tm,
     strptime_dcm_dt,
+    strptime_micr,
     update_json,
 )
 
@@ -222,7 +222,7 @@ def test_strptime_bids(dt: str, fmt: str) -> None:
     "offset, offset_fmt",
     [
         ("-0900", "%z"),
-        ('', ''),
+        ("", ""),
     ],
 )
 def test_strptime_dcm_da_tm(tm: str, tm_fmt: str, offset: str, offset_fmt: str) -> None:
@@ -260,7 +260,7 @@ def test_strptime_dcm_da_tm(tm: str, tm_fmt: str, offset: str, offset_fmt: str) 
     "offset, offset_fmt",
     [
         ("-0900", "%z"),
-        ('', ''),
+        ("", ""),
     ],
 )
 def test_strptime_dcm_dt(dt: str, dt_fmt: str, offset: str, offset_fmt: str) -> None:

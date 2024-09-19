@@ -961,8 +961,7 @@ def select_fmap_from_compatible_groups(
         )
         # differences in acquisition time (abs value):
         diff_fmaps_acq_times = {
-            k: abs(strptime_bids(v) - json_acq_time)
-            for k, v in acq_times_fmaps.items()
+            k: abs(strptime_bids(v) - json_acq_time) for k, v in acq_times_fmaps.items()
         }
         min_diff_acq_times = sorted(diff_fmaps_acq_times.values())[0]
         selected_fmap_key = [

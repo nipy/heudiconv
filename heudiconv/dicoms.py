@@ -33,7 +33,7 @@ from .utils import (
     load_json,
     set_readonly,
     strptime_dcm_da_tm,
-    strptime_dcm_dt
+    strptime_dcm_dt,
 )
 
 if TYPE_CHECKING:
