@@ -724,7 +724,7 @@ def strptime(datetime_string: str, fmts: list[str]) -> datetime.datetime:
     fmts: list[str]
       List of format strings
     """
-    datetime_str = datetime_string.strip()
+    datetime_str = datetime_string
     for fmt in fmts:
         try:
             return datetime.datetime.strptime(datetime_str, fmt)
@@ -769,20 +769,20 @@ def strptime_dcm_da_tm(
       Dicom tag with TM value representation
     """
     # https://dicom.nema.org/medical/dicom/current/output/chtml/part05/sect_6.2.html
-    date_str = dcm_data[da_tag].value.strip()
+    date_str = dcm_data[da_tag].value
     fmts = [
         "%Y%m%d",
     ]
     date = strptime(date_str, fmts)
 
-    time_str = dcm_data[tm_tag].value.strip()
+    time_str = dcm_data[tm_tag].value
     fmts = ["%H", "%H%M", "%H%M%S", "%H%M%S.%f"]
     time = strptime(time_str, fmts)
 
     datetime_obj = datetime.datetime.combine(date.date(), time.time())
 
     if utc_offset_dcm := dcm_data.get((0x0008, 0x0201)):
-        utc_offset = utc_offset_dcm.value.strip()
+        utc_offset = utc_offset_dcm.value
         datetime_obj = (
             datetime_utc_offset(datetime_obj, utc_offset)
             if utc_offset
@@ -804,7 +804,7 @@ def strptime_dcm_dt(dcm_data: dcm.Dataset, dt_tag: TagType) -> datetime.datetime
       Dicom tag with DT value representation
     """
     # https://dicom.nema.org/medical/dicom/current/output/chtml/part05/sect_6.2.html
-    datetime_str = dcm_data[dt_tag].value.strip()
+    datetime_str = dcm_data[dt_tag].value
     fmts = [
         "%Y%z",
         "%Y%m%z",
@@ -824,7 +824,7 @@ def strptime_dcm_dt(dcm_data: dcm.Dataset, dt_tag: TagType) -> datetime.datetime
     datetime_obj = strptime(datetime_str, fmts)
 
     if utc_offset_dcm := dcm_data.get((0x0008, 0x0201)):
-        if utc_offset := utc_offset_dcm.value.strip():
+        if utc_offset := utc_offset_dcm.value:
             datetime_obj2 = datetime_utc_offset(datetime_obj, utc_offset)
             if datetime_obj.tzinfo and datetime_obj2 != datetime_obj:
                 lgr.warning(

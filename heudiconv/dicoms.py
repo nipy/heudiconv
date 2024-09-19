@@ -536,11 +536,15 @@ def get_datetime_from_dcm(dcm_data: dcm.FileDataset) -> Optional[datetime.dateti
     3. SeriesDate & SeriesTime  (0008,0021); (0008,0031)
 
     """
-    if "AcquisitionDate" in dcm_data and "AcquisitionTime" in dcm_data:
+
+    def check_tag(x):
+        return x in dcm_data and dcm_data[x].value.strip()
+
+    if check_tag("AcquisitionDate") and check_tag("AcquisitionTime"):
         return strptime_dcm_da_tm(dcm_data, "AcquisitionDate", "AcquisitionTime")
-    if "AcquisitionDateTime" in dcm_data:
+    if check_tag("AcquisitionDateTime"):
         return strptime_dcm_dt(dcm_data, "AcquisitionDateTime")
-    if "SeriesDate" in dcm_data and "SeriesTime" in dcm_data:
+    if check_tag("SeriesDate") and check_tag("SeriesTime"):
         return strptime_dcm_da_tm(dcm_data, "SeriesDate", "SeriesTime")
     return None
 
