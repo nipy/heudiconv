@@ -37,6 +37,7 @@ from typing import (
     cast,
     overload,
 )
+import warnings
 
 lgr = logging.getLogger(__name__)
 
@@ -683,6 +684,11 @@ def strptime_micr(date_string: str, fmt: str) -> datetime.datetime:
       '.\d+' regex and not if it does not.
     """
 
+    warnings.warn(
+        "strptime_micr() is deprecated, please use strptime() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     optional_micr = "[.%f]"
     if fmt.endswith(optional_micr):
         fmt = fmt[: -len(optional_micr)]

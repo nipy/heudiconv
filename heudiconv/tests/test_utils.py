@@ -182,14 +182,15 @@ def test_get_datetime() -> None:
     ],
 )
 def test_strptime_micr(dt: str, fmt: str) -> None:
-    target = datetime.strptime(dt, fmt)
-    assert strptime_micr(dt, fmt) == target
-    assert strptime_micr(dt, fmt + "[.%f]") == target
-    assert strptime_micr(dt + ".0", fmt + "[.%f]") == target
-    assert strptime_micr(dt + ".000000", fmt + "[.%f]") == target
-    assert strptime_micr(dt + ".1", fmt + "[.%f]") == datetime.strptime(
-        dt + ".1", fmt + ".%f"
-    )
+    with pytest.warns(DeprecationWarning):
+        target = datetime.strptime(dt, fmt)
+        assert strptime_micr(dt, fmt) == target
+        assert strptime_micr(dt, fmt + "[.%f]") == target
+        assert strptime_micr(dt + ".0", fmt + "[.%f]") == target
+        assert strptime_micr(dt + ".000000", fmt + "[.%f]") == target
+        assert strptime_micr(dt + ".1", fmt + "[.%f]") == datetime.strptime(
+            dt + ".1", fmt + ".%f"
+        )
 
 
 @pytest.mark.parametrize(
