@@ -531,7 +531,7 @@ def update_multiorient_name(
         )
         return filename
     iop = metadata.get("ImageOrientationPatientDICOM")
-    iop = [round(x) for x in iop]
+    # iop = [round(x) for x in iop]
     cross_prod = [
         iop[1] * iop[5] - iop[2] * iop[4],
         iop[2] * iop[3] - iop[0] * iop[5],
@@ -1077,8 +1077,6 @@ def save_converted_files(
                 iops.add(str(metadata["ImageOrientationPatientDICOM"]))
             except KeyError:
                 pass
-
-        print(iops)
 
         is_multiecho = (
             len(set(filter(bool, echo_times))) > 1
