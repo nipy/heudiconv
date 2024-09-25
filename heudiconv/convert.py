@@ -532,6 +532,7 @@ def update_multiorient_name(
         return filename
     iop = metadata.get("ImageOrientationPatientDICOM")
     # iop = [round(x) for x in iop]
+    assert isinstance(iop, list)
     cross_prod = [
         iop[1] * iop[5] - iop[2] * iop[4],
         iop[2] * iop[3] - iop[0] * iop[5],
