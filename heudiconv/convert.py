@@ -20,6 +20,7 @@ from nipype.interfaces.base import TraitListObject
 from .bids import (
     BIDS_VERSION,
     BIDSError,
+    BIDSFile,
     add_participant_record,
     populate_bids_templates,
     populate_intended_for,
@@ -525,9 +526,11 @@ def update_multiorient_name(
     metadata: dict[str, Any],
     filename: str,
 ) -> str:
-    if "_acq-" in filename:
+    bids_file = BIDSFile.parse(filename)
+    if bids_file["acq"]:
         lgr.warning(
-            "Not embedding multi-orientation information as `%r` already uses acq- parameter.", filename
+            "Not embedding multi-orientation information as `%r` already uses acq- parameter.",
+            filename,
         )
         return filename
     iop = metadata.get("ImageOrientationPatientDICOM")
@@ -539,14 +542,8 @@ def update_multiorient_name(
     ]
     cross_prod = [abs(x) for x in cross_prod]
     slice_orient = ["sagittal", "coronal", "axial"][cross_prod.index(1)]
-    bids_pairs = filename.split("_")
-    # acq needs to be inserted right after sub- or ses-
-    ses_or_sub_idx = sum(
-        [bids_pair.split("-")[0] in ["sub", "ses"] for bids_pair in bids_pairs]
-    )
-    bids_pairs.insert(ses_or_sub_idx, "acq-%s" % slice_orient)
-    filename = "_".join(bids_pairs)
-    return filename
+    bids_file["acq"] = slice_orient
+    return str(bids_file)
 
 
 def convert(

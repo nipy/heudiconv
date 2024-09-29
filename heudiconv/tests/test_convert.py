@@ -151,7 +151,7 @@ def test_update_multiorient_name() -> None:
     # Standard name update
     base_fn = "sub-X_ses-Y_task-Z_run-01_bold"
     metadata = {"ImageOrientationPatientDICOM": [0, 1, 0, 0, 0, -1]}
-    out_fn_true = "sub-X_ses-Y_acq-sagittal_task-Z_run-01_bold"
+    out_fn_true = "sub-X_ses-Y_task-Z_acq-sagittal_run-01_bold"
     out_fn_test = update_multiorient_name(metadata, base_fn)
     assert out_fn_test == out_fn_true
 
