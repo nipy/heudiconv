@@ -1608,7 +1608,6 @@ def test_populate_aggregated_jsons_events(tmp_path: Path) -> None:
     assert sorted(tmp_path.rglob("*_events.tsv")) == events_files
 
 
-@pytest.mark.skipif(not have_datalad, reason="no datalad")
 def test_convert_multiorient(
     tmp_path: Path,
     heuristic: str = "bids_localizer.py",
