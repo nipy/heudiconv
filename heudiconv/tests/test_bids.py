@@ -1369,7 +1369,6 @@ def test_BIDSFile() -> None:
     assert my_bids_file["echo"] == "2"
 
 
-@pytest.mark.skipif(not have_datalad, reason="no datalad")
 def test_convert_multiorient(
     tmp_path: Path,
     heuristic: str = "bids_localizer.py",
