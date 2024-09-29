@@ -525,13 +525,12 @@ def update_multiorient_name(
     metadata: dict[str, Any],
     filename: str,
 ) -> str:
-    if "acq-" in filename:
+    if "_acq-" in filename:
         lgr.warning(
-            "Not embedding multi-orientation information as prefix already uses acq- parameter."
+            "Not embedding multi-orientation information as `%r` already uses acq- parameter.", filename
         )
         return filename
     iop = metadata.get("ImageOrientationPatientDICOM")
-    # iop = [round(x) for x in iop]
     assert isinstance(iop, list)
     cross_prod = [
         iop[1] * iop[5] - iop[2] * iop[4],
