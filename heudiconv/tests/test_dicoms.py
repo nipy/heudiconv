@@ -182,7 +182,7 @@ def test_get_datetime_from_dcm_wo_dt() -> None:
 
 @pytest.mark.parametrize("dcmfile", TEST_DICOM_PATHS)
 def test_create_seqinfo(
-    dcmfile,
+    dcmfile: str,
 ) -> None:
     mw = dw.wrapper_from_file(dcmfile)
     seqinfo = create_seqinfo(mw, [dcmfile], op.basename(dcmfile))
@@ -190,7 +190,7 @@ def test_create_seqinfo(
 
 
 @pytest.mark.parametrize("dcmfile", TEST_DICOM_PATHS)
-def test_get_reproducible_int(dcmfile) -> None:
+def test_get_reproducible_int(dcmfile:str) -> None:
     assert type(get_reproducible_int([dcmfile])) is int
 
 
