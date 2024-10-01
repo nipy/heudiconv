@@ -537,7 +537,7 @@ def get_datetime_from_dcm(dcm_data: dcm.FileDataset) -> Optional[datetime.dateti
 
     """
 
-    def check_tag(x):
+    def check_tag(x: str) -> bool:
         return x in dcm_data and dcm_data[x].value.strip()
 
     if check_tag("AcquisitionDate") and check_tag("AcquisitionTime"):
