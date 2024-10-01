@@ -190,7 +190,7 @@ def test_create_seqinfo(
 
 
 @pytest.mark.parametrize("dcmfile", TEST_DICOM_PATHS)
-def test_get_reproducible_int(dcmfile:str) -> None:
+def test_get_reproducible_int(dcmfile: str) -> None:
     assert type(get_reproducible_int([dcmfile])) is int
 
 
