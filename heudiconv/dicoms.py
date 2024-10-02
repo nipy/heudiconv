@@ -32,7 +32,8 @@ from .utils import (
     get_typed_attr,
     load_json,
     set_readonly,
-    strptime_micr,
+    strptime_dcm_da_tm,
+    strptime_dcm_dt,
 )
 
 if TYPE_CHECKING:
@@ -539,19 +540,16 @@ def get_datetime_from_dcm(dcm_data: dcm.FileDataset) -> Optional[datetime.dateti
     3. SeriesDate & SeriesTime  (0008,0021); (0008,0031)
 
     """
-    acq_date = dcm_data.get("AcquisitionDate", "").strip()
-    acq_time = dcm_data.get("AcquisitionTime", "").strip()
-    if acq_date and acq_time:
-        return strptime_micr(acq_date + acq_time, "%Y%m%d%H%M%S[.%f]")
 
-    acq_dt = dcm_data.get("AcquisitionDateTime", "").strip()
-    if acq_dt:
-        return strptime_micr(acq_dt, "%Y%m%d%H%M%S[.%f]")
+    def check_tag(x: str) -> bool:
+        return x in dcm_data and dcm_data[x].value.strip()
 
-    series_date = dcm_data.get("SeriesDate", "").strip()
-    series_time = dcm_data.get("SeriesTime", "").strip()
-    if series_date and series_time:
-        return strptime_micr(series_date + series_time, "%Y%m%d%H%M%S[.%f]")
+    if check_tag("AcquisitionDate") and check_tag("AcquisitionTime"):
+        return strptime_dcm_da_tm(dcm_data, "AcquisitionDate", "AcquisitionTime")
+    if check_tag("AcquisitionDateTime"):
+        return strptime_dcm_dt(dcm_data, "AcquisitionDateTime")
+    if check_tag("SeriesDate") and check_tag("SeriesTime"):
+        return strptime_dcm_da_tm(dcm_data, "SeriesDate", "SeriesTime")
     return None
 
 
