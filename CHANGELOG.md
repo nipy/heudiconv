@@ -1,3 +1,24 @@
+# v1.3.0 (Wed Oct 02 2024)
+
+#### 🚀 Enhancement
+
+- timezone aware [#780](https://github.com/nipy/heudiconv/pull/780) ([@AlanKuurstra](https://github.com/AlanKuurstra) [@yarikoptic](https://github.com/yarikoptic))
+
+#### 🐛 Bug Fix
+
+- BF(workaround): if heuristic provided just a string and not list of types -- make it into a tuple [#787](https://github.com/nipy/heudiconv/pull/787) ([@yarikoptic](https://github.com/yarikoptic))
+- Refactor create_seqinfo tiny bit to avoid duplication and add logging; and in tests to reuse list of dicom paths [#785](https://github.com/nipy/heudiconv/pull/785) ([@yarikoptic](https://github.com/yarikoptic))
+- extract sequence_name from PulseSequenceName on Siemens XA** data [#753](https://github.com/nipy/heudiconv/pull/753) ([@bpinsard](https://github.com/bpinsard))
+- Just INFO not WARNING if heuristic is missing intotoids [#784](https://github.com/nipy/heudiconv/pull/784) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 3
+
+- [@AlanKuurstra](https://github.com/AlanKuurstra)
+- Basile ([@bpinsard](https://github.com/bpinsard))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v1.2.0 (Fri Sep 13 2024)
 
 #### 🚀 Enhancement
