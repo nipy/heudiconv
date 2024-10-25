@@ -55,6 +55,7 @@ def test_conversion(
         heuristic,
         anon_cmd,
         template="sourcedata/sub-{subject}/*/*/*.tgz",
+        xargs=["--datalad"],
     )
     runner(args)  # run conversion
 
@@ -95,6 +96,18 @@ def test_conversion(
     keys = ["EchoTime", "MagneticFieldStrength", "Manufacturer", "SliceTiming"]
     for key in keys:
         assert orig[key] == conv[key]
+
+    # validate sensitive marking
+    from datalad.api import Dataset
+
+    ds = Dataset(outdir)
+    all_meta = dict(ds.repo.get_metadata("."))
+    target_rec = {"distribution-restrictions": ["sensitive"]}
+    for pth, meta in all_meta.items():
+        if "anat" in pth or "scans.tsv" in pth:
+            assert meta == target_rec
+        else:
+            assert meta == {}
 
 
 @pytest.mark.skipif(not have_datalad, reason="no datalad")
