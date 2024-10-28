@@ -141,12 +141,12 @@ def get_extracted_dicoms(fl: Iterable[str]) -> ItemsView[Optional[str], list[str
         os.chmod(tmpdir, mode=0o700)
         # For tar (only!) starting with 3.12 we should provide filter
         # (enforced in 3.14) on how to filter/safe-guard filenames.
-        kws = {}
+        kws: dict[str, str] = {}
         if sys.version_info >= (3, 12) and t.endswith(_TAR_UNPACK_FORMATS):
             # Allow for a user-workaround if would be desired
             # see e.g. https://docs.python.org/3.12/library/tarfile.html#extraction-filters
             kws["filter"] = os.environ.get("HEUDICONV_TAR_FILTER", "tar")
-        shutil.unpack_archive(t, extract_dir=tmpdir, **kws)
+        shutil.unpack_archive(t, extract_dir=tmpdir, **kws)  # type: ignore[arg-type]
 
         archive_content = list(find_files(regex=".*", topdir=tmpdir))
 
