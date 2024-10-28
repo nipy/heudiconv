@@ -9,6 +9,7 @@ import os
 import os.path as op
 import re
 import shutil
+import sys
 from types import ModuleType
 from typing import Optional
 
@@ -22,7 +23,18 @@ atexit.register(tempdirs.cleanup)
 
 _VCS_REGEX = r"%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)" % (op.sep, op.sep)
 
-_UNPACK_FORMATS = tuple(sum((x[1] for x in shutil.get_unpack_formats()), []))
+
+def _get_unpack_formats() -> dict[str, bool]:
+    """For each extension return if it is a tar"""
+    out = {}
+    for _, exts, d in shutil.get_unpack_formats():
+        for e in exts:
+            out[e] = bool(re.search(r"\btar\b", d.lower()))
+    return out
+
+
+_UNPACK_FORMATS = _get_unpack_formats()
+_TAR_UNPACK_FORMATS = tuple(k for k, is_tar in _UNPACK_FORMATS.items() if is_tar)
 
 
 @docstring_parameter(_VCS_REGEX)
@@ -114,7 +126,7 @@ def get_extracted_dicoms(fl: Iterable[str]) -> ItemsView[Optional[str], list[str
 
     # needs sorting to keep the generated "session" label deterministic
     for _, t in enumerate(sorted(fl)):
-        if not t.endswith(_UNPACK_FORMATS):
+        if not t.endswith(tuple(_UNPACK_FORMATS)):
             sessions[None].append(t)
             continue
 
@@ -127,7 +139,14 @@ def get_extracted_dicoms(fl: Iterable[str]) -> ItemsView[Optional[str], list[str
 
         # check content and sanitize permission bits before extraction
         os.chmod(tmpdir, mode=0o700)
-        shutil.unpack_archive(t, extract_dir=tmpdir)
+        # For tar (only!) starting with 3.12 we should provide filter
+        # (enforced in 3.14) on how to filter/safe-guard filenames.
+        kws = {}
+        if sys.version_info >= (3, 12) and t.endswith(_TAR_UNPACK_FORMATS):
+            # Allow for a user-workaround if would be desired
+            # see e.g. https://docs.python.org/3.12/library/tarfile.html#extraction-filters
+            kws["filter"] = os.environ.get("HEUDICONV_TAR_FILTER", "tar")
+        shutil.unpack_archive(t, extract_dir=tmpdir, **kws)
 
         archive_content = list(find_files(regex=".*", topdir=tmpdir))
 
