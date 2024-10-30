@@ -7,6 +7,9 @@ on:
 
 jobs:
   build-docker:
+    strategy:
+      matrix:
+        version: ["", "-alpine"]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source
@@ -23,18 +26,20 @@ jobs:
         run: |
           # build only if not release tag, i.e. has some "-" in describe
           # so we do not duplicate work with release workflow.
+          dockerfile=Dockerfile${version/-/.}
           git describe --match 'v[0-9]*' | grep -q -e - && \
               docker build \
-                -t nipy/heudiconv:master \
-                -t nipy/heudiconv:unstable \
-                .
+                -t nipy/heudiconv:master${version} \
+                -t nipy/heudiconv:unstable${version} \
+                . \
+                -f $dockerfile
 
       - name: Push Docker image
         run: |
           git describe --match 'v[0-9]*' | grep -q -e - && (
               docker login -u "$DOCKER_LOGIN" --password-stdin <<<"$DOCKER_TOKEN"
-              docker push nipy/heudiconv:master
-              docker push nipy/heudiconv:unstable
+              docker push nipy/heudiconv:master${version}
+              docker push nipy/heudiconv:unstable${version}
           )
         env:
           DOCKER_LOGIN: ${{ secrets.DOCKER_LOGIN }}
