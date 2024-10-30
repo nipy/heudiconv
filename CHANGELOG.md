@@ -1,3 +1,15 @@
+# v1.3.1 (Fri Oct 25 2024)
+
+#### 🐛 Bug Fix
+
+- Fix assignment of sensitive git-annex metadata data via glob patterns (regression introduced by #739) [#793](https://github.com/nipy/heudiconv/pull/793) ([@bpinsard](https://github.com/bpinsard))
+
+#### Authors: 1
+
+- Basile ([@bpinsard](https://github.com/bpinsard))
+
+---
+
 # v1.3.0 (Wed Oct 02 2024)
 
 #### 🚀 Enhancement

@@ -40,6 +40,10 @@
    :target: https://repology.org/project/python:heudiconv/versions
    :alt: PyPI
 
+.. image:: https://img.shields.io/badge/RRID-SCR__017427-blue
+   :target: https://identifiers.org/RRID:SCR_017427
+   :alt: RRID
+
 About
 -----
 
