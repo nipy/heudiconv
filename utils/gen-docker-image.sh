@@ -7,11 +7,20 @@ VER=$(grep -Po '(?<=^__version__ = ).*' $thisd/../heudiconv/info.py | sed 's/"//
 
 image="kaczmarj/neurodocker:0.9.1"
 
-docker run --rm $image generate docker \
-    --base-image neurodebian:bullseye \
+if hash podman; then
+    OCI_BINARY=podman
+elif hash docker; then
+    OCI_BINARY=docker
+else
+    echo "ERROR: no podman or docker found" >&2
+    exit 1
+fi
+
+${OCI_BINARY:-docker} run --rm $image generate docker \
+    --base-image neurodebian:bookworm \
     --pkg-manager apt \
     --dcm2niix \
-        version=v1.0.20220720 \
+        version=v1.0.20240202 \
         method=source \
         cmake_opts="-DZLIB_IMPLEMENTATION=Cloudflare -DUSE_JPEGLS=ON -DUSE_OPENJPEG=ON" \
     --install \

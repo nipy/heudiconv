@@ -156,12 +156,12 @@ def add_to_datalad(
 
     # Provide metadata for sensitive information
     sensitive_patterns = [
-        "sourcedata",
+        "sourcedata/**",
         "*_scans.tsv",  # top level
         "*/*_scans.tsv",  # within subj
         "*/*/*_scans.tsv",  # within sess/subj
-        "*/anat",  # within subj
-        "*/*/anat",  # within ses/subj
+        "*/anat/*",  # within subj
+        "*/*/anat/*",  # within ses/subj
     ]
     for sp in sensitive_patterns:
         mark_sensitive(ds, sp, annexed_files)

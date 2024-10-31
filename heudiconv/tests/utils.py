@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from glob import glob
 import logging
 import os.path as op
 from pathlib import Path
@@ -9,6 +10,14 @@ import heudiconv.heuristics
 
 HEURISTICS_PATH = op.join(heudiconv.heuristics.__path__[0])
 TESTS_DATA_PATH = op.join(op.dirname(__file__), "data")
+# Do relative to curdir to shorten in a typical application,
+# and side-effect test that tests do not change curdir.
+TEST_DICOM_PATHS = [
+    op.relpath(x)
+    for x in glob(op.join(TESTS_DATA_PATH, "**/*.dcm"), recursive=True)
+    # exclude PhoenixDocuments
+    if "PhoenixDocument" not in x
+]
 
 lgr = logging.getLogger(__name__)
 
