@@ -1,3 +1,25 @@
+# v1.3.2 (Tue Nov 05 2024)
+
+#### 🐛 Bug Fix
+
+- chore!: drop support and testing for EOLed Python 3.8 [#801](https://github.com/nipy/heudiconv/pull/801) ([@yarikoptic](https://github.com/yarikoptic))
+- Do specify filter="tar" when extracting tars [#796](https://github.com/nipy/heudiconv/pull/796) ([@yarikoptic](https://github.com/yarikoptic))
+- Add RRID badge to README.rst [#796](https://github.com/nipy/heudiconv/pull/796) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### 🏠 Internal
+
+- Docker image: Use newer debian stable for the base and newer dcm2niix [#790](https://github.com/nipy/heudiconv/pull/790) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### 🧪 Tests
+
+- Add Python 3.12 into github testing CI [#799](https://github.com/nipy/heudiconv/pull/799) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 1
+
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v1.3.1 (Fri Oct 25 2024)
 
 #### 🐛 Bug Fix
