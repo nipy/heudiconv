@@ -169,6 +169,9 @@ def validate_dicom(
     Parse DICOM attributes. Returns None if not valid.
     """
     mw = dw.wrapper_from_file(fl, force=True, stop_before_pixels=True)
+    if dcmfilter is not None and dcmfilter(mw.dcm_data):
+        lgr.warning("Ignoring %s because of DICOM filter", fl)
+        return None
     # clean series signature
     for sig in ("iop", "ICE_Dims", "SequenceName"):
         try:
@@ -188,9 +191,6 @@ def validate_dicom(
         series_id = (int(mw.dcm_data.SeriesNumber), protocol_name)
     except AttributeError as e:
         lgr.warning('Ignoring %s since not quite a "normal" DICOM: %s', fl, e)
-        return None
-    if dcmfilter is not None and dcmfilter(mw.dcm_data):
-        lgr.warning("Ignoring %s because of DICOM filter", fl)
         return None
     if mw.dcm_data[0x0008, 0x0016].repval in (
         "Raw Data Storage",
