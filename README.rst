@@ -95,7 +95,7 @@ Having decided on a heuristic, you could use the command line::
     heudiconv -f HEURISTIC-FILE-OR-NAME -o OUTPUT-PATH --files INPUT-PATHs
 
 with various additional options (see ``heudiconv --help`` or
-`"Usage" in documentation <https://heudiconv.readthedocs.io/en/latest/usage.html>`__) to tune its behavior to
+`"CLI Reference" in documentation <https://heudiconv.readthedocs.io/en/latest/commandline.html>`__) to tune its behavior to
 convert your data.
 
 For detailed examples and guides, please check out `ReproIn conversion invocation examples <https://github.com/ReproNim/reproin/#conversion>`_
