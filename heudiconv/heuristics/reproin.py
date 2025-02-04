@@ -406,7 +406,11 @@ def infotodict(
         # XXX: skip derived sequences, we don't store them to avoid polluting
         # the directory, unless it is the motion corrected ones
         # (will get _rec-moco suffix)
-        if skip_derived and curr_seqinfo.is_derived and not curr_seqinfo.is_motion_corrected:
+        if (
+            skip_derived
+            and curr_seqinfo.is_derived
+            and not curr_seqinfo.is_motion_corrected
+        ):
             skipped.append(curr_seqinfo.series_id)
             lgr.debug("Ignoring derived data %s", curr_seqinfo.series_id)
             continue
@@ -552,7 +556,10 @@ def infotodict(
                         # XXX if we have a known earlier study, we need to always
                         # increase the run counter for phasediff because magnitudes
                         # were not acquired
-                        if get_study_hash([curr_seqinfo]) == "9d148e2a05f782273f6343507733309d":
+                        if (
+                            get_study_hash([curr_seqinfo])
+                            == "9d148e2a05f782273f6343507733309d"
+                        ):
                             current_run += 1
                         else:
                             raise RuntimeError(
