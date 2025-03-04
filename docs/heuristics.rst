@@ -129,9 +129,14 @@ to be used in ``infotodict``.
 Importantly the return value of that function needs to be hashable.
 For instance the following non-hashable types can be converted to an alternative
 hashable type:
-- list > tuple
-- dict > frozendict
-- arrays > bytes (tobytes(), or pickle.dumps), str or tuple of tuples.
+
+- `list` --> `tuple`
+- `dict` --> `frozendict`
+- `arrays` --> `bytes` (`tobytes()`, or `pickle.dumps`), `str` or `tuple` of tuples.
+
+For an example see
+`convertall_custom.py <https://github.com/nipy/heudiconv/blob/master/heudiconv/heuristics/convertall_custom.py#L16>`__
+heuristic.
 
 -------------------------------
 ``POPULATE_INTENDED_FOR_OPTS``
