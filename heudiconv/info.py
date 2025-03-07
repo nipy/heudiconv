@@ -27,7 +27,7 @@ REQUIRES = [
     "dcmstack>=0.8",
     "etelemetry",
     "filelock>=3.0.12",
-    "nibabel",
+    "nibabel>=5.3.1",
     "nipype >=1.2.3",
     "pydicom >= 1.0.0",
 ]
