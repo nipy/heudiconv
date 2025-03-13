@@ -885,6 +885,7 @@ def save_converted_files(
 
     bids_outfiles: list[str] = []
     res_files = res.outputs.converted_files
+    bids_files = res.outputs.bids
 
     if not len(res_files):
         lgr.debug("DICOMs {} were not converted".format(item_dicoms))
@@ -925,6 +926,42 @@ def save_converted_files(
         # we should provide specific handling for fmap,
         # dwi etc which might spit out multiple files
 
+        # Also copy BIDS files although they might need to
+        # be merged/postprocessed later
+        bids_files = (
+            sorted(bids_files)
+            if len(bids_files) == len(res_files)
+            else [None] * len(res_files)
+        )
+        # preload since will be used in multiple spots
+        bids_metas = [load_json(b) for b in bids_files if b]
+
+        # interrupted scans on XA: see dcm2niix #742
+        partial_volumes = [
+            bool(metadata.get("RawImage", True)) for metadata in bids_metas
+        ]
+        has_partial_volumes = any(partial_volumes) and not all(partial_volumes)
+
+        if has_partial_volumes:
+            for fl, bids_meta, bids_file, is_pv in zip(
+                res_files, bids_metas, bids_files, partial_volumes
+            ):
+                if is_pv:
+                    # remove partial volume
+                    os.remove(fl)
+                    os.remove(bids_file)
+                    res_files.remove(fl)
+                    bids_files.remove(bids_file)
+                    bids_metas.remove(bids_meta)
+                    lgr.warning(f"dropped {fl} partial volume from interrupted series")
+            if len(res_files) == 1:
+                res_files, bids_files, bids_metas = (
+                    res_files[0],
+                    bids_files[0],
+                    bids_metas[0],
+                )
+
+    if isinstance(res_files, list):
         suffixes = (
             [str(i + 1) for i in range(len(res_files))]
             if (bids_options is not None)
@@ -940,16 +977,6 @@ def save_converted_files(
                 item_dicoms[0],
             )
             suffixes = [str(-i - 1) for i in range(len(res_files))]
-
-        # Also copy BIDS files although they might need to
-        # be merged/postprocessed later
-        bids_files = (
-            sorted(res.outputs.bids)
-            if len(res.outputs.bids) == len(res_files)
-            else [None] * len(res_files)
-        )
-        # preload since will be used in multiple spots
-        bids_metas = [load_json(b) for b in bids_files if b]
 
         ###   Do we have a multi-echo series?   ###
         #   Some Siemens sequences (e.g. CMRR's MB-EPI) set the label 'TE1',
@@ -1043,7 +1070,7 @@ def save_converted_files(
         safe_movefile(res_files, outname, overwrite)
         if isdefined(res.outputs.bids):
             try:
-                safe_movefile(res.outputs.bids, outname_bids, overwrite)
+                safe_movefile(bids_files, outname_bids, overwrite)
                 bids_outfiles.append(outname_bids)
             except TypeError:  ##catch lists
                 raise TypeError("Multiple BIDS sidecars detected.")
