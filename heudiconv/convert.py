@@ -630,6 +630,19 @@ def convert(
                         item_dicoms, prefix, with_prov, bids_options, tmpdir, dcmconfig
                     )
 
+                    # try to handle compression failures from dcm2niix
+                    if outtype == 'nii.gz':
+                        converted_files = res.outputs.converted_files
+                        if not isinstance(converted_files, list):
+                            converted_files = [converted_files]
+                        uncompressed = [x for x in converted_files if x.endswith('.nii')]
+                        if len(uncompressed) > 0:
+                            lgr.warning("Conversion returned uncompressed nifti (>4GB?) - "
+                                        "trying to salvage by recompressing ourselves. "
+                                        "This might take a while ")
+                            if not recompress_failed(uncompressed):
+                                raise RuntimeError("Error compressing nifti")
+
                     bids_outfiles = save_converted_files(
                         res,
                         item_dicoms,
@@ -1099,3 +1112,38 @@ def bvals_are_zero(bval_file: str | list) -> bool:
 
     bvals_unique = set(float(b) for b in bvals)
     return bvals_unique == {0.0} or bvals_unique == {5.0}
+
+
+def recompress_failed(niftis: list) -> bool:
+    """Tries to recompress nifti files with built-in gzip module
+
+    Parameters
+    ----------
+    niftis : list
+      list of nifti file paths
+
+    Returns
+    -------
+    True if all nifits were successfully compressed. False otherwise.
+    """
+
+    import zlib
+    import gzip
+    from nibabel import load as nb_load
+    from nibabel.filebasedimages import ImageFileError
+
+    for nifti in niftis:
+        try:
+            img = nb_load(nifti)
+            # read everything to catch truncated/corrupted files
+            _ = img.get_fdata()  # type:ignore[attr-defined]
+            with open(nifti, 'rb') as f_in:
+                with gzip.open(nifti + '.gz', 'wb', compresslevel=6) as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+            # nipype results still carry uncompressed file names and they will
+            # be renamed to '.nii.gz' later
+            os.rename(nifti + '.gz', nifti)
+        except (OSError, ImageFileError, zlib.error):
+            return False
+
+    return True
