@@ -849,6 +849,57 @@ def nipype_convert(
     return eg, prov_file
 
 
+def filter_partial_volumes(
+    nii_files: list[str],
+    bids_files: list[str],
+    bids_metas: list[dict[str, Any]],
+):
+    """filter interrupted 4D scans volumes with missing slices on XA: see dcm2niix #742
+
+    Parameters
+    ----------
+    nii_files : list[str]
+        converted nifti filepaths
+    bids_files: list[str]
+        converted BIDS json filepaths
+    bids_metas : list[dict[str, Any]]
+        list of metadata dict loaded from BIDS json files
+
+    Returns
+    -------
+    nii_files
+        filtered niftis
+    bids_files
+        filtered BIDS jsons
+    bids_metas
+        filtered BIDS metadata
+
+    """
+    partial_volumes = [not metadata.get("RawImage", True) for metadata in bids_metas]
+    no_partial_volumes = not any(partial_volumes) or all(partial_volumes)
+
+    if no_partial_volumes:
+        return nii_files, bids_files, bids_metas
+    else:
+        new_nii_files, new_bids_files, new_bids_metas = [], [], []
+        for fl, bids_file, bids_meta, is_pv in zip(
+            nii_files, bids_files, bids_metas, partial_volumes
+        ):
+            if is_pv:
+                # remove partial volume
+                os.remove(fl)
+                os.remove(bids_file)
+                lgr.warning(f"dropped {fl} partial volume from interrupted series")
+            else:
+                new_nii_files.append(fl)
+                new_bids_files.append(bids_file)
+                new_bids_metas.append(bids_meta)
+                print(bids_file)
+        if len(new_nii_files) == 1:
+            return new_nii_files[0], new_bids_files[0], new_bids_metas[0]
+        return new_nii_files, new_bids_files, new_bids_metas
+
+
 def save_converted_files(
     res: Node,
     item_dicoms: list[str],
@@ -936,30 +987,9 @@ def save_converted_files(
         # preload since will be used in multiple spots
         bids_metas = [load_json(b) for b in bids_files if b]
 
-        # interrupted scans on XA: see dcm2niix #742
-        partial_volumes = [
-            bool(metadata.get("RawImage", True)) for metadata in bids_metas
-        ]
-        has_partial_volumes = any(partial_volumes) and not all(partial_volumes)
-
-        if has_partial_volumes:
-            for fl, bids_meta, bids_file, is_pv in zip(
-                res_files, bids_metas, bids_files, partial_volumes
-            ):
-                if is_pv:
-                    # remove partial volume
-                    os.remove(fl)
-                    os.remove(bids_file)
-                    res_files.remove(fl)
-                    bids_files.remove(bids_file)
-                    bids_metas.remove(bids_meta)
-                    lgr.warning(f"dropped {fl} partial volume from interrupted series")
-            if len(res_files) == 1:
-                res_files, bids_files, bids_metas = (
-                    res_files[0],
-                    bids_files[0],
-                    bids_metas[0],
-                )
+        res_files, bids_files, bids_metas = filter_partial_volumes(
+            res_files, bids_files, bids_metas
+        )
 
     if isinstance(res_files, list):
         suffixes = (
