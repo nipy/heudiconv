@@ -491,7 +491,7 @@ def save_scans_key(
     for bids_file in bids_files:
         # get filenames
         f_name = "/".join(bids_file.split("/")[-2:])
-        f_name = f_name.replace("json", "nii.gz")
+        f_name = f_name.replace("json", outtype_from_bidsfile(bids_file))
         rows[f_name] = get_formatted_scans_key_row(item[-1][0])
         subj_, ses_ = find_subj_ses(f_name)
         if not subj_:
@@ -938,9 +938,9 @@ def select_fmap_from_compatible_groups(
     # acq_times for the compatible fmaps:
     acq_times_fmaps = {
         k: acq_times[
-            # remove session folder and '.json', add '.nii.gz':
+            # remove session folder and '.json', add outtype:
             remove_suffix(remove_prefix(v[0], sess_folder + op.sep), ".json")
-            + ".nii.gz"
+            + '.' + outtype_from_bidsfile(v[0])
         ]
         for k, v in compatible_fmap_groups.items()
     }
@@ -956,7 +956,7 @@ def select_fmap_from_compatible_groups(
             acq_times[
                 # remove session folder and '.json', add '.nii.gz':
                 remove_suffix(remove_prefix(json_file, sess_folder + op.sep), ".json")
-                + ".nii.gz"
+                + '.' + outtype_from_bidsfile(json_file)
             ]
         )
         # differences in acquisition time (abs value):
@@ -1209,3 +1209,22 @@ def sanitize_label(label: str) -> str:
             clean_label,
         )
     return clean_label
+
+
+def outtype_from_bidsfile(json_file: str) -> str:
+    """Returns outtype ('nii' or 'nii.gz') for an existing json bids file
+
+    Parameters
+    ----------
+    filename: string
+
+    Returns
+    -------
+    fileext: string
+        file extension / outtype
+    """
+    json_path = Path(json_file)
+    for suffix in ['nii.gz', 'nii']:
+        if op.exists(json_path.with_suffix('.' + suffix)):
+            return suffix
+    raise RuntimeError('No accompanying file found for %s' % json_file)
