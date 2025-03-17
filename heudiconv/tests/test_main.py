@@ -61,9 +61,17 @@ def test_create_file_if_missing(tmp_path: Path) -> None:
         assert not tf_base.exists()  # was not created, since there is .md
 
     # non-matching glob - change
-    for g in [".md", ".json"], [".d*", ".*d"], []:
+    for g in [".md", ".json"], [".d*", ".*d"]:
         assert create_file_if_missing(str(tf_base), "content3", glob_suffixes=g)
         assert tf_base.read_text() == "content3"
+        # now that we have suffix less README, we do not match, so we keep creating it
+        assert create_file_if_missing(str(tf_base), "content4", glob_suffixes=g)
+        assert tf_base.read_text() == "content4"
+        # unless we list it explicitly
+        assert not create_file_if_missing(
+            str(tf_base), "content5", glob_suffixes=g + [""]
+        )
+        assert tf_base.read_text() == "content4"
         tf_base.unlink()
 
 

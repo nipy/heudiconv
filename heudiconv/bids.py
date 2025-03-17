@@ -181,7 +181,7 @@ def populate_bids_templates(
             "each sequence, replicating directory hierarchy of the BIDS dataset"
             " itself.",
             # TODO: get from schema
-            glob_suffixes=[".md", ".txt", ".rst"],
+            glob_suffixes=[".md", ".txt", ".rst", ""],
         )
     create_file_if_missing(
         op.join(path, "CHANGES"),
@@ -197,7 +197,7 @@ def populate_bids_templates(
         "TODO: Provide description for the dataset -- basic details about the "
         "study, possibly pointing to pre-registration (if public or embargoed)",
         # TODO: get from schema
-        glob_suffixes=[".md", ".txt", ".rst"],
+        glob_suffixes=[".md", ".txt", ".rst", ""],
     )
     create_file_if_missing(
         op.join(path, "scans.json"), json_dumps(SCANS_FILE_FIELDS, sort_keys=False)

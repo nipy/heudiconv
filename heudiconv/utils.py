@@ -168,7 +168,12 @@ def create_file_if_missing(
     filename: str, content: str, glob_suffixes: list[str] | None = None
 ) -> bool:
     """Create file if missing, so we do not
-    override any possibly introduced changes"""
+    override any possibly introduced changes.
+
+    Note: if glob_suffixes list is used, and it is desired
+    also to allow for original filename to 'match', add an empty
+    string within glob_suffixes.
+    """
     if glob_suffixes:
         if any(glob(filename + s) for s in glob_suffixes):
             return False
