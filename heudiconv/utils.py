@@ -164,10 +164,15 @@ def anonymize_sid(sid: AnyStr, anon_sid_cmd: str) -> AnyStr:
     return anon_sid
 
 
-def create_file_if_missing(filename: str, content: str) -> bool:
+def create_file_if_missing(
+    filename: str, content: str, glob_suffixes: list[str] | None = None
+) -> bool:
     """Create file if missing, so we do not
     override any possibly introduced changes"""
-    if op.lexists(filename):
+    if glob_suffixes:
+        if any(glob(filename + s) for s in glob_suffixes):
+            return False
+    elif op.lexists(filename):
         return False
     dirname = op.dirname(filename)
     if not op.exists(dirname):

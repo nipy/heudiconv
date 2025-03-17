@@ -176,12 +176,12 @@ def populate_bids_templates(
     if op.exists(op.dirname(sourcedata_README)):
         create_file_if_missing(
             sourcedata_README,
-            (
-                "TODO: Provide description about source data, e.g. \n"
-                "Directory below contains DICOMS compressed into tarballs per "
-                "each sequence, replicating directory hierarchy of the BIDS dataset"
-                " itself."
-            ),
+            "TODO: Provide description about source data, e.g. \n"
+            "Directory below contains DICOMS compressed into tarballs per "
+            "each sequence, replicating directory hierarchy of the BIDS dataset"
+            " itself.",
+            # TODO: get from schema
+            glob_suffixes=[".md", ".txt", ".rst"],
         )
     create_file_if_missing(
         op.join(path, "CHANGES"),
@@ -196,6 +196,8 @@ def populate_bids_templates(
         op.join(path, "README"),
         "TODO: Provide description for the dataset -- basic details about the "
         "study, possibly pointing to pre-registration (if public or embargoed)",
+        # TODO: get from schema
+        glob_suffixes=[".md", ".txt", ".rst"],
     )
     create_file_if_missing(
         op.join(path, "scans.json"), json_dumps(SCANS_FILE_FIELDS, sort_keys=False)
