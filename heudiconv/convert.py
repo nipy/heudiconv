@@ -896,7 +896,7 @@ def save_converted_files(
         bvals, bvecs = res.outputs.bvals, res.outputs.bvecs
         bvals = list(bvals) if isinstance(bvals, TraitListObject) else bvals
         bvecs = list(bvecs) if isinstance(bvecs, TraitListObject) else bvecs
-        if prefix_dirname.endswith("dwi"):
+        if prefix.endswith("dwi"):
             outname_bvecs, outname_bvals = prefix + ".bvec", prefix + ".bval"
             safe_movefile(bvecs, outname_bvecs, overwrite)
             safe_movefile(bvals, outname_bvals, overwrite)
