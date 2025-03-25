@@ -136,4 +136,4 @@ please submit a question to `NeuroStars.org <http://neurostars.org/tags/heudicon
 NeuroStars.org is a platform similar to StackOverflow but dedicated to neuroinformatics.
 
 All previous ``heudiconv`` questions are available here:
-http://neurostars.org/tags/heudiconv/
+http://neurostars.org/tags/heudiconv/ .
