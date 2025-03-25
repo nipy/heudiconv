@@ -44,14 +44,35 @@ def test_main_version(std: StringIO) -> None:
 
 
 def test_create_file_if_missing(tmp_path: Path) -> None:
-    tf = tmp_path / "README.txt"
+    tf_base = tmp_path / "README"
+    tf = tf_base.with_suffix(".txt")
     assert not tf.exists()
-    create_file_if_missing(str(tf), "content")
+    assert create_file_if_missing(str(tf), "content")
     assert tf.exists()
     assert tf.read_text() == "content"
-    create_file_if_missing(str(tf), "content2")
+    assert not create_file_if_missing(str(tf), "content2")
     # nothing gets changed
     assert tf.read_text() == "content"
+    # matching glob - no change
+    for g in [".md", ".txt", ".json"], [".*"], [".*", ".txt"]:
+        assert not create_file_if_missing(str(tf_base), "content2", glob_suffixes=g)
+        assert tf.exists()
+        assert tf.read_text() == "content"
+        assert not tf_base.exists()  # was not created, since there is .md
+
+    # non-matching glob - change
+    for g in [".md", ".json"], [".d*", ".*d"]:
+        assert create_file_if_missing(str(tf_base), "content3", glob_suffixes=g)
+        assert tf_base.read_text() == "content3"
+        # now that we have suffix less README, we do not match, so we keep creating it
+        assert create_file_if_missing(str(tf_base), "content4", glob_suffixes=g)
+        assert tf_base.read_text() == "content4"
+        # unless we list it explicitly
+        assert not create_file_if_missing(
+            str(tf_base), "content5", glob_suffixes=g + [""]
+        )
+        assert tf_base.read_text() == "content4"
+        tf_base.unlink()
 
 
 def test_populate_bids_templates(tmp_path: Path) -> None:
