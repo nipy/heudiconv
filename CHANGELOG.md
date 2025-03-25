@@ -1,3 +1,28 @@
+# v1.3.3 (Tue Mar 25 2025)
+
+#### 🐛 Bug Fix
+
+- Require nibabel >= 5.3.1 (fixes issues with enhanced DICOMs), and drop Python 3.8 support [#800](https://github.com/nipy/heudiconv/pull/800) ([@bpinsard](https://github.com/bpinsard))
+- Do not create README if there is other allowed README.md or alike [#818](https://github.com/nipy/heudiconv/pull/818) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### 🏠 Internal
+
+- Minor non-consecuential changes (trailing ., add venv folders to ignore for codespell) [#820](https://github.com/nipy/heudiconv/pull/820) ([@yarikoptic](https://github.com/yarikoptic))
+- [gh-actions](deps): Bump codecov/codecov-action from 4 to 5 [#805](https://github.com/nipy/heudiconv/pull/805) ([@dependabot[bot]](https://github.com/dependabot[bot]))
+
+#### 📝 Documentation
+
+- Improve formatting in custom_seqinfo doc + provide url to an example [#815](https://github.com/nipy/heudiconv/pull/815) ([@yarikoptic](https://github.com/yarikoptic))
+- DOC: Replace gone pointer to "Usage" with "CLI Reference" [#811](https://github.com/nipy/heudiconv/pull/811) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 3
+
+- [@dependabot[bot]](https://github.com/dependabot[bot])
+- Basile ([@bpinsard](https://github.com/bpinsard))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v1.3.2 (Tue Nov 05 2024)
 
 #### 🐛 Bug Fix
