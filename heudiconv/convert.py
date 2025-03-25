@@ -61,9 +61,7 @@ if TYPE_CHECKING:
 
 
 LOCKFILE = "heudiconv.lock"
-DW_IMAGE_IN_FMAP_FOLDER_WARNING = (
-    "Diffusion-weighted image saved in non dwi folder ({folder})"
-)
+DW_IMAGE_WRONG_SUFFIX_WARNING = "Diffusion-weighted image saved as non dwi ({prefix})"
 lgr = logging.getLogger(__name__)
 
 
@@ -907,9 +905,7 @@ def save_converted_files(
                     os.remove(ftr)
                 lgr.debug("%s and %s were removed since not dwi", bvecs, bvals)
             else:
-                lgr.warning(
-                    DW_IMAGE_IN_FMAP_FOLDER_WARNING.format(folder=prefix_dirname)
-                )
+                lgr.warning(DW_IMAGE_WRONG_SUFFIX_WARNING.format(prefix=prefix))
                 lgr.warning(
                     ".bvec and .bval files will be generated. This is NOT BIDS compliant"
                 )
