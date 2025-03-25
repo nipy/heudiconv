@@ -851,6 +851,57 @@ def nipype_convert(
     return eg, prov_file
 
 
+def filter_partial_volumes(
+    nii_files: list[str],
+    bids_files: list[str],
+    bids_metas: list[dict[str, Any]],
+):
+    """filter interrupted 4D scans volumes with missing slices on XA: see dcm2niix #742
+
+    Parameters
+    ----------
+    nii_files : list[str]
+        converted nifti filepaths
+    bids_files: list[str]
+        converted BIDS json filepaths
+    bids_metas : list[dict[str, Any]]
+        list of metadata dict loaded from BIDS json files
+
+    Returns
+    -------
+    nii_files
+        filtered niftis
+    bids_files
+        filtered BIDS jsons
+    bids_metas
+        filtered BIDS metadata
+
+    """
+    partial_volumes = [not metadata.get("RawImage", True) for metadata in bids_metas]
+    no_partial_volumes = not any(partial_volumes) or all(partial_volumes)
+
+    if no_partial_volumes:
+        return nii_files, bids_files, bids_metas
+    else:
+        new_nii_files, new_bids_files, new_bids_metas = [], [], []
+        for fl, bids_file, bids_meta, is_pv in zip(
+            nii_files, bids_files, bids_metas, partial_volumes
+        ):
+            if is_pv:
+                # remove partial volume
+                os.remove(fl)
+                os.remove(bids_file)
+                lgr.warning(f"dropped {fl} partial volume from interrupted series")
+            else:
+                new_nii_files.append(fl)
+                new_bids_files.append(bids_file)
+                new_bids_metas.append(bids_meta)
+                print(bids_file)
+        if len(new_nii_files) == 1:
+            return new_nii_files[0], new_bids_files[0], new_bids_metas[0]
+        return new_nii_files, new_bids_files, new_bids_metas
+
+
 def save_converted_files(
     res: Node,
     item_dicoms: list[str],
@@ -887,6 +938,7 @@ def save_converted_files(
 
     bids_outfiles: list[str] = []
     res_files = res.outputs.converted_files
+    bids_files = res.outputs.bids
 
     if not len(res_files):
         lgr.debug("DICOMs {} were not converted".format(item_dicoms))
@@ -922,6 +974,21 @@ def save_converted_files(
         # we should provide specific handling for fmap,
         # dwi etc which might spit out multiple files
 
+        # Also copy BIDS files although they might need to
+        # be merged/postprocessed later
+        bids_files = (
+            sorted(bids_files)
+            if len(bids_files) == len(res_files)
+            else [None] * len(res_files)
+        )
+        # preload since will be used in multiple spots
+        bids_metas = [load_json(b) for b in bids_files if b]
+
+        res_files, bids_files, bids_metas = filter_partial_volumes(
+            res_files, bids_files, bids_metas
+        )
+
+    if isinstance(res_files, list):
         suffixes = (
             [str(i + 1) for i in range(len(res_files))]
             if (bids_options is not None)
@@ -937,16 +1004,6 @@ def save_converted_files(
                 item_dicoms[0],
             )
             suffixes = [str(-i - 1) for i in range(len(res_files))]
-
-        # Also copy BIDS files although they might need to
-        # be merged/postprocessed later
-        bids_files = (
-            sorted(res.outputs.bids)
-            if len(res.outputs.bids) == len(res_files)
-            else [None] * len(res_files)
-        )
-        # preload since will be used in multiple spots
-        bids_metas = [load_json(b) for b in bids_files if b]
 
         ###   Do we have a multi-echo series?   ###
         #   Some Siemens sequences (e.g. CMRR's MB-EPI) set the label 'TE1',
@@ -1040,7 +1097,7 @@ def save_converted_files(
         safe_movefile(res_files, outname, overwrite)
         if isdefined(res.outputs.bids):
             try:
-                safe_movefile(res.outputs.bids, outname_bids, overwrite)
+                safe_movefile(bids_files, outname_bids, overwrite)
                 bids_outfiles.append(outname_bids)
             except TypeError:  ##catch lists
                 raise TypeError("Multiple BIDS sidecars detected.")
