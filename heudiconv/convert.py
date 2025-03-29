@@ -1002,7 +1002,8 @@ def save_converted_files(
             len(set(filter(bool, channel_names))) > 1
         )  # Check for uncombined data
         # Determine if data are complex (magnitude + phase or real + imag or all-4)
-        is_complex = len(set(IMAGETYPE_TO_PARTS.keys()).intersection(image_types))
+        parts = filter(bool, [IMAGETYPE_TO_PARTS.get(it) for it in image_types])
+        is_complex = len(set(parts)) > 1
         echo_times_lst = sorted(echo_times)  # also converts to list
         channel_names_lst = sorted(channel_names)  # also converts to list
 
