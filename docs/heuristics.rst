@@ -83,7 +83,10 @@ But it is not used directly by HeuDiConv.
 A utility function used to filter any input files.
 
 If this function is included, every file found will go through this filter. Any
-files where this function returns ``True`` will be filtered out.
+files where this function returns ``False`` will be filtered out (files where
+this function returns ``True`` will be kept).
+Note: this function's logic is opposite to ``filter_dicom`` (see
+below). Think of it as an input for Python's built-in ``filter()``.
 
 --------------------------
 ``filter_dicom(dcm_data)``
