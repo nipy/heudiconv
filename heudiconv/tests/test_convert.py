@@ -13,7 +13,7 @@ from heudiconv.bids import BIDSError
 from heudiconv.cli.run import main as runner
 import heudiconv.convert
 from heudiconv.convert import (
-    DW_IMAGE_IN_FMAP_FOLDER_WARNING,
+    DW_IMAGE_WRONG_SUFFIX_WARNING,
     bvals_are_zero,
     update_complex_name,
     update_multiecho_name,
@@ -170,8 +170,8 @@ def test_b0dwi_for_fmap(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> Non
 
     # assert that it raised a warning that the fmap directory will contain
     # bvec and bval files.
-    expected_msg = DW_IMAGE_IN_FMAP_FOLDER_WARNING.format(
-        folder=op.join(tmp_path, f"sub-{subID}", "fmap")
+    expected_msg = DW_IMAGE_WRONG_SUFFIX_WARNING.format(
+        prefix=op.join(tmp_path, f"sub-{subID}", "fmap", f"sub-{subID}_acq-b0dwi_epi")
     )
     assert any(expected_msg in c.message for c in caplog.records)
 
