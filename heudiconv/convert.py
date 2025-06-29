@@ -11,7 +11,7 @@ import re
 import shutil
 import sys
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, List, Optional, cast
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple, cast
 
 import filelock
 from nipype import Node
@@ -853,7 +853,7 @@ def filter_partial_volumes(
     nii_files: list[str],
     bids_files: list[str],
     bids_metas: list[dict[str, Any]],
-):
+) -> Tuple[list[str] | str, list[str] | str, list[Any] | Any]:
     """filter interrupted 4D scans volumes with missing slices on XA: see dcm2niix #742
 
     Parameters
@@ -1098,7 +1098,7 @@ def save_converted_files(
     else:
         outname = "{}.{}".format(prefix, outtype)
         safe_movefile(res_files, outname, overwrite)
-        if isdefined(res.outputs.bids):
+        if bids_files:
             try:
                 safe_movefile(bids_files, outname_bids, overwrite)
                 bids_outfiles.append(outname_bids)
