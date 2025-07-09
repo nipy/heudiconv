@@ -9,7 +9,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     env:
       BOTO_CONFIG: /tmp/nowhere
       DATALAD_TESTS_SSH: '1'
