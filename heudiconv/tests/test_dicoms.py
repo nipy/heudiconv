@@ -224,6 +224,6 @@ def test_get_reproducible_int_raises_assertion_wo_dt(tmp_path: Path) -> None:
     del XA30_enhanced_dcm.AcquisitionDateTime
     del XA30_enhanced_dcm.SeriesDate
     del XA30_enhanced_dcm.SeriesTime
-    dcm.dcmwrite(tmp_path, dataset=XA30_enhanced_dcm)
+    dcm.dcmwrite(tmp_path, XA30_enhanced_dcm)
     with pytest.raises(AssertionError):
         get_reproducible_int([str(tmp_path)])

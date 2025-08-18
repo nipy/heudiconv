@@ -50,7 +50,7 @@ with warnings.catch_warnings():
 # TODO: remove the kludge whenever
 # https://github.com/moloney/dcmstack/pull/90 is merged and released
 if not hasattr(dcm, "read_file"):
-    dcm.read_file = dcm.dcmread
+    dcm.read_file = dcm.dcmread  # type: ignore[attr-defined]
 
 lgr = logging.getLogger(__name__)
 total_files = 0
