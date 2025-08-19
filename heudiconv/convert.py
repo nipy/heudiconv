@@ -894,10 +894,19 @@ def save_converted_files(
         bvals, bvecs = res.outputs.bvals, res.outputs.bvecs
         bvals = list(bvals) if isinstance(bvals, TraitListObject) else bvals
         bvecs = list(bvecs) if isinstance(bvecs, TraitListObject) else bvecs
-        if prefix.endswith("dwi"):
+
+        def rename_files() -> None:
+            # shared code for renaming files
+            if isinstance(bvecs, list):
+                assert len(bvecs) == len(bvals) == 1
             outname_bvecs, outname_bvals = prefix + ".bvec", prefix + ".bval"
-            safe_movefile(bvecs, outname_bvecs, overwrite)
-            safe_movefile(bvals, outname_bvals, overwrite)
+            bvecs_src = bvecs[0] if isinstance(bvecs, list) else bvecs
+            bvals_src = bvals[0] if isinstance(bvals, list) else bvals
+            safe_movefile(bvecs_src, outname_bvecs, overwrite)
+            safe_movefile(bvals_src, outname_bvals, overwrite)
+
+        if prefix.endswith("dwi"):
+            rename_files()
         else:
             if bvals_are_zero(bvals):
                 to_remove = bvals + bvecs if isinstance(bvals, list) else [bvals, bvecs]
@@ -909,9 +918,7 @@ def save_converted_files(
                 lgr.warning(
                     ".bvec and .bval files will be generated. This is NOT BIDS compliant"
                 )
-                outname_bvecs, outname_bvals = prefix + ".bvec", prefix + ".bval"
-                safe_movefile(bvecs, outname_bvecs, overwrite)
-                safe_movefile(bvals, outname_bvals, overwrite)
+                rename_files()
 
     if isinstance(res_files, list):
         res_files = sorted(res_files)
