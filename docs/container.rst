@@ -37,7 +37,7 @@ Podman Permissions
 When running Podman without specifying a user, the container is run as root inside the container, but your user outside of the container.
 This default behavior usually works for heudiconv users::
 
-    docker run -v $PWD:PWD nipy/heudiconv:latest --version
+    podman run -v $PWD:PWD nipy/heudiconv:latest --version
 
 Other Common Options
 --------------------
