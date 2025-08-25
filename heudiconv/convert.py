@@ -894,7 +894,6 @@ def filter_partial_volumes(
                 new_nii_files.append(fl)
                 new_bids_files.append(bids_file)
                 new_bids_metas.append(bids_meta)
-                print(bids_file)
         if len(new_nii_files) == 1:
             return new_nii_files[0], new_bids_files[0], new_bids_metas[0]
         return new_nii_files, new_bids_files, new_bids_metas
