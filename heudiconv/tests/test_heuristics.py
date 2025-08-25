@@ -183,6 +183,25 @@ def test_scout_conversion(tmp_path: Path) -> None:
     assert j[HEUDICONV_VERSION_JSON_KEY] == __version__
 
 
+def test_partial_xa_conversion(tmp_path: Path) -> None:
+    args = [
+        "-b",
+        "-f",
+        "convertall",
+        "-s",
+        "test",
+        "--minmeta",
+        "--files",
+        op.join(TESTS_DATA_PATH, "xa_4d_interrupted"),
+        "-o",
+        str(tmp_path),
+    ]
+    runner(args)
+    n_output_files = len(list(tmp_path.glob("*.nii.gz")))
+    # partial volumes of interrupted scan should have been removed
+    assert n_output_files == 1
+
+
 @pytest.mark.parametrize(
     "bidsoptions",
     [
