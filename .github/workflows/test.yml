@@ -21,8 +21,7 @@ jobs:
           - '3.10'
           - '3.11'
           - '3.12'
-          # Seems needs work in traits: https://github.com/nipy/heudiconv/pull/799#issuecomment-2447298795
-          # - '3.13'
+          - '3.13'
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
