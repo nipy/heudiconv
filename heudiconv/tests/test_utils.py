@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 import json
 from json.decoder import JSONDecodeError
+import logging
 import os
 import os.path as op
 from pathlib import Path
@@ -22,6 +23,7 @@ from heudiconv.utils import (
     load_json,
     remove_prefix,
     remove_suffix,
+    sanitize_path,
     save_json,
     strptime_bids,
     strptime_dcm_da_tm,
@@ -294,3 +296,30 @@ def test_remove_prefix() -> None:
     assert remove_prefix(s, "") == s
     assert remove_prefix(s, "foo") == s
     assert remove_prefix(s, "jason") == ".bourne"
+
+
+@pytest.mark.parametrize("value", ["valid-name_123", "valid/name/123"])
+def test_sanitize_path_valid(value: str) -> None:
+    assert sanitize_path(value) == value
+
+
+@pytest.mark.parametrize(
+    "value,target",
+    [
+        ("in valid/na   me:123*?", "in_valid/na_me_123_"),
+        ("   leading-and-trailing--- ", "_leading-and-trailing---_"),
+        ("!!!", "_"),
+        (" ! ", "_"),
+    ],
+)
+def test_sanitize_path_invalid(
+    value: str, target: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.WARNING)
+    assert sanitize_path(value) == target
+    # should log about replacements only
+    assert len(caplog.records) == 1
+    msg = caplog.records[0].message
+    assert value in msg
+    assert target in msg
+    assert "contained problematic character(s)" in msg

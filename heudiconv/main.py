@@ -13,7 +13,7 @@ from .convert import prep_conversion
 from .due import Doi, due
 from .parser import get_study_sessions
 from .queue import queue_conversion
-from .utils import SeqInfo, anonymize_sid, load_heuristic, treat_infofile
+from .utils import SeqInfo, anonymize_sid, load_heuristic, sanitize_path, treat_infofile
 
 lgr = logging.getLogger(__name__)
 
@@ -445,7 +445,8 @@ def workflow(
         if locator == "unknown":
             lgr.warning("Skipping unknown locator dataset")
             continue
-
+        if locator:
+            locator = sanitize_path(locator, "locator")
         if anon_cmd and sid is not None:
             anon_sid = anonymize_sid(sid, anon_cmd)
             lgr.info("Anonymized {} to {}".format(sid, anon_sid))

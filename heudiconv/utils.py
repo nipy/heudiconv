@@ -164,6 +164,24 @@ def anonymize_sid(sid: AnyStr, anon_sid_cmd: str) -> AnyStr:
     return anon_sid
 
 
+def sanitize_path(path: str, descr: str = "path") -> str:
+    """Sanitize a path by replacing multiple consecutive unwanted characters with _.
+
+    Due to https://github.com/nipy/nipype/issues/3604 we would like to avoid
+    spaces in the paths, or any special characters which could cause special treatment in
+    the shell, e.g. characters like ; or & serving as command separators.
+    """
+    clean_path = re.sub("[ #!$%^&:;*?]+", "_", path)
+    if clean_path != path:
+        lgr.warning(
+            "%r %s contained problematic character(s), it " "was cleaned to be %r",
+            path,
+            descr,
+            clean_path,
+        )
+    return clean_path
+
+
 def create_file_if_missing(
     filename: str, content: str, glob_suffixes: list[str] | None = None
 ) -> bool:
