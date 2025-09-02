@@ -226,7 +226,7 @@ def _delete_chars(from_str: str, deletechars: str) -> str:
 
 def filter_dicom(dcmdata: dcm.dataset.Dataset) -> bool:
     """Return True if a DICOM dataset should be filtered out, else False"""
-    return True if dcmdata.get("StudyInstanceUID") in dicoms2skip else False
+    return True if dcmdata.StudyInstanceUID in dicoms2skip else False
 
 
 def filter_files(_fn: str) -> bool:

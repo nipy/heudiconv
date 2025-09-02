@@ -183,6 +183,9 @@ def validate_dicom(
     except AttributeError as e:
         lgr.warning('Ignoring %s since not quite a "normal" DICOM: %s', fl, e)
         return None
+    if dcmfilter is not None and dcmfilter(mw.dcm_data):
+        lgr.warning("Ignoring %s because of DICOM filter", fl)
+        return None
     if mw.dcm_data[0x0008, 0x0016].repval in (
         "Raw Data Storage",
         "GrayscaleSoftcopyPresentationStateStorage",
@@ -194,9 +197,6 @@ def validate_dicom(
     except AttributeError:
         lgr.info("File {} is missing any StudyInstanceUID".format(fl))
         file_studyUID = None
-    if dcmfilter is not None and dcmfilter(mw.dcm_data):
-        lgr.warning("Ignoring %s because of DICOM filter", fl)
-        return None
     # clean series signature
     for sig in ("iop", "ICE_Dims", "SequenceName"):
         try:
