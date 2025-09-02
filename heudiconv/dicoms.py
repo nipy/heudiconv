@@ -169,12 +169,6 @@ def validate_dicom(
     Parse DICOM attributes. Returns None if not valid.
     """
     mw = dw.wrapper_from_file(fl, force=True, stop_before_pixels=True)
-    # clean series signature
-    for sig in ("iop", "ICE_Dims", "SequenceName"):
-        try:
-            del mw.series_signature[sig]
-        except KeyError:
-            pass
     # Workaround for protocol name in private siemens csa header
     if not getattr(mw.dcm_data, "ProtocolName", "").strip():
         mw.dcm_data.ProtocolName = (
@@ -203,6 +197,12 @@ def validate_dicom(
     except AttributeError:
         lgr.info("File {} is missing any StudyInstanceUID".format(fl))
         file_studyUID = None
+    # clean series signature
+    for sig in ("iop", "ICE_Dims", "SequenceName"):
+        try:
+            del mw.series_signature[sig]
+        except KeyError:
+            pass
     return mw, series_id, file_studyUID
 
 
