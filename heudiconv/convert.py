@@ -875,6 +875,9 @@ def filter_partial_volumes(
         filtered BIDS metadata
 
     """
+    # dcm2niix sets metadata "RawImage": false and "SeriesNumber" += 1000 to mark partial volumes
+    # https://github.com/rordenlab/dcm2niix/blob/f6d7a0018d9d268ed1d084faafdedfadcbbb830b/console/nii_dicom.cpp#L8434-L8437
+    # following that logic until https://github.com/nipy/heudiconv/pull/828 gets resolved
     partial_volumes = [
         not metadata.get("RawImage", True)
         and metadata.get("SeriesNumber", 0) > 1000
