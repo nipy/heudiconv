@@ -875,7 +875,12 @@ def filter_partial_volumes(
         filtered BIDS metadata
 
     """
-    partial_volumes = [not metadata.get("RawImage", True) for metadata in bids_metas]
+    partial_volumes = [
+        not metadata.get("RawImage", True)
+        and metadata.get("SeriesNumber", 0) > 1000
+        and "syngo MR XA" in metadata.get("SoftwareVersions")
+        for metadata in bids_metas
+    ]
     no_partial_volumes = not any(partial_volumes) or all(partial_volumes)
 
     if no_partial_volumes:
