@@ -10,6 +10,7 @@ import random
 import re
 import shutil
 import sys
+import json
 from types import ModuleType
 from typing import TYPE_CHECKING, Any, List, Optional, Tuple, cast
 
@@ -618,15 +619,39 @@ def convert(
                     description="DICOM to NIfTI + .json sidecar conversion utility",
                     tags=["implementation"],
                 )
-                outname, scaninfo = (prefix + "." + outtype, prefix + scaninfo_suffix)
+                outnames = [prefix + "." + t for t in ["nii", "nii.gz"]]
+                scaninfo = prefix + scaninfo_suffix
 
-                if not op.exists(outname) or overwrite:
+                if not any([op.exists(outname) for outname in outnames]) or overwrite:
                     tmpdir = tempdirs("dcm2niix")
+
+                    # demote outtype if dcmconfig explicitly disables compression
+                    # and issue a warning (user supplied mixed signals here)
+                    if dcmconfig is not None:
+                        with open(dcmconfig) as f:
+                            dcmconfig_dict = json.loads(f.read())
+                        if dcmconfig_dict.get('compress', 'y') == 'n':
+                            outtype = 'nii'
+                            lgr.warning("Demoting outtype to uncompressed nifti, because "
+                                        "compress is set to 'n' in supplied dcmconfig")
 
                     # run conversion through nipype
                     res, prov_file = nipype_convert(
                         item_dicoms, prefix, with_prov, bids_options, tmpdir, dcmconfig
                     )
+
+                    # try to handle compression failures from dcm2niix
+                    if outtype == 'nii.gz':
+                        converted_files = res.outputs.converted_files
+                        if isinstance(converted_files, list):
+                            # we do not handle mixed compression results from dcm2niix, yet
+                            # fail, if any of the outputs weren't compressed properly
+                            assert all([x.endswith('nii.gz') for x in converted_files])
+                        else:
+                            if converted_files.endswith('nii'):
+                                lgr.warning("Conversion returned uncompressed nifti (>4GB?) - "
+                                            "demoting outtype to 'nii'")
+                                outtype = 'nii'
 
                     bids_outfiles = save_converted_files(
                         res,
@@ -651,8 +676,8 @@ def convert(
                     tempdirs.rmtree(tmpdir)
                 else:
                     raise RuntimeError(
-                        "was asked to convert into %s but destination already exists"
-                        % (outname)
+                        "was asked to convert into %s.nii[.gz] but destination already exists"
+                        % (prefix)
                     )
 
         # add the taskname field to the json file(s):
