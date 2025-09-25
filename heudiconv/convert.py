@@ -638,6 +638,11 @@ def convert(
                         overwrite=overwrite,
                     )
 
+                    # TODO: add heuristic call to possibly adjust filenames
+                    # renames = rename_after_dcm2niix(item, bids_outfiles)
+                    # for file_from, file_to in renames.items():
+                    #    safe_movefile(...)
+
                     # save acquisition time information if it's BIDS
                     # at this point we still have acquisition date
                     if bids_options is not None:
@@ -646,6 +651,10 @@ def convert(
                     tuneup_bids_json_files(bids_outfiles)
 
                     if prov_file:
+                        # TODO: check if it remains sensible since save_converted_files
+                        # would do all kinds of renames etc
+                        # if above bids_outfiles become dict -- it could add
+                        # additional prov fields for renaming or just adjust the records
                         prov_files.append(prov_file)
 
                     tempdirs.rmtree(tmpdir)
@@ -1111,7 +1120,7 @@ def save_converted_files(
                 bids_outfiles.append(outname_bids)
             except TypeError:  ##catch lists
                 raise TypeError("Multiple BIDS sidecars detected.")
-    return bids_outfiles
+    return bids_outfiles  # TODO: make this to be a dict which would point to original filenames
 
 
 def add_taskname_to_infofile(infofiles: str | list[str]) -> None:
