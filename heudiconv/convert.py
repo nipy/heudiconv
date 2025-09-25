@@ -295,10 +295,20 @@ def prep_conversion(
             )
 
 
+IMAGETYPE_TO_PARTS = {
+    "M": "mag",
+    "MAGNITUDE": "mag",
+    "P": "phase",
+    "PHASE": "phase",
+    "REAL": "real",
+    "IMAGINARY": "imag",
+}
+
+
 def update_complex_name(metadata: dict[str, Any], filename: str) -> str:
     """
-    Insert `_part-<mag|phase>` entity into filename if data are from a
-    sequence with magnitude/phase part.
+    Insert `_part-<mag|phase|real|imag>` entity into filename if data are from a
+    sequence with magnitude/phase/real/imaginary part.
 
     Parameters
     ----------
@@ -328,20 +338,27 @@ def update_complex_name(metadata: dict[str, Any], filename: str) -> str:
     if any(ut in filename for ut in unsupported_types):
         return filename
 
-    # Check to see if it is magnitude or phase part:
     img_type = cast(List[str], metadata.get("ImageType", []))
-    if "M" in img_type:
-        mag_or_phase = "mag"
-    elif "P" in img_type:
-        mag_or_phase = "phase"
+
+    present_parts = set(
+        IMAGETYPE_TO_PARTS[tp] for tp in img_type if tp in IMAGETYPE_TO_PARTS
+    )
+    if not present_parts:
+        raise RuntimeError(
+            f"Data type could not be inferred from the ImageType={img_type}. Known types are: {sorted(IMAGETYPE_TO_PARTS)}"
+        )
+    elif len(present_parts) == 1:
+        part = present_parts.pop()
     else:
-        raise RuntimeError("Data type could not be inferred from the metadata.")
+        raise RuntimeError(
+            f"Data type could not be inferred from the ImageType={img_type}. Multiple BIDS parts matched: {present_parts}"
+        )
 
     # Determine scan suffix
     filetype = "_" + filename.split("_")[-1]
 
     # Insert part label
-    if not ("_part-%s" % mag_or_phase) in filename:
+    if not ("_part-%s" % part) in filename:
         # If "_part-" is specified, prepend the 'mag_or_phase' value.
         if "_part-" in filename:
             raise BIDSError(
@@ -366,7 +383,7 @@ def update_complex_name(metadata: dict[str, Any], filename: str) -> str:
         ]
         for label in entities_after_part:
             if (label == filetype) or (label in filename):
-                filename = filename.replace(label, "_part-%s%s" % (mag_or_phase, label))
+                filename = filename.replace(label, "_part-%s%s" % (part, label))
                 break
 
     return filename
@@ -1051,9 +1068,9 @@ def save_converted_files(
         is_uncombined = (
             len(set(filter(bool, channel_names))) > 1
         )  # Check for uncombined data
-        is_complex = (
-            "M" in image_types and "P" in image_types
-        )  # Determine if data are complex (magnitude + phase)
+        # Determine if data are complex (magnitude + phase or real + imag or all-4)
+        parts = filter(bool, [IMAGETYPE_TO_PARTS.get(it) for it in image_types])
+        is_complex = len(set(parts)) > 1
         echo_times_lst = sorted(echo_times)  # also converts to list
         channel_names_lst = sorted(channel_names)  # also converts to list
 
