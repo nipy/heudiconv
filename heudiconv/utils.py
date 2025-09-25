@@ -18,6 +18,7 @@ import shutil
 import stat
 from subprocess import check_output
 import sys
+import string
 import tempfile
 from time import sleep
 from types import ModuleType
@@ -254,6 +255,41 @@ def load_json(filename: str | Path, retry: int = 0) -> Any:
             continue
 
     return data
+
+
+def is_deprecated_seriesid(series_id: str, len_hash_hex: int = 8) -> bool:
+    """Return True if series_id is in deprecated format.
+    A deprecated series ID is in the format "series_number-protocol_name".
+    A non-deprecated series ID is in the format "series_number-protocol_name-seriesUID_hash_hex"
+    """
+    # Check at least two '-' in the series_id
+    if series_id.count('-') <= 1:
+        return True
+    # Check the first part of the series_id is a number
+    series_number = series_id.split('-')[0]
+    if not series_number.isdigit():
+        return True
+    # Check the last part of the series_id is a hash in hexadecimal format of length len_hash_hex
+    hash_hex = series_id.split('-')[-1]
+    hex_digits = set(string.hexdigits)
+    if len(hash_hex) != len_hash_hex or not all(c in hex_digits for c in hash_hex):
+        return True
+    # If all previous tests passed, then the series_id is not deprecated
+    return False
+
+
+def has_deprecated_seriesid(info_file: str) -> bool:
+    """Return True if any series_id in the info_file is in deprecated format."""
+    info = read_config(info_file)
+    series_ids = [series_id for sublist in info.values() for series_id in sublist]
+    if any(is_deprecated_seriesid(series_id) for series_id in series_ids):
+        lgr.warning(
+            "Found deprecated series identifier in info file in the format"
+            "<series num>-<protocol name> instead of <series num>-<protocol name>-<UID hash>"
+            "The existing conversion table will be ignored."
+        )
+        return True
+    return False
 
 
 def assure_no_file_exists(path: str | Path) -> None:
