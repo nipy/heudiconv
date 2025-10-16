@@ -1088,6 +1088,10 @@ def save_converted_files(
             # If we have failed to modify this_prefix_basename, because it didn't fall
             #   into any of the options above, just add the suffix at the end:
             if this_prefix_basename == prefix_basename:
+                # TODO: never hit by tests! So what are the suffixes for?!
+                import pdb
+
+                pdb.set_trace()
                 this_prefix_basename += suffix
 
             # Finally, form the outname by stitching the directory and outtype:

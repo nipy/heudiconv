@@ -68,7 +68,7 @@ class BIDSError(Exception):
     pass
 
 
-BIDS_VERSION = "1.8.0"
+BIDS_VERSION = "1.10.1"
 
 # List defining allowed parameter matching for fmap assignment:
 SHIM_KEY = "ShimSetting"
@@ -1067,17 +1067,33 @@ def populate_intended_for(
 
 
 class BIDSFile:
-    """as defined in https://bids-specification.readthedocs.io/en/stable/99-appendices/04-entity-table.html
-    which might soon become machine readable
-    order matters
+    """Representation of a BIDS file with order of entities following BIDS
+
+    Full ordered list from
+    http://github.com/bids-standard/bids-specification/blob/HEAD/src/schema/rules/entities.yaml
+    while taking shortened versions from
+    https://github.com/bids-standard/bids-specification/blob/master/src/schema/objects/entities.yaml
+
+    Use
+
+         python -c 'from heudiconv.bids import BIDSFile; BIDSFile._print_entities()'
+
+    to print the current list of entities to plug in below.
     """
 
+    # For release 1.10.1
     _known_entities = [
         "sub",
         "ses",
+        "sample",
         "task",
+        "tracksys",
         "acq",
+        "nuc",
+        "voi",
         "ce",
+        "trc",
+        "stain",
         "rec",
         "dir",
         "run",
@@ -1087,8 +1103,52 @@ class BIDSFile:
         "inv",
         "mt",
         "part",
+        "proc",
+        "hemi",
+        "space",
+        "split",
         "recording",
+        "chunk",
+        "seg",
+        "res",
+        "den",
+        "label",
+        "desc",
     ]
+
+    @staticmethod
+    def _get_entities(version: str = BIDS_VERSION) -> list[str]:
+        """Load BIDS entity rules and print entity names to plug above."""
+
+        from urllib.request import urlopen
+
+        import yaml
+
+        is_released = version and version[0].isdigit()
+        version_url = f"refs/tags/v{version}" if is_released else version
+
+        base_url = f"https://raw.githubusercontent.com/bids-standard/bids-specification/{version_url}/src/schema"
+
+        # Load the list of entity keys
+        with urlopen(f"{base_url}/rules/entities.yaml") as response:
+            entity_keys = yaml.safe_load(response)
+
+        # Load the entities dictionary
+        with urlopen(f"{base_url}/objects/entities.yaml") as response:
+            entities_dict = yaml.safe_load(response)
+
+        return [entities_dict[key]["name"] for key in entity_keys]
+
+    @staticmethod
+    def _print_entities(version: str = BIDS_VERSION) -> None:
+        # Print the name for each entity
+        is_released = version and version[0].isdigit()
+        if is_released:
+            print(f"    # For release {version}")
+        print("    _known_entities = [")
+        for ent in BIDSFile._get_entities(version=version):
+            print(f'        "{ent}",')
+        print("    ]")
 
     def __init__(
         self, entities: dict[str, str], suffix: str, extension: Optional[str]
