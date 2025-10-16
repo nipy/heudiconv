@@ -1120,24 +1120,25 @@ class BIDSFile:
     def _get_entities(version: str = BIDS_VERSION) -> list[str]:
         """Load BIDS entity rules and print entity names to plug above."""
 
-        from urllib.request import urlopen
-
-        import yaml
+        import json
+        from urllib.request import Request, urlopen
 
         is_released = version and version[0].isdigit()
-        version_url = f"refs/tags/v{version}" if is_released else version
+        version_url = f"v{version}" if is_released else version
 
-        base_url = f"https://raw.githubusercontent.com/bids-standard/bids-specification/{version_url}/src/schema"
+        schema_url = (
+            f"https://bids-specification.readthedocs.io/en/{version_url}/schema.json"
+        )
+        headers = {
+            "User-Agent": "heudiconv/{__version__}",
+        }
+        with urlopen(Request(schema_url, headers=headers)) as response:
+            schema = json.loads(response.read().decode())
 
-        # Load the list of entity keys
-        with urlopen(f"{base_url}/rules/entities.yaml") as response:
-            entity_keys = yaml.safe_load(response)
-
-        # Load the entities dictionary
-        with urlopen(f"{base_url}/objects/entities.yaml") as response:
-            entities_dict = yaml.safe_load(response)
-
-        return [entities_dict[key]["name"] for key in entity_keys]
+        return [
+            schema["objects"]["entities"][key]["name"]
+            for key in schema["rules"]["entities"]
+        ]
 
     @staticmethod
     def _print_entities(version: str = BIDS_VERSION) -> None:
