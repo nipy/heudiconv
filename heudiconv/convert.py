@@ -269,6 +269,7 @@ def prep_conversion(
             min_meta=min_meta,
             overwrite=overwrite,
             dcmconfig=dcmconfig,
+            no_sanitize_jsons=no_sanitize_jsons,
         )
 
     for item_dicoms in filegroup.values():
@@ -536,6 +537,7 @@ def convert(
     prov_file: Optional[str] = None,
     dcmconfig: Optional[str] = None,
     populate_intended_for_opts: Optional[PopulateIntendedForOpts] = None,
+    no_sanitize_jsons: bool = False,
 ) -> None:
     """Perform actual conversion (calls to converter etc) given info from
     heuristic's `infotodict`

@@ -61,6 +61,7 @@ def process_extra_commands(
     session: Optional[str],
     subjs: Optional[list[str]],
     grouping: str,
+    no_sanitize_jsons: bool = False,
 ) -> None:
     """
     Perform custom command instead of regular operations. Supported commands:
@@ -82,6 +83,8 @@ def process_extra_commands(
         List of subject identifiers
     grouping : {'studyUID', 'accession_number', 'all', 'custom'}
         How to group dicoms.
+    no_sanitize_jsons : bool, optional
+        Disable removal of sensitive date/time information from JSON sidecar files.
     """
 
     def ensure_has_files() -> None:
@@ -389,6 +392,7 @@ def workflow(
             session,
             subjs,
             grouping,
+            no_sanitize_jsons,
         )
         return
     #

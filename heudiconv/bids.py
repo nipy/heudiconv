@@ -315,7 +315,7 @@ def populate_aggregated_jsons(path: str) -> None:
 
 def tuneup_bids_json_files(json_files: list[str], sanitize: bool = True) -> None:
     """Given a list of BIDS .json files, tune them up (add HeuDiConv version, optionally remove dates).
-    
+
     Parameters
     ----------
     json_files : list of str

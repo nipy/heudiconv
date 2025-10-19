@@ -1424,11 +1424,11 @@ def test_tuneup_bids_json_files_sanitization(tmp_path: Path) -> None:
         "RepetitionTime": 2.0,
     }
     save_json(str(test_json_path), test_data)
-    
+
     # Test with sanitization enabled (default)
     tuneup_bids_json_files([str(test_json_path)], sanitize=True)
     result = load_json(str(test_json_path))
-    
+
     # Check that date/time fields were removed
     assert "AcquisitionDate" not in result
     assert "AcquisitionDateTime" not in result
@@ -1436,21 +1436,21 @@ def test_tuneup_bids_json_files_sanitization(tmp_path: Path) -> None:
     assert "StudyDateTime" not in result
     assert "SeriesDate" not in result
     assert "SeriesDateTime" not in result
-    
+
     # Check that other fields were preserved
     assert result["EchoTime"] == 0.03
     assert result["RepetitionTime"] == 2.0
-    
+
     # Check that HeudiconvVersion was added
     assert "HeudiconvVersion" in result
-    
+
     # Recreate the file for the second test
     save_json(str(test_json_path), test_data)
-    
+
     # Test with sanitization disabled
     tuneup_bids_json_files([str(test_json_path)], sanitize=False)
     result = load_json(str(test_json_path))
-    
+
     # Check that date/time fields were preserved
     assert result["AcquisitionDate"] == "20231015"
     assert result["AcquisitionDateTime"] == "20231015120000"
@@ -1458,10 +1458,10 @@ def test_tuneup_bids_json_files_sanitization(tmp_path: Path) -> None:
     assert result["StudyDateTime"] == "20231015120000"
     assert result["SeriesDate"] == "20231015"
     assert result["SeriesDateTime"] == "20231015120000"
-    
+
     # Check that other fields were preserved
     assert result["EchoTime"] == 0.03
     assert result["RepetitionTime"] == 2.0
-    
+
     # Check that HeudiconvVersion was added
     assert "HeudiconvVersion" in result
