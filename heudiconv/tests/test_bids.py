@@ -35,6 +35,7 @@ from heudiconv.bids import (
     sanitize_label,
     select_fmap_from_compatible_groups,
     treat_age,
+    tuneup_bids_json_files,
 )
 from heudiconv.cli.run import main as runner
 from heudiconv.utils import Load, create_tree, load_json, remove_suffix, save_json
@@ -1406,3 +1407,61 @@ def test_sanitize_label() -> None:
     assert sanitize_label("az XZ-@09") == "azXZ09"
     with pytest.raises(ValueError):
         sanitize_label(" @ ")
+
+
+def test_tuneup_bids_json_files_sanitization(tmp_path: Path) -> None:
+    """Test that tuneup_bids_json_files properly sanitizes date/time fields."""
+    # Create a test JSON file with date/time fields
+    test_json_path = tmp_path / "test.json"
+    test_data = {
+        "AcquisitionDate": "20231015",
+        "AcquisitionDateTime": "20231015120000",
+        "StudyDate": "20231015",
+        "StudyDateTime": "20231015120000",
+        "SeriesDate": "20231015",
+        "SeriesDateTime": "20231015120000",
+        "EchoTime": 0.03,
+        "RepetitionTime": 2.0,
+    }
+    save_json(str(test_json_path), test_data)
+    
+    # Test with sanitization enabled (default)
+    tuneup_bids_json_files([str(test_json_path)], sanitize=True)
+    result = load_json(str(test_json_path))
+    
+    # Check that date/time fields were removed
+    assert "AcquisitionDate" not in result
+    assert "AcquisitionDateTime" not in result
+    assert "StudyDate" not in result
+    assert "StudyDateTime" not in result
+    assert "SeriesDate" not in result
+    assert "SeriesDateTime" not in result
+    
+    # Check that other fields were preserved
+    assert result["EchoTime"] == 0.03
+    assert result["RepetitionTime"] == 2.0
+    
+    # Check that HeudiconvVersion was added
+    assert "HeudiconvVersion" in result
+    
+    # Recreate the file for the second test
+    save_json(str(test_json_path), test_data)
+    
+    # Test with sanitization disabled
+    tuneup_bids_json_files([str(test_json_path)], sanitize=False)
+    result = load_json(str(test_json_path))
+    
+    # Check that date/time fields were preserved
+    assert result["AcquisitionDate"] == "20231015"
+    assert result["AcquisitionDateTime"] == "20231015120000"
+    assert result["StudyDate"] == "20231015"
+    assert result["StudyDateTime"] == "20231015120000"
+    assert result["SeriesDate"] == "20231015"
+    assert result["SeriesDateTime"] == "20231015120000"
+    
+    # Check that other fields were preserved
+    assert result["EchoTime"] == 0.03
+    assert result["RepetitionTime"] == 2.0
+    
+    # Check that HeudiconvVersion was added
+    assert "HeudiconvVersion" in result
