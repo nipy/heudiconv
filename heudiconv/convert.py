@@ -130,6 +130,7 @@ def prep_conversion(
     overwrite: bool,
     dcmconfig: Optional[str],
     grouping: str,
+    no_sanitize_jsons: bool = False,
 ) -> None:
     if dicoms:
         lgr.info("Processing %d dicoms", len(dicoms))
@@ -643,7 +644,7 @@ def convert(
                     if bids_options is not None:
                         save_scans_key(item, bids_outfiles)
                     # Fix up and unify BIDS files
-                    tuneup_bids_json_files(bids_outfiles)
+                    tuneup_bids_json_files(bids_outfiles, sanitize=not no_sanitize_jsons)
 
                     if prov_file:
                         prov_files.append(prov_file)

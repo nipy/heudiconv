@@ -188,6 +188,14 @@ def get_parser() -> ArgumentParser:
         help="Exclude dcmstack meta information in sidecar jsons.",
     )
     parser.add_argument(
+        "--no-sanitize-jsons",
+        action="store_true",
+        dest="no_sanitize_jsons",
+        help="Disable removal of sensitive date/time information from JSON sidecar files. "
+        "By default, AcquisitionDate, AcquisitionDateTime, StudyDate, StudyDateTime, "
+        "SeriesDate, and SeriesDateTime fields are removed from JSON files.",
+    )
+    parser.add_argument(
         "--random-seed", type=int, default=None, help="Random seed to initialize RNG."
     )
     parser.add_argument(
