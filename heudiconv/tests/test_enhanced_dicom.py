@@ -213,10 +213,7 @@ def test_extract_metadata_with_real_dicom_if_available() -> None:
         metadata = extract_metadata(test_file)
 
         # Should extract basic metadata
-        assert (
-            metadata["SeriesInstanceUID"] is not None
-            or metadata["SeriesInstanceUID"] == ""
-        )
+        assert metadata["SeriesInstanceUID"] is not None
         assert isinstance(metadata, dict)
 
         # For classic DICOM, NumberOfFrames might not be present
