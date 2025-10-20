@@ -130,6 +130,7 @@ def prep_conversion(
     overwrite: bool,
     dcmconfig: Optional[str],
     grouping: str,
+    use_enhanced_dicom: bool = False,
 ) -> None:
     if dicoms:
         lgr.info("Processing %d dicoms", len(dicoms))
@@ -222,6 +223,7 @@ def prep_conversion(
                 # callable which will be provided dcminfo and returned
                 # structure extend seqinfo
                 custom_seqinfo=getattr(heuristic, "custom_seqinfo", None),
+                use_enhanced_dicom=use_enhanced_dicom,
             )
         elif seqinfo is None:
             raise ValueError("Neither 'dicoms' nor 'seqinfo' is given")

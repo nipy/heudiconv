@@ -109,6 +109,7 @@ def process_extra_commands(
                 session,
                 subjs,
                 grouping=grouping,
+                use_enhanced_dicom=use_enhanced_dicom,
             )
             print(fname)
             for study_session, sequences in study_sessions.items():
@@ -235,6 +236,7 @@ def workflow(
     dcmconfig: Optional[str] = None,
     queue: Optional[str] = None,
     queue_args: Optional[str] = None,
+    use_enhanced_dicom: bool = False,
 ) -> None:
     """Run the HeuDiConv conversion workflow.
 
@@ -322,6 +324,10 @@ def workflow(
     queue_args : str or None, optional
         Additional queue arguments passed as single string of space-separated
         Argument=Value pairs. Default is None.
+    use_enhanced_dicom : bool, optional
+        Use enhanced DICOM metadata extraction module for multi-frame
+        Enhanced DICOM files. This provides better handling of Enhanced MR
+        images with multi-frame data. Default is False.
 
     Notes
     -----
@@ -415,6 +421,7 @@ def workflow(
         session,
         subjs,
         grouping=grouping,
+        use_enhanced_dicom=use_enhanced_dicom,
     )
 
     # extract tarballs, and replace their entries with expanded lists of files
@@ -493,6 +500,7 @@ def workflow(
             overwrite=overwrite,
             dcmconfig=dcmconfig,
             grouping=grouping,
+            use_enhanced_dicom=use_enhanced_dicom,
         )
 
         lgr.info(
