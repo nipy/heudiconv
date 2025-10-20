@@ -43,6 +43,7 @@ EXTRA_REQUIRES = {
     "tests": TESTS_REQUIRES,
     "extras": [
         "duecredit",  # optional dependency
+        "highdicom",  # optional dependency for Enhanced DICOM support
     ],  # Requires patched version ATM ['dcmstack'],
     "datalad": ["datalad >=%s" % MIN_DATALAD_VERSION],
 }
