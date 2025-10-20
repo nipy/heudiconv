@@ -76,12 +76,13 @@ def extract_metadata(dcm_file: str) -> Dict[str, Any]:
             try:
                 from highdicom import MRImage  # type: ignore[import-not-found]
 
-                MRImage(ds)  # noqa: F841
-                lgr.debug("Successfully loaded Enhanced DICOM via highdicom")
+                # Validate that the dataset is a valid Enhanced MR image
+                MRImage(ds)
+                lgr.debug("Successfully validated Enhanced DICOM via highdicom")
             except ImportError:
                 lgr.debug("highdicom not available, using basic pydicom parsing")
             except Exception as e:
-                lgr.debug(f"Could not create MRImage with highdicom: {e}")
+                lgr.debug(f"Could not validate MRImage with highdicom: {e}")
 
             shared = ds.SharedFunctionalGroupsSequence[0]
 
@@ -92,7 +93,13 @@ def extract_metadata(dcm_file: str) -> Dict[str, Any]:
             out["ImageOrientationPatient"] = geom.get("ImageOrientationPatient")
             out["PixelSpacing"] = spacing.get("PixelSpacing")
             out["SliceThickness"] = spacing.get("SliceThickness")
-            out["NumberOfFrames"] = int(ds.get("NumberOfFrames", 1))
+
+            # Handle NumberOfFrames - only convert to int if present
+            num_frames = ds.get("NumberOfFrames")
+            if num_frames is not None:
+                out["NumberOfFrames"] = int(num_frames)
+            else:
+                out["NumberOfFrames"] = None
 
             # Dimension organization
             if hasattr(ds, "DimensionIndexSequence"):
