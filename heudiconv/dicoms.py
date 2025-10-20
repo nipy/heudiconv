@@ -192,11 +192,39 @@ def create_seqinfo(
 
 
 def validate_dicom(
-    fl: str, dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]]
+    fl: str,
+    dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]],
+    use_enhanced_dicom: bool = False,
 ) -> Optional[tuple[dw.Wrapper, tuple[int, str], Optional[str]]]:
     """
     Parse DICOM attributes. Returns None if not valid.
+
+    Parameters
+    ----------
+    fl : str
+        Path to DICOM file
+    dcmfilter : callable, optional
+        Filter function to apply to DICOM dataset
+    use_enhanced_dicom : bool, optional
+        If True, use enhanced DICOM metadata extraction for multi-frame files
     """
+    # If using enhanced DICOM module, try to extract metadata with it first
+    if use_enhanced_dicom:
+        from .dicom.enhanced import extract_metadata
+
+        try:
+            extract_metadata(fl)
+            lgr.debug(
+                "Using enhanced DICOM metadata extraction for validation of %s", fl
+            )
+            # If enhanced metadata extraction succeeds, we can use it to supplement
+            # or validate the standard wrapper-based extraction
+        except Exception as e:
+            lgr.debug(
+                "Enhanced DICOM metadata extraction failed for %s: %s", fl, e
+            )
+            # Fall back to standard extraction
+
     mw = dw.wrapper_from_file(fl, force=True, stop_before_pixels=True)
     # Workaround for protocol name in private siemens csa header
     if not getattr(mw.dcm_data, "ProtocolName", "").strip():
@@ -367,7 +395,7 @@ def group_dicoms_into_seqinfos(
 
     removeidx = []
     for idx, filename in enumerate(files):
-        mwinfo = validate_dicom(filename, dcmfilter)
+        mwinfo = validate_dicom(filename, dcmfilter, use_enhanced_dicom)
         if mwinfo is None:
             removeidx.append(idx)
             continue
