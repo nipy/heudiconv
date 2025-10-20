@@ -69,6 +69,7 @@ def create_seqinfo(
     series_files: list[str],
     series_id: str,
     custom_seqinfo: CustomSeqinfoT | None = None,
+    use_enhanced_dicom: bool = False,
 ) -> SeqInfo:
     """Generate sequence info
 
@@ -77,9 +78,37 @@ def create_seqinfo(
     mw: Wrapper
     series_files: list
     series_id: str
+    custom_seqinfo: callable, optional
+    use_enhanced_dicom: bool, optional
+        If True, use enhanced DICOM metadata extraction for multi-frame files
     """
     dcminfo = mw.dcm_data
     accession_number = dcminfo.get("AccessionNumber")
+
+    # If using enhanced DICOM module, try to extract metadata with it
+    if use_enhanced_dicom and series_files:
+        from .dicom.enhanced import extract_metadata
+
+        try:
+            enhanced_meta = extract_metadata(series_files[0])
+            lgr.debug(
+                "Using enhanced DICOM metadata extraction for series %s", series_id
+            )
+            # If enhanced metadata has NumberOfFrames, it's likely an Enhanced DICOM
+            if enhanced_meta.get("NumberOfFrames"):
+                lgr.info(
+                    "Detected Enhanced DICOM with %d frames for series %s",
+                    enhanced_meta["NumberOfFrames"],
+                    series_id,
+                )
+        except Exception as e:
+            lgr.debug(
+                "Enhanced DICOM metadata extraction failed for %s: %s", series_id, e
+            )
+            # Fall back to standard extraction
+            enhanced_meta = None
+    else:
+        enhanced_meta = None
 
     # TODO: do not group echoes by default
     size: list[int] = list(mw.image_shape) + [len(series_files)]
@@ -232,6 +261,7 @@ def group_dicoms_into_seqinfos(
     ]
     | None = None,
     custom_seqinfo: CustomSeqinfoT | None = None,
+    use_enhanced_dicom: bool = False,
 ) -> dict[Optional[str], dict[SeqInfo, list[str]]]:
     ...
 
@@ -251,6 +281,7 @@ def group_dicoms_into_seqinfos(
     ]
     | None = None,
     custom_seqinfo: CustomSeqinfoT | None = None,
+    use_enhanced_dicom: bool = False,
 ) -> dict[SeqInfo, list[str]]:
     ...
 
@@ -268,6 +299,7 @@ def group_dicoms_into_seqinfos(
     ]
     | None = None,
     custom_seqinfo: CustomSeqinfoT | None = None,
+    use_enhanced_dicom: bool = False,
 ) -> dict[Optional[str], dict[SeqInfo, list[str]]] | dict[SeqInfo, list[str]]:
     """Process list of dicoms and return seqinfo and file group
     `seqinfo` contains per-sequence extract of fields from DICOMs which
@@ -413,7 +445,9 @@ def group_dicoms_into_seqinfos(
             else:
                 # nothing to see here, just move on
                 continue
-        seqinfo = create_seqinfo(mw, series_files, series_id_str, custom_seqinfo)
+        seqinfo = create_seqinfo(
+            mw, series_files, series_id_str, custom_seqinfo, use_enhanced_dicom
+        )
 
         key: Optional[str]
         if per_studyUID:

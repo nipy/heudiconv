@@ -175,6 +175,7 @@ def get_study_sessions(
     session: Optional[str],
     sids: Optional[list[str]],
     grouping: str = "studyUID",
+    use_enhanced_dicom: bool = False,
 ) -> dict[StudySessionInfo, list[str] | dict[SeqInfo, list[str]]]:
     """Sort files or dicom seqinfos into study_sessions.
 
@@ -244,6 +245,7 @@ def get_study_sessions(
             dcmfilter=getattr(heuristic, "filter_dicom", None),
             custom_grouping=getattr(heuristic, "grouping", None),
             custom_seqinfo=getattr(heuristic, "custom_seqinfo", None),
+            use_enhanced_dicom=use_enhanced_dicom,
         )
 
         if sids:
