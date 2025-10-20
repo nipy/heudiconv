@@ -257,3 +257,82 @@ def test_extract_metadata_without_dimension_index(tmp_path: Path) -> None:
     # Should still extract other Enhanced metadata
     assert metadata["NumberOfFrames"] == 120
     assert "Dimensions" not in metadata
+
+
+def test_cli_use_enhanced_dicom_option(tmp_path: Path) -> None:
+    """Test that --use-enhanced-dicom CLI option is properly parsed and used."""
+    from heudiconv.cli.run import get_parser
+
+    parser = get_parser()
+
+    # Test that the option exists and defaults to False
+    args = parser.parse_args(["--files", str(tmp_path), "-f", "convertall"])
+    assert hasattr(args, "use_enhanced_dicom")
+    assert args.use_enhanced_dicom is False
+
+    # Test that the option can be set to True
+    args = parser.parse_args(
+        ["--files", str(tmp_path), "-f", "convertall", "--use-enhanced-dicom"]
+    )
+    assert args.use_enhanced_dicom is True
+
+
+def test_group_dicoms_with_enhanced_option(tmp_path: Path) -> None:
+    """Test group_dicoms_into_seqinfos with use_enhanced_dicom option."""
+    from heudiconv.dicoms import group_dicoms_into_seqinfos
+    from heudiconv.tests.utils import TESTS_DATA_PATH
+
+    # Use an existing test DICOM file
+    test_file = op.join(TESTS_DATA_PATH, "axasc35.dcm")
+    if not op.exists(test_file):
+        pytest.skip("Test DICOM file not available")
+
+    # Test with use_enhanced_dicom=False (default)
+    seqinfo_dict_default = group_dicoms_into_seqinfos(
+        [test_file],
+        "studyUID",
+        flatten=True,
+        use_enhanced_dicom=False,
+    )
+    assert len(seqinfo_dict_default) > 0
+
+    # Test with use_enhanced_dicom=True
+    seqinfo_dict_enhanced = group_dicoms_into_seqinfos(
+        [test_file],
+        "studyUID",
+        flatten=True,
+        use_enhanced_dicom=True,
+    )
+    assert len(seqinfo_dict_enhanced) > 0
+
+    # Both should produce valid seqinfo
+    for seqinfo in seqinfo_dict_default.keys():
+        assert seqinfo.series_uid is not None
+
+    for seqinfo in seqinfo_dict_enhanced.keys():
+        assert seqinfo.series_uid is not None
+
+
+def test_create_seqinfo_with_enhanced_option(tmp_path: Path) -> None:
+    """Test create_seqinfo with use_enhanced_dicom option."""
+    from heudiconv.dicoms import create_seqinfo
+    import nibabel.nicom.dicomwrappers as dw
+    from heudiconv.tests.utils import TESTS_DATA_PATH
+
+    # Use an existing test DICOM file
+    dcm_file = op.join(TESTS_DATA_PATH, "axasc35.dcm")
+    if not op.exists(dcm_file):
+        pytest.skip("Test DICOM file not available")
+
+    # Create wrapper
+    mw = dw.wrapper_from_file(dcm_file, force=True, stop_before_pixels=True)
+
+    # Test with use_enhanced_dicom=False (default)
+    seqinfo_default = create_seqinfo(mw, [dcm_file], "1-test", use_enhanced_dicom=False)
+    assert seqinfo_default is not None
+    assert seqinfo_default.series_uid is not None
+
+    # Test with use_enhanced_dicom=True
+    seqinfo_enhanced = create_seqinfo(mw, [dcm_file], "1-test", use_enhanced_dicom=True)
+    assert seqinfo_enhanced is not None
+    assert seqinfo_enhanced.series_uid is not None
