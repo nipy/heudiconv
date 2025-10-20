@@ -5,6 +5,7 @@ from __future__ import annotations
 import os.path as op
 from pathlib import Path
 
+import pytest
 from pydicom.dataset import Dataset, FileDataset, FileMetaDataset
 from pydicom.uid import ImplicitVRLittleEndian
 
