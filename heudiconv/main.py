@@ -61,6 +61,7 @@ def process_extra_commands(
     session: Optional[str],
     subjs: Optional[list[str]],
     grouping: str,
+    use_enhanced_dicom: bool = False,
 ) -> None:
     """
     Perform custom command instead of regular operations. Supported commands:
@@ -82,6 +83,9 @@ def process_extra_commands(
         List of subject identifiers
     grouping : {'studyUID', 'accession_number', 'all', 'custom'}
         How to group dicoms.
+    use_enhanced_dicom : bool, optional
+        Use enhanced DICOM metadata extraction module for multi-frame
+        Enhanced DICOM files. Default is False.
     """
 
     def ensure_has_files() -> None:
@@ -390,6 +394,7 @@ def workflow(
             session,
             subjs,
             grouping,
+            use_enhanced_dicom,
         )
         return
     #

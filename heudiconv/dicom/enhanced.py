@@ -194,6 +194,119 @@ def validate_dicom_enhanced(
     return ds, series_id, file_studyUID
 
 
+def create_seqinfo_enhanced(
+    ds: Dataset,
+    series_files: list[str],
+    series_id: str,
+) -> Any:
+    """Generate SeqInfo from pydicom Dataset for enhanced DICOM.
+
+    Parameters
+    ----------
+    ds : Dataset
+        pydicom Dataset object
+    series_files : list[str]
+        List of files in this series
+    series_id : str
+        Series identifier string
+
+    Returns
+    -------
+    SeqInfo
+        Named tuple containing series metadata
+    """
+    from ..utils import SeqInfo
+
+    # Extract basic metadata
+    accession_number = str(ds.get("AccessionNumber", ""))
+    
+    # Get image dimensions - for enhanced DICOM this can be complex
+    num_frames = ds.get("NumberOfFrames")
+    if num_frames is not None:
+        num_frames = int(num_frames)
+    
+    # Get basic dimensions from dataset
+    rows = int(ds.get("Rows", 0))
+    cols = int(ds.get("Columns", 0))
+    
+    # For enhanced DICOM, dimensions are more complex
+    # For now, use a simplified approach
+    dim1 = cols
+    dim2 = rows
+    dim3 = num_frames if num_frames else len(series_files)
+    dim4 = 1  # Time dimension, simplified
+    
+    # Get timing parameters
+    TR = float(ds.get("RepetitionTime", 0))
+    TE = float(ds.get("EchoTime", 0))
+    
+    # Get protocol and series information
+    protocol_name = str(ds.get("ProtocolName", ""))
+    series_description = str(ds.get("SeriesDescription", ""))
+    sequence_name = str(ds.get("SequenceName", ""))
+    
+    # Get patient information
+    patient_id = str(ds.get("PatientID", ""))
+    patient_age = ds.get("PatientAge")
+    patient_sex = ds.get("PatientSex")
+    
+    # Get study information
+    study_description = str(ds.get("StudyDescription", ""))
+    referring_physician_name = str(ds.get("ReferringPhysicianName", ""))
+    
+    # Get image type
+    image_type_raw = ds.get("ImageType", [])
+    if isinstance(image_type_raw, (list, tuple)):
+        image_type = tuple(str(x) for x in image_type_raw)
+    else:
+        image_type = (str(image_type_raw),) if image_type_raw else ()
+    
+    # Check if motion corrected or derived
+    is_motion_corrected = "MOCO" in image_type
+    is_derived = "DERIVED" in image_type
+    
+    # Get date and time
+    study_date = ds.get("StudyDate")
+    study_time = ds.get("StudyTime")
+    
+    # Get series UID
+    series_uid = str(ds.get("SeriesInstanceUID", ""))
+    
+    # Create SeqInfo object
+    seqinfo = SeqInfo(
+        total_files_till_now=len(series_files),  # Will be updated by caller if needed
+        example_dcm_file=series_files[0] if series_files else "",
+        series_id=series_id,
+        dcm_dir_name="",  # Not applicable for enhanced DICOM
+        series_files=len(series_files),
+        unspecified="",
+        dim1=dim1,
+        dim2=dim2,
+        dim3=dim3,
+        dim4=dim4,
+        TR=TR,
+        TE=TE,
+        protocol_name=protocol_name,
+        is_motion_corrected=is_motion_corrected,
+        is_derived=is_derived,
+        patient_id=patient_id,
+        study_description=study_description,
+        referring_physician_name=referring_physician_name,
+        series_description=series_description,
+        sequence_name=sequence_name,
+        image_type=image_type,
+        accession_number=accession_number,
+        patient_age=patient_age,
+        patient_sex=patient_sex,
+        date=study_date,
+        series_uid=series_uid,
+        time=study_time,
+        custom=None,
+    )
+    
+    return seqinfo
+
+
 def group_dicoms_into_seqinfos_enhanced(
     files: list[str],
     grouping: str,
@@ -223,7 +336,7 @@ def group_dicoms_into_seqinfos_enhanced(
     -------
     dict[Optional[str], dict[Any, list[str]]]
         Dictionary mapping study/group identifiers to seqinfo dictionaries,
-        where each seqinfo maps metadata to list of files
+        where each seqinfo maps SeqInfo objects to list of files
     """
     from collections import defaultdict
 
@@ -277,6 +390,7 @@ def group_dicoms_into_seqinfos_enhanced(
 
     # Build the output structure
     seqinfos: dict[Optional[str], dict[Any, list[str]]] = {}
+    total_files_till_now = 0
 
     for group_key, files_list in sorted(series_groups.items()):
         ds = series_datasets[group_key]
@@ -292,19 +406,21 @@ def group_dicoms_into_seqinfos_enhanced(
             # custom grouping
             study_key = ds.get(grouping)
 
-        # Create a simple metadata key for the inner dict
-        # For enhanced DICOM, we can use the dataset itself or extract metadata
-        metadata = extract_metadata(files_list[0])
-
-        # Use a hashable key - create a simple seqinfo-like structure
-        # For now, use series_id as the key
+        # Create a series_id string for the SeqInfo
         series_num, protocol_name = group_key[0], group_key[1]
-        seqinfo_key = (series_num, protocol_name, len(files_list))
+        series_id = f"{series_num}-{protocol_name}"
+        
+        # Create a proper SeqInfo object
+        seqinfo = create_seqinfo_enhanced(ds, files_list, series_id)
+        
+        # Update total_files_till_now
+        seqinfo = seqinfo._replace(total_files_till_now=total_files_till_now)
+        total_files_till_now += len(files_list)
 
         if study_key not in seqinfos:
             seqinfos[study_key] = {}
 
-        seqinfos[study_key][seqinfo_key] = files_list
+        seqinfos[study_key][seqinfo] = files_list
 
         lgr.debug(
             "Enhanced DICOM: %30s series=%d-%s nfiles=%d",
