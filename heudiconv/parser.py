@@ -238,15 +238,27 @@ def get_study_sessions(
             extracted_files += files_ex
 
         # sort all DICOMS using heuristic
-        seqinfo_dict = group_dicoms_into_seqinfos(
-            extracted_files,
-            grouping,
-            file_filter=getattr(heuristic, "filter_files", None),
-            dcmfilter=getattr(heuristic, "filter_dicom", None),
-            custom_grouping=getattr(heuristic, "grouping", None),
-            custom_seqinfo=getattr(heuristic, "custom_seqinfo", None),
-            use_enhanced_dicom=use_enhanced_dicom,
-        )
+        if use_enhanced_dicom:
+            # Use enhanced DICOM-specific function
+            from .dicom.enhanced import group_dicoms_into_seqinfos_enhanced
+            
+            seqinfo_dict = group_dicoms_into_seqinfos_enhanced(
+                extracted_files,
+                grouping,
+                file_filter=getattr(heuristic, "filter_files", None),
+                dcmfilter=getattr(heuristic, "filter_dicom", None),
+                custom_grouping=getattr(heuristic, "grouping", None),
+            )
+        else:
+            # Use standard nibabel dicomwrapper-based function
+            seqinfo_dict = group_dicoms_into_seqinfos(
+                extracted_files,
+                grouping,
+                file_filter=getattr(heuristic, "filter_files", None),
+                dcmfilter=getattr(heuristic, "filter_dicom", None),
+                custom_grouping=getattr(heuristic, "grouping", None),
+                custom_seqinfo=getattr(heuristic, "custom_seqinfo", None),
+            )
 
         if sids:
             if len(sids) != 1:
