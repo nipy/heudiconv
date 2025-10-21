@@ -241,7 +241,7 @@ def get_study_sessions(
         if use_enhanced_dicom:
             # Use enhanced DICOM-specific function
             from .dicom.enhanced import group_dicoms_into_seqinfos_enhanced
-            
+
             seqinfo_dict = group_dicoms_into_seqinfos_enhanced(
                 extracted_files,
                 grouping,
