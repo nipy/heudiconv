@@ -60,8 +60,7 @@ compresslevel = 9
 
 
 class CustomSeqinfoT(Protocol):
-    def __call__(self, wrapper: dw.Wrapper, series_files: list[str]) -> Hashable:
-        ...
+    def __call__(self, wrapper: dw.Wrapper, series_files: list[str]) -> Hashable: ...
 
 
 def create_seqinfo(
@@ -234,15 +233,16 @@ def group_dicoms_into_seqinfos(
     file_filter: Optional[Callable[[str], Any]] = None,
     dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]] = None,
     flatten: Literal[False] = False,
-    custom_grouping: str
-    | Callable[
-        [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]],
-        dict[SeqInfo, list[str]],
-    ]
-    | None = None,
+    custom_grouping: (
+        str
+        | Callable[
+            [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]],
+            dict[SeqInfo, list[str]],
+        ]
+        | None
+    ) = None,
     custom_seqinfo: CustomSeqinfoT | None = None,
-) -> dict[Optional[str], dict[SeqInfo, list[str]]]:
-    ...
+) -> dict[Optional[str], dict[SeqInfo, list[str]]]: ...
 
 
 @overload
@@ -253,15 +253,16 @@ def group_dicoms_into_seqinfos(
     dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]] = None,
     *,
     flatten: Literal[True],
-    custom_grouping: str
-    | Callable[
-        [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]],
-        dict[SeqInfo, list[str]],
-    ]
-    | None = None,
+    custom_grouping: (
+        str
+        | Callable[
+            [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]],
+            dict[SeqInfo, list[str]],
+        ]
+        | None
+    ) = None,
     custom_seqinfo: CustomSeqinfoT | None = None,
-) -> dict[SeqInfo, list[str]]:
-    ...
+) -> dict[SeqInfo, list[str]]: ...
 
 
 def group_dicoms_into_seqinfos(
@@ -270,12 +271,14 @@ def group_dicoms_into_seqinfos(
     file_filter: Optional[Callable[[str], Any]] = None,
     dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]] = None,
     flatten: Literal[False, True] = False,
-    custom_grouping: str
-    | Callable[
-        [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]],
-        dict[SeqInfo, list[str]],
-    ]
-    | None = None,
+    custom_grouping: (
+        str
+        | Callable[
+            [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]],
+            dict[SeqInfo, list[str]],
+        ]
+        | None
+    ) = None,
     custom_seqinfo: CustomSeqinfoT | None = None,
 ) -> dict[Optional[str], dict[SeqInfo, list[str]]] | dict[SeqInfo, list[str]]:
     """Process list of dicoms and return seqinfo and file group
@@ -422,9 +425,7 @@ def group_dicoms_into_seqinfos(
             else:
                 # nothing to see here, just move on
                 continue
-        seqinfo = create_seqinfo(
-            mw, series_files, series_id_str, custom_seqinfo
-        )
+        seqinfo = create_seqinfo(mw, series_files, series_id_str, custom_seqinfo)
 
         key: Optional[str]
         if per_studyUID:

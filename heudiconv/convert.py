@@ -216,7 +216,7 @@ def prep_conversion(
             if use_enhanced_dicom:
                 # Use enhanced DICOM-specific function (returns different structure)
                 from .dicom.enhanced import group_dicoms_into_seqinfos_enhanced
-                
+
                 seqinfo_enhanced = group_dicoms_into_seqinfos_enhanced(
                     dicoms,
                     grouping,

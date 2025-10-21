@@ -147,12 +147,13 @@ def validate_dicom_enhanced(
     try:
         ds = pydicom.dcmread(fl, stop_before_pixels=True, force=True)
     except Exception as e:
-        lgr.warning('Failed to read %s: %s', fl, e)
+        lgr.warning("Failed to read %s: %s", fl, e)
         return None
 
     # Try to validate with highdicom if available
     try:
         import highdicom as hd
+
         hd.Image.from_dataset(ds)
         lgr.debug("Successfully validated Enhanced DICOM with highdicom for %s", fl)
     except ImportError:
@@ -176,7 +177,7 @@ def validate_dicom_enhanced(
 
     # Check for unsupported storage classes
     sop_class = ds.get((0x0008, 0x0016))
-    if sop_class and hasattr(sop_class, 'repval'):
+    if sop_class and hasattr(sop_class, "repval"):
         if sop_class.repval in (
             "Raw Data Storage",
             "GrayscaleSoftcopyPresentationStateStorage",
@@ -224,8 +225,9 @@ def group_dicoms_into_seqinfos_enhanced(
         Dictionary mapping study/group identifiers to seqinfo dictionaries,
         where each seqinfo maps metadata to list of files
     """
-    from ..utils import SeqInfo
     from collections import defaultdict
+
+    from ..utils import SeqInfo
 
     allowed_groupings = ["studyUID", "accession_number", "all", "custom"]
     if grouping not in allowed_groupings:
@@ -240,8 +242,7 @@ def group_dicoms_into_seqinfos_enhanced(
         files = list(filter(file_filter, files))
         nfl_after = len(files)
         lgr.info(
-            "Filtering out %d dicoms based on their filename",
-            nfl_before - nfl_after
+            "Filtering out %d dicoms based on their filename", nfl_before - nfl_after
         )
 
     if grouping == "custom":
@@ -256,30 +257,30 @@ def group_dicoms_into_seqinfos_enhanced(
     # Group files by series
     series_groups: dict[tuple, list[str]] = defaultdict(list)
     series_datasets: dict[tuple, Dataset] = {}
-    
+
     for filename in files:
         result = validate_dicom_enhanced(filename, dcmfilter)
         if result is None:
             continue
-        
+
         ds, series_id, file_studyUID = result
-        
+
         # Build the grouping key
         if per_studyUID:
             group_key = (series_id[0], series_id[1], file_studyUID)
         else:
             group_key = (series_id[0], series_id[1])
-        
+
         series_groups[group_key].append(filename)
         if group_key not in series_datasets:
             series_datasets[group_key] = ds
 
     # Build the output structure
     seqinfos: dict[Optional[str], dict[Any, list[str]]] = {}
-    
+
     for group_key, files_list in sorted(series_groups.items()):
         ds = series_datasets[group_key]
-        
+
         # Determine the study/group identifier for the outer dict
         if per_studyUID:
             study_key = group_key[2]  # file_studyUID
@@ -290,32 +291,32 @@ def group_dicoms_into_seqinfos_enhanced(
         else:
             # custom grouping
             study_key = ds.get(grouping)
-        
+
         # Create a simple metadata key for the inner dict
         # For enhanced DICOM, we can use the dataset itself or extract metadata
         metadata = extract_metadata(files_list[0])
-        
+
         # Use a hashable key - create a simple seqinfo-like structure
         # For now, use series_id as the key
         series_num, protocol_name = group_key[0], group_key[1]
         seqinfo_key = (series_num, protocol_name, len(files_list))
-        
+
         if study_key not in seqinfos:
             seqinfos[study_key] = {}
-        
+
         seqinfos[study_key][seqinfo_key] = files_list
-        
+
         lgr.debug(
             "Enhanced DICOM: %30s series=%d-%s nfiles=%d",
             study_key,
             series_num,
             protocol_name,
-            len(files_list)
+            len(files_list),
         )
 
     entries = len(seqinfos)
     subentries = sum(len(v) for v in seqinfos.values())
-    
+
     if per_studyUID:
         lgr.info(
             "Generated enhanced DICOM sequence info for %d studies with %d entries total",
@@ -324,6 +325,5 @@ def group_dicoms_into_seqinfos_enhanced(
         )
     else:
         lgr.info("Generated enhanced DICOM sequence info with %d entries", entries)
-    
-    return seqinfos
 
+    return seqinfos
