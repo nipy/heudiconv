@@ -281,6 +281,7 @@ def test_cli_use_enhanced_dicom_option(tmp_path: Path) -> None:
 def test_group_dicoms_with_enhanced_option(tmp_path: Path) -> None:
     """Test group_dicoms_into_seqinfos with use_enhanced_dicom option."""
     from heudiconv.dicoms import group_dicoms_into_seqinfos
+    from heudiconv.dicom.enhanced import group_dicoms_into_seqinfos_enhanced
     from heudiconv.tests.utils import TESTS_DATA_PATH
 
     # Use an existing test DICOM file
@@ -288,35 +289,30 @@ def test_group_dicoms_with_enhanced_option(tmp_path: Path) -> None:
     if not op.exists(test_file):
         pytest.skip("Test DICOM file not available")
 
-    # Test with use_enhanced_dicom=False (default)
+    # Test with standard dicomwrapper-based function
     seqinfo_dict_default = group_dicoms_into_seqinfos(
         [test_file],
         "studyUID",
         flatten=True,
-        use_enhanced_dicom=False,
     )
     assert len(seqinfo_dict_default) > 0
 
-    # Test with use_enhanced_dicom=True
-    seqinfo_dict_enhanced = group_dicoms_into_seqinfos(
+    # Test with enhanced DICOM function
+    seqinfo_dict_enhanced = group_dicoms_into_seqinfos_enhanced(
         [test_file],
         "studyUID",
-        flatten=True,
-        use_enhanced_dicom=True,
     )
     assert len(seqinfo_dict_enhanced) > 0
 
-    # Both should produce valid seqinfo
+    # Standard function should produce valid seqinfo
     for seqinfo in seqinfo_dict_default.keys():
-        assert seqinfo.series_uid is not None
-
-    for seqinfo in seqinfo_dict_enhanced.keys():
         assert seqinfo.series_uid is not None
 
 
 def test_create_seqinfo_with_enhanced_option(tmp_path: Path) -> None:
     """Test create_seqinfo with use_enhanced_dicom option."""
     from heudiconv.dicoms import create_seqinfo
+    from heudiconv.dicom.enhanced import validate_dicom_enhanced
     import nibabel.nicom.dicomwrappers as dw
     from heudiconv.tests.utils import TESTS_DATA_PATH
 
@@ -325,15 +321,15 @@ def test_create_seqinfo_with_enhanced_option(tmp_path: Path) -> None:
     if not op.exists(dcm_file):
         pytest.skip("Test DICOM file not available")
 
-    # Create wrapper
+    # Test with standard dicomwrapper-based function
     mw = dw.wrapper_from_file(dcm_file, force=True, stop_before_pixels=True)
-
-    # Test with use_enhanced_dicom=False (default)
-    seqinfo_default = create_seqinfo(mw, [dcm_file], "1-test", use_enhanced_dicom=False)
+    seqinfo_default = create_seqinfo(mw, [dcm_file], "1-test")
     assert seqinfo_default is not None
     assert seqinfo_default.series_uid is not None
 
-    # Test with use_enhanced_dicom=True
-    seqinfo_enhanced = create_seqinfo(mw, [dcm_file], "1-test", use_enhanced_dicom=True)
-    assert seqinfo_enhanced is not None
-    assert seqinfo_enhanced.series_uid is not None
+    # Test with enhanced DICOM function
+    result = validate_dicom_enhanced(dcm_file, None)
+    assert result is not None
+    ds, series_id, study_uid = result
+    assert series_id is not None
+    assert study_uid is not None

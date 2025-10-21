@@ -230,11 +230,11 @@ def test_get_reproducible_int_raises_assertion_wo_dt(tmp_path: Path) -> None:
 
 
 def test_validate_dicom_with_use_enhanced_dicom_false() -> None:
-    """Test validate_dicom with use_enhanced_dicom=False (default)."""
+    """Test validate_dicom (standard dicomwrapper-based function)."""
     from heudiconv.dicoms import validate_dicom
 
     dcmfile = TEST_DICOM_PATHS[0]
-    result = validate_dicom(dcmfile, None, use_enhanced_dicom=False)
+    result = validate_dicom(dcmfile, None)
     assert result is not None
     mw, series_id, file_studyUID = result
     assert mw is not None
@@ -243,14 +243,14 @@ def test_validate_dicom_with_use_enhanced_dicom_false() -> None:
 
 
 def test_validate_dicom_with_use_enhanced_dicom_true() -> None:
-    """Test validate_dicom with use_enhanced_dicom=True."""
-    from heudiconv.dicoms import validate_dicom
+    """Test validate_dicom_enhanced (enhanced DICOM function)."""
+    from heudiconv.dicom.enhanced import validate_dicom_enhanced
 
     dcmfile = TEST_DICOM_PATHS[0]
-    result = validate_dicom(dcmfile, None, use_enhanced_dicom=True)
+    result = validate_dicom_enhanced(dcmfile, None)
     assert result is not None
-    mw, series_id, file_studyUID = result
-    assert mw is not None
+    ds, series_id, file_studyUID = result
+    assert ds is not None
     assert series_id is not None
     assert len(series_id) == 2  # (series_number, protocol_name)
 
