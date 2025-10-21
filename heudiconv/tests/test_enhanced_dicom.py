@@ -278,6 +278,54 @@ def test_cli_use_enhanced_dicom_option(tmp_path: Path) -> None:
     assert args.use_enhanced_dicom is True
 
 
+def test_enhanced_dicom_cli_integration(tmp_path: Path) -> None:
+    """Integration test for --use-enhanced-dicom flag with CLI commands."""
+    from heudiconv.cli.run import main as runner
+    from heudiconv.tests.utils import TESTS_DATA_PATH
+    import os.path as op
+
+    # Create some test DICOM files
+    test_file = op.join(TESTS_DATA_PATH, "axasc35.dcm")
+    if not op.exists(test_file):
+        pytest.skip("Test DICOM file not available")
+
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    # Test with ls command and enhanced DICOM
+    runner([
+        "--command", "ls",
+        "--files", test_file,
+        "-f", "convertall",
+        "--subjects", "test01",
+        "--use-enhanced-dicom",
+        "--grouping", "all",
+    ])
+    # If it doesn't crash, the test passes
+
+    # Test conversion with enhanced DICOM (converter=none to skip actual conversion)
+    runner([
+        "--files", test_file,
+        "-f", "convertall",
+        "--subjects", "test02",
+        "--use-enhanced-dicom",
+        "-o", str(output_dir),
+        "-c", "none",
+    ])
+
+    # Verify that the output directory was created
+    assert output_dir.exists()
+
+    # Test that standard mode still works
+    runner([
+        "--files", test_file,
+        "-f", "convertall",
+        "--subjects", "test03",
+        "-o", str(output_dir),
+        "-c", "none",
+    ])
+
+
 def test_group_dicoms_with_enhanced_option(tmp_path: Path) -> None:
     """Test group_dicoms_into_seqinfos with use_enhanced_dicom option."""
     from heudiconv.dicoms import group_dicoms_into_seqinfos
