@@ -326,7 +326,7 @@ def test_enhanced_dicom_cli_integration(tmp_path: Path) -> None:
     ])
 
 
-def test_group_dicoms_with_enhanced_option(tmp_path: Path) -> None:
+def test_group_dicoms_with_enhanced_option() -> None:
     """Test group_dicoms_into_seqinfos with use_enhanced_dicom option."""
     from heudiconv.dicoms import group_dicoms_into_seqinfos
     from heudiconv.dicom.enhanced import group_dicoms_into_seqinfos_enhanced
@@ -357,7 +357,7 @@ def test_group_dicoms_with_enhanced_option(tmp_path: Path) -> None:
         assert seqinfo.series_uid is not None
 
 
-def test_create_seqinfo_with_enhanced_option(tmp_path: Path) -> None:
+def test_create_seqinfo_with_enhanced_option() -> None:
     """Test create_seqinfo with use_enhanced_dicom option."""
     from heudiconv.dicoms import create_seqinfo
     from heudiconv.dicom.enhanced import validate_dicom_enhanced
@@ -383,7 +383,7 @@ def test_create_seqinfo_with_enhanced_option(tmp_path: Path) -> None:
     assert study_uid is not None
 
 
-def test_extract_tr_te_from_functional_groups(tmp_path: Path) -> None:
+def test_extract_tr_te_from_functional_groups() -> None:
     """Test that TR and TE are correctly extracted from SharedFunctionalGroupsSequence."""
     from heudiconv.dicom.enhanced import create_seqinfo_enhanced
 
@@ -450,7 +450,7 @@ def test_extract_metadata_tr_te_from_functional_groups(tmp_path: Path) -> None:
     assert metadata["EchoTime"] == 3.5, f"Expected TE=3.5, got {metadata['EchoTime']}"
 
 
-def test_tr_te_fallback_to_top_level(tmp_path: Path) -> None:
+def test_tr_te_fallback_to_top_level() -> None:
     """Test that TR/TE from top-level are used if available (classic DICOM compatibility)."""
     from heudiconv.dicom.enhanced import create_seqinfo_enhanced
 
@@ -467,7 +467,7 @@ def test_tr_te_fallback_to_top_level(tmp_path: Path) -> None:
     assert seqinfo.TE == 3.5, f"Expected TE=3.5, got {seqinfo.TE}"
 
 
-def test_tr_te_priority_top_level_over_functional_groups(tmp_path: Path) -> None:
+def test_tr_te_priority_top_level_over_functional_groups() -> None:
     """Test that top-level TR/TE take priority over functional groups if both exist."""
     from heudiconv.dicom.enhanced import create_seqinfo_enhanced
 
