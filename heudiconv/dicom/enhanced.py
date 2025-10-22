@@ -65,8 +65,11 @@ def extract_metadata(dcm_file: str) -> Dict[str, Any]:
     out["SeriesNumber"] = ds.get("SeriesNumber")
     out["ProtocolName"] = ds.get("ProtocolName")
     out["SequenceName"] = ds.get("SequenceName")
+    
+    # Get timing parameters - may be at top level or in functional groups
     out["EchoTime"] = ds.get("EchoTime")
     out["RepetitionTime"] = ds.get("RepetitionTime")
+    
     out["Manufacturer"] = ds.get("Manufacturer")
     out["ManufacturerModelName"] = ds.get("ManufacturerModelName")
 
@@ -94,6 +97,17 @@ def extract_metadata(dcm_file: str) -> Dict[str, Any]:
             out["ImageOrientationPatient"] = geom.get("ImageOrientationPatient")
             out["PixelSpacing"] = spacing.get("PixelSpacing")
             out["SliceThickness"] = spacing.get("SliceThickness")
+            
+            # Extract timing parameters from MRTimingAndRelatedParametersSequence
+            # In Enhanced DICOM, these are often not at the top level
+            if out["EchoTime"] is None or out["RepetitionTime"] is None:
+                timing_seq = shared.get("MRTimingAndRelatedParametersSequence", [{}])
+                if timing_seq:
+                    timing = timing_seq[0]
+                    if out["EchoTime"] is None:
+                        out["EchoTime"] = timing.get("EchoTime")
+                    if out["RepetitionTime"] is None:
+                        out["RepetitionTime"] = timing.get("RepetitionTime")
 
             # Handle NumberOfFrames - only convert to int if present
             num_frames = ds.get("NumberOfFrames")
@@ -237,8 +251,26 @@ def create_seqinfo_enhanced(
     dim4 = 1  # Time dimension, simplified
     
     # Get timing parameters
-    TR = float(ds.get("RepetitionTime", 0))
-    TE = float(ds.get("EchoTime", 0))
+    # In Enhanced DICOM, TR/TE may be in SharedFunctionalGroupsSequence
+    TR = ds.get("RepetitionTime")
+    TE = ds.get("EchoTime")
+    
+    # If not found at top level, check SharedFunctionalGroupsSequence
+    if (TR is None or TE is None) and hasattr(ds, "SharedFunctionalGroupsSequence"):
+        try:
+            shared = ds.SharedFunctionalGroupsSequence[0]
+            if hasattr(shared, "MRTimingAndRelatedParametersSequence"):
+                timing = shared.MRTimingAndRelatedParametersSequence[0]
+                if TR is None:
+                    TR = timing.get("RepetitionTime")
+                if TE is None:
+                    TE = timing.get("EchoTime")
+        except (IndexError, AttributeError, KeyError):
+            pass  # Keep None values if extraction fails
+    
+    # Convert to float, defaulting to 0 if still None
+    TR = float(TR) if TR is not None else 0.0
+    TE = float(TE) if TE is not None else 0.0
     
     # Get protocol and series information
     protocol_name = str(ds.get("ProtocolName", ""))
