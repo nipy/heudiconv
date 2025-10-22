@@ -381,3 +381,115 @@ def test_create_seqinfo_with_enhanced_option(tmp_path: Path) -> None:
     ds, series_id, study_uid = result
     assert series_id is not None
     assert study_uid is not None
+
+
+def test_extract_tr_te_from_functional_groups(tmp_path: Path) -> None:
+    """Test that TR and TE are correctly extracted from SharedFunctionalGroupsSequence."""
+    from heudiconv.dicom.enhanced import create_seqinfo_enhanced
+
+    # Create an Enhanced DICOM with TR/TE only in functional groups (not top-level)
+    ds = create_mock_classic_dicom()
+    ds.NumberOfFrames = 120
+    ds.Rows = 256
+    ds.Columns = 256
+
+    # Remove top-level TR/TE if they exist (Enhanced DICOMs typically don't have them)
+    if hasattr(ds, "EchoTime"):
+        delattr(ds, "EchoTime")
+    if hasattr(ds, "RepetitionTime"):
+        delattr(ds, "RepetitionTime")
+
+    # Create SharedFunctionalGroupsSequence with MR Timing
+    shared_group = Dataset()
+
+    # Add MRTimingAndRelatedParametersSequence (the correct location for TR/TE in Enhanced DICOM)
+    mr_timing = Dataset()
+    mr_timing.RepetitionTime = 2300.0
+    mr_timing.EchoTime = 3.5
+    shared_group.MRTimingAndRelatedParametersSequence = [mr_timing]
+
+    ds.SharedFunctionalGroupsSequence = [shared_group]
+
+    # Test create_seqinfo_enhanced
+    seqinfo = create_seqinfo_enhanced(ds, ["test.dcm"], "1-test")
+
+    # Verify TR and TE are correctly extracted
+    assert seqinfo.TR == 2300.0, f"Expected TR=2300.0, got {seqinfo.TR}"
+    assert seqinfo.TE == 3.5, f"Expected TE=3.5, got {seqinfo.TE}"
+
+
+def test_extract_metadata_tr_te_from_functional_groups(tmp_path: Path) -> None:
+    """Test that extract_metadata correctly extracts TR/TE from SharedFunctionalGroupsSequence."""
+    # Create an Enhanced DICOM with TR/TE only in functional groups
+    ds = create_mock_classic_dicom()
+    ds.NumberOfFrames = 120
+
+    # Remove top-level TR/TE
+    if hasattr(ds, "EchoTime"):
+        delattr(ds, "EchoTime")
+    if hasattr(ds, "RepetitionTime"):
+        delattr(ds, "RepetitionTime")
+
+    # Create SharedFunctionalGroupsSequence with MR Timing
+    shared_group = Dataset()
+    mr_timing = Dataset()
+    mr_timing.RepetitionTime = 2300.0
+    mr_timing.EchoTime = 3.5
+    shared_group.MRTimingAndRelatedParametersSequence = [mr_timing]
+    ds.SharedFunctionalGroupsSequence = [shared_group]
+
+    # Save to file
+    dcm_file = tmp_path / "enhanced_timing.dcm"
+    ds.save_as(str(dcm_file))
+
+    # Extract metadata
+    metadata = extract_metadata(str(dcm_file))
+
+    # Verify TR and TE are correctly extracted
+    assert metadata["RepetitionTime"] == 2300.0, f"Expected TR=2300.0, got {metadata['RepetitionTime']}"
+    assert metadata["EchoTime"] == 3.5, f"Expected TE=3.5, got {metadata['EchoTime']}"
+
+
+def test_tr_te_fallback_to_top_level(tmp_path: Path) -> None:
+    """Test that TR/TE from top-level are used if available (classic DICOM compatibility)."""
+    from heudiconv.dicom.enhanced import create_seqinfo_enhanced
+
+    # Create a DICOM with top-level TR/TE (classic style)
+    ds = create_mock_classic_dicom()  # This has TR/TE at top level
+    ds.Rows = 256
+    ds.Columns = 256
+
+    # Test create_seqinfo_enhanced
+    seqinfo = create_seqinfo_enhanced(ds, ["test.dcm"], "1-test")
+
+    # Verify TR and TE from top level are used
+    assert seqinfo.TR == 2300.0, f"Expected TR=2300.0, got {seqinfo.TR}"
+    assert seqinfo.TE == 3.5, f"Expected TE=3.5, got {seqinfo.TE}"
+
+
+def test_tr_te_priority_top_level_over_functional_groups(tmp_path: Path) -> None:
+    """Test that top-level TR/TE take priority over functional groups if both exist."""
+    from heudiconv.dicom.enhanced import create_seqinfo_enhanced
+
+    # Create a DICOM with TR/TE at both levels
+    ds = create_mock_classic_dicom()
+    ds.Rows = 256
+    ds.Columns = 256
+    ds.NumberOfFrames = 120
+    ds.RepetitionTime = 1000.0  # Top level value
+    ds.EchoTime = 10.0  # Top level value
+
+    # Create SharedFunctionalGroupsSequence with different TR/TE
+    shared_group = Dataset()
+    mr_timing = Dataset()
+    mr_timing.RepetitionTime = 2300.0  # Different value
+    mr_timing.EchoTime = 3.5  # Different value
+    shared_group.MRTimingAndRelatedParametersSequence = [mr_timing]
+    ds.SharedFunctionalGroupsSequence = [shared_group]
+
+    # Test create_seqinfo_enhanced
+    seqinfo = create_seqinfo_enhanced(ds, ["test.dcm"], "1-test")
+
+    # Verify top-level values take priority
+    assert seqinfo.TR == 1000.0, f"Expected TR=1000.0 (top level), got {seqinfo.TR}"
+    assert seqinfo.TE == 10.0, f"Expected TE=10.0 (top level), got {seqinfo.TE}"
