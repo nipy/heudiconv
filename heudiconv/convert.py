@@ -550,9 +550,9 @@ def update_multiorient_name(
             filename,
         )
         return filename
-    iops = sorted(list(iops))
+    iops_list = sorted(list(iops))
     bids_file["chunk"] = str(
-        iops.index(str(metadata["ImageOrientationPatientDICOM"])) + 1
+        iops_list.index(str(metadata["ImageOrientationPatientDICOM"])) + 1
     )
     return str(bids_file)
 
