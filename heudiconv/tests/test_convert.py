@@ -146,13 +146,15 @@ def test_update_uncombined_name() -> None:
 
 def test_update_multiorient_name() -> None:
     """Unit testing for heudiconv.convert.update_multiorient_name(), which updates
-    filenames with the acq field if appropriate.
+    filenames with the chunk field if appropriate.
     """
     # Standard name update
     base_fn = "sub-X_ses-Y_task-Z_run-01_bold"
     metadata = {"ImageOrientationPatientDICOM": [0, 1, 0, 0, 0, -1]}
-    out_fn_true = "sub-X_ses-Y_task-Z_acq-sagittal_run-01_bold"
-    out_fn_test = update_multiorient_name(metadata, base_fn)
+    out_fn_true = "sub-X_ses-Y_task-Z_run-01_chunk-1_bold"
+    out_fn_test = update_multiorient_name(
+        metadata, base_fn, set(["[0, 1, 0, 0, 0, -1]"])
+    )
     assert out_fn_test == out_fn_true
 
 

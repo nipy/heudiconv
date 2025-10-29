@@ -1077,6 +1077,11 @@ class BIDSFile:
         "part",
         "recording",
         "chunk",
+        "nuc",
+        "tracksys",
+        "voi",
+        "stain",
+        "trc",
     ]
 
     def __init__(
