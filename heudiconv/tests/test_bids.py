@@ -1385,12 +1385,12 @@ def test_convert_multiorient(
 
     # Check that the expected files have been extracted.
     # This also checks that the "echo" entity comes before "part":
-    for orient in ["sagittal", "coronal", "axial"]:
+    for orient in [1, 2, 3]:
         for ext in ["nii.gz", "json"]:
-            assert op.exists(
-                op.join(outdir, "sub-%s", "anat", "sub-%s_acq-%s_localizer.%s")
-                % (subID, subID, orient, ext)
-            )
+            fname = op.join(
+                outdir, "sub-%s", "anat", "sub-%s_chunk-%d_localizer.%s"
+            ) % (subID, subID, orient, ext)
+            assert op.exists(fname)
 
 
 @pytest.mark.skipif(not have_datalad, reason="no datalad")

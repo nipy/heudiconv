@@ -525,24 +525,35 @@ def update_uncombined_name(
 def update_multiorient_name(
     metadata: dict[str, Any],
     filename: str,
+    iops: set,
 ) -> str:
+    """
+    Insert `_chunk-<num>` entity into filename if data are from a sequence
+    that outputs multiple FoV (localizer, multi-FoV bold)
+
+    Parameters
+    ----------
+    metadata : dict
+        Scan metadata dictionary from BIDS sidecar file.
+    filename : str
+        Incoming filename
+
+    Returns
+    -------
+    filename : str
+        Updated filename with chunk entity added, if appropriate.
+    """
     bids_file = BIDSFile.parse(filename)
-    if bids_file["acq"]:
+    if bids_file["chunk"]:
         lgr.warning(
-            "Not embedding multi-orientation information as `%r` already uses acq- parameter.",
+            "Not embedding multi-orientation information as `%r` already uses chunk- parameter.",
             filename,
         )
         return filename
-    iop = metadata.get("ImageOrientationPatientDICOM")
-    assert isinstance(iop, list)
-    cross_prod = [
-        iop[1] * iop[5] - iop[2] * iop[4],
-        iop[2] * iop[3] - iop[0] * iop[5],
-        iop[0] * iop[4] - iop[1] * iop[3],
-    ]
-    cross_prod = [abs(x) for x in cross_prod]
-    slice_orient = ["sagittal", "coronal", "axial"][cross_prod.index(1)]
-    bids_file["acq"] = slice_orient
+    iops = sorted(list(iops))
+    bids_file["chunk"] = str(
+        iops.index(str(metadata["ImageOrientationPatientDICOM"])) + 1
+    )
     return str(bids_file)
 
 
@@ -1117,7 +1128,7 @@ def save_converted_files(
 
                 if is_multiorient:
                     this_prefix_basename = update_multiorient_name(
-                        bids_meta, this_prefix_basename
+                        bids_meta, this_prefix_basename, iops
                     )
 
             # Fallback option:
