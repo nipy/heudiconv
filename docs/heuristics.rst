@@ -43,7 +43,7 @@ The following details of the sequences could also be used as a ``{detail}`` in t
 
 - ``item``: an index of seqinfo (e.g., ``1``),
 - ``subject``: a subject label (e.g., ``qa``)
-- ``seqitem``: sequence item, index with a sequence/protocol name (e.g., ``3-anat-scout_ses-{date}``)
+- ``seqitem``: sequence item, index with a sequence/protocol name (e.g., ``3-anat-scout_ses-{date}`` or ``3-anat-scout_ses-DATE`` for Siemens X60 which does not allow {} in names)
 - ``subindex``: an index within the ``seqinfo`` (e.g., ``1``),
 - ``session``: empty (no session) or a session entity (along with ``ses-``, e.g., ``ses-20191216``),
 - ``bids_subject_session_prefix``: shortcut for BIDS file name prefix combining subject and optional session (e.g., ``sub-qa_ses-20191216``),
