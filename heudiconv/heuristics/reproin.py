@@ -124,6 +124,9 @@ generally to accommodate limitations imposed by different manufacturers/models:
 
 - We replace all ( with { and ) with } to be able e.g. to specify session {date}
 - "WIP " prefix unconditionally added by the scanner is stripped
+
+
+-Michael-Sun Plans on adding a heuristic to deal with ses-X* instances
 """
 
 from __future__ import annotations
@@ -816,6 +819,13 @@ def infotoids(seqinfos: Iterable[SeqInfo], outdir: str) -> dict[str, Optional[st
                     "Should have got a single session marker.  Got following: %s"
                     % ", ".join(map(repr, ses_markers))
                 )
+            if re.match("(X|x)*", ses_markers):
+               # replace X* or x* sessions with prior_sessions+1
+               prior_sessions = sorted(glob(os.path.join(sessions_dir, 'ses-*')))
+               if prior_sessions:
+                session = '%03d' % (len(prior_sessions) + 1)
+               else:
+                session='001'
             session = ses_markers[0]
         else:
             # TODO - I think we are doomed to go through the sequence and split
