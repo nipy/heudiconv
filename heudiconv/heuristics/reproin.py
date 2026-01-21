@@ -74,8 +74,9 @@ _ses-<SESID> (optional)
     follow "multi-session" layout. A common practice to have a _ses specifier
     within the scout sequence name. You can either specify explicit session
     identifier (SESID) or just say to maintain, create (starts with 1).
-    You can also use _ses-{date} in case of scanning phantoms or non-human
-    subjects and wanting sessions to be coded by the acquisition date.
+    You can also use _ses-{date} (or _ses-DATE for Siemens X60 which does not
+    allow {} in names) in case of scanning phantoms or non-human subjects and
+    wanting sessions to be coded by the acquisition date.
 
 _task-<TASKID> (optional)
     a short name for a task performed during that run.  If not provided and it
@@ -124,6 +125,10 @@ generally to accommodate limitations imposed by different manufacturers/models:
 
 - We replace all ( with { and ) with } to be able e.g. to specify session {date}
 - "WIP " prefix unconditionally added by the scanner is stripped
+
+### Siemens X60
+
+- _ses-DATE is supported as an alternative to _ses-{date} since X60 does not allow {}
 """
 
 from __future__ import annotations
@@ -790,6 +795,9 @@ def infotoids(seqinfos: Iterable[SeqInfo], outdir: str) -> dict[str, Optional[st
             # there was a marker for something we could provide from our seqinfo
             # e.g. {date}
             session_ = session_.format(**s._asdict())
+        elif session_ == "DATE":
+            # Siemens X60 does not allow {} in names, so also support uppercase "DATE"
+            session_ = s.date
         if session_:
             ses_markers.append(session_)
     session: Optional[str] = None

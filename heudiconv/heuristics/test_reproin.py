@@ -17,10 +17,12 @@ from .reproin import (
     fixup_subjectid,
     get_dups_marked,
     get_unique,
+    infotoids,
     md5sum,
     parse_series_spec,
     sanitize_str,
 )
+from ..utils import SeqInfo
 
 
 class FakeSeqInfo(NamedTuple):
@@ -234,6 +236,9 @@ def test_parse_series_spec() -> None:
         == {"datatype": "func", "session": "{date}"}
     )
 
+    # Siemens X60 does not allow {} in names, so also support uppercase "DATE"
+    assert pdpn("func_ses-DATE") == {"datatype": "func", "session": "DATE"}
+
     assert pdpn("fmap_dir-AP_ses-01") == {
         "datatype": "fmap",
         "session": "01",
@@ -255,3 +260,57 @@ def test_get_unique() -> None:
         str(ce.value)
         == "Was expecting a single value for attribute 'study_description' but got: mystudy, mystudy2"
     )
+
+
+@pytest.mark.parametrize(
+    "ses_spec,expected_session",
+    [
+        # ses-DATE (Siemens X60 workaround) should resolve to acquisition date
+        ("DATE", "20240115"),
+        # ses-{date} (original syntax) should resolve to acquisition date
+        ("{date}", "20240115"),
+        # ses-date (lowercase) should be treated as session name 'date'
+        ("date", "date"),
+        # ses-datelike should NOT expand - only exact "DATE" is special
+        ("datelike", "datelike"),
+        # explicit session should pass through unchanged
+        ("01", "01"),
+    ],
+)
+def test_infotoids_ses_date(ses_spec: str, expected_session: str) -> None:
+    """Test session resolution in infotoids for various ses- specifications."""
+    seqinfo = SeqInfo(
+        total_files_till_now=1,
+        example_dcm_file="/path/to/dcm",
+        series_id=f"1-anat-scout_ses-{ses_spec}",
+        dcm_dir_name=f"1-anat-scout_ses-{ses_spec}",
+        series_files=1,
+        unspecified="",
+        dim1=256,
+        dim2=256,
+        dim3=176,
+        dim4=1,
+        TR=2.0,
+        TE=3.0,
+        protocol_name=f"anat-scout_ses-{ses_spec}",
+        is_motion_corrected=False,
+        is_derived=False,
+        patient_id="phantom01",
+        study_description="PI^study",
+        referring_physician_name="",
+        series_description=f"anat-scout_ses-{ses_spec}",
+        sequence_name="",
+        image_type=("ORIGINAL", "PRIMARY"),
+        accession_number="A001",
+        patient_age="030Y",
+        patient_sex="O",
+        date="20240115",
+        series_uid="1.2.3.4",
+        time="120000",
+        custom=None,
+    )
+
+    # outdir not accessed for explicit session values (only for +/= markers)
+    result = infotoids([seqinfo], "/dev/null/output")
+
+    assert result["session"] == expected_session
