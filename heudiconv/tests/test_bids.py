@@ -1112,6 +1112,135 @@ def test_find_compatible_fmaps_for_run(
             assert compatible_fmaps == expected_compatible_fmaps[json_file]
 
 
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "rel_diff,should_match",
+    [
+        (
+            0.02,
+            True,
+        ),  # 2% difference - should be compatible (real-world case from ds005256)
+        (0.03, True),  # 3% difference - should be compatible
+        (0.049, True),  # 4.9% difference - just under threshold, should be compatible
+        (
+            0.06,
+            False,
+        ),  # 6% difference - clearly over 5% threshold, should NOT be compatible
+        (0.07, False),  # 7% difference - should NOT be compatible
+        (0.10, False),  # 10% difference - should NOT be compatible
+    ],
+)
+def test_find_compatible_fmaps_rtol(
+    tmp_path: Path, rel_diff: float, should_match: bool
+) -> None:
+    """
+    Test that rtol=0.05 (5% relative tolerance) works correctly for fieldmap matching.
+
+    This tests the enhancement from https://github.com/OpenNeuroDatasets/ds005256/pull/2
+    which allows affine matrices and other numeric parameters to differ by up to 5%
+    while still being considered compatible for fieldmap assignment.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory for test files
+    rel_diff : float
+        Relative difference to test (e.g., 0.02 for 2%, 0.06 for 6%)
+    should_match : bool
+        Whether the fmaps should be considered compatible at this tolerance
+    """
+    import numpy as np
+
+    # Create a session directory
+    session_path = op.join(tmp_path, "sub-test")
+    os.makedirs(op.join(session_path, "func"), exist_ok=True)
+    os.makedirs(op.join(session_path, "fmap"), exist_ok=True)
+
+    # Create base affine matrix (typical neuroimaging affine)
+    base_affine = np.array(
+        [
+            [2.0, 0.0, 0.0, -90.0],
+            [0.0, 2.0, 0.0, -126.0],
+            [0.0, 0.0, 2.0, -72.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    )
+
+    # Create a modified affine with the specified relative difference
+    # Apply the difference to non-zero, non-1.0 elements
+    modified_affine = base_affine.copy()
+    # Modify diagonal elements (2.0 values) and translation components
+    for i in range(3):
+        modified_affine[i, i] = base_affine[i, i] * (1 + rel_diff)  # Apply to diagonal
+        modified_affine[i, 3] = base_affine[i, 3] * (
+            1 + rel_diff
+        )  # Apply to translation
+
+    # Create base ShimSettings
+    base_shims = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    modified_shims = [s * (1 + rel_diff) for s in base_shims]
+
+    # Test with ImagingVolume (affine-based matching)
+    # Create NIfTI files with different affines
+    func_nifti = op.join(session_path, "func", "sub-test_task-rest_bold.nii.gz")
+    fmap_nifti = op.join(session_path, "fmap", "sub-test_dir-AP_epi.nii.gz")
+
+    # Create minimal NIfTI files with the specific affines
+    func_img = nibabel.Nifti1Image(np.zeros((64, 64, 30)), base_affine)
+    nibabel.save(func_img, func_nifti)
+
+    fmap_img = nibabel.Nifti1Image(np.zeros((64, 64, 30)), modified_affine)
+    nibabel.save(fmap_img, fmap_nifti)
+
+    # Create corresponding JSON files
+    func_json = op.join(session_path, "func", "sub-test_task-rest_bold.json")
+    fmap_json = op.join(session_path, "fmap", "sub-test_dir-AP_epi.json")
+
+    save_json(func_json, {"EchoTime": 0.030})
+    save_json(fmap_json, {"EchoTime": 0.030})
+
+    # Create fmap groups
+    fmap_groups = {"sub-test_epi": [fmap_json]}
+
+    # Test compatibility with ImagingVolume matching
+    compatible_fmaps = find_compatible_fmaps_for_run(
+        func_json, fmap_groups, matching_parameters=["ImagingVolume"]
+    )
+
+    if should_match:
+        assert len(compatible_fmaps) == 1, (
+            f"Expected fmaps to be compatible with {rel_diff*100:.1f}% difference, "
+            f"but got {len(compatible_fmaps)} compatible groups"
+        )
+        assert "sub-test_epi" in compatible_fmaps
+    else:
+        assert len(compatible_fmaps) == 0, (
+            f"Expected fmaps to be incompatible with {rel_diff*100:.1f}% difference, "
+            f"but got {len(compatible_fmaps)} compatible groups"
+        )
+
+    # Test with Shims matching
+    # Update JSON files with ShimSettings
+    save_json(func_json, {"ShimSetting": base_shims})
+    save_json(fmap_json, {"ShimSetting": modified_shims})
+
+    compatible_fmaps_shims = find_compatible_fmaps_for_run(
+        func_json, fmap_groups, matching_parameters=["Shims"]
+    )
+
+    if should_match:
+        assert len(compatible_fmaps_shims) == 1, (
+            f"Expected fmaps with ShimSettings to be compatible with {rel_diff*100:.1f}% difference, "
+            f"but got {len(compatible_fmaps_shims)} compatible groups"
+        )
+        assert "sub-test_epi" in compatible_fmaps_shims
+    else:
+        assert len(compatible_fmaps_shims) == 0, (
+            f"Expected fmaps with ShimSettings to be incompatible with {rel_diff*100:.1f}% difference, "
+            f"but got {len(compatible_fmaps_shims)} compatible groups"
+        )
+
+
 # Test two scenarios for each case:
 # -study without sessions
 # -study with sessions
