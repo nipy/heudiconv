@@ -130,6 +130,7 @@ def prep_conversion(
     overwrite: bool,
     dcmconfig: Optional[str],
     grouping: str,
+    use_enhanced_dicom: bool = False,
 ) -> None:
     if dicoms:
         lgr.info("Processing %d dicoms", len(dicoms))
@@ -212,17 +213,40 @@ def prep_conversion(
         assure_no_file_exists(target_heuristic_filename)
         safe_copyfile(heuristic.filename, target_heuristic_filename)
         if dicoms:
-            seqinfo = group_dicoms_into_seqinfos(
-                dicoms,
-                grouping,
-                file_filter=getattr(heuristic, "filter_files", None),
-                dcmfilter=getattr(heuristic, "filter_dicom", None),
-                flatten=True,
-                custom_grouping=getattr(heuristic, "grouping", None),
-                # callable which will be provided dcminfo and returned
-                # structure extend seqinfo
-                custom_seqinfo=getattr(heuristic, "custom_seqinfo", None),
-            )
+            if use_enhanced_dicom:
+                # Use enhanced DICOM-specific function (returns different structure)
+                from .dicom.enhanced import group_dicoms_into_seqinfos_enhanced
+
+                seqinfo_enhanced = group_dicoms_into_seqinfos_enhanced(
+                    dicoms,
+                    grouping,
+                    file_filter=getattr(heuristic, "filter_files", None),
+                    dcmfilter=getattr(heuristic, "filter_dicom", None),
+                    custom_grouping=getattr(heuristic, "grouping", None),
+                )
+                # Flatten the enhanced structure to match expected format
+                # The enhanced version returns dict[str, dict[Any, list[str]]]
+                # We need dict[SeqInfo, list[str]] for compatibility
+                # For now, just take all entries from all studies
+                seqinfo = {}
+                for study_key, study_seqinfos in seqinfo_enhanced.items():
+                    for seqinfo_key, files_list in study_seqinfos.items():
+                        # Create a minimal SeqInfo-like key
+                        # seqinfo_key is (series_num, protocol_name, nfiles)
+                        seqinfo[seqinfo_key] = files_list
+            else:
+                # Use standard nibabel dicomwrapper-based function
+                seqinfo = group_dicoms_into_seqinfos(
+                    dicoms,
+                    grouping,
+                    file_filter=getattr(heuristic, "filter_files", None),
+                    dcmfilter=getattr(heuristic, "filter_dicom", None),
+                    flatten=True,
+                    custom_grouping=getattr(heuristic, "grouping", None),
+                    # callable which will be provided dcminfo and returned
+                    # structure extend seqinfo
+                    custom_seqinfo=getattr(heuristic, "custom_seqinfo", None),
+                )
         elif seqinfo is None:
             raise ValueError("Neither 'dicoms' nor 'seqinfo' is given")
 

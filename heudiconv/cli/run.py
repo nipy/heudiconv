@@ -195,6 +195,14 @@ def get_parser() -> ArgumentParser:
         default=None,
         help="JSON file for additional dcm2niix configuration.",
     )
+    parser.add_argument(
+        "--use-enhanced-dicom",
+        action="store_true",
+        default=False,
+        help="Use enhanced DICOM metadata extraction module for multi-frame "
+        "Enhanced DICOM files. This provides better handling of Enhanced MR "
+        "images with multi-frame data.",
+    )
     submission = parser.add_argument_group("Conversion submission options")
     submission.add_argument(
         "-q",

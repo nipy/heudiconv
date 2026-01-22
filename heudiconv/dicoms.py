@@ -60,8 +60,7 @@ compresslevel = 9
 
 
 class CustomSeqinfoT(Protocol):
-    def __call__(self, wrapper: dw.Wrapper, series_files: list[str]) -> Hashable:
-        ...
+    def __call__(self, wrapper: dw.Wrapper, series_files: list[str]) -> Hashable: ...
 
 
 def create_seqinfo(
@@ -77,6 +76,7 @@ def create_seqinfo(
     mw: Wrapper
     series_files: list
     series_id: str
+    custom_seqinfo: callable, optional
     """
     dcminfo = mw.dcm_data
     accession_number = dcminfo.get("AccessionNumber")
@@ -163,10 +163,18 @@ def create_seqinfo(
 
 
 def validate_dicom(
-    fl: str, dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]]
+    fl: str,
+    dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]],
 ) -> Optional[tuple[dw.Wrapper, tuple[int, str], Optional[str]]]:
     """
     Parse DICOM attributes. Returns None if not valid.
+
+    Parameters
+    ----------
+    fl : str
+        Path to DICOM file
+    dcmfilter : callable, optional
+        Filter function to apply to DICOM dataset
     """
     mw = dw.wrapper_from_file(fl, force=True, stop_before_pixels=True)
     # Workaround for protocol name in private siemens csa header
@@ -225,15 +233,16 @@ def group_dicoms_into_seqinfos(
     file_filter: Optional[Callable[[str], Any]] = None,
     dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]] = None,
     flatten: Literal[False] = False,
-    custom_grouping: str
-    | Callable[
-        [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]],
-        dict[SeqInfo, list[str]],
-    ]
-    | None = None,
+    custom_grouping: (
+        str
+        | Callable[
+            [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]],
+            dict[SeqInfo, list[str]],
+        ]
+        | None
+    ) = None,
     custom_seqinfo: CustomSeqinfoT | None = None,
-) -> dict[Optional[str], dict[SeqInfo, list[str]]]:
-    ...
+) -> dict[Optional[str], dict[SeqInfo, list[str]]]: ...
 
 
 @overload
@@ -244,15 +253,16 @@ def group_dicoms_into_seqinfos(
     dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]] = None,
     *,
     flatten: Literal[True],
-    custom_grouping: str
-    | Callable[
-        [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]],
-        dict[SeqInfo, list[str]],
-    ]
-    | None = None,
+    custom_grouping: (
+        str
+        | Callable[
+            [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]],
+            dict[SeqInfo, list[str]],
+        ]
+        | None
+    ) = None,
     custom_seqinfo: CustomSeqinfoT | None = None,
-) -> dict[SeqInfo, list[str]]:
-    ...
+) -> dict[SeqInfo, list[str]]: ...
 
 
 def group_dicoms_into_seqinfos(
@@ -261,12 +271,14 @@ def group_dicoms_into_seqinfos(
     file_filter: Optional[Callable[[str], Any]] = None,
     dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]] = None,
     flatten: Literal[False, True] = False,
-    custom_grouping: str
-    | Callable[
-        [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]],
-        dict[SeqInfo, list[str]],
-    ]
-    | None = None,
+    custom_grouping: (
+        str
+        | Callable[
+            [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]],
+            dict[SeqInfo, list[str]],
+        ]
+        | None
+    ) = None,
     custom_seqinfo: CustomSeqinfoT | None = None,
 ) -> dict[Optional[str], dict[SeqInfo, list[str]]] | dict[SeqInfo, list[str]]:
     """Process list of dicoms and return seqinfo and file group
