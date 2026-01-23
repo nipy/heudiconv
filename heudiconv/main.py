@@ -61,6 +61,7 @@ def process_extra_commands(
     session: Optional[str],
     subjs: Optional[list[str]],
     grouping: str,
+    no_sanitize_jsons: bool = False,
 ) -> None:
     """
     Perform custom command instead of regular operations. Supported commands:
@@ -82,6 +83,8 @@ def process_extra_commands(
         List of subject identifiers
     grouping : {'studyUID', 'accession_number', 'all', 'custom'}
         How to group dicoms.
+    no_sanitize_jsons : bool, optional
+        Disable removal of sensitive date/time information from JSON sidecar files.
     """
 
     def ensure_has_files() -> None:
@@ -128,7 +131,7 @@ def process_extra_commands(
     elif command == "sanitize-jsons":
         ensure_has_files()
         assert files is not None  # for mypy now
-        tuneup_bids_json_files(files)
+        tuneup_bids_json_files(files, sanitize=not no_sanitize_jsons)
     elif command == "heuristics":
         from .utils import get_known_heuristics_with_descriptions
 
@@ -235,6 +238,7 @@ def workflow(
     dcmconfig: Optional[str] = None,
     queue: Optional[str] = None,
     queue_args: Optional[str] = None,
+    no_sanitize_jsons: bool = False,
 ) -> None:
     """Run the HeuDiConv conversion workflow.
 
@@ -322,6 +326,10 @@ def workflow(
     queue_args : str or None, optional
         Additional queue arguments passed as single string of space-separated
         Argument=Value pairs. Default is None.
+    no_sanitize_jsons : bool, optional
+        Disable removal of sensitive date/time information from JSON sidecar files.
+        By default, AcquisitionDate, AcquisitionDateTime, StudyDate, StudyDateTime,
+        SeriesDate, and SeriesDateTime fields are removed from JSON files. Default is False.
 
     Notes
     -----
@@ -384,6 +392,7 @@ def workflow(
             session,
             subjs,
             grouping,
+            no_sanitize_jsons,
         )
         return
     #
@@ -493,6 +502,7 @@ def workflow(
             overwrite=overwrite,
             dcmconfig=dcmconfig,
             grouping=grouping,
+            no_sanitize_jsons=no_sanitize_jsons,
         )
 
         lgr.info(

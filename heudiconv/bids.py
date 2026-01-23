@@ -313,25 +313,40 @@ def populate_aggregated_jsons(path: str) -> None:
         save_json(task_file, fields, sort_keys=True, pretty=True)
 
 
-def tuneup_bids_json_files(json_files: list[str]) -> None:
-    """Given a list of BIDS .json files, e.g."""
+def tuneup_bids_json_files(json_files: list[str], sanitize: bool = True) -> None:
+    """Given a list of BIDS .json files, tune them up (add HeuDiConv version, optionally remove dates).
+
+    Parameters
+    ----------
+    json_files : list of str
+        List of paths to JSON files to tune up
+    sanitize : bool, optional
+        If True (default), remove sensitive date/time information from JSON files.
+        This includes AcquisitionDate, AcquisitionDateTime, StudyDate, StudyDateTime,
+        SeriesDate, and SeriesDateTime fields.
+    """
     if not json_files:
         return
     # Harmonize generic .json formatting
     for jsonfile in json_files:
         json_ = load_json(jsonfile)
         # sanitize!
-        for f1 in ["Acquisition", "Study", "Series"]:
-            for f2 in ["DateTime", "Date"]:
-                json_.pop(f1 + f2, None)
+        if sanitize:
+            for f1 in ["Acquisition", "Study", "Series"]:
+                for f2 in ["DateTime", "Date"]:
+                    json_.pop(f1 + f2, None)
         # TODO:  should actually be placed into series file which must
         #        go under annex (not under git) and marked as sensitive
         # MG - Might want to replace with flag for data sensitivity
         # related - https://github.com/nipy/heudiconv/issues/92
-        if "Date" in str(json_):
-            # Let's hope no word 'Date' comes within a study name or smth like
-            # that
-            raise ValueError("There must be no dates in .json sidecar")
+            if "Date" in str(json_):
+                # Let's hope no word 'Date' comes within a study name or smth like
+                # that
+                lgr.warning(
+                    "File %s contains 'Date' in its content after sanitization. "
+                    "This might indicate sensitive information that should be removed.",
+                    jsonfile
+                )
         # Those files should not have our version field already - should have been
         # freshly produced
         assert HEUDICONV_VERSION_JSON_KEY not in json_
