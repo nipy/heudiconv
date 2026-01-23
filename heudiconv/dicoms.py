@@ -201,7 +201,9 @@ def validate_dicom(
     for sig in ("iop", "ICE_Dims", "SequenceName"):
         try:
             del mw.series_signature[sig]
-        except KeyError:
+        except (KeyError, IndexError):
+            # index error can come deep within nibabel/dicom
+            # https://github.com/nipy/heudiconv/issues/633
             pass
     return mw, series_id, file_studyUID
 
