@@ -407,7 +407,7 @@ def infotodict(
     run_label: Optional[str] = None  # run-
     dcm_image_iod_spec: Optional[str] = None
     skip_derived = False
-    for curr_seqinfo in seqinfo:
+    for i_acq, curr_seqinfo in enumerate(seqinfo):
         # XXX: skip derived sequences, we don't store them to avoid polluting
         # the directory, unless it is the motion corrected ones
         # (will get _rec-moco suffix)
@@ -419,6 +419,30 @@ def infotodict(
             skipped.append(curr_seqinfo.series_id)
             lgr.debug("Ignoring derived data %s", curr_seqinfo.series_id)
             continue
+
+        if i_acq == 0:
+            prev_dcm_image_iod_spec = None
+        else:
+            prev_seqinfo = seqinfo[i_acq - 1]
+            for f in "series_description", "protocol_name":
+                prev_seqinfo = prev_seqinfo._replace(
+                    **{f: getattr(prev_seqinfo, f).format(**prev_seqinfo._asdict())}
+                )
+
+            prev_dcm_image_iod_spec = prev_seqinfo.image_type[2]
+
+        if i_acq == (len(seqinfo) - 1):
+            next_series_description = None
+            next_dcm_image_iod_spec = None
+        else:
+            next_seqinfo = seqinfo[i_acq + 1]
+            for f in "series_description", "protocol_name":
+                next_seqinfo = next_seqinfo._replace(
+                    **{f: getattr(next_seqinfo, f).format(**next_seqinfo._asdict())}
+                )
+
+            next_series_description = next_seqinfo.series_description
+            next_dcm_image_iod_spec = next_seqinfo.image_type[2]
 
         # possibly apply present formatting in the series_description or protocol name
         for f in "series_description", "protocol_name":
@@ -432,7 +456,6 @@ def infotodict(
 
         # figure out type of image from curr_seqinfo.image_info -- just for checking ATM
         # since we primarily rely on encoded in the protocol name information
-        prev_dcm_image_iod_spec = dcm_image_iod_spec
         if len(curr_seqinfo.image_type) > 2:
             # https://dicom.innolitics.com/ciods/cr-image/general-image/00080008
             # 0 - ORIGINAL/DERIVED
@@ -509,10 +532,6 @@ def infotodict(
             if datatype == "func":
                 if "_pace_" in series_spec:
                     datatype_suffix = "pace"  # or should it be part of seq-
-                elif "P" in curr_seqinfo.image_type:
-                    datatype_suffix = "phase"
-                elif "M" in curr_seqinfo.image_type:
-                    datatype_suffix = "bold"
                 else:
                     # assume bold by default
                     datatype_suffix = "bold"
@@ -531,6 +550,19 @@ def infotodict(
             elif datatype == "dwi":
                 # label for dwi as well
                 datatype_suffix = "dwi"
+
+            # Add "part" entity as needed
+            if datatype != "fmap" and not curr_seqinfo.series_description.endswith(
+                "_SBRef"
+            ):
+                if "P" in curr_seqinfo.image_type:
+                    series_info["part"] = "phase"
+                elif "M" in curr_seqinfo.image_type:
+                    # if next one is phase from same scan, we should set part to mag
+                    if (
+                        next_series_description == curr_seqinfo.series_description
+                    ) and (next_dcm_image_iod_spec == "P"):
+                        series_info["part"] = "mag"
 
         #
         # Even if datatype_suffix was provided, for some data we might need to override,
@@ -629,8 +661,10 @@ def infotodict(
             from_series_info("dir"),
             series_info.get("bids"),
             run_label,
+            from_series_info("part"),
             datatype_suffix,
         ]
+
         # filter those which are None, and join with _
         suffix = "_".join(filter(bool, filename_suffix_parts))  # type: ignore[arg-type]
 
@@ -655,8 +689,8 @@ def infotodict(
             "_Scout" in curr_seqinfo.series_description
             or (
                 datatype == "anat"
-                and datatype_suffix
-                and datatype_suffix.startswith("scout")
+                and filename_suffix_parts[-1]
+                and filename_suffix_parts[-1].startswith("scout")
             )
             or (
                 curr_seqinfo.series_description.lower()

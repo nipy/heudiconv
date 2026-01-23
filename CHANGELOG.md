@@ -705,7 +705,7 @@ target output directory during conversion.
   name later on), which avoids hitting file size limits of /tmp ([#481][]) and
   helped to avoid a regression in dcm2nixx 1.0.20201102
 - [#477][] replaced `rec-<magnitude|phase>` with `part-<mag|phase>` now
-  hat BIDSsupports the part entity
+  that BIDS supports the part entity
 - [#473][] made default for CogAtlasID to be a TODO URL
 - [#459][] made AcquisitionTime used for acq_time scans file field
 - [#451][] retained sub-second resolution in scans files
