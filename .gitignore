@@ -11,4 +11,3 @@ build/
 dist/
 sample_nifti.json
 venvs/
-heudiconv/_version.py
