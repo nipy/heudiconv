@@ -313,15 +313,15 @@ def populate_aggregated_jsons(path: str) -> None:
         save_json(task_file, fields, sort_keys=True, pretty=True)
 
 
-def tuneup_bids_json_files(json_files: list[str], sanitize: bool = True) -> None:
+def tuneup_bids_json_files(json_files: list[str], sanitize: str = 'remove') -> None:
     """Given a list of BIDS .json files, tune them up (add HeuDiConv version, optionally remove dates).
 
     Parameters
     ----------
     json_files : list of str
         List of paths to JSON files to tune up
-    sanitize : bool, optional
-        If True (default), remove sensitive date/time information from JSON files.
+    sanitize : str, optional
+        If 'remove' (default), discard sensitive date/time information from JSON files.
         This includes AcquisitionDate, AcquisitionDateTime, StudyDate, StudyDateTime,
         SeriesDate, and SeriesDateTime fields.
     """
@@ -331,7 +331,7 @@ def tuneup_bids_json_files(json_files: list[str], sanitize: bool = True) -> None
     for jsonfile in json_files:
         json_ = load_json(jsonfile)
         # sanitize!
-        if sanitize:
+        if sanitize == 'remove':
             for f1 in ["Acquisition", "Study", "Series"]:
                 for f2 in ["DateTime", "Date"]:
                     json_.pop(f1 + f2, None)
