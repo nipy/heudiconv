@@ -231,7 +231,7 @@ def workflow(
     dcmconfig: Optional[str] = None,
     queue: Optional[str] = None,
     queue_args: Optional[str] = None,
-    sanitize_dates: str,
+    sanitize_dates: Optional[str] = 'remove',
 ) -> None:
     """Run the HeuDiConv conversion workflow.
 

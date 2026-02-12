@@ -1426,7 +1426,7 @@ def test_tuneup_bids_json_files_sanitization(tmp_path: Path) -> None:
     save_json(str(test_json_path), test_data)
 
     # Test with sanitization enabled (default)
-    tuneup_bids_json_files([str(test_json_path)], sanitize=True)
+    tuneup_bids_json_files([str(test_json_path)], sanitize = 'remove' )
     result = load_json(str(test_json_path))
 
     # Check that date/time fields were removed
@@ -1448,7 +1448,7 @@ def test_tuneup_bids_json_files_sanitization(tmp_path: Path) -> None:
     save_json(str(test_json_path), test_data)
 
     # Test with sanitization disabled
-    tuneup_bids_json_files([str(test_json_path)], sanitize=False)
+    tuneup_bids_json_files([str(test_json_path)], sanitize = 'nothing')
     result = load_json(str(test_json_path))
 
     # Check that date/time fields were preserved
