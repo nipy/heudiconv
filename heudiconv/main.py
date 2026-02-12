@@ -125,10 +125,6 @@ def process_extra_commands(
         heuristic_mod = load_heuristic(heuristic)
         for fname in files:
             populate_bids_templates(fname, getattr(heuristic_mod, "DEFAULT_FIELDS", {}))
-    elif command == "sanitize-jsons":
-        ensure_has_files()
-        assert files is not None  # for mypy now
-        tuneup_bids_json_files(files)
     elif command == "heuristics":
         from .utils import get_known_heuristics_with_descriptions
 
@@ -235,6 +231,7 @@ def workflow(
     dcmconfig: Optional[str] = None,
     queue: Optional[str] = None,
     queue_args: Optional[str] = None,
+    sanitize_dates: Optional[str] = 'remove',
 ) -> None:
     """Run the HeuDiConv conversion workflow.
 
@@ -322,6 +319,10 @@ def workflow(
     queue_args : str or None, optional
         Additional queue arguments passed as single string of space-separated
         Argument=Value pairs. Default is None.
+    sanitize_dates : str, optional, {'remove', 'nothing', 'shift'}
+        Removal of sensitive date/time information from JSON sidecar files.
+        By default, AcquisitionDate, AcquisitionDateTime, StudyDate, StudyDateTime,
+        SeriesDate, and SeriesDateTime fields are removed from JSON files. Default is False.
 
     Notes
     -----
@@ -493,6 +494,7 @@ def workflow(
             overwrite=overwrite,
             dcmconfig=dcmconfig,
             grouping=grouping,
+            sanitize_dates=sanitize_dates,
         )
 
         lgr.info(
