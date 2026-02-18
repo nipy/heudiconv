@@ -272,11 +272,14 @@ def create_seqinfo_enhanced(
     TR = float(TR) if TR is not None else 0.0
     empty_list = []
     if TE is None:
-        for i in range(0,len(ds.PerFrameFunctionalGroupsSequence)):
-                for j in range(0, len(ds.PerFrameFunctionalGroupsSequence[i].MREchoSequence)):
-                                echo_time_ms = float(ds.PerFrameFunctionalGroupsSequence[i].MREchoSequence[j][0x0018,0x9082].value)
-                                empty_list.append(echo_time_ms)
-        TE = tuple(set(empty_list))
+        if "SharedFunctionalGroupsSequence" in ds:
+            TE = ds.SharedFunctionalGroupsSequence[0].MREchoSequence[0].EffectiveEchoTime
+        elif "PerFrameFunctionalGroupsSequence" in ds:
+            for i in range(0,len(ds.PerFrameFunctionalGroupsSequence)):
+                    for j in range(0, len(ds.PerFrameFunctionalGroupsSequence[i].MREchoSequence)):
+                                    echo_time_ms = float(ds.PerFrameFunctionalGroupsSequence[i].MREchoSequence[j][0x0018,0x9082].value)
+                                    empty_list.append(echo_time_ms)
+            TE = tuple(set(empty_list))
 
     # Get protocol and series information
     protocol_name = str(ds.get("ProtocolName", ""))
