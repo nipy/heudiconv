@@ -184,9 +184,15 @@ The parameters that can be specified and the allowed options are defined in ``bi
    * ``'PlainAcquisitionLabel'``: similar to ``'CustomAcquisitionLabel'``, but does not change
      behavior for ``func`` modality and always bases decision on the ``_acq-`` label. Helps in
      cases when there are multiple tasks and a shared ``fmap`` for some of them.
+   * ``'MultipleLabels'``: in cases where an ``_acq-`` label is not sufficient to distinguish
+     fmap groups. Useful in scenarios where ``_rec-`` is automatically assigned. Configure the
+     list of entities to consider in the ``'parameter_opts'`` dictionary.
+     ``''``
    * ``'Force'``: forces ``heudiconv`` to consider any ``fmaps`` in the session to be
      suitable for any image, no matter what the imaging parameters are.
 
+ - ``'parameter_opts'``: Some ``'matching_parameters'`` like ``'MultipleLabels'`` can be
+   configured using this dictionary.
 
  - ``'criterion'``: Criterion to decide which of the candidate ``fmaps`` will be assigned to
    a given file, if there are more than one. Allowed values are:
@@ -195,10 +201,16 @@ The parameters that can be specified and the allowed options are defined in ``bi
    * ``'Closest'``: The closest in time to the beginning of the image acquisition.
 
 .. note::
-  Example::
+  Examples::
 
     POPULATE_INTENDED_FOR_OPTS = {
             'matching_parameters': ['ImagingVolume', 'Shims'],
+            'criterion': 'Closest'
+    }
+
+    POPULATE_INTENDED_FOR_OPTS = {
+            'matching_parameters': ['MultipleLabels'],
+            'parameter_opts': {'MultipleLabels': {'entities': ['acq', 'rec']}},
             'criterion': 'Closest'
     }
 
