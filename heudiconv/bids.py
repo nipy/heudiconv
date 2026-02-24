@@ -700,7 +700,7 @@ def find_fmap_groups(fmap_dir: str) -> dict[str, list[str]]:
 def get_key_info_for_fmap_assignment(
     json_file: str,
     matching_parameter: str,
-    parameter_opts: dict = {},
+    parameter_opts: None | dict = None,
 ) -> list[Any]:
     """
     Gets key information needed to assign fmaps to other modalities.
@@ -715,7 +715,7 @@ def get_key_info_for_fmap_assignment(
         matching_parameter that will be used to match runs
     parameter_opts : dict
         possible options for the matching_parameter
-        default: {}
+        default: None
 
     Returns
     -------
@@ -723,6 +723,9 @@ def get_key_info_for_fmap_assignment(
         part of the json file that will need to match between the fmap and
         the other image
     """
+    if parameter_opts is None:
+        parameter_opts = {}
+
     if not op.exists(json_file):
         raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), json_file)
 
@@ -791,7 +794,7 @@ def find_compatible_fmaps_for_run(
     json_file: str,
     fmap_groups: dict[str, list[str]],
     matching_parameters: list[str],
-    parameter_opts: dict[str, dict] = {},
+    parameter_opts: None | dict[str, dict] = None,
 ) -> dict[str, list[str]]:
     """
     Finds compatible fmaps for a given run, for populate_intended_for.
@@ -810,7 +813,7 @@ def find_compatible_fmaps_for_run(
     parameter_opts : dict
         key: matching_parameter name
         value: dictionary of options for the matching_parameter
-        default: {}
+        default: None
 
     Returns
     -------
@@ -820,6 +823,9 @@ def find_compatible_fmaps_for_run(
         key: prefix common to the group
         value: list of all fmap paths in the group
     """
+    if parameter_opts is None:
+        parameter_opts = {}
+
     lgr.debug("Looking for fmaps for %s", json_file)
     json_info = {}
     for param in matching_parameters:
@@ -859,7 +865,7 @@ def find_compatible_fmaps_for_run(
 def find_compatible_fmaps_for_session(
     path_to_bids_session: str,
     matching_parameters: list[str],
-    parameter_opts: dict[str, dict] = {},
+    parameter_opts: None | dict[str, dict] = None,
 ) -> Optional[dict[str, dict[str, list[str]]]]:
     """
     Finds compatible fmaps for all non-fmap runs in a session.
@@ -876,13 +882,16 @@ def find_compatible_fmaps_for_session(
     parameter_opts : dict
         key: matching_parameter name
         value: dictionary of options for the matching_parameter
-        default: {}
+        default: None
 
     Returns
     -------
     compatible_fmap : dict
         Dict of compatible_fmaps_groups (values) for each non-fmap run (keys)
     """
+    if parameter_opts is None:
+        parameter_opts = {}
+
     lgr.debug("Looking for fmaps for session: %s", path_to_bids_session)
 
     # Resolve path (eliminate '..')
@@ -1012,7 +1021,7 @@ def populate_intended_for(
     path_to_bids_session: str,
     matching_parameters: str | list[str],
     criterion: str,
-    parameter_opts: dict[str, dict] = {},
+    parameter_opts: None | dict[str, dict] = None,
 ) -> None:
     """
     Adds the 'IntendedFor' field to the fmap .json files in a session folder.
@@ -1036,11 +1045,14 @@ def populate_intended_for(
     parameter_opts : dict
         key: matching_parameter name
         value: dictionary of options for the matching_parameter
-        default: {}
+        default: None
     criterion : str in ['First', 'Closest']
         matching_parameters that will be used to decide which of the matching
         fmaps to use
     """
+
+    if parameter_opts is None:
+        parameter_opts = {}
 
     if not isinstance(matching_parameters, list):
         assert isinstance(matching_parameters, str), (
