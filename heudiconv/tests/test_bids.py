@@ -112,6 +112,7 @@ def test_get_key_info_for_fmap_assignment(
     the seed for the random label creation.
     """
 
+    expected_key_info: str | None = None  # avoid mypy type inference
     nifti_file = op.join(TESTS_DATA_PATH, "sample_nifti.nii.gz")
     # Get the expected parameters from the NIfTI header:
     MY_HEADER = nibabel.ni1.np.loadtxt(
