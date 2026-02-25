@@ -1183,7 +1183,7 @@ def bvals_are_zero(bval_file: str | list) -> bool:
     return bvals_unique == {0.0} or bvals_unique == {5.0}
 
 
-def recompress_failed(nifti: str):
+def recompress_failed(nifti: str) -> None:
     """Tries to recompress nifti file with built-in gzip module
 
     Parameters
