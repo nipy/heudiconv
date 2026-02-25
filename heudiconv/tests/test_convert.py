@@ -312,12 +312,12 @@ def test_recompress(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that uncompressed niftis from dcm2niix are recompressed to gzip files."""
 
     def mock_nipype_convert(
-        item_dicoms: list[str],
+        _item_dicoms: list[str],
         prefix: str,
-        with_prov: bool,
-        bids_options: Optional[str],
-        tmpdir: str,
-        dcmconfig: Optional[str] = None,
+        _with_prov: bool,
+        _bids_options: Optional[str],
+        _tmpdir: str,
+        _dcmconfig: Optional[str] = None,
     ) -> tuple[Mock, Optional[str]]:
         """
         Fake nipype_convert to "produce" a mixture of compressed and
@@ -391,12 +391,12 @@ def test_recompress_truncated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     """Test that recompress_failed raises RuntimeError for truncated/corrupted nifti files."""
 
     def mock_nipype_convert(
-        item_dicoms: list[str],
+        _item_dicoms: list[str],
         prefix: str,
-        with_prov: bool,
-        bids_options: Optional[str],
-        tmpdir: str,
-        dcmconfig: Optional[str] = None,
+        _with_prov: bool,
+        _bids_options: Optional[str],
+        _tmpdir: str,
+        _dcmconfig: Optional[str] = None,
     ) -> tuple[Mock, Optional[str]]:
         """
         Fake nipype_convert to produce a truncated uncompressed nifti file
