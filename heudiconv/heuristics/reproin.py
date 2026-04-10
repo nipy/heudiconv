@@ -596,15 +596,6 @@ def infotodict(
             # if there is no _run -- no run label added
             run_label = None
 
-        # yoh: had a wrong assumption
-        # if curr_seqinfo.is_motion_corrected:
-        #     assert curr_seqinfo.is_derived, "Motion corrected images must be 'derived'"
-
-        if curr_seqinfo.is_motion_corrected and "rec-" in series_info.get("bids", ""):
-            raise NotImplementedError(
-                "want to add _rec-moco but there is _rec- already"
-            )
-
         def from_series_info(name: str) -> Optional[str]:
             """A little helper to provide _name-value if series_info knows it
 
@@ -615,6 +606,19 @@ def infotodict(
             else:
                 return None
 
+        # yoh: had a wrong assumption
+        # if curr_seqinfo.is_motion_corrected:
+        #     assert curr_seqinfo.is_derived, "Motion corrected images must be 'derived'"
+
+        if curr_seqinfo.is_motion_corrected:
+            if from_series_info("rec"):
+                raise NotImplementedError(
+                    "want to add _rec-moco but there is _rec- already"
+                )
+            # But we want to add an indicator in case it was motion corrected
+            # in the magnet. ref sample  /2017/01/03/qa
+            series_info["rec"] = "moco"
+
         # TODO: get order from schema, do not hardcode. ATM could be checked at
         # https://bids-specification.readthedocs.io/en/stable/99-appendices/04-entity-table.html
         # https://github.com/bids-standard/bids-specification/blob/HEAD/src/schema/rules/entities.yaml
@@ -623,9 +627,7 @@ def infotodict(
         filename_suffix_parts = [
             from_series_info("task"),
             from_series_info("acq"),
-            # But we want to add an indicator in case it was motion corrected
-            # in the magnet. ref sample  /2017/01/03/qa
-            None if not curr_seqinfo.is_motion_corrected else "rec-moco",
+            from_series_info("rec"),
             from_series_info("dir"),
             series_info.get("bids"),
             run_label,
@@ -948,7 +950,7 @@ def parse_series_spec(series_spec: str) -> dict[str, str]:
             .replace(")", "}")
         )  # for Philips
 
-        if key in ["ses", "run", "task", "acq", "dir"]:
+        if key in ["ses", "run", "task", "acq", "rec", "dir"]:
             # those we care about explicitly
             regd[{"ses": "session"}.get(key, key)] = sanitize_str(value)
         else:
