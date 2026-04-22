@@ -330,11 +330,13 @@ def test_infotoids_ses_date(ses_spec: str, expected_session: str) -> None:
     assert result["session"] == expected_session
 
 
-def test_infotodict_entity_ordering() -> None:
+@pytest.mark.parametrize("moco", [True, False])
+@pytest.mark.parametrize("additional_rec", ["_rec-norm", ""])
+def test_infotodict_entity_ordering(moco: bool, additional_rec: str) -> None:
     """Test that entities in the generated filename follow BIDS ordering
     (task, acq, rec, dir, run, suffix) regardless of input order."""
     # Deliberately scramble entity order in the protocol name
-    scrambled = "func-bold_dir-AP_run-1_rec-norm_task-rest_acq-mb4"
+    scrambled = f"func-bold_dir-AP_run-1{additional_rec}_task-rest_acq-mb4"
     seqinfo = SeqInfo(
         total_files_till_now=1,
         example_dcm_file="/path/to/dcm",
@@ -349,7 +351,7 @@ def test_infotodict_entity_ordering() -> None:
         TR=2.0,
         TE=30.0,
         protocol_name=scrambled,
-        is_motion_corrected=False,
+        is_motion_corrected=moco,
         is_derived=False,
         patient_id="sub01",
         study_description="PI^study",
@@ -366,14 +368,39 @@ def test_infotodict_entity_ordering() -> None:
         custom=None,
     )
 
-    result = reproin.infotodict([seqinfo])
-    templates = [key[0] for key in result]
-    assert len(templates) == 1
-    template = templates[0]
+    if moco and additional_rec == '':
+        result = reproin.infotodict([seqinfo])
+        templates = [key[0] for key in result]
+        assert len(templates) == 1
+        template = templates[0]
 
-    # Verify entities appear in BIDS order in the generated filename
-    expected_order = ["task-rest", "acq-mb4", "rec-norm", "dir-AP", "run-01", "bold"]
-    positions = [template.index(e) for e in expected_order]
-    assert positions == sorted(positions), (
-        f"Entities not in BIDS order in {template!r}"
-    )
+        # Verify rec-moco has been added in the generated filename
+        expected_order = ["task-rest", "acq-mb4", "rec-moco", "dir-AP", "run-01", "bold"]
+        positions = [template.index(e) for e in expected_order]
+        assert positions == sorted(positions), (
+            f"Entities not in BIDS order in {template!r} or rec-moco missing"
+        )
+        pass
+
+    if moco and additional_rec != '':
+        with pytest.raises(NotImplementedError) as ce:
+            reproin.infotodict([seqinfo])
+            # "want to add _rec-moco but there is _rec- already"
+        assert str(ce.value) == "want to add _rec-moco but there is _rec- already"
+
+    if not moco and additional_rec == '':
+        # nothing new to test for this combination
+        return
+
+    if not moco and additional_rec != '':
+        result = reproin.infotodict([seqinfo])
+        templates = [key[0] for key in result]
+        assert len(templates) == 1
+        template = templates[0]
+
+        # Verify entities appear in BIDS order in the generated filename
+        expected_order = ["task-rest", "acq-mb4", "rec-norm", "dir-AP", "run-01", "bold"]
+        positions = [template.index(e) for e in expected_order]
+        assert positions == sorted(positions), (
+            f"Entities not in BIDS order in {template!r}"
+        )
