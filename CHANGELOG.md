@@ -1,3 +1,27 @@
+# v1.4.0 (Tue Apr 28 2026)
+
+#### 🚀 Enhancement
+
+- BF: support _ses-DATE as alternative to _ses-{date} for Siemens XA60 [#848](https://github.com/nipy/heudiconv/pull/848) ([@yarikoptic](https://github.com/yarikoptic))
+- Allow for relative, up to 5% differences, while comparing numerics for fieldmap correspondence [#842](https://github.com/nipy/heudiconv/pull/842) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### 🐛 Bug Fix
+
+- Fix fmap rec dir ordering [#855](https://github.com/nipy/heudiconv/pull/855) ([@octomike](https://github.com/octomike))
+
+#### 🏠 Internal
+
+- [gh-actions](deps): Bump codecov/codecov-action from 5 to 6 [#854](https://github.com/nipy/heudiconv/pull/854) ([@dependabot[bot]](https://github.com/dependabot[bot]))
+- [gh-actions](deps): Bump actions/checkout from 5 to 6 [#841](https://github.com/nipy/heudiconv/pull/841) ([@dependabot[bot]](https://github.com/dependabot[bot]))
+
+#### Authors: 3
+
+- [@dependabot[bot]](https://github.com/dependabot[bot])
+- Michael ([@octomike](https://github.com/octomike))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v1.3.4 (Wed Sep 24 2025)
 
 #### 🐛 Bug Fix
