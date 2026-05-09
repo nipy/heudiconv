@@ -112,6 +112,7 @@ def test_get_key_info_for_fmap_assignment(
     the seed for the random label creation.
     """
 
+    expected_key_info: str | None = None  # avoid mypy type inference
     nifti_file = op.join(TESTS_DATA_PATH, "sample_nifti.nii.gz")
     # Get the expected parameters from the NIfTI header:
     MY_HEADER = nibabel.ni1.np.loadtxt(
@@ -195,6 +196,30 @@ def test_get_key_info_for_fmap_assignment(
         save_json(json_name, {SHIM_KEY: A_SHIM})
         assert [expected_key_info] == get_key_info_for_fmap_assignment(
             json_name, matching_parameter="PlainAcquisitionLabel"
+        )
+
+    # 8) matching_parameter = 'MultipleLabels'
+    A_LABEL = gen_rand_label(label_size, label_seed)
+    B_LABEL = gen_rand_label(label_size, label_seed)
+    BOTH = A_LABEL + B_LABEL
+    for d in ["fmap", "func", "dwi", "anat"]:
+        (tmp_path / d).mkdir(parents=True, exist_ok=True)
+
+    for dirname, fname, expected_key_info in [
+        ("fmap", "sub-foo_epi.json", None),
+        ("fmap", f"sub-foo_acq-{A_LABEL}_epi.json", A_LABEL),
+        ("fmap", f"sub-foo_acq-{A_LABEL}_rec-{B_LABEL}_epi.json", BOTH),
+        ("func", f"sub-foo_task-foo_acq-{A_LABEL}_bold.json", A_LABEL),
+        ("func", f"sub-foo_task-bar_acq-{A_LABEL}_rec-{B_LABEL}_bold.json", BOTH),
+        ("dwi", f"sub-foo_acq-{A_LABEL}_dwi.json", A_LABEL),
+        ("anat", f"sub-foo_rec-{B_LABEL}_T1w.json", B_LABEL),
+    ]:
+        json_name = op.join(tmp_path, dirname, fname)
+        save_json(json_name, {SHIM_KEY: A_SHIM})
+        assert [expected_key_info] == get_key_info_for_fmap_assignment(
+            json_name,
+            matching_parameter="MultipleLabels",
+            parameter_opts={"entities": ["acq", "rec"]},
         )
 
     # Finally: invalid matching_parameters:
