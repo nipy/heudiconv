@@ -168,7 +168,6 @@ def get_parser() -> ArgumentParser:
             "heuristic-info",
             "ls",
             "populate-templates",
-            "sanitize-jsons",
             "treat-jsons",
             "populate-intended-for",
         ),
@@ -186,6 +185,14 @@ def get_parser() -> ArgumentParser:
         "--minmeta",
         action="store_true",
         help="Exclude dcmstack meta information in sidecar jsons.",
+    )
+    parser.add_argument(
+        "--sanitize-dates",
+        choices=("remove", "nothing", "shift"),
+        default="remove",
+        help="Removal of sensitive date/time information from JSON sidecar files. "
+        "By default, AcquisitionDate, AcquisitionDateTime, StudyDate, StudyDateTime, "
+        "SeriesDate, and SeriesDateTime fields are removed from JSON files.",
     )
     parser.add_argument(
         "--random-seed", type=int, default=None, help="Random seed to initialize RNG."
