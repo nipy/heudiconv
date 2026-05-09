@@ -1498,6 +1498,30 @@ def test_BIDSFile() -> None:
     assert my_bids_file["echo"] == "2"
 
 
+def test_convert_multiorient(
+    tmp_path: Path,
+    heuristic: str = "bids_localizer.py",
+    subID: str = "loc",
+) -> None:
+    """Unit test for the case of multi-orient localizer data.
+    The different orientations should be labeled in `acq` entity.
+    """
+    datadir = op.join(TESTS_DATA_PATH, "01-localizer_64ch")
+    outdir = tmp_path / "out"
+    outdir.mkdir()
+    args = gen_heudiconv_args(datadir, str(outdir), subID, heuristic)
+    runner(args)
+
+    # Check that the expected files have been extracted.
+    # This also checks that the "echo" entity comes before "part":
+    for orient in [1, 2, 3]:
+        for ext in ["nii.gz", "json"]:
+            fname = op.join(
+                outdir, "sub-%s", "anat", "sub-%s_chunk-%d_localizer.%s"
+            ) % (subID, subID, orient, ext)
+            assert op.exists(fname)
+
+
 @pytest.mark.skipif(not have_datalad, reason="no datalad")
 def test_ME_mag_phase_conversion(
     monkeypatch: pytest.MonkeyPatch,
