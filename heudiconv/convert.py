@@ -838,7 +838,18 @@ def nipype_convert(
         convertnode.terminal_output = "allatonce"
     convertnode.inputs.bids_format = bids_options is not None
     eg = convertnode.run()
+    if eg.runtime.returncode:
+        lgr.error(
+            f"Conversion has failed with exit code {eg.runtime.returncode}.\n"
+            f"  Produced files: {eg.outputs.converted_files}\n"
+            f"  stdout: {eg.runtime.stdout}\n"
+            f"  stderr: {eg.runtime.stderr}"
+        )
+        import pdb
 
+        pdb.set_trace()
+        # TODO: make an option on behavior in such cases -- error or to continue
+        raise RuntimeError("Conversion has failed. Check the logs for more details")
     # prov information
     prov_file = prefix + "_prov.ttl" if with_prov else None
     if prov_file:
