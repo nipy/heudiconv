@@ -23,6 +23,7 @@ from typing import (
 )
 from unittest.mock import patch
 import warnings
+import hashlib
 
 import pydicom as dcm
 
@@ -164,7 +165,7 @@ def create_seqinfo(
 
 def validate_dicom(
     fl: str, dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]]
-) -> Optional[tuple[dw.Wrapper, tuple[int, str], Optional[str]]]:
+) -> Optional[tuple[dw.Wrapper, tuple[int, str, str], Optional[str]]]:
     """
     Parse DICOM attributes. Returns None if not valid.
     """
@@ -179,7 +180,7 @@ def validate_dicom(
     try:
         protocol_name = mw.dcm_data.ProtocolName
         assert isinstance(protocol_name, str)
-        series_id = (int(mw.dcm_data.SeriesNumber), protocol_name)
+        series_id = (int(mw.dcm_data.SeriesNumber), protocol_name, mw.dcm_data.SeriesInstanceUID)
     except AttributeError as e:
         lgr.warning('Ignoring %s since not quite a "normal" DICOM: %s', fl, e)
         return None
@@ -209,10 +210,13 @@ def validate_dicom(
 class SeriesID(NamedTuple):
     series_number: int
     protocol_name: str
+    series_uid: str
     file_studyUID: Optional[str] = None
 
     def __str__(self) -> str:
-        s = f"{self.series_number}-{self.protocol_name}"
+        len_hash_hex = 8
+        suid_hex = hashlib.md5(self.series_uid.encode('utf-8')).hexdigest()[:len_hash_hex]
+        s = f"{self.series_number}-{self.protocol_name}-{suid_hex}"
         if self.file_studyUID is not None:
             s += f"-{self.file_studyUID}"
         return s
@@ -340,7 +344,7 @@ def group_dicoms_into_seqinfos(
             removeidx.append(idx)
             continue
         mw, series_id_, file_studyUID = mwinfo
-        series_id = SeriesID(series_id_[0], series_id_[1])
+        series_id = SeriesID(series_id_[0], series_id_[1], series_id_[2])
         if per_studyUID:
             series_id = series_id._replace(file_studyUID=file_studyUID)
 
@@ -375,6 +379,7 @@ def group_dicoms_into_seqinfos(
                 series_id = SeriesID(
                     mwgroup[idx].dcm_data.SeriesNumber,
                     mwgroup[idx].dcm_data.ProtocolName,
+                    mwgroup[idx].dcm_data.SeriesInstanceUID,
                 )
                 if per_studyUID:
                     series_id = series_id._replace(file_studyUID=file_studyUID)
