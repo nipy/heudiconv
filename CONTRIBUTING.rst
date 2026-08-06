@@ -81,9 +81,9 @@ The following pull request labels are respected:
 Development environment
 -----------------------
 
-We support Python 3 only (>= 3.7).
+We support Python 3 only (>= 3.9).
 
-Dependencies which you will need are `listed in the repository <heudiconv/info.py>`_.
+Dependencies which you will need are `listed in the repository <pyproject.toml>`_.
 Note that you will likely have these will already be available on your system if you used a
 package manager (e.g. Debian's ``apt-get``, Gentoo's ``emerge``, or simply PIP) to install the
 software.

@@ -5,20 +5,18 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+"""Shim to support builds without versioningit.
+
+All packaging metadata lives in pyproject.toml.  This file is kept around only
+to be able to take the version from the pre-generated heudiconv/_version.py
+whenever versioningit is not available.
+"""
 
 
 def main():
     import os.path as op
 
-    from setuptools import find_packages, findall, setup
-
-    thispath = op.dirname(__file__)
-    ldict = locals()
-
-    # Get version and release info, which is all stored in heudiconv/info.py
-    info_file = op.join(thispath, "heudiconv", "info.py")
-    with open(info_file) as infofile:
-        exec(infofile.read(), globals(), ldict)
+    from setuptools import setup
 
     try:
         import versioningit  # noqa: F401
@@ -32,51 +30,7 @@ def main():
     else:
         kwargs = {}
 
-    def findsome(subdir, extensions):
-        """Find files under subdir having specified extensions
-
-        Leading directory (datalad) gets stripped
-        """
-        return [
-            f.split(op.sep, 1)[1]
-            for f in findall(subdir)
-            if op.splitext(f)[-1].lstrip(".") in extensions
-        ]
-
-    # Only recentish versions of find_packages support include
-    # heudiconv_pkgs = find_packages('.', include=['heudiconv*'])
-    # so we will filter manually for maximal compatibility
-    heudiconv_pkgs = [pkg for pkg in find_packages(".") if pkg.startswith("heudiconv")]
-
-    setup(
-        name=ldict["__packagename__"],
-        author=ldict["__author__"],
-        # author_email="team@???",
-        description=ldict["__description__"],
-        long_description=ldict["__longdesc__"],
-        license=ldict["__license__"],
-        classifiers=ldict["CLASSIFIERS"],
-        packages=heudiconv_pkgs,
-        entry_points={
-            "console_scripts": [
-                "heudiconv=heudiconv.cli.run:main",
-                "heudiconv_monitor=heudiconv.cli.monitor:main",
-            ]
-        },
-        python_requires=ldict["PYTHON_REQUIRES"],
-        install_requires=ldict["REQUIRES"],
-        extras_require=ldict["EXTRA_REQUIRES"],
-        package_data={
-            "heudiconv": ["py.typed"],
-            "heudiconv.tests": [
-                op.join("data", "*.dcm"),
-                op.join("data", "*", "*.dcm"),
-                op.join("data", "*", "*", "*.dcm"),
-                op.join("data", "sample_nifti*"),
-            ],
-        },
-        **kwargs,
-    )
+    setup(**kwargs)
 
 
 if __name__ == "__main__":
