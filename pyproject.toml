@@ -10,9 +10,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "heudiconv"
 description = "Heuristic DICOM Converter"
-readme = { text = """Convert DICOM dirs based on heuristic info - HeuDiConv
-uses the dcmstack package and dcm2niix tool to convert DICOM directories or
-tarballs into collections of NIfTI files following pre-defined heuristic(s).""", content-type = "text/plain" }
+# README.rst, with its relative links absolutized -- see setup.py
 authors = [
     { name = "HeuDiConv team and contributors" },
 ]
@@ -40,7 +38,7 @@ dependencies = [
     "nipype >=1.2.3",
     "pydicom >= 1.0.0",
 ]
-dynamic = ["version"]
+dynamic = ["version", "readme"]
 
 [project.optional-dependencies]
 tests = [
