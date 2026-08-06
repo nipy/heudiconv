@@ -1,7 +1,15 @@
-"""Heuristic demonstrating conversion of the Multi-Echo sequences.
+"""Heuristic demonstrating conversion of a multi-orientation localizer.
 
-It only cares about converting sequences which have _ME_ in their
+It only cares about converting sequences which have "localizer" in their
 series_description and outputs to BIDS.
+
+Note that BIDS has no suffix for localizers/scouts, so the `_localizer`
+name used below is *not* BIDS-compliant -- this heuristic exists to
+exercise the `chunk-` naming of the multiple orientations dcm2niix
+produces for such a series, not to serve as a model for what to do with
+localizers (`reproin` converts them to DICOMs only).  It also makes no
+attempt to tell two localizer series apart, so it is only usable on a
+session which has a single one.
 """
 
 from __future__ import annotations

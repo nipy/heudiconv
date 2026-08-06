@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from glob import glob
+import json
 import os.path as op
 from pathlib import Path
 from typing import Optional
@@ -144,18 +145,51 @@ def test_update_uncombined_name() -> None:
         update_uncombined_name(metadata, base_fn, set(channel_names))  # type: ignore[arg-type]
 
 
-def test_update_multiorient_name() -> None:
+SAG = "[0, 1, 0, 0, 0, -1]"
+COR = "[1, 0, 0, 0, 0, -1]"
+TRA = "[1, 0, 0, 0, 1, 0]"
+# as encountered in file order, i.e. *not* sorted -- COR sorts before TRA
+THREE_PLANES = [SAG, TRA, COR]
+
+
+@pytest.mark.parametrize(
+    "iop,base_fn,expected",
+    [
+        # index is the position of the orientation within the series, so the
+        # last-listed orientation is chunk-3 even though it sorts second
+        (SAG, "sub-X_task-Z_run-01_bold", "sub-X_task-Z_run-01_chunk-1_bold"),
+        (TRA, "sub-X_task-Z_run-01_bold", "sub-X_task-Z_run-01_chunk-2_bold"),
+        (COR, "sub-X_task-Z_run-01_bold", "sub-X_task-Z_run-01_chunk-3_bold"),
+        # chunk- goes after part- and heudiconv's own ch-, per the entity table
+        (SAG, "sub-X_acq-A_part-mag_T2starw", "sub-X_acq-A_part-mag_chunk-1_T2starw"),
+        (SAG, "sub-X_ch-03_T1w", "sub-X_ch-03_chunk-1_T1w"),
+        # names we cannot take apart are handed back untouched, so that the
+        # caller's fallback applies instead of the conversion blowing up
+        (SAG, "sub-X_chunk-7_T1w", "sub-X_chunk-7_T1w"),
+        (SAG, "localizer", "localizer"),
+        (SAG, "run-01_T1w", "run-01_T1w"),
+        # reproin's __dup-NN marker must not be mistaken for an entity and eat
+        # the suffix along with it
+        (SAG, "sub-X_task-Z_bold__dup-01", "sub-X_task-Z_chunk-1_bold__dup-01"),
+    ],
+)
+@pytest.mark.ai_generated
+def test_update_multiorient_name(iop: str, base_fn: str, expected: str) -> None:
     """Unit testing for heudiconv.convert.update_multiorient_name(), which updates
     filenames with the chunk field if appropriate.
     """
-    # Standard name update
-    base_fn = "sub-X_ses-Y_task-Z_run-01_bold"
-    metadata = {"ImageOrientationPatientDICOM": [0, 1, 0, 0, 0, -1]}
-    out_fn_true = "sub-X_ses-Y_task-Z_run-01_chunk-1_bold"
-    out_fn_test = update_multiorient_name(
-        metadata, base_fn, set(["[0, 1, 0, 0, 0, -1]"])
+    metadata = {"ImageOrientationPatientDICOM": json.loads(iop)}
+    assert update_multiorient_name(metadata, base_fn, THREE_PLANES) == expected
+
+
+@pytest.mark.ai_generated
+def test_update_multiorient_name_no_orientation() -> None:
+    """A sidecar without an orientation while its siblings have one used to
+    raise a KeyError; it should just be left alone."""
+    assert (
+        update_multiorient_name({}, "sub-X_task-Z_bold", THREE_PLANES)
+        == "sub-X_task-Z_bold"
     )
-    assert out_fn_test == out_fn_true
 
 
 def test_b0dwi_for_fmap(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
