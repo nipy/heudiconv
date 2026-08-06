@@ -25,6 +25,9 @@ jobs:
           # so we do not duplicate work with release workflow.
           git describe --match 'v[0-9]*' | grep -q -e - && \
               docker build \
+                --label org.opencontainers.image.version="$(git describe --match 'v[0-9]*' | sed -e 's,^v,,g')" \
+                --label org.opencontainers.image.revision="$(git rev-parse HEAD)" \
+                --label org.opencontainers.image.source=https://github.com/nipy/heudiconv \
                 -t nipy/heudiconv:master \
                 -t nipy/heudiconv:unstable \
                 .
