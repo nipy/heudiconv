@@ -525,11 +525,21 @@ def update_uncombined_name(
 def update_multiorient_name(
     metadata: dict[str, Any],
     filename: str,
-    iops: set,
+    iops: list[str],
 ) -> str:
     """
     Insert `_chunk-<num>` entity into filename if data are from a sequence
     that outputs multiple FoV (localizer, multi-FoV bold)
+
+    The index is the position of this file's orientation within ``iops``, which
+    lists the distinct orientations of the series in the order dcm2niix emitted
+    them.  Indexing the *orientations* rather than the files means that files
+    which share an orientation share a chunk, which matters when the series is
+    additionally split by echo or by magnitude/phase.  Taking the order from the
+    files rather than from the orientation values themselves keeps the index
+    stable: sorting the orientations would give an order which is both arbitrary
+    and liable to change between subjects, since a slightly different obliquity
+    would reshuffle it.
 
     Parameters
     ----------
@@ -537,24 +547,42 @@ def update_multiorient_name(
         Scan metadata dictionary from BIDS sidecar file.
     filename : str
         Incoming filename
+    iops : list of str
+        The distinct ``ImageOrientationPatientDICOM`` values of the series, as
+        strings, in the order in which they were encountered.
 
     Returns
     -------
     filename : str
         Updated filename with chunk entity added, if appropriate.
     """
-    bids_file = BIDSFile.parse(filename)
-    if bids_file["chunk"]:
+    iop = metadata.get("ImageOrientationPatientDICOM")
+    if iop is None or str(iop) not in iops:
         lgr.warning(
-            "Not embedding multi-orientation information as `%r` already uses chunk- parameter.",
+            "Not embedding multi-orientation information into %r: it has no "
+            "ImageOrientationPatientDICOM while other files of the series do.",
             filename,
         )
         return filename
-    iops_list = sorted(list(iops))
-    bids_file["chunk"] = str(
-        iops_list.index(str(metadata["ImageOrientationPatientDICOM"])) + 1
-    )
-    return str(bids_file)
+    try:
+        bids_file = BIDSFile.parse(filename)
+        if bids_file["chunk"]:
+            lgr.warning(
+                "Not embedding multi-orientation information as %r already uses "
+                "the chunk- entity; falling back to appending an index to the "
+                "suffix, which is not BIDS-compliant.",
+                filename,
+            )
+            return filename
+        bids_file["chunk"] = str(iops.index(str(iop)) + 1)
+        return str(bids_file)
+    except ValueError as exc:
+        # not a name we can take apart (no entities at all, or no sub-);
+        # leave it to the caller's fallback rather than aborting the conversion
+        lgr.warning(
+            "Not embedding multi-orientation information into %r: %s", filename, exc
+        )
+        return filename
 
 
 def convert(
@@ -1065,7 +1093,9 @@ def save_converted_files(
         echo_times: set[float] = set()
         channel_names: set[str] = set()
         image_types: set[str] = set()
-        iops: set[str] = set()
+        # the distinct image orientations, kept in the order dcm2niix emitted
+        # them rather than sorted -- see update_multiorient_name
+        iops: list[str] = []
         for metadata in bids_metas:
             if not metadata:
                 continue
@@ -1082,9 +1112,12 @@ def save_converted_files(
             except KeyError:
                 pass
             try:
-                iops.add(str(metadata["ImageOrientationPatientDICOM"]))
+                iop = str(metadata["ImageOrientationPatientDICOM"])
             except KeyError:
                 pass
+            else:
+                if iop not in iops:
+                    iops.append(iop)
 
         is_multiecho = (
             len(set(filter(bool, echo_times))) > 1
