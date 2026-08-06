@@ -29,11 +29,13 @@ def setup_py() -> ModuleType:
     return mod
 
 
+@pytest.mark.ai_generated
 def test_setup_doctests(setup_py: ModuleType) -> None:
     results = doctest.testmod(setup_py)
     assert results.failed == 0
 
 
+@pytest.mark.ai_generated
 def test_readme_is_absolutized(setup_py: ModuleType) -> None:
     """No link should be left relative in the rendered long description"""
     rendered = setup_py.absolutize_links((REPO_ROOT / "README.rst").read_text())

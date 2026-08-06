@@ -55,6 +55,8 @@ def absolutize_links(text, repo_url=REPO_URL, ref=REPO_REF):
     '.. image:: https://raw.githubusercontent.com/nipy/heudiconv/master/figs/workflow.png'
     >>> absolutize_links("see the `guide <CONTRIBUTING.rst>`_.")
     'see the `guide <https://github.com/nipy/heudiconv/blob/master/CONTRIBUTING.rst>`_.'
+    >>> absolutize_links("see `docs <./docs>`_.")  # the ./ prefix we tend to use
+    'see `docs <https://github.com/nipy/heudiconv/blob/master/docs>`_.'
     >>> absolutize_links(".. image:: https://example.com/badge.svg")
     '.. image:: https://example.com/badge.svg'
     """
@@ -63,7 +65,9 @@ def absolutize_links(text, repo_url=REPO_URL, ref=REPO_REF):
     )
     for regex, is_image in LINK_RES:
         base = f"{raw_url}/{ref}/" if is_image else f"{repo_url}/blob/{ref}/"
-        text = re.sub(regex, lambda m, base=base: m[1] + base + m[2], text)
+        text = re.sub(
+            regex, lambda m, base=base: m[1] + base + re.sub(r"^\./", "", m[2]), text
+        )
     return text
 
 

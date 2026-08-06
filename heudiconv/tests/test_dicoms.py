@@ -16,6 +16,7 @@ from heudiconv.dicoms import (
     dw,
     embed_dicom_and_nifti_metadata,
     get_datetime_from_dcm,
+    get_datetime_strings_from_dcm,
     get_reproducible_int,
     group_dicoms_into_seqinfos,
     parse_private_csa_header,
@@ -187,6 +188,107 @@ def test_create_seqinfo(
     mw = dw.wrapper_from_file(dcmfile)
     seqinfo = create_seqinfo(mw, [dcmfile], op.basename(dcmfile))
     assert seqinfo.sequence_name
+
+
+@pytest.mark.ai_generated
+def test_get_datetime_strings_from_dcm_acq_date_time() -> None:
+    # AcquisitionDate/AcquisitionTime are taken as is whenever both are present
+    typical_dcm = dcm.dcmread(
+        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+    )
+    assert get_datetime_strings_from_dcm(typical_dcm) == (
+        typical_dcm.get("AcquisitionDate"),
+        typical_dcm.get("AcquisitionTime"),
+    )
+
+
+@pytest.mark.ai_generated
+def test_get_datetime_strings_from_dcm_acq_datetime() -> None:
+    # https://github.com/nipy/heudiconv/issues/537 -- some DICOMs (e.g. XA30
+    # enhanced ones) have only AcquisitionDateTime, and we should still be able
+    # to provide date and time
+    XA30_enhanced_dcm = dcm.dcmread(
+        op.join(
+            TESTS_DATA_PATH,
+            "MRI_102TD_PHA_S.MR.Chen_Matthews_1.3.1.2022.11.16.15.50.20.357.31204541.dcm",
+        ),
+        stop_before_pixels=True,
+    )
+    assert "AcquisitionDate" not in XA30_enhanced_dcm
+    assert "AcquisitionTime" not in XA30_enhanced_dcm
+
+    date, time = get_datetime_strings_from_dcm(XA30_enhanced_dcm)
+    acq_datetime = XA30_enhanced_dcm.get("AcquisitionDateTime")
+    assert date == acq_datetime[:8]
+    assert date is not None and time is not None
+    assert datetime.datetime.strptime(
+        date + time, "%Y%m%d%H%M%S.%f"
+    ) == datetime.datetime.strptime(acq_datetime, "%Y%m%d%H%M%S.%f")
+
+
+@pytest.mark.ai_generated
+def test_get_datetime_strings_from_dcm_series_date_time() -> None:
+    # fall back to SeriesDate/SeriesTime if no acquisition date/time/datetime
+    XA30_enhanced_dcm = dcm.dcmread(
+        op.join(
+            TESTS_DATA_PATH,
+            "MRI_102TD_PHA_S.MR.Chen_Matthews_1.3.1.2022.11.16.15.50.20.357.31204541.dcm",
+        ),
+        stop_before_pixels=True,
+    )
+    del XA30_enhanced_dcm.AcquisitionDateTime
+    date, time = get_datetime_strings_from_dcm(XA30_enhanced_dcm)
+    assert date == XA30_enhanced_dcm.get("SeriesDate")
+    assert date is not None and time is not None
+    assert datetime.datetime.strptime(
+        date + time, "%Y%m%d%H%M%S.%f"
+    ) == datetime.datetime.strptime(
+        XA30_enhanced_dcm.get("SeriesDate") + XA30_enhanced_dcm.get("SeriesTime"),
+        "%Y%m%d%H%M%S.%f",
+    )
+
+
+@pytest.mark.ai_generated
+def test_get_datetime_strings_from_dcm_wo_dt() -> None:
+    # no date/time information whatsoever (e.g. after anonymization) -- no error
+    XA30_enhanced_dcm = dcm.dcmread(
+        op.join(
+            TESTS_DATA_PATH,
+            "MRI_102TD_PHA_S.MR.Chen_Matthews_1.3.1.2022.11.16.15.50.20.357.31204541.dcm",
+        ),
+        stop_before_pixels=True,
+    )
+    del XA30_enhanced_dcm.AcquisitionDateTime
+    del XA30_enhanced_dcm.SeriesDate
+    del XA30_enhanced_dcm.SeriesTime
+    assert get_datetime_strings_from_dcm(XA30_enhanced_dcm) == (None, None)
+
+
+@pytest.mark.ai_generated
+def test_get_datetime_strings_from_dcm_partial() -> None:
+    # if only a date is known and nothing else -- return it with time being None
+    typical_dcm = dcm.dcmread(
+        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+    )
+    acq_date = typical_dcm.get("AcquisitionDate")
+    del typical_dcm.AcquisitionTime
+    del typical_dcm.SeriesDate
+    del typical_dcm.SeriesTime
+    assert get_datetime_strings_from_dcm(typical_dcm) == (acq_date, None)
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize("dcmfile", TEST_DICOM_PATHS)
+def test_create_seqinfo_date_time(dcmfile: str) -> None:
+    # all our test DICOMs do carry some date/time information, and seqinfo
+    # should expose it regardless of which tags it comes from
+    mw = dw.wrapper_from_file(dcmfile)
+    seqinfo = create_seqinfo(mw, [dcmfile], op.basename(dcmfile))
+    assert seqinfo.date is not None
+    assert seqinfo.time is not None
+    assert datetime.datetime.strptime(
+        seqinfo.date + seqinfo.time, "%Y%m%d%H%M%S.%f"
+    ) == get_datetime_from_dcm(mw.dcm_data)
 
 
 @pytest.mark.parametrize("dcmfile", TEST_DICOM_PATHS)
