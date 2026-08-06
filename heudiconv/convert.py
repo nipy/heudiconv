@@ -532,14 +532,15 @@ def update_multiorient_name(
     that outputs multiple FoV (localizer, multi-FoV bold)
 
     The index is the position of this file's orientation within ``iops``, which
-    lists the distinct orientations of the series in the order dcm2niix emitted
+    lists the distinct orientations of the series in the order in which the
+    files carrying them are converted, i.e. sorted by the name dcm2niix gave
     them.  Indexing the *orientations* rather than the files means that files
     which share an orientation share a chunk, which matters when the series is
-    additionally split by echo or by magnitude/phase.  Taking the order from the
-    files rather than from the orientation values themselves keeps the index
-    stable: sorting the orientations would give an order which is both arbitrary
-    and liable to change between subjects, since a slightly different obliquity
-    would reshuffle it.
+    additionally split by echo or by magnitude/phase.  Taking the order from
+    the files rather than from the orientation values themselves keeps the
+    index stable: sorting the orientations would give an order which is both
+    arbitrary and liable to change between subjects, since a slightly different
+    obliquity would reshuffle it.
 
     Parameters
     ----------
@@ -557,13 +558,22 @@ def update_multiorient_name(
         Updated filename with chunk entity added, if appropriate.
     """
     iop = metadata.get("ImageOrientationPatientDICOM")
-    if iop is None or str(iop) not in iops:
+    if iop is None:
         lgr.warning(
             "Not embedding multi-orientation information into %r: it has no "
             "ImageOrientationPatientDICOM while other files of the series do.",
             filename,
         )
         return filename
+    if str(iop) not in iops:  # should not happen: iops comes from this metadata
+        lgr.warning(
+            "Not embedding multi-orientation information into %r: its "
+            "orientation is not among the %d collected for the series.",
+            filename,
+            len(iops),
+        )
+        return filename
+    chunk = str(iops.index(str(iop)) + 1)
     try:
         bids_file = BIDSFile.parse(filename)
         if bids_file["chunk"]:
@@ -574,7 +584,7 @@ def update_multiorient_name(
                 filename,
             )
             return filename
-        bids_file["chunk"] = str(iops.index(str(iop)) + 1)
+        bids_file["chunk"] = chunk
         return str(bids_file)
     except ValueError as exc:
         # not a name we can take apart (no entities at all, or no sub-);
@@ -1132,7 +1142,12 @@ def save_converted_files(
         echo_times_lst = sorted(echo_times)  # also converts to list
         channel_names_lst = sorted(channel_names)  # also converts to list
 
-        ### Loop through the bids_files, set the output name and save files
+        ### Loop through the bids_files and set the output names.  We do not
+        ### save anything yet: the renaming below is only of use if it gives
+        ### every file a distinct name, and we cannot tell until we have them
+        ### all (dcm2niix splits a series on more criteria than we handle, so
+        ### e.g. two of the images can well share an orientation).
+        renamed: list[tuple[str, str, Optional[str]]] = []
         for fl, suffix, bids_file, bids_meta in zip(
             res_files, suffixes, bids_files, bids_metas
         ):
@@ -1170,6 +1185,27 @@ def save_converted_files(
             if this_prefix_basename == prefix_basename:
                 this_prefix_basename += suffix
 
+            renamed.append((fl, this_prefix_basename, bids_file))
+
+        # If the renaming did not manage to tell the files apart, we would
+        # overwrite (or, with overwrite=False, fail on) our own output, so use
+        # the plain numeric suffix for all of them instead.
+        basenames = [basename for _, basename, _ in renamed]
+        if len(set(basenames)) != len(basenames):
+            lgr.warning(
+                "Renaming of the %d files converted for %s did not give them "
+                "unique names; falling back to appending an index to the suffix, "
+                "which is not BIDS-compliant.",
+                len(basenames),
+                prefix_basename,
+            )
+            renamed = [
+                (fl, prefix_basename + suffix, bids_file)
+                for (fl, _, bids_file), suffix in zip(renamed, suffixes)
+            ]
+
+        ### Now save the files under the names we settled on
+        for fl, this_prefix_basename, bids_file in renamed:
             # Finally, form the outname by stitching the directory and outtype:
             outname = op.join(prefix_dirname, this_prefix_basename)
             outfile = outname + "." + outtype
