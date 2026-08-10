@@ -102,7 +102,7 @@ Development environment
 
 We support Python 3 only (>= 3.9), and test against all Python versions from 3.9 through 3.13.
 
-Dependencies which you will need are listed in `heudiconv/info.py <./heudiconv/info.py>`_.
+Dependencies which you will need are listed in `pyproject.toml <./pyproject.toml>`_.
 Note that you will likely have these will already be available on your system if you used a
 package manager (e.g. Debian's ``apt-get``, Gentoo's ``emerge``, or simply PIP) to install the
 software.

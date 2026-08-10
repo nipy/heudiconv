@@ -3,7 +3,6 @@
 set -eu
 
 thisd=$(dirname $0)
-VER=$(grep -Po '(?<=^__version__ = ).*' $thisd/../heudiconv/info.py | sed 's/"//g')
 
 image="kaczmarj/neurodocker:0.9.1"
 

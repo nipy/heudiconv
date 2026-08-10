@@ -1,10 +1,80 @@
 [build-system]
 requires = [
-    "setuptools >= 46.4.0",
+    # 77.0.3 is the first version fully supporting PEP 639 (SPDX license
+    # expressions and license-files) which we use below
+    "setuptools >= 77.0.3",
     "versioningit ~= 2.3",
-    "wheel ~= 0.32"
 ]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "heudiconv"
+description = "Heuristic DICOM Converter"
+# README.rst, with its relative links absolutized -- see setup.py
+authors = [
+    { name = "HeuDiConv team and contributors" },
+]
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+    "Typing :: Typed",
+]
+requires-python = ">=3.9"
+dependencies = [
+    # not usable in some use cases since might be just a downloader, not binary
+    # "dcm2niix",
+    "dcmstack>=0.8",
+    "etelemetry",
+    "filelock>=3.0.12",
+    "nibabel>=5.3.1",
+    "nipype >=1.2.3",
+    "pydicom >= 1.0.0",
+]
+dynamic = ["version", "readme"]
+
+[project.optional-dependencies]
+tests = [
+    "pytest",
+    "tinydb",
+    "inotify",
+]
+extras = [
+    "duecredit",  # optional dependency
+]
+# Keep the version in sync with MIN_DATALAD_VERSION in heudiconv/info.py
+datalad = ["datalad >=0.13.0"]
+all = ["heudiconv[tests,extras,datalad]"]
+
+[project.scripts]
+heudiconv = "heudiconv.cli.run:main"
+heudiconv_monitor = "heudiconv.cli.monitor:main"
+
+[project.urls]
+Homepage = "https://github.com/nipy/heudiconv"
+Documentation = "https://heudiconv.readthedocs.io"
+"Source Code" = "https://github.com/nipy/heudiconv"
+"Bug Tracker" = "https://github.com/nipy/heudiconv/issues"
+Changelog = "https://github.com/nipy/heudiconv/blob/master/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+include = ["heudiconv*"]
+
+[tool.setuptools.package-data]
+heudiconv = ["py.typed"]
+"heudiconv.tests" = [
+    "data/*.dcm",
+    "data/*/*.dcm",
+    "data/*/*/*.dcm",
+    "data/sample_nifti*",
+]
 
 [tool.versioningit.write]
 file = "heudiconv/_version.py"

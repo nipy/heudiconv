@@ -69,11 +69,15 @@ jobs:
       - name: Build Docker images
         if: steps.auto-version.outputs.version != ''
         run: |
+          version="$(git describe | sed -e 's,^v,,g')"
           docker build \
+            --label org.opencontainers.image.version="$version" \
+            --label org.opencontainers.image.revision="$(git rev-parse HEAD)" \
+            --label org.opencontainers.image.source=https://github.com/nipy/heudiconv \
             -t nipy/heudiconv:master \
             -t nipy/heudiconv:unstable \
             -t nipy/heudiconv:latest \
-            -t nipy/heudiconv:"$(git describe | sed -e 's,^v,,g')" \
+            -t nipy/heudiconv:"$version" \
             .
 
       - name: Push Docker images
