@@ -71,7 +71,7 @@ def absolutize_links(text, repo_url=REPO_URL, ref=REPO_REF):
     return text
 
 
-def main():
+def main():  # pragma: no cover -- runs at build time, not under the test suite
     from setuptools import setup
 
     with open(op.join(op.dirname(__file__), "README.rst")) as f:
@@ -95,5 +95,5 @@ def main():
     setup(**kwargs)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()
