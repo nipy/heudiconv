@@ -1,13 +1,18 @@
-"""Test functions in heudiconv.convert module.
-"""
+"""Test functions in heudiconv.convert module."""
+
 from __future__ import annotations
 
 from glob import glob
 import os.path as op
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Optional
+from unittest.mock import Mock
 
+import nibabel as nib
+import numpy as np
 import pytest
+from nipype.interfaces.base import Undefined
 
 from heudiconv.bids import BIDSError
 from heudiconv.cli.run import main as runner
@@ -301,3 +306,156 @@ def test_bvals_are_zero() -> None:
     assert not bvals_are_zero(non_zero_bvals)
     assert bvals_are_zero([zero_bvals, zero_bvals])
     assert not bvals_are_zero([non_zero_bvals, zero_bvals])
+
+
+def test_recompress(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that uncompressed niftis from dcm2niix are recompressed to gzip files."""
+
+    def mock_nipype_convert(
+        _item_dicoms: list[str],
+        prefix: str,
+        _with_prov: bool,
+        _bids_options: Optional[str],
+        _tmpdir: str,
+        _dcmconfig: Optional[str] = None,
+    ) -> tuple[Mock, Optional[str]]:
+        """
+        Fake nipype_convert to "produce" a mixture of compressed and
+        uncompressed nifti files (simulating dcm2niix behavior when
+        some files are >4GB and fail to compress).
+        """
+        prefix_dir = op.dirname(prefix)
+        Path(prefix_dir).mkdir(parents=True, exist_ok=True)
+
+        nii_file = f"{prefix}_1.nii"
+        niigz_file = f"{prefix}_2.nii.gz"
+
+        # Create minimal valid NIfTI files (recompress_failed needs valid NIfTI to load)
+        data = np.zeros((2, 3, 4), dtype=np.int16)
+        affine = np.eye(4)
+        img = nib.Nifti1Image(data, affine)
+        nib.save(img, nii_file)
+        nib.save(img, niigz_file)
+
+        # Create BIDS json files
+        json_files = []
+        for i in [1, 2]:
+            json_f = f"{prefix}_{i}.json"
+            Path(json_f).write_text("{}")
+            json_files.append(json_f)
+
+        result = Mock()
+        result.outputs = SimpleNamespace(
+            converted_files=[nii_file, niigz_file],
+            bids=json_files,
+            bvecs=Undefined,
+            bvals=Undefined,
+        )
+        return result, None
+
+    monkeypatch.setattr(heudiconv.convert, "nipype_convert", mock_nipype_convert)
+
+    outdir = tmp_path / "output"
+    outdir.mkdir()
+
+    prefix = str(outdir / "sub-test" / "func" / "sub-test_task-rest_bold")
+    items: list[tuple[str, tuple[str, ...], list[str]]] = [
+        (prefix, ("nii.gz",), ["fake_dicom.dcm"])
+    ]
+
+    # Call convert - should trigger recompress_failed for .nii files
+    heudiconv.convert.convert(
+        items,
+        converter="dcm2niix",
+        scaninfo_suffix=".json",
+        custom_callable=None,
+        populate_intended_for_opts=None,
+        with_prov=False,
+        bids_options=None,
+        outdir=str(outdir),
+        min_meta=True,
+        overwrite=False,
+    )
+
+    # Verify all output files are gzip-compressed
+    output_files = list((outdir / "sub-test" / "func").glob("*.nii.gz"))
+    assert len(output_files) == 2, f"Expected 2 output files, got {len(output_files)}"
+
+    for nii_gz in output_files:
+        with open(nii_gz, "rb") as f:
+            magic = f.read(2)
+            assert magic == b"\x1f\x8b", f"Output {nii_gz} is not gzip-compressed"
+
+
+def test_recompress_truncated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that recompress_failed raises RuntimeError for truncated/corrupted nifti files."""
+
+    def mock_nipype_convert(
+        _item_dicoms: list[str],
+        prefix: str,
+        _with_prov: bool,
+        _bids_options: Optional[str],
+        _tmpdir: str,
+        _dcmconfig: Optional[str] = None,
+    ) -> tuple[Mock, Optional[str]]:
+        """
+        Fake nipype_convert to produce a truncated uncompressed nifti file
+        (simulating incomplete write or corrupted file).
+        """
+        prefix_dir = op.dirname(prefix)
+        Path(prefix_dir).mkdir(parents=True, exist_ok=True)
+
+        nii_file = f"{prefix}_1.nii"
+
+        # Create a valid NIfTI first, then truncate it
+        data = np.zeros((2, 3, 4), dtype=np.int16)
+        affine = np.eye(4)
+        img = nib.Nifti1Image(data, affine)
+        nib.save(img, nii_file)
+
+        # Truncate the file to simulate incomplete write (only keep header, corrupt the data)
+        with open(nii_file, "rb") as f:
+            partial_data = f.read(
+                352
+            )  # NIfTI-1 header is 348 bytes, keep just a bit more
+
+        with open(nii_file, "wb") as f:
+            f.write(partial_data)
+
+        # Create BIDS json file
+        json_f = f"{prefix}_1.json"
+        Path(json_f).write_text("{}")
+
+        result = Mock()
+        result.outputs = SimpleNamespace(
+            converted_files=[nii_file],
+            bids=[json_f],
+            bvecs=Undefined,
+            bvals=Undefined,
+        )
+        return result, None
+
+    monkeypatch.setattr(heudiconv.convert, "nipype_convert", mock_nipype_convert)
+
+    outdir = tmp_path / "output"
+    outdir.mkdir()
+
+    prefix = str(outdir / "sub-test" / "func" / "sub-test_task-rest_bold")
+    items: list[tuple[str, tuple[str, ...], list[str]]] = [
+        (prefix, ("nii.gz",), ["fake_dicom.dcm"])
+    ]
+
+    # Call convert - should raise RuntimeError when recompress_failed encounters truncated file
+    with pytest.raises(RuntimeError, match="Error recompressing"):
+        heudiconv.convert.convert(
+            items,
+            converter="dcm2niix",
+            scaninfo_suffix=".json",
+            custom_callable=None,
+            populate_intended_for_opts=None,
+            with_prov=False,
+            bids_options=None,
+            outdir=str(outdir),
+            min_meta=True,
+            overwrite=False,
+        )
