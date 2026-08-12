@@ -20,6 +20,7 @@ from nipype.interfaces.base import TraitListObject
 from .bids import (
     BIDS_VERSION,
     BIDSError,
+    BIDSFile,
     add_participant_record,
     populate_bids_templates,
     populate_intended_for,
@@ -519,6 +520,41 @@ def update_uncombined_name(
             filename = filename.replace(label, "_ch-%s%s" % (channel_number, label))
             break
     return filename
+
+
+def update_multiorient_name(
+    metadata: dict[str, Any],
+    filename: str,
+    iops: set,
+) -> str:
+    """
+    Insert `_chunk-<num>` entity into filename if data are from a sequence
+    that outputs multiple FoV (localizer, multi-FoV bold)
+
+    Parameters
+    ----------
+    metadata : dict
+        Scan metadata dictionary from BIDS sidecar file.
+    filename : str
+        Incoming filename
+
+    Returns
+    -------
+    filename : str
+        Updated filename with chunk entity added, if appropriate.
+    """
+    bids_file = BIDSFile.parse(filename)
+    if bids_file["chunk"]:
+        lgr.warning(
+            "Not embedding multi-orientation information as `%r` already uses chunk- parameter.",
+            filename,
+        )
+        return filename
+    iops_list = sorted(list(iops))
+    bids_file["chunk"] = str(
+        iops_list.index(str(metadata["ImageOrientationPatientDICOM"])) + 1
+    )
+    return str(bids_file)
 
 
 def convert(
@@ -1029,6 +1065,7 @@ def save_converted_files(
         echo_times: set[float] = set()
         channel_names: set[str] = set()
         image_types: set[str] = set()
+        iops: set[str] = set()
         for metadata in bids_metas:
             if not metadata:
                 continue
@@ -1044,6 +1081,10 @@ def save_converted_files(
                 image_types.update(metadata["ImageType"])
             except KeyError:
                 pass
+            try:
+                iops.add(str(metadata["ImageOrientationPatientDICOM"]))
+            except KeyError:
+                pass
 
         is_multiecho = (
             len(set(filter(bool, echo_times))) > 1
@@ -1054,6 +1095,7 @@ def save_converted_files(
         is_complex = (
             "M" in image_types and "P" in image_types
         )  # Determine if data are complex (magnitude + phase)
+        is_multiorient = len(iops) > 1
         echo_times_lst = sorted(echo_times)  # also converts to list
         channel_names_lst = sorted(channel_names)  # also converts to list
 
@@ -1082,6 +1124,11 @@ def save_converted_files(
                 if is_uncombined:
                     this_prefix_basename = update_uncombined_name(
                         bids_meta, this_prefix_basename, channel_names_lst
+                    )
+
+                if is_multiorient:
+                    this_prefix_basename = update_multiorient_name(
+                        bids_meta, this_prefix_basename, iops
                     )
 
             # Fallback option:
