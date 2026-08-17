@@ -5,6 +5,7 @@ set -eu
 thisd=$(dirname $0)
 
 image="kaczmarj/neurodocker:0.9.1"
+dcm2niix_version="v1.0.20260724"
 
 if hash podman; then
     OCI_BINARY=podman
@@ -19,7 +20,7 @@ ${OCI_BINARY:-docker} run --rm $image generate docker \
     --base-image neurodebian:bookworm \
     --pkg-manager apt \
     --dcm2niix \
-        version=v1.0.20240202 \
+        version="${dcm2niix_version}" \
         method=source \
         cmake_opts="-DZLIB_IMPLEMENTATION=Cloudflare -DUSE_JPEGLS=ON -DUSE_OPENJPEG=ON" \
     --install \
