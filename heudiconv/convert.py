@@ -47,6 +47,7 @@ from .utils import (
     set_readonly,
     treat_infofile,
     write_config,
+    has_deprecated_seriesid,
 )
 
 if TYPE_CHECKING:
@@ -171,7 +172,8 @@ def prep_conversion(
     # if conversion table(s) do not exist -- we need to prepare them
     # (the *prepare* stage in https://github.com/nipy/heudiconv/issues/134)
     # if overwrite - recalculate this anyways
-    reuse_conversion_table = op.exists(edit_file)
+    # MD: a check for the deprecated series_id is added here to avoid reusing the conversion table
+    reuse_conversion_table = op.exists(edit_file) and not has_deprecated_seriesid(edit_file)
     # We also might need to redo it if changes in the heuristic file
     # detected
     # ref: https://github.com/nipy/heudiconv/issues/84#issuecomment-330048609
