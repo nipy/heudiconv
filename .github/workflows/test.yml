@@ -1,11 +1,18 @@
 name: Test
 
+# See the comments in lint.yml
 on:
   pull_request:
   push:
+    branches:
+      - master
   schedule:
     # run weekly to ensure that we are still good
     - cron: '1 2 * * 3'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   test:

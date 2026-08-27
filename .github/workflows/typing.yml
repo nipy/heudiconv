@@ -1,8 +1,15 @@
 name: Type-check
 
+# See the comments in lint.yml
 on:
-  - push
-  - pull_request
+  push:
+    branches:
+      - master
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   typing:
