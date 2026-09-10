@@ -5,6 +5,7 @@ from glob import glob
 import json
 import os.path as op
 from pathlib import Path
+from typing import Any
 
 import pydicom as dcm
 import pytest
@@ -334,6 +335,7 @@ def test_get_reproducible_int_raises_assertion_wo_dt(tmp_path: Path) -> None:
         get_reproducible_int([str(tmp_path)])
 
 
+@pytest.mark.ai_generated
 @pytest.mark.parametrize("dcmfile", TEST_DICOM_PATHS)
 def test_get_dicom_acquisition_duration_absent(dcmfile: str) -> None:
     # none of our test DICOMs carry AcquisitionDuration-like tags
@@ -341,33 +343,77 @@ def test_get_dicom_acquisition_duration_absent(dcmfile: str) -> None:
     assert get_dicom_acquisition_duration(dcm_data) is None
 
 
-def test_get_dicom_acquisition_duration_standard_tag() -> None:
+# GE private tag block is only recognized under its own private creator, so
+# every case which sets (0019,105A) also sets (0019,0010) accordingly.
+_GE_CREATOR_TAG = (0x0019, 0x0010)
+_GE_DURATION_TAG = (0x0019, 0x105A)
+_GE_CREATOR = "GEMS_ACQU_01"
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "tags,expected",
+    [
+        # standard tag alone
+        pytest.param({(0x0018, 0x9073): ("FD", 12.5)}, 12.5, id="standard"),
+        # GE private tag alone, under its recognized private creator
+        pytest.param(
+            {
+                _GE_CREATOR_TAG: ("LO", _GE_CREATOR),
+                _GE_DURATION_TAG: ("FL", 3.0118515e08),
+            },
+            pytest.approx(301.185, rel=1e-3),
+            id="ge_private",
+        ),
+        # both present -- the standard tag takes precedence
+        pytest.param(
+            {
+                (0x0018, 0x9073): ("FD", 12.5),
+                _GE_CREATOR_TAG: ("LO", _GE_CREATOR),
+                _GE_DURATION_TAG: ("FL", 999e6),
+            },
+            12.5,
+            id="prefers_standard",
+        ),
+    ],
+)
+def test_get_dicom_acquisition_duration(
+    tags: dict[tuple[int, int], tuple[str, Any]], expected: float
+) -> None:
     dcm_data = dcm.dcmread(
         op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
     )
-    dcm_data.add_new((0x0018, 0x9073), "FD", 12.5)
-    assert get_dicom_acquisition_duration(dcm_data) == pytest.approx(12.5)
+    for tag, (vr, value) in tags.items():
+        dcm_data.add_new(tag, vr, value)
+    assert get_dicom_acquisition_duration(dcm_data) == expected
 
 
-def test_get_dicom_acquisition_duration_ge_private_tag() -> None:
+@pytest.mark.ai_generated
+def test_get_dicom_acquisition_duration_ge_tag_wrong_creator() -> None:
+    # private group 0019 is used differently by different vendors -- an
+    # element at the GE offset under an unrelated creator block must not be
+    # mistaken for GE's Acquisition Duration
     dcm_data = dcm.dcmread(
         op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
     )
-    # GE private tag reports duration in microseconds; see
-    # https://github.com/rordenlab/dcm2niix/issues/808
-    dcm_data.add_new((0x0019, 0x105A), "FL", 3.0118515e08)
-    assert get_dicom_acquisition_duration(dcm_data) == pytest.approx(301.185, rel=1e-3)
+    dcm_data.add_new(_GE_CREATOR_TAG, "LO", "SOME_OTHER_VENDOR_01")
+    dcm_data.add_new(_GE_DURATION_TAG, "FL", 3.0118515e08)
+    assert get_dicom_acquisition_duration(dcm_data) is None
 
 
-def test_get_dicom_acquisition_duration_prefers_standard_tag() -> None:
+@pytest.mark.ai_generated
+@pytest.mark.parametrize("value", [0.0, -5.0])
+def test_get_dicom_acquisition_duration_non_positive(value: float) -> None:
+    # e.g. some scanners write AcquisitionDuration = 0 when unpopulated;
+    # that is not a usable duration
     dcm_data = dcm.dcmread(
         op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
     )
-    dcm_data.add_new((0x0018, 0x9073), "FD", 12.5)
-    dcm_data.add_new((0x0019, 0x105A), "FL", 999e6)
-    assert get_dicom_acquisition_duration(dcm_data) == pytest.approx(12.5)
+    dcm_data.add_new((0x0018, 0x9073), "FD", value)
+    assert get_dicom_acquisition_duration(dcm_data) is None
 
 
+@pytest.mark.ai_generated
 def test_estimate_scan_duration_from_times() -> None:
     # 3 DICOMs, ~4.15s apart -- duration is the span plus one more interval
     dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))
@@ -375,34 +421,43 @@ def test_estimate_scan_duration_from_times() -> None:
     assert estimate_scan_duration_from_times(dicom_list) == pytest.approx(12.45)
 
 
+@pytest.mark.ai_generated
 def test_estimate_scan_duration_from_times_single_file() -> None:
     dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))[:1]
     assert estimate_scan_duration_from_times(dicom_list) is None
 
 
+@pytest.mark.ai_generated
 def test_estimate_scan_duration_from_times_wo_dt(tmp_path: Path) -> None:
-    # no usable date/time information (e.g. stripped by anonymization)
-    dcm_data = dcm.dcmread(
-        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
-    )
-    for field in (
-        "AcquisitionDate",
-        "AcquisitionTime",
-        "AcquisitionDateTime",
-        "SeriesDate",
-        "SeriesTime",
-    ):
-        if field in dcm_data:
-            delattr(dcm_data, field)
-    out = tmp_path / "no_dt.dcm"
-    dcm.dcmwrite(str(out), dcm_data)
-    assert estimate_scan_duration_from_times([str(out), str(out)]) is None
+    # no usable date/time information (e.g. stripped by anonymization) --
+    # use two distinct files, so this also rules out the "single unique
+    # timestamp" case rather than just a single-file list
+    outs = []
+    for i in range(2):
+        dcm_data = dcm.dcmread(
+            op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+        )
+        for field in (
+            "AcquisitionDate",
+            "AcquisitionTime",
+            "AcquisitionDateTime",
+            "SeriesDate",
+            "SeriesTime",
+        ):
+            if field in dcm_data:
+                delattr(dcm_data, field)
+        out = tmp_path / f"no_dt_{i}.dcm"
+        dcm.dcmwrite(str(out), dcm_data)
+        outs.append(str(out))
+    assert estimate_scan_duration_from_times(outs) is None
 
 
+@pytest.mark.ai_generated
 def test_get_acquisition_duration_empty() -> None:
     assert get_acquisition_duration([]) is None
 
 
+@pytest.mark.ai_generated
 def test_get_acquisition_duration_prefers_tag(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -421,6 +476,7 @@ def test_get_acquisition_duration_prefers_tag(
     assert get_acquisition_duration([str(out)]) == pytest.approx(12.5)
 
 
+@pytest.mark.ai_generated
 def test_get_acquisition_duration_falls_back_to_times() -> None:
     dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))
     assert get_acquisition_duration(dicom_list) == pytest.approx(12.45)

@@ -18,6 +18,7 @@ import shutil
 import stat
 from subprocess import check_output
 import sys
+import tarfile
 import tempfile
 from time import sleep
 from types import ModuleType
@@ -563,6 +564,45 @@ def clear_temp_dicoms(item_dicoms: list[str]) -> None:
 def file_md5sum(filename: str) -> str:
     with open(filename, "rb") as f:
         return hashlib.md5(f.read()).hexdigest()
+
+
+def tar_extract_filter_kwargs() -> dict[str, str]:
+    """kwargs to pass to a tar-extraction call to guard against unsafe members.
+
+    On Python >= 3.12, ``tarfile``/``shutil.unpack_archive`` accept a
+    ``filter=`` argument controlling which archive members (absolute paths,
+    path traversal, device files, ...) are allowed to be extracted; Python
+    3.14 will make this mandatory by defaulting to the safest filter.  See
+    https://docs.python.org/3/library/tarfile.html#tarfile-extraction-filter
+
+    Returns
+    -------
+    dict
+        ``{"filter": ...}`` on Python >= 3.12 (honoring the
+        ``HEUDICONV_TAR_FILTER`` environment variable as an escape hatch for
+        the rare legitimate archive the default "tar" filter would reject),
+        or ``{}`` on older Pythons (which do not accept the argument).
+    """
+    if sys.version_info >= (3, 12):
+        return {"filter": os.environ.get("HEUDICONV_TAR_FILTER", "tar")}
+    return {}
+
+
+def safe_extract_tar(tarball: str, dest: str) -> None:
+    """Extract a tar-based archive (``.tar``, ``.tar.gz``, ...) into `dest`.
+
+    Thin wrapper around :func:`tarfile.extractall` applying
+    :func:`tar_extract_filter_kwargs` for safety.
+
+    Parameters
+    ----------
+    tarball : str
+        Path to the tar archive.
+    dest : str
+        Destination directory (created by ``tarfile`` as needed).
+    """
+    with tarfile.open(tarball) as tar:
+        tar.extractall(dest, **tar_extract_filter_kwargs())  # type: ignore[arg-type]
 
 
 # Borrowed from DataLad (MIT license), with "archives" functionality commented

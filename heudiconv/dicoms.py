@@ -589,17 +589,26 @@ def get_datetime_strings_from_dcm(
     return datetime_.strftime("%Y%m%d"), datetime_.strftime("%H%M%S.%f")
 
 
-# DICOM tags which report a scan's total acquisition duration directly, and
-# the factor to multiply their value by to get seconds.
-#  - (0018,9073) "Acquisition Duration" is the standard tag, populated mostly
-#    for Enhanced MR/CT multi-frame DICOMs, and already reported in seconds.
-#  - (0019,105A) is a private GE tag reporting the same information (in
-#    microseconds) for classic (per-slice) GE DICOMs.
-#    See https://github.com/rordenlab/dcm2niix/issues/808
-_ACQUISITION_DURATION_TAGS = (
-    ((0x0018, 0x9073), 1.0),
-    ((0x0019, 0x105A), 1e-6),
-)
+# Private GE tag reporting the "Acquisition Duration" (in microseconds) for
+# classic (per-slice) GE DICOMs; see
+# https://github.com/rordenlab/dcm2niix/issues/808
+_GE_ACQUISITION_DURATION_GROUP = 0x0019
+_GE_ACQUISITION_DURATION_OFFSET = 0x5A
+_GE_ACQUISITION_DURATION_CREATOR = "GEMS_ACQU_01"
+
+
+def _as_positive_float(value: Any) -> Optional[float]:
+    """Parse `value` as a float, returning None if unparsable or <= 0.
+
+    A non-positive "duration" is not a usable one (some scanners write
+    ``AcquisitionDuration = 0`` for sequences which do not populate it), so
+    callers can treat None uniformly as "try the next method".
+    """
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
 
 
 def get_dicom_acquisition_duration(dcm_data: dcm.Dataset) -> Optional[float]:
@@ -617,20 +626,32 @@ def get_dicom_acquisition_duration(dcm_data: dcm.Dataset) -> Optional[float]:
 
     Notes
     -----
-    Checks, in order, the tags listed in :data:`_ACQUISITION_DURATION_TAGS`.
+    Checks, in order:
+
+    1. The standard ``AcquisitionDuration`` tag (0018,9073), populated
+       mostly for Enhanced MR/CT multi-frame DICOMs, already in seconds.
+    2. The private GE tag (0019,105A), in microseconds, for classic
+       (per-slice) GE DICOMs.  Since private group 0019 is used differently
+       by different vendors, the private creator block is checked first --
+       a raw ``(0019,105A) in dcm_data`` check alone could pick up an
+       unrelated element from a non-GE DICOM and silently return a bogus
+       "duration".
     """
-    for tag, scale in _ACQUISITION_DURATION_TAGS:
-        if tag in dcm_data and dcm_data[tag].value not in (None, ""):
-            try:
-                return float(dcm_data[tag].value) * scale
-            except (TypeError, ValueError) as exc:
-                lgr.debug(
-                    "Could not parse duration tag %s value %r: %s",
-                    tag,
-                    dcm_data[tag].value,
-                    exc,
-                )
-    return None
+    if (0x0018, 0x9073) in dcm_data:
+        duration = _as_positive_float(dcm_data[(0x0018, 0x9073)].value)
+        if duration is not None:
+            return duration
+
+    try:
+        elem = dcm_data.get_private_item(
+            _GE_ACQUISITION_DURATION_GROUP,
+            _GE_ACQUISITION_DURATION_OFFSET,
+            _GE_ACQUISITION_DURATION_CREATOR,
+        )
+    except KeyError:
+        return None
+    duration = _as_positive_float(elem.value)
+    return duration * 1e-6 if duration is not None else None
 
 
 def estimate_scan_duration_from_times(dicom_list: list[str]) -> Optional[float]:
@@ -661,9 +682,21 @@ def estimate_scan_duration_from_times(dicom_list: list[str]) -> Optional[float]:
         timestamps could be established (e.g., a single-file series, dates/
         times stripped by anonymization, or all files sharing one timestamp).
     """
+    # only parse the handful of tags get_datetime_from_dcm() looks at --
+    # meaningfully faster than a full header parse when scanning every file
+    # of a (possibly large) run
+    datetime_tags = [
+        "AcquisitionDate",
+        "AcquisitionTime",
+        "AcquisitionDateTime",
+        "SeriesDate",
+        "SeriesTime",
+    ]
     timestamps = []
     for fn in dicom_list:
-        dcm_data = dcm.dcmread(fn, stop_before_pixels=True, force=True)
+        dcm_data = dcm.dcmread(
+            fn, stop_before_pixels=True, force=True, specific_tags=datetime_tags
+        )
         dt = get_datetime_from_dcm(dcm_data)
         if dt is not None:
             timestamps.append(dt)

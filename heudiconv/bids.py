@@ -15,7 +15,6 @@ import os
 import os.path as op
 from pathlib import Path
 import re
-import tarfile
 import tempfile
 from typing import Any, Optional
 import warnings
@@ -32,6 +31,7 @@ from .utils import (
     load_json,
     remove_prefix,
     remove_suffix,
+    safe_extract_tar,
     save_json,
     set_readonly,
     strptime_bids,
@@ -511,11 +511,15 @@ def save_scans_key(
     # as I see it, so should have the same subject/session
     subj: Optional[str] = None
     ses: Optional[str] = None
+    # all bids_files of this item share the same source DICOMs, so the row
+    # (including the possibly-expensive `duration` estimation) is the same
+    # for every one of them -- compute it once rather than per file
+    scan_key_row = get_formatted_scans_key_row(item[-1])
     for bids_file in bids_files:
         # get filenames
         f_name = "/".join(bids_file.split("/")[-2:])
         f_name = f_name.replace("json", "nii.gz")
-        rows[f_name] = get_formatted_scans_key_row(item[-1])
+        rows[f_name] = scan_key_row
         subj_, ses_ = find_subj_ses(f_name)
         if not subj_:
             lgr.warning(
@@ -553,27 +557,42 @@ def add_rows_to_scans_keys_file(fn: str, newrows: dict[str, list[str]]) -> None:
     fn: str
       filename
     newrows: dict
-      extra rows to add (acquisition time, referring physician, random string)
+      extra rows to add (acquisition time, duration, referring physician,
+      random string), in the order of ``SCANS_FILE_FIELDS`` (excluding
+      "filename")
     """
+    header = list(SCANS_FILE_FIELDS.keys())
     if op.lexists(fn):
         with open(fn, "r") as csvfile:
             reader = csv.reader(csvfile, delimiter="\t")
             existing_rows = [row for row in reader]
-        # skip header
-        fnames2info = {row[0]: row[1:] for row in existing_rows[1:]}
+        # Key each row's values by their *own* column name, not by
+        # position: a file written by an older heudiconv version may have
+        # fewer/differently-ordered columns (e.g. no "duration"), and
+        # zipping those positionally against the current, wider header
+        # would silently misassign values (e.g. "operator" ending up under
+        # "duration").
+        existing_header = existing_rows[0] if existing_rows else header
+        fnames2info = {
+            row[0]: dict(zip(existing_header[1:], row[1:])) for row in existing_rows[1:]
+        }
 
         newrows_key = newrows.keys()
         newrows_toadd = list(set(newrows_key) - set(fnames2info.keys()))
         for key_toadd in newrows_toadd:
-            fnames2info[key_toadd] = newrows[key_toadd]
+            fnames2info[key_toadd] = dict(zip(header[1:], newrows[key_toadd]))
         # remove
         os.unlink(fn)
     else:
-        fnames2info = newrows
+        fnames2info = {k: dict(zip(header[1:], v)) for k, v in newrows.items()}
 
-    header = list(SCANS_FILE_FIELDS.keys())
-    # prepare all the data rows
-    data_rows = [[k] + v for k, v in fnames2info.items()]
+    # prepare all the data rows, filling any column missing from a given
+    # row (e.g. "duration" for a row carried over from an older file) with
+    # 'n/a' rather than shifting the remaining columns into its place
+    data_rows = [
+        [filename] + [info.get(col, "n/a") for col in header[1:]]
+        for filename, info in fnames2info.items()
+    ]
     # sort by the date/filename
     try:
         data_rows_sorted = sorted(data_rows, key=lambda x: (x[1], x[0]))
@@ -626,7 +645,7 @@ def get_formatted_scans_key_row(
         perfphys = ""
     row = [
         acq_datetime.isoformat() if acq_datetime else "",
-        "%.3f" % duration if duration is not None else "",
+        _format_duration(duration),
         perfphys,
         randstr,
     ]
@@ -678,13 +697,29 @@ def _duration_from_dicom_tarball(tarball: str) -> Optional[float]:
         Duration in seconds, or None if it could not be determined.
     """
     with tempfile.TemporaryDirectory() as tmpdir:
-        with tarfile.open(tarball) as tar:
-            tar.extractall(tmpdir)  # source is our own prior output
+        safe_extract_tar(tarball, tmpdir)
         dicom_files = sorted(str(p) for p in Path(tmpdir).rglob("*") if p.is_file())
         if not dicom_files:
             lgr.warning("No files found within %s", tarball)
             return None
         return dicoms.get_acquisition_duration(dicom_files)
+
+
+def _nifti_stem(nifti_fn: str) -> str:
+    """Strip a NIfTI extension (``.nii`` or ``.nii.gz``) off `nifti_fn`."""
+    return remove_suffix(remove_suffix(nifti_fn, ".gz"), ".nii")
+
+
+def _format_duration(duration: Optional[float]) -> str:
+    """Format a duration in seconds as a `_scans.tsv` cell (``'n/a'`` if None)."""
+    return "%.3f" % duration if duration is not None else "n/a"
+
+
+def _is_within_directory(path: str, directory: str) -> bool:
+    """Return True if `path` resolves to somewhere at or under `directory`."""
+    path = op.abspath(path)
+    directory = op.abspath(directory)
+    return path == directory or path.startswith(directory + os.sep)
 
 
 def _duration_from_nifti_sidecar(nifti_fn: str) -> Optional[float]:
@@ -708,7 +743,7 @@ def _duration_from_nifti_sidecar(nifti_fn: str) -> Optional[float]:
     Optional[float]
         Duration in seconds, or None if it could not be determined.
     """
-    json_fn = remove_suffix(remove_suffix(nifti_fn, ".gz"), ".nii") + ".json"
+    json_fn = _nifti_stem(nifti_fn) + ".json"
     if not op.exists(json_fn):
         return None
     tr = load_json(json_fn).get("RepetitionTime")
@@ -719,7 +754,12 @@ def _duration_from_nifti_sidecar(nifti_fn: str) -> Optional[float]:
 
         shape = nb_load(nifti_fn).shape  # type: ignore[attr-defined]
     except Exception as exc:
-        lgr.debug("Failed to load %s to get the number of volumes: %s", nifti_fn, exc)
+        # nifti_fn is arbitrary, externally-produced (possibly corrupted or
+        # truncated) user data, so we deliberately catch broadly here and
+        # treat it as "could not determine", but do log at 'warning' since
+        # -- unlike a missing sourcedata tarball -- this is a case we
+        # otherwise expected to be able to measure
+        lgr.warning("Failed to load %s to get the number of volumes: %s", nifti_fn, exc)
         return None
     nvols = shape[3] if len(shape) > 3 else 1
     if nvols <= 1:
@@ -751,13 +791,18 @@ def _get_retrospective_duration(nifti_fn: str, bids_root: str) -> Optional[float
 
     1. The heudiconv-produced sourcedata DICOM tarball for this scan
        (``sourcedata/<same relative path>.dicom.tgz``), if present --
-       see :func:`_duration_from_dicom_tarball`.
+       see :func:`_duration_from_dicom_tarball`.  Note that this tarball is
+       named after the *pre-conversion* item prefix (see
+       :func:`heudiconv.convert.convert_dicom`), so for outputs whose BIDS
+       filename gained suffixes at nifti-writing time -- e.g. ``_echo-1``
+       for multi-echo, or ``_part-mag``/``_part-phase`` -- the expected
+       tarball path below will not exist, and this transparently falls
+       through to the NIfTI/JSON fallback.
     2. ``RepetitionTime`` x number-of-volumes from the NIfTI + JSON sidecar,
        for multi-volume runs only -- see :func:`_duration_from_nifti_sidecar`.
     """
     rel = op.relpath(nifti_fn, bids_root)
-    stem = remove_suffix(remove_suffix(rel, ".gz"), ".nii")
-    tarball = op.join(bids_root, "sourcedata", stem + ".dicom.tgz")
+    tarball = op.join(bids_root, "sourcedata", _nifti_stem(rel) + ".dicom.tgz")
     if op.exists(tarball):
         duration = _duration_from_dicom_tarball(tarball)
         if duration is not None:
@@ -806,7 +851,40 @@ def populate_scans_duration(path: str, overwrite: bool = False) -> None:
         lgr.warning("No '*_scans.tsv' files found under %s", path)
         return
     for scans_tsv in scans_tsvs:
-        _populate_scans_duration_file(scans_tsv, overwrite=overwrite)
+        try:
+            _populate_scans_duration_file(scans_tsv, overwrite=overwrite)
+        except Exception as exc:
+            # do not let one malformed/unexpected file abort the backfill
+            # for the rest of the dataset
+            lgr.error("Failed to populate 'duration' in %s: %s", scans_tsv, exc)
+
+
+def _write_scans_tsv_atomically(
+    scans_tsv: str, fieldnames: list[str], rows: list[dict[str, Optional[str]]]
+) -> None:
+    """Rewrite `scans_tsv` in place, atomically.
+
+    Writes the new content to a temporary file in the same directory and
+    ``os.replace``s it over `scans_tsv`.  This succeeds even when
+    `scans_tsv` is read-only or a symlink into git-annex (as is the case
+    for a DataLad-tracked dataset, see ``heudiconv/external/dlad.py``):
+    replacing a directory entry only requires write permission on the
+    *directory*, not on the file/symlink being replaced.  It also means a
+    failure while writing the new content leaves the original file intact.
+    """
+    directory = op.dirname(scans_tsv) or "."
+    fd, tmp_path = tempfile.mkstemp(
+        dir=directory, prefix=".heudiconv-scans-", suffix=".tsv"
+    )
+    try:
+        with os.fdopen(fd, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter="\t")
+            writer.writeheader()
+            writer.writerows(rows)
+        os.replace(tmp_path, scans_tsv)
+    except BaseException:
+        os.unlink(tmp_path)
+        raise
 
 
 def _populate_scans_duration_file(scans_tsv: str, overwrite: bool) -> None:
@@ -820,6 +898,20 @@ def _populate_scans_duration_file(scans_tsv: str, overwrite: bool) -> None:
         rows = list(reader)
     if not rows:
         return
+    if "filename" not in fieldnames:
+        lgr.warning("%s has no 'filename' column, skipping", scans_tsv)
+        return
+    if any(None in row for row in rows):
+        # csv.DictReader stashes any fields beyond the header under the
+        # `None` key; writing those back out under our (possibly extended)
+        # `fieldnames` would raise deep inside csv.DictWriter, so bail with
+        # a clear message instead of leaving a half-written file behind
+        lgr.warning(
+            "%s has row(s) with more fields than its header (possibly "
+            "malformed); skipping duration backfill for this file",
+            scans_tsv,
+        )
+        return
 
     if "duration" not in fieldnames:
         insert_at = fieldnames.index("acq_time") + 1 if "acq_time" in fieldnames else 1
@@ -827,27 +919,37 @@ def _populate_scans_duration_file(scans_tsv: str, overwrite: bool) -> None:
 
     changed = False
     for row in rows:
-        existing = row.get("duration")
-        if existing and existing != "n/a" and not overwrite:
+        filename = row.get("filename")
+        if not filename:
+            lgr.warning("%s has a row with no filename, skipping it", scans_tsv)
             continue
-        nifti_fn = op.join(session_dir, row["filename"])
+        if maybe_na(row.get("duration")) != "n/a" and not overwrite:
+            continue
+        nifti_fn = op.join(session_dir, filename)
+        if not _is_within_directory(nifti_fn, bids_root):
+            lgr.warning(
+                "Refusing %r in %s: resolves outside of the dataset (%s)",
+                filename,
+                scans_tsv,
+                bids_root,
+            )
+            continue
         duration = _get_retrospective_duration(nifti_fn, bids_root)
-        new_value = "%.3f" % duration if duration is not None else "n/a"
+        new_value = _format_duration(duration)
         if row.get("duration") != new_value:
             changed = True
         row["duration"] = new_value
 
-    if not changed:
+    if changed:
+        _write_scans_tsv_atomically(scans_tsv, fieldnames, rows)
+        lgr.info("Updated 'duration' column in %s", scans_tsv)
+    else:
         lgr.info("No new 'duration' values could be established for %s", scans_tsv)
-        return
 
-    with open(scans_tsv, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter="\t")
-        writer.writeheader()
-        writer.writerows(rows)
-    lgr.info("Updated 'duration' column in %s", scans_tsv)
-
-    # keep the data dictionary in sync
+    # keep the data dictionary in sync, regardless of whether the tsv
+    # itself needed a rewrite this time (e.g. it may already carry correct
+    # durations from a previous run, while scans.json still lacks the
+    # description)
     scans_json = op.join(bids_root, "scans.json")
     if op.lexists(scans_json):
         meta = load_json(scans_json)

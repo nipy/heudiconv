@@ -285,6 +285,38 @@ def test_add_rows_to_scans_keys_file(tmp_path: Path) -> None:
     _check_rows(fn, extra_rows)
 
 
+@pytest.mark.ai_generated
+def test_add_rows_to_scans_keys_file_upgrades_older_header(tmp_path: Path) -> None:
+    # a file written by a heudiconv version predating 'duration' has fewer,
+    # differently-ordered columns; adding a new row to it must not
+    # misalign the old row's values (e.g. 'operator' landing under
+    # 'duration') -- see gh-issue discussion on positional vs. by-name
+    # column handling.
+    fn = opj(tmp_path, "file.tsv")
+    with open(fn, "w") as f:
+        f.write("filename\tacq_time\toperator\trandstr\n")
+        f.write("old_file.nii.gz\t2016adsfasd\tDr. Old\toldrand01\n")
+
+    add_rows_to_scans_keys_file(
+        fn, {"new_file.nii.gz": ["2018xxxxx", "1.500", "", "newrand01"]}
+    )
+
+    with open(fn) as f:
+        reader = csv.reader(f, delimiter="\t")
+        header, *rows = list(reader)
+    assert header == ["filename", "acq_time", "duration", "operator", "randstr"]
+    by_filename = {row[0]: row[1:] for row in rows}
+    # the pre-existing row keeps its own values under their own columns,
+    # gaining 'n/a' for the new 'duration' column rather than being shifted
+    assert by_filename["old_file.nii.gz"] == [
+        "2016adsfasd",
+        "n/a",
+        "Dr. Old",
+        "oldrand01",
+    ]
+    assert by_filename["new_file.nii.gz"] == ["2018xxxxx", "1.500", "", "newrand01"]
+
+
 def test__find_subj_ses() -> None:
     assert find_subj_ses(
         "950_bids_test4/sub-phantom1sid1/fmap/"

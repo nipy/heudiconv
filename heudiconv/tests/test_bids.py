@@ -27,6 +27,7 @@ from heudiconv.bids import (
     AllowedCriteriaForFmapAssignment,
     BIDSFile,
     KeyInfoForForce,
+    _find_bids_dataset_root,
     find_compatible_fmaps_for_run,
     find_compatible_fmaps_for_session,
     find_fmap_groups,
@@ -1661,6 +1662,7 @@ def _make_bids_dataset_stub(bids_root: Path) -> Path:
     return scans_tsv
 
 
+@pytest.mark.ai_generated
 def test_populate_scans_duration_from_sourcedata(tmp_path: Path) -> None:
     bids_root = tmp_path / "bids"
     scans_tsv = _make_bids_dataset_stub(bids_root)
@@ -1691,6 +1693,7 @@ def test_populate_scans_duration_from_sourcedata(tmp_path: Path) -> None:
     assert "duration" in scans_json
 
 
+@pytest.mark.ai_generated
 def test_populate_scans_duration_from_nifti_sidecar(tmp_path: Path) -> None:
     bids_root = tmp_path / "bids"
     scans_tsv = _make_bids_dataset_stub(bids_root)
@@ -1709,6 +1712,7 @@ def test_populate_scans_duration_from_nifti_sidecar(tmp_path: Path) -> None:
     assert float(rows[0]["duration"]) == pytest.approx(20.0)
 
 
+@pytest.mark.ai_generated
 def test_populate_scans_duration_single_volume_stays_na(tmp_path: Path) -> None:
     bids_root = tmp_path / "bids"
     scans_tsv = _make_bids_dataset_stub(bids_root)
@@ -1727,6 +1731,7 @@ def test_populate_scans_duration_single_volume_stays_na(tmp_path: Path) -> None:
     assert rows[0]["duration"] == "n/a"
 
 
+@pytest.mark.ai_generated
 def test_populate_scans_duration_overwrite(tmp_path: Path) -> None:
     bids_root = tmp_path / "bids"
     scans_tsv = _make_bids_dataset_stub(bids_root)
@@ -1753,11 +1758,13 @@ def test_populate_scans_duration_overwrite(tmp_path: Path) -> None:
     assert float(rows[0]["duration"]) == pytest.approx(20.0)
 
 
+@pytest.mark.ai_generated
 def test_populate_scans_duration_no_scans_tsv(tmp_path: Path) -> None:
     # should warn and do nothing, rather than raise, when nothing is found
     populate_scans_duration(str(tmp_path))
 
 
+@pytest.mark.ai_generated
 def test_populate_scans_duration_direct_file_path(tmp_path: Path) -> None:
     # pointing directly at a single '_scans.tsv' file also works
     bids_root = tmp_path / "bids"
@@ -1773,3 +1780,78 @@ def test_populate_scans_duration_direct_file_path(tmp_path: Path) -> None:
 
     _, rows = _read_scans_rows(scans_tsv)
     assert float(rows[0]["duration"]) == pytest.approx(20.0)
+
+
+@pytest.mark.ai_generated
+def test_populate_scans_duration_tarball_present_but_unusable_falls_back(
+    tmp_path: Path,
+) -> None:
+    # a sourcedata tarball exists for the scan, but it does not yield a
+    # usable duration (e.g. a single DICOM with no AcquisitionDuration-like
+    # tag) -- should transparently fall through to the nifti/json sidecar
+    bids_root = tmp_path / "bids"
+    scans_tsv = _make_bids_dataset_stub(bids_root)
+    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
+    nibabel.Nifti1Image(np.zeros((2, 2, 2, 10)), np.eye(4)).to_filename(str(nifti_fn))
+    save_json(
+        str(bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json"),
+        {"RepetitionTime": 2.0},
+    )
+
+    # a single-file "series" cannot yield a duration on its own (neither a
+    # tag nor >= 2 timestamps to estimate from)
+    single_dicom = [op.join(TESTS_DATA_PATH, "01-anat-scout", "0001.dcm")]
+    sourcedata_dir = bids_root / "sourcedata" / "sub-01" / "func"
+    sourcedata_dir.mkdir(parents=True)
+    compress_dicoms(
+        single_dicom,
+        str(sourcedata_dir / "sub-01_task-rest_bold"),
+        TempDirs(),
+        overwrite=True,
+    )
+
+    populate_scans_duration(str(bids_root))
+
+    _, rows = _read_scans_rows(scans_tsv)
+    assert float(rows[0]["duration"]) == pytest.approx(20.0)
+
+
+@pytest.mark.ai_generated
+def test_populate_scans_duration_via_cli(tmp_path: Path) -> None:
+    bids_root = tmp_path / "bids"
+    scans_tsv = _make_bids_dataset_stub(bids_root)
+    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
+    nibabel.Nifti1Image(np.zeros((2, 2, 2, 10)), np.eye(4)).to_filename(str(nifti_fn))
+    save_json(
+        str(bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json"),
+        {"RepetitionTime": 2.0},
+    )
+    # pre-populate with a bogus value to also exercise --overwrite
+    scans_tsv.write_text(
+        "filename\tacq_time\tduration\n"
+        "func/sub-01_task-rest_bold.nii.gz\t2018-08-10T12:08:25.360000\t1.0\n"
+    )
+
+    runner(
+        [
+            "--command",
+            "populate-scans-duration",
+            "--files",
+            str(bids_root),
+            "--overwrite",
+        ]
+    )
+
+    _, rows = _read_scans_rows(scans_tsv)
+    assert float(rows[0]["duration"]) == pytest.approx(20.0)
+
+
+@pytest.mark.ai_generated
+def test_find_bids_dataset_root(tmp_path: Path) -> None:
+    session_dir = tmp_path / "sub-01" / "ses-01"
+    session_dir.mkdir(parents=True)
+    # no dataset_description.json anywhere -- falls back to the input path
+    assert _find_bids_dataset_root(str(session_dir)) == str(session_dir)
+
+    (tmp_path / "dataset_description.json").write_text("{}")
+    assert _find_bids_dataset_root(str(session_dir)) == str(tmp_path)
