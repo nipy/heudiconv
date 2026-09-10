@@ -15,8 +15,11 @@ from heudiconv.dicoms import (
     create_seqinfo,
     dw,
     embed_dicom_and_nifti_metadata,
+    estimate_scan_duration_from_times,
+    get_acquisition_duration,
     get_datetime_from_dcm,
     get_datetime_strings_from_dcm,
+    get_dicom_acquisition_duration,
     get_reproducible_int,
     group_dicoms_into_seqinfos,
     parse_private_csa_header,
@@ -329,3 +332,95 @@ def test_get_reproducible_int_raises_assertion_wo_dt(tmp_path: Path) -> None:
     dcm.dcmwrite(tmp_path, XA30_enhanced_dcm)
     with pytest.raises(AssertionError):
         get_reproducible_int([str(tmp_path)])
+
+
+@pytest.mark.parametrize("dcmfile", TEST_DICOM_PATHS)
+def test_get_dicom_acquisition_duration_absent(dcmfile: str) -> None:
+    # none of our test DICOMs carry AcquisitionDuration-like tags
+    dcm_data = dcm.dcmread(dcmfile, stop_before_pixels=True, force=True)
+    assert get_dicom_acquisition_duration(dcm_data) is None
+
+
+def test_get_dicom_acquisition_duration_standard_tag() -> None:
+    dcm_data = dcm.dcmread(
+        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+    )
+    dcm_data.add_new((0x0018, 0x9073), "FD", 12.5)
+    assert get_dicom_acquisition_duration(dcm_data) == pytest.approx(12.5)
+
+
+def test_get_dicom_acquisition_duration_ge_private_tag() -> None:
+    dcm_data = dcm.dcmread(
+        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+    )
+    # GE private tag reports duration in microseconds; see
+    # https://github.com/rordenlab/dcm2niix/issues/808
+    dcm_data.add_new((0x0019, 0x105A), "FL", 3.0118515e08)
+    assert get_dicom_acquisition_duration(dcm_data) == pytest.approx(301.185, rel=1e-3)
+
+
+def test_get_dicom_acquisition_duration_prefers_standard_tag() -> None:
+    dcm_data = dcm.dcmread(
+        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+    )
+    dcm_data.add_new((0x0018, 0x9073), "FD", 12.5)
+    dcm_data.add_new((0x0019, 0x105A), "FL", 999e6)
+    assert get_dicom_acquisition_duration(dcm_data) == pytest.approx(12.5)
+
+
+def test_estimate_scan_duration_from_times() -> None:
+    # 3 DICOMs, ~4.15s apart -- duration is the span plus one more interval
+    dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))
+    assert len(dicom_list) == 3
+    assert estimate_scan_duration_from_times(dicom_list) == pytest.approx(12.45)
+
+
+def test_estimate_scan_duration_from_times_single_file() -> None:
+    dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))[:1]
+    assert estimate_scan_duration_from_times(dicom_list) is None
+
+
+def test_estimate_scan_duration_from_times_wo_dt(tmp_path: Path) -> None:
+    # no usable date/time information (e.g. stripped by anonymization)
+    dcm_data = dcm.dcmread(
+        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+    )
+    for field in (
+        "AcquisitionDate",
+        "AcquisitionTime",
+        "AcquisitionDateTime",
+        "SeriesDate",
+        "SeriesTime",
+    ):
+        if field in dcm_data:
+            delattr(dcm_data, field)
+    out = tmp_path / "no_dt.dcm"
+    dcm.dcmwrite(str(out), dcm_data)
+    assert estimate_scan_duration_from_times([str(out), str(out)]) is None
+
+
+def test_get_acquisition_duration_empty() -> None:
+    assert get_acquisition_duration([]) is None
+
+
+def test_get_acquisition_duration_prefers_tag(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # when a tag is present, the (more expensive) per-file timestamp scan
+    # should not even be attempted
+    def _boom(_dicom_list: list[str]) -> float:
+        raise AssertionError("should not be called")
+
+    monkeypatch.setattr("heudiconv.dicoms.estimate_scan_duration_from_times", _boom)
+    dcm_data = dcm.dcmread(
+        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+    )
+    dcm_data.add_new((0x0018, 0x9073), "FD", 12.5)
+    out = tmp_path / "with_tag.dcm"
+    dcm.dcmwrite(str(out), dcm_data)
+    assert get_acquisition_duration([str(out)]) == pytest.approx(12.5)
+
+
+def test_get_acquisition_duration_falls_back_to_times() -> None:
+    dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))
+    assert get_acquisition_duration(dicom_list) == pytest.approx(12.45)

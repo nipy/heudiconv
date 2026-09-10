@@ -5,6 +5,7 @@ from __future__ import annotations
 __docformat__ = "numpy"
 
 from collections import OrderedDict
+from collections.abc import Sequence
 import csv
 import errno
 from glob import glob
@@ -14,6 +15,8 @@ import os
 import os.path as op
 from pathlib import Path
 import re
+import tarfile
+import tempfile
 from typing import Any, Optional
 import warnings
 
@@ -47,6 +50,24 @@ SCANS_FILE_FIELDS = OrderedDict(
                 [
                     ("LongName", "Acquisition time"),
                     ("Description", "Acquisition time of the particular scan"),
+                ]
+            ),
+        ),
+        (
+            "duration",
+            OrderedDict(
+                [
+                    ("LongName", "Scan duration"),
+                    (
+                        "Description",
+                        "Wallclock duration of the scan, in seconds, from the "
+                        "onset of the first to the end of the last acquired "
+                        "volume or sample. Estimated from the DICOM headers "
+                        "(see heudiconv.dicoms.get_acquisition_duration) or, "
+                        "retrospectively, from the NIfTI/JSON sidecar. See also "
+                        "https://github.com/bids-standard/bids-specification/pull/2508",
+                    ),
+                    ("Units", "s"),
                 ]
             ),
         ),
@@ -494,7 +515,7 @@ def save_scans_key(
         # get filenames
         f_name = "/".join(bids_file.split("/")[-2:])
         f_name = f_name.replace("json", "nii.gz")
-        rows[f_name] = get_formatted_scans_key_row(item[-1][0])
+        rows[f_name] = get_formatted_scans_key_row(item[-1])
         subj_, ses_ = find_subj_ses(f_name)
         if not subj_:
             lgr.warning(
@@ -565,21 +586,33 @@ def add_rows_to_scans_keys_file(fn: str, newrows: dict[str, list[str]]) -> None:
         writer.writerows([header] + data_rows_sorted)
 
 
-def get_formatted_scans_key_row(dcm_fn: str | Path) -> list[str]:
+def get_formatted_scans_key_row(
+    dcm_fns: str | Path | Sequence[str | Path],
+) -> list[str]:
     """
     Parameters
     ----------
-    dcm_fn: str
+    dcm_fns: str or Path, or sequence of str or Path
+        A single DICOM file representative of the run, or -- preferably --
+        every DICOM file belonging to it.  Providing the full list allows
+        `duration` to be estimated from per-file acquisition timestamps when
+        no `AcquisitionDuration` tag is directly available; see
+        :func:`heudiconv.dicoms.get_acquisition_duration`.
 
     Returns
     -------
     row: list
-        [ISO acquisition time, performing physician name, random string]
+        [ISO acquisition time, duration in seconds (or 'n/a'), performing
+        physician name, random string]
 
     """
-    dcm_data = dcm.dcmread(dcm_fn, stop_before_pixels=True, force=True)
+    if isinstance(dcm_fns, (str, Path)):
+        dcm_fns = [dcm_fns]
+    dcm_fn_strs: list[str] = [str(f) for f in dcm_fns]
+    dcm_data = dcm.dcmread(dcm_fn_strs[0], stop_before_pixels=True, force=True)
     # we need to store filenames and acquisition datetimes
     acq_datetime = dicoms.get_datetime_from_dcm(dcm_data=dcm_data)
+    duration = dicoms.get_acquisition_duration(dcm_fn_strs)
     # add random string
     # But let's make it reproducible by using all UIDs
     # (might change across versions?)
@@ -591,11 +624,238 @@ def get_formatted_scans_key_row(dcm_fn: str | Path) -> list[str]:
         perfphys = dcm_data.PerformingPhysicianName
     except AttributeError:
         perfphys = ""
-    row = [acq_datetime.isoformat() if acq_datetime else "", perfphys, randstr]
+    row = [
+        acq_datetime.isoformat() if acq_datetime else "",
+        "%.3f" % duration if duration is not None else "",
+        perfphys,
+        randstr,
+    ]
     # empty entries should be 'n/a'
     # https://github.com/dartmouth-pbs/heudiconv/issues/32
     row = ["n/a" if not str(e) else e for e in row]
     return row
+
+
+def _find_bids_dataset_root(path: str) -> str:
+    """Find the BIDS dataset root, walking upward from `path`.
+
+    Parameters
+    ----------
+    path : str
+        Directory to start the search from (e.g., a subject or session
+        folder).
+
+    Returns
+    -------
+    str
+        The closest ancestor of `path` (inclusive) containing a
+        ``dataset_description.json``, or `path` itself (absolute) if no such
+        ancestor could be found.
+    """
+    current = op.abspath(path)
+    while True:
+        if op.exists(op.join(current, "dataset_description.json")):
+            return current
+        parent = op.dirname(current)
+        if parent == current:
+            return op.abspath(path)
+        current = parent
+
+
+def _duration_from_dicom_tarball(tarball: str) -> Optional[float]:
+    """Compute acquisition duration from a heudiconv-produced DICOM tarball.
+
+    Parameters
+    ----------
+    tarball : str
+        Path to a ``*.dicom.tgz`` file, as produced under ``sourcedata/`` by
+        heudiconv's ``-c dicom`` conversion (see
+        :func:`heudiconv.dicoms.compress_dicoms`).
+
+    Returns
+    -------
+    Optional[float]
+        Duration in seconds, or None if it could not be determined.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with tarfile.open(tarball) as tar:
+            tar.extractall(tmpdir)  # source is our own prior output
+        dicom_files = sorted(str(p) for p in Path(tmpdir).rglob("*") if p.is_file())
+        if not dicom_files:
+            lgr.warning("No files found within %s", tarball)
+            return None
+        return dicoms.get_acquisition_duration(dicom_files)
+
+
+def _duration_from_nifti_sidecar(nifti_fn: str) -> Optional[float]:
+    """Coarsely estimate a run's duration from its NIfTI + JSON sidecar.
+
+    Computes ``RepetitionTime`` (from the JSON sidecar) times the number of
+    volumes (from the NIfTI header), which is only meaningful for
+    multi-volume (e.g., functional) runs.  This is a coarse approximation:
+    it cannot account for any preparation/dummy-scan time preceding the
+    first recorded volume, so it is used only as a last resort, when no
+    source DICOMs are available.
+
+    Parameters
+    ----------
+    nifti_fn : str
+        Path to the ``.nii``/``.nii.gz`` file. A same-named ``.json``
+        sidecar is expected alongside it.
+
+    Returns
+    -------
+    Optional[float]
+        Duration in seconds, or None if it could not be determined.
+    """
+    json_fn = remove_suffix(remove_suffix(nifti_fn, ".gz"), ".nii") + ".json"
+    if not op.exists(json_fn):
+        return None
+    tr = load_json(json_fn).get("RepetitionTime")
+    if not tr:
+        return None
+    try:
+        from nibabel import load as nb_load
+
+        shape = nb_load(nifti_fn).shape  # type: ignore[attr-defined]
+    except Exception as exc:
+        lgr.debug("Failed to load %s to get the number of volumes: %s", nifti_fn, exc)
+        return None
+    nvols = shape[3] if len(shape) > 3 else 1
+    if nvols <= 1:
+        # a single-volume (e.g., anatomical) scan -- TR x 1 vastly
+        # underestimates its actual acquisition time, so we do not guess
+        return None
+    return float(tr) * nvols
+
+
+def _get_retrospective_duration(nifti_fn: str, bids_root: str) -> Optional[float]:
+    """Best-effort acquisition duration for an already-converted BIDS scan.
+
+    Parameters
+    ----------
+    nifti_fn : str
+        Path to the converted ``.nii``/``.nii.gz`` file.
+    bids_root : str
+        Path to the root of the BIDS dataset `nifti_fn` belongs to.
+
+    Returns
+    -------
+    Optional[float]
+        Duration in seconds, or None if it could not be determined by any
+        of the methods below.
+
+    Notes
+    -----
+    Tries, in order:
+
+    1. The heudiconv-produced sourcedata DICOM tarball for this scan
+       (``sourcedata/<same relative path>.dicom.tgz``), if present --
+       see :func:`_duration_from_dicom_tarball`.
+    2. ``RepetitionTime`` x number-of-volumes from the NIfTI + JSON sidecar,
+       for multi-volume runs only -- see :func:`_duration_from_nifti_sidecar`.
+    """
+    rel = op.relpath(nifti_fn, bids_root)
+    stem = remove_suffix(remove_suffix(rel, ".gz"), ".nii")
+    tarball = op.join(bids_root, "sourcedata", stem + ".dicom.tgz")
+    if op.exists(tarball):
+        duration = _duration_from_dicom_tarball(tarball)
+        if duration is not None:
+            return duration
+        lgr.debug(
+            "Could not establish duration from source DICOMs %s for %s",
+            tarball,
+            nifti_fn,
+        )
+    return _duration_from_nifti_sidecar(nifti_fn)
+
+
+def populate_scans_duration(path: str, overwrite: bool = False) -> None:
+    """Retrospectively populate the 'duration' column of ``_scans.tsv`` file(s).
+
+    This complements the automatic population of `duration` performed
+    during regular BIDS conversion (see :func:`get_formatted_scans_key_row`),
+    for datasets that were converted before this feature was added.
+
+    Parameters
+    ----------
+    path : str
+        Path to a BIDS dataset, to any directory within it (e.g., a subject
+        or session folder) -- every ``*_scans.tsv`` file found at or under
+        this path is processed -- or directly to a single ``*_scans.tsv``
+        file.
+    overwrite : bool, optional
+        If True, also (re)compute `duration` for rows which already have a
+        value. By default, existing non-empty values are left untouched.
+
+    Notes
+    -----
+    Where the original DICOMs are no longer directly accessible, this can
+    only do so much: it is a best-effort, retrospective backfill, not a
+    replacement for populating `duration` at conversion time. See
+    :func:`_get_retrospective_duration` for the resolution order used per
+    scan; rows for which no method succeeds are (left) marked as 'n/a'.
+    """
+    if op.isfile(path):
+        scans_tsvs = [path] if path.endswith("_scans.tsv") else []
+    else:
+        scans_tsvs = sorted(
+            find_files(r".*_scans\.tsv$", topdir=path, exclude_vcs=True)
+        )
+    if not scans_tsvs:
+        lgr.warning("No '*_scans.tsv' files found under %s", path)
+        return
+    for scans_tsv in scans_tsvs:
+        _populate_scans_duration_file(scans_tsv, overwrite=overwrite)
+
+
+def _populate_scans_duration_file(scans_tsv: str, overwrite: bool) -> None:
+    """Backfill the 'duration' column of a single ``_scans.tsv`` file, in place."""
+    session_dir = op.dirname(scans_tsv)
+    bids_root = _find_bids_dataset_root(session_dir)
+
+    with open(scans_tsv, newline="") as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        fieldnames = list(reader.fieldnames or [])
+        rows = list(reader)
+    if not rows:
+        return
+
+    if "duration" not in fieldnames:
+        insert_at = fieldnames.index("acq_time") + 1 if "acq_time" in fieldnames else 1
+        fieldnames = fieldnames[:insert_at] + ["duration"] + fieldnames[insert_at:]
+
+    changed = False
+    for row in rows:
+        existing = row.get("duration")
+        if existing and existing != "n/a" and not overwrite:
+            continue
+        nifti_fn = op.join(session_dir, row["filename"])
+        duration = _get_retrospective_duration(nifti_fn, bids_root)
+        new_value = "%.3f" % duration if duration is not None else "n/a"
+        if row.get("duration") != new_value:
+            changed = True
+        row["duration"] = new_value
+
+    if not changed:
+        lgr.info("No new 'duration' values could be established for %s", scans_tsv)
+        return
+
+    with open(scans_tsv, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter="\t")
+        writer.writeheader()
+        writer.writerows(rows)
+    lgr.info("Updated 'duration' column in %s", scans_tsv)
+
+    # keep the data dictionary in sync
+    scans_json = op.join(bids_root, "scans.json")
+    if op.lexists(scans_json):
+        meta = load_json(scans_json)
+        if "duration" not in meta:
+            meta["duration"] = SCANS_FILE_FIELDS["duration"]
+            save_json(scans_json, meta, sort_keys=False)
+    else:
+        save_json(scans_json, SCANS_FILE_FIELDS, sort_keys=False)
 
 
 def convert_sid_bids(subject_id: str) -> str:

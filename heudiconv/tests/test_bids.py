@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Callable
+import csv
 from datetime import datetime, timedelta
 from glob import glob
 import itertools
@@ -17,6 +18,7 @@ import string
 from typing import Any, Dict, List, Optional, Tuple
 
 import nibabel
+import numpy as np
 from numpy import testing as np_testing
 import pytest
 
@@ -32,12 +34,21 @@ from heudiconv.bids import (
     get_shim_setting,
     maybe_na,
     populate_intended_for,
+    populate_scans_duration,
     sanitize_label,
     select_fmap_from_compatible_groups,
     treat_age,
 )
 from heudiconv.cli.run import main as runner
-from heudiconv.utils import Load, create_tree, load_json, remove_suffix, save_json
+from heudiconv.dicoms import compress_dicoms
+from heudiconv.utils import (
+    Load,
+    TempDirs,
+    create_tree,
+    load_json,
+    remove_suffix,
+    save_json,
+)
 
 from .utils import TESTS_DATA_PATH, fetch_data, gen_heudiconv_args
 
@@ -1612,3 +1623,153 @@ def test_sanitize_label() -> None:
     assert sanitize_label("az XZ-@09") == "azXZ09"
     with pytest.raises(ValueError):
         sanitize_label(" @ ")
+
+
+def _read_scans_rows(
+    scans_tsv: Path,
+) -> tuple[Optional[list[str]], list[dict[str, str]]]:
+    """Read a `_scans.tsv` file, returning its (fieldnames, rows)."""
+    with open(scans_tsv, newline="") as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        fieldnames = list(reader.fieldnames) if reader.fieldnames else None
+        return fieldnames, list(reader)
+
+
+def _make_bids_dataset_stub(bids_root: Path) -> Path:
+    """Create the minimal skeleton `populate_scans_duration` operates on.
+
+    Layout: ``sub-01/func/sub-01_task-rest_bold.{nii.gz,json}`` plus a
+    ``sub-01/sub-01_scans.tsv`` with only ``filename``/``acq_time`` columns
+    (as produced before `duration` support was added).
+
+    Returns
+    -------
+    Path
+        Path to the ``_scans.tsv`` file.
+    """
+    func_dir = bids_root / "sub-01" / "func"
+    func_dir.mkdir(parents=True)
+    save_json(
+        str(bids_root / "dataset_description.json"),
+        {"Name": "test", "BIDSVersion": "1.8.0"},
+    )
+    scans_tsv = bids_root / "sub-01" / "sub-01_scans.tsv"
+    scans_tsv.write_text(
+        "filename\tacq_time\n"
+        "func/sub-01_task-rest_bold.nii.gz\t2018-08-10T12:08:25.360000\n"
+    )
+    return scans_tsv
+
+
+def test_populate_scans_duration_from_sourcedata(tmp_path: Path) -> None:
+    bids_root = tmp_path / "bids"
+    scans_tsv = _make_bids_dataset_stub(bids_root)
+    (bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz").write_bytes(b"")
+    save_json(str(bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json"), {})
+
+    # package the same source DICOMs heudiconv itself would have, under
+    # sourcedata/, mirroring the converted file's relative path:
+    dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))
+    sourcedata_dir = bids_root / "sourcedata" / "sub-01" / "func"
+    sourcedata_dir.mkdir(parents=True)
+    compress_dicoms(
+        dicom_list,
+        str(sourcedata_dir / "sub-01_task-rest_bold"),
+        TempDirs(),
+        overwrite=True,
+    )
+    assert (sourcedata_dir / "sub-01_task-rest_bold.dicom.tgz").exists()
+
+    populate_scans_duration(str(bids_root))
+
+    fieldnames, rows = _read_scans_rows(scans_tsv)
+    assert fieldnames == ["filename", "acq_time", "duration"]
+    assert float(rows[0]["duration"]) == pytest.approx(12.45)
+
+    # the dataset-level data dictionary should now document 'duration' too
+    scans_json = load_json(str(bids_root / "scans.json"))
+    assert "duration" in scans_json
+
+
+def test_populate_scans_duration_from_nifti_sidecar(tmp_path: Path) -> None:
+    bids_root = tmp_path / "bids"
+    scans_tsv = _make_bids_dataset_stub(bids_root)
+    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
+    # a multi-volume run -- duration falls back to RepetitionTime x nvols:
+    nibabel.Nifti1Image(np.zeros((2, 2, 2, 10)), np.eye(4)).to_filename(str(nifti_fn))
+    save_json(
+        str(bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json"),
+        {"RepetitionTime": 2.0},
+    )
+    # no sourcedata/ present -- only the nifti/json fallback is available
+
+    populate_scans_duration(str(bids_root))
+
+    _, rows = _read_scans_rows(scans_tsv)
+    assert float(rows[0]["duration"]) == pytest.approx(20.0)
+
+
+def test_populate_scans_duration_single_volume_stays_na(tmp_path: Path) -> None:
+    bids_root = tmp_path / "bids"
+    scans_tsv = _make_bids_dataset_stub(bids_root)
+    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
+    # a single-volume (e.g. anatomical-like) run -- TR x nvols is not a sound
+    # estimate, and there is no sourcedata/ to fall back to:
+    nibabel.Nifti1Image(np.zeros((2, 2, 2)), np.eye(4)).to_filename(str(nifti_fn))
+    save_json(
+        str(bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json"),
+        {"RepetitionTime": 2.0},
+    )
+
+    populate_scans_duration(str(bids_root))
+
+    _, rows = _read_scans_rows(scans_tsv)
+    assert rows[0]["duration"] == "n/a"
+
+
+def test_populate_scans_duration_overwrite(tmp_path: Path) -> None:
+    bids_root = tmp_path / "bids"
+    scans_tsv = _make_bids_dataset_stub(bids_root)
+    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
+    nibabel.Nifti1Image(np.zeros((2, 2, 2, 10)), np.eye(4)).to_filename(str(nifti_fn))
+    save_json(
+        str(bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json"),
+        {"RepetitionTime": 2.0},
+    )
+    # pre-populate with a bogus value
+    scans_tsv.write_text(
+        "filename\tacq_time\tduration\n"
+        "func/sub-01_task-rest_bold.nii.gz\t2018-08-10T12:08:25.360000\t1.0\n"
+    )
+
+    # by default, an existing value is left untouched:
+    populate_scans_duration(str(bids_root))
+    _, rows = _read_scans_rows(scans_tsv)
+    assert rows[0]["duration"] == "1.0"
+
+    # with overwrite=True, it gets recomputed:
+    populate_scans_duration(str(bids_root), overwrite=True)
+    _, rows = _read_scans_rows(scans_tsv)
+    assert float(rows[0]["duration"]) == pytest.approx(20.0)
+
+
+def test_populate_scans_duration_no_scans_tsv(tmp_path: Path) -> None:
+    # should warn and do nothing, rather than raise, when nothing is found
+    populate_scans_duration(str(tmp_path))
+
+
+def test_populate_scans_duration_direct_file_path(tmp_path: Path) -> None:
+    # pointing directly at a single '_scans.tsv' file also works
+    bids_root = tmp_path / "bids"
+    scans_tsv = _make_bids_dataset_stub(bids_root)
+    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
+    nibabel.Nifti1Image(np.zeros((2, 2, 2, 10)), np.eye(4)).to_filename(str(nifti_fn))
+    save_json(
+        str(bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json"),
+        {"RepetitionTime": 2.0},
+    )
+
+    populate_scans_duration(str(scans_tsv))
+
+    _, rows = _read_scans_rows(scans_tsv)
+    assert float(rows[0]["duration"]) == pytest.approx(20.0)

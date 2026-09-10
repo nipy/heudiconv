@@ -589,6 +589,131 @@ def get_datetime_strings_from_dcm(
     return datetime_.strftime("%Y%m%d"), datetime_.strftime("%H%M%S.%f")
 
 
+# DICOM tags which report a scan's total acquisition duration directly, and
+# the factor to multiply their value by to get seconds.
+#  - (0018,9073) "Acquisition Duration" is the standard tag, populated mostly
+#    for Enhanced MR/CT multi-frame DICOMs, and already reported in seconds.
+#  - (0019,105A) is a private GE tag reporting the same information (in
+#    microseconds) for classic (per-slice) GE DICOMs.
+#    See https://github.com/rordenlab/dcm2niix/issues/808
+_ACQUISITION_DURATION_TAGS = (
+    ((0x0018, 0x9073), 1.0),
+    ((0x0019, 0x105A), 1e-6),
+)
+
+
+def get_dicom_acquisition_duration(dcm_data: dcm.Dataset) -> Optional[float]:
+    """Extract the total scan duration directly from a DICOM tag, if present.
+
+    Parameters
+    ----------
+    dcm_data : dcm.Dataset
+        DICOM with header, e.g., as read by pydicom.dcmread.
+
+    Returns
+    -------
+    Optional[float]
+        Duration in seconds, or None if no known tag is present/parseable.
+
+    Notes
+    -----
+    Checks, in order, the tags listed in :data:`_ACQUISITION_DURATION_TAGS`.
+    """
+    for tag, scale in _ACQUISITION_DURATION_TAGS:
+        if tag in dcm_data and dcm_data[tag].value not in (None, ""):
+            try:
+                return float(dcm_data[tag].value) * scale
+            except (TypeError, ValueError) as exc:
+                lgr.debug(
+                    "Could not parse duration tag %s value %r: %s",
+                    tag,
+                    dcm_data[tag].value,
+                    exc,
+                )
+    return None
+
+
+def estimate_scan_duration_from_times(dicom_list: list[str]) -> Optional[float]:
+    """Estimate a run's total duration from per-file acquisition timestamps.
+
+    Reads the acquisition datetime (see :func:`get_datetime_from_dcm`) of
+    every file in `dicom_list`, and estimates the wallclock duration of the
+    run as the span between the earliest and latest timestamps, plus one
+    "sample interval" -- the median difference between consecutive distinct
+    timestamps -- to account for the fact that the last timestamp marks the
+    *onset*, not the end, of the final acquired volume/slice.
+
+    Using every DICOM file of the run (rather than just the first and last)
+    and a *median* interval makes the estimate robust to a handful of files
+    sharing a timestamp (e.g., multi-echo acquisitions).  Comparing full
+    datetimes (not just time-of-day strings) throughout also avoids
+    mishandling a scan that happens to straddle midnight.
+
+    Parameters
+    ----------
+    dicom_list : list of str
+        Paths to every DICOM file belonging to a single run/series.
+
+    Returns
+    -------
+    Optional[float]
+        Estimated duration in seconds, or None if fewer than two distinct
+        timestamps could be established (e.g., a single-file series, dates/
+        times stripped by anonymization, or all files sharing one timestamp).
+    """
+    timestamps = []
+    for fn in dicom_list:
+        dcm_data = dcm.dcmread(fn, stop_before_pixels=True, force=True)
+        dt = get_datetime_from_dcm(dcm_data)
+        if dt is not None:
+            timestamps.append(dt)
+    unique_timestamps = sorted(set(timestamps))
+    if len(unique_timestamps) < 2:
+        return None
+    intervals = sorted(
+        (t2 - t1).total_seconds()
+        for t1, t2 in zip(unique_timestamps[:-1], unique_timestamps[1:])
+    )
+    median_interval = intervals[len(intervals) // 2]
+    return (
+        unique_timestamps[-1] - unique_timestamps[0]
+    ).total_seconds() + median_interval
+
+
+def get_acquisition_duration(dicom_list: list[str]) -> Optional[float]:
+    """Determine the total wallclock duration, in seconds, of a run.
+
+    Parameters
+    ----------
+    dicom_list : list of str
+        Paths to every DICOM file belonging to a single run/series.  A
+        single representative file also works, but then only
+        :func:`get_dicom_acquisition_duration` has a chance of succeeding.
+
+    Returns
+    -------
+    Optional[float]
+        Duration in seconds, or None if it could not be determined.
+
+    Notes
+    -----
+    Tries, in order of preference:
+
+    1. :func:`get_dicom_acquisition_duration` on the first file -- covers
+       Enhanced MR/CT and classic GE DICOMs, which carry the duration
+       directly.
+    2. :func:`estimate_scan_duration_from_times`, using every file of the
+       run to approximate the wallclock span of the whole acquisition.
+    """
+    if not dicom_list:
+        return None
+    dcm_data = dcm.dcmread(dicom_list[0], stop_before_pixels=True, force=True)
+    duration = get_dicom_acquisition_duration(dcm_data)
+    if duration is not None:
+        return duration
+    return estimate_scan_duration_from_times(dicom_list)
+
+
 def compress_dicoms(
     dicom_list: list[str], out_prefix: str, tempdirs: TempDirs, overwrite: bool
 ) -> Optional[str]:

@@ -8,7 +8,12 @@ from types import TracebackType
 from typing import Any, Optional
 
 from . import __packagename__, __version__
-from .bids import populate_bids_templates, populate_intended_for, tuneup_bids_json_files
+from .bids import (
+    populate_bids_templates,
+    populate_intended_for,
+    populate_scans_duration,
+    tuneup_bids_json_files,
+)
 from .convert import prep_conversion
 from .due import Doi, due
 from .parser import get_study_sessions
@@ -61,16 +66,19 @@ def process_extra_commands(
     session: Optional[str],
     subjs: Optional[list[str]],
     grouping: str,
+    overwrite: bool = False,
 ) -> None:
     """
     Perform custom command instead of regular operations. Supported commands:
-    ['treat-json', 'ls', 'populate-templates', 'populate-intended-for']
+    ['treat-json', 'ls', 'populate-templates', 'populate-intended-for',
+    'populate-scans-duration']
 
     Parameters
     ----------
     outdir : str
         Output directory
-    command : {'treat-json', 'ls', 'populate-templates', 'populate-intended-for'}
+    command : {'treat-json', 'ls', 'populate-templates',
+               'populate-intended-for', 'populate-scans-duration'}
         Heudiconv command to run
     files : list of str or None
         List of files if command needs/expects it
@@ -82,6 +90,9 @@ def process_extra_commands(
         List of subject identifiers
     grouping : {'studyUID', 'accession_number', 'all', 'custom'}
         How to group dicoms.
+    overwrite : bool, optional
+        For 'populate-scans-duration': also recompute `duration` for scans
+        which already have a value. Default is False.
     """
 
     def ensure_has_files() -> None:
@@ -129,6 +140,11 @@ def process_extra_commands(
         ensure_has_files()
         assert files is not None  # for mypy now
         tuneup_bids_json_files(files)
+    elif command == "populate-scans-duration":
+        ensure_has_files()
+        assert files is not None  # for mypy now
+        for fname in files:
+            populate_scans_duration(fname, overwrite=overwrite)
     elif command == "heuristics":
         from .utils import get_known_heuristics_with_descriptions
 
@@ -304,7 +320,8 @@ def workflow(
     debug : bool, optional
         Do not catch exceptions and show exception traceback. Default is False.
     command : {'heuristics', 'heuristic-info', 'ls', 'populate-templates',
-               'sanitize-jsons', 'treat-jsons', 'populate-intended-for', None}, optional
+               'sanitize-jsons', 'treat-jsons', 'populate-intended-for',
+               'populate-scans-duration', None}, optional
         Custom action to be performed on provided files instead of regular
         operation. Default is None.
     grouping : {'studyUID', 'accession_number', 'all', 'custom'}, optional
@@ -384,6 +401,7 @@ def workflow(
             session,
             subjs,
             grouping,
+            overwrite,
         )
         return
     #

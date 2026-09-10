@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+from glob import glob
 from io import StringIO
 import logging
 import os
@@ -210,14 +211,17 @@ def test_get_formatted_scans_key_row() -> None:
     )
 
     row1 = get_formatted_scans_key_row(dcm_fn)
-    assert len(row1) == 3
+    assert len(row1) == 4
     assert row1[0] == "2016-10-14T09:26:34.692500"
+    # duration cannot be established from a single DICOM without an
+    # AcquisitionDuration-like tag
     assert row1[1] == "n/a"
-    prandstr1 = row1[2]
+    assert row1[2] == "n/a"
+    prandstr1 = row1[3]
 
     # if we rerun - should be identical!
     row2 = get_formatted_scans_key_row(dcm_fn)
-    prandstr2 = row2[2]
+    prandstr2 = row2[3]
     assert prandstr1 == prandstr2
     assert row1 == row2
     # So it is consistent across pythons etc, we use explicit value here
@@ -226,17 +230,23 @@ def test_get_formatted_scans_key_row() -> None:
     # but the prandstr should change when we consider another DICOM file
     row3 = get_formatted_scans_key_row("%s/01-anat-scout/0001.dcm" % TESTS_DATA_PATH)
     assert row3 != row1
-    prandstr3 = row3[2]
+    prandstr3 = row3[3]
     assert prandstr1 != prandstr3
     assert prandstr3 == "fae3befb"
+
+    # providing the full list of DICOMs for a run allows duration to be
+    # estimated from per-file acquisition timestamps
+    dicom_list = sorted(glob("%s/b0dwiForFmap/*.dcm" % TESTS_DATA_PATH))
+    row4 = get_formatted_scans_key_row(dicom_list)
+    assert float(row4[1]) == pytest.approx(12.45)
 
 
 # TODO: finish this
 def test_add_rows_to_scans_keys_file(tmp_path: Path) -> None:
     fn = opj(tmp_path, "file.tsv")
     rows = {
-        "my_file.nii.gz": ["2016adsfasd", "", "fasadfasdf"],
-        "another_file.nii.gz": ["2018xxxxx", "", "fasadfasdf"],
+        "my_file.nii.gz": ["2016adsfasd", "1.500", "", "fasadfasdf"],
+        "another_file.nii.gz": ["2018xxxxx", "n/a", "", "fasadfasdf"],
     }
     add_rows_to_scans_keys_file(fn, rows)
 
@@ -248,7 +258,13 @@ def test_add_rows_to_scans_keys_file(tmp_path: Path) -> None:
                 rows_loaded.append(row)
         for i, row_ in enumerate(rows_loaded):
             if i == 0:
-                assert row_ == ["filename", "acq_time", "operator", "randstr"]
+                assert row_ == [
+                    "filename",
+                    "acq_time",
+                    "duration",
+                    "operator",
+                    "randstr",
+                ]
             else:
                 assert rows[row_[0]] == row_[1:]
         # dates, filename should be sorted (date "first", filename "second")
@@ -261,9 +277,9 @@ def test_add_rows_to_scans_keys_file(tmp_path: Path) -> None:
     assert not op.exists(opj(tmp_path, "file.json"))
     # add a new one
     extra_rows = {
-        "a_new_file.nii.gz": ["2016adsfasd23", "", "fasadfasdf"],
-        "my_file.nii.gz": ["2016adsfasd", "", "fasadfasdf"],
-        "another_file.nii.gz": ["2018xxxxx", "", "fasadfasdf"],
+        "a_new_file.nii.gz": ["2016adsfasd23", "n/a", "", "fasadfasdf"],
+        "my_file.nii.gz": ["2016adsfasd", "1.500", "", "fasadfasdf"],
+        "another_file.nii.gz": ["2018xxxxx", "n/a", "", "fasadfasdf"],
     }
     add_rows_to_scans_keys_file(fn, extra_rows)
     _check_rows(fn, extra_rows)
