@@ -422,6 +422,28 @@ def test_estimate_scan_duration_from_times() -> None:
 
 
 @pytest.mark.ai_generated
+def test_estimate_scan_duration_from_times_even_intervals(tmp_path: Path) -> None:
+    # 5 timestamps -> 4 intervals (an even count): 1, 2, 4, 1 seconds.
+    # The true median is the average of the two middle (sorted) values,
+    # (1 + 2) / 2 == 1.5 -- not just "the" middle element of a 4-item list,
+    # which has no single middle element.
+    offsets = [0, 1, 3, 7, 8]
+    dicom_list = []
+    for i, offset in enumerate(offsets):
+        dcm_data = dcm.dcmread(
+            op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+        )
+        dcm_data.AcquisitionDate = "20200101"
+        dcm_data.AcquisitionTime = "%06d.000000" % (120000 + offset)
+        out = tmp_path / f"f{i}.dcm"
+        dcm.dcmwrite(str(out), dcm_data)
+        dicom_list.append(str(out))
+
+    # span (8s) + median interval (1.5s)
+    assert estimate_scan_duration_from_times(dicom_list) == pytest.approx(9.5)
+
+
+@pytest.mark.ai_generated
 def test_estimate_scan_duration_from_times_single_file() -> None:
     dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))[:1]
     assert estimate_scan_duration_from_times(dicom_list) is None

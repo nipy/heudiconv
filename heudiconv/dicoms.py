@@ -7,6 +7,7 @@ import logging
 import os
 import os.path as op
 from pathlib import Path
+import statistics
 import sys
 import tarfile
 from typing import (
@@ -29,6 +30,7 @@ import pydicom as dcm
 from .utils import (
     SeqInfo,
     TempDirs,
+    as_finite_positive_float,
     get_typed_attr,
     load_json,
     set_readonly,
@@ -597,20 +599,6 @@ _GE_ACQUISITION_DURATION_OFFSET = 0x5A
 _GE_ACQUISITION_DURATION_CREATOR = "GEMS_ACQU_01"
 
 
-def _as_positive_float(value: Any) -> Optional[float]:
-    """Parse `value` as a float, returning None if unparsable or <= 0.
-
-    A non-positive "duration" is not a usable one (some scanners write
-    ``AcquisitionDuration = 0`` for sequences which do not populate it), so
-    callers can treat None uniformly as "try the next method".
-    """
-    try:
-        parsed = float(value)
-    except (TypeError, ValueError):
-        return None
-    return parsed if parsed > 0 else None
-
-
 def get_dicom_acquisition_duration(dcm_data: dcm.Dataset) -> Optional[float]:
     """Extract the total scan duration directly from a DICOM tag, if present.
 
@@ -638,7 +626,7 @@ def get_dicom_acquisition_duration(dcm_data: dcm.Dataset) -> Optional[float]:
        "duration".
     """
     if (0x0018, 0x9073) in dcm_data:
-        duration = _as_positive_float(dcm_data[(0x0018, 0x9073)].value)
+        duration = as_finite_positive_float(dcm_data[(0x0018, 0x9073)].value)
         if duration is not None:
             return duration
 
@@ -650,7 +638,7 @@ def get_dicom_acquisition_duration(dcm_data: dcm.Dataset) -> Optional[float]:
         )
     except KeyError:
         return None
-    duration = _as_positive_float(elem.value)
+    duration = as_finite_positive_float(elem.value)
     return duration * 1e-6 if duration is not None else None
 
 
@@ -703,11 +691,14 @@ def estimate_scan_duration_from_times(dicom_list: list[str]) -> Optional[float]:
     unique_timestamps = sorted(set(timestamps))
     if len(unique_timestamps) < 2:
         return None
-    intervals = sorted(
+    intervals = [
         (t2 - t1).total_seconds()
         for t1, t2 in zip(unique_timestamps[:-1], unique_timestamps[1:])
-    )
-    median_interval = intervals[len(intervals) // 2]
+    ]
+    # statistics.median() (not a hand-rolled "middle of the sorted list")
+    # to get the *true* median -- averaging the two middle values -- when
+    # there is an even number of intervals
+    median_interval = statistics.median(intervals)
     return (
         unique_timestamps[-1] - unique_timestamps[0]
     ).total_seconds() + median_interval

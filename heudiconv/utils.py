@@ -10,6 +10,7 @@ import hashlib
 import json
 from json.decoder import JSONDecodeError
 import logging
+import math
 import os
 import os.path as op
 from pathlib import Path
@@ -566,6 +567,32 @@ def file_md5sum(filename: str) -> str:
         return hashlib.md5(f.read()).hexdigest()
 
 
+def as_finite_positive_float(value: Any) -> Optional[float]:
+    """Parse `value` as a float, or None if not a finite, strictly positive one.
+
+    Guards uniformly against values which are missing, non-numeric,
+    negative, zero, ``NaN``, or infinite -- e.g. a malformed or
+    placeholder metadata field -- so that callers can treat all of those
+    cases the same way ("value unusable, try something else") without
+    each having to special-case ``math.isfinite``/sign checks themselves.
+
+    Parameters
+    ----------
+    value : Any
+        Value to parse (e.g. read from a DICOM tag or a JSON sidecar).
+
+    Returns
+    -------
+    Optional[float]
+        The parsed value, or None if it does not qualify.
+    """
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if math.isfinite(parsed) and parsed > 0 else None
+
+
 def tar_extract_filter_kwargs() -> dict[str, str]:
     """kwargs to pass to a tar-extraction call to guard against unsafe members.
 
@@ -581,18 +608,79 @@ def tar_extract_filter_kwargs() -> dict[str, str]:
         ``{"filter": ...}`` on Python >= 3.12 (honoring the
         ``HEUDICONV_TAR_FILTER`` environment variable as an escape hatch for
         the rare legitimate archive the default "tar" filter would reject),
-        or ``{}`` on older Pythons (which do not accept the argument).
+        or ``{}`` on older Pythons, which do not accept the argument at all
+        -- callers extracting a ``tarfile.TarFile`` directly (rather than
+        via :func:`shutil.unpack_archive`) should use :func:`safe_extract_tar`
+        instead of relying on this dict alone, so that members are still
+        vetted manually pre-3.12 (see :func:`_safe_tar_members`).
     """
     if sys.version_info >= (3, 12):
         return {"filter": os.environ.get("HEUDICONV_TAR_FILTER", "tar")}
     return {}
 
 
+def _safe_tar_members(tar: tarfile.TarFile, dest: str) -> list[tarfile.TarInfo]:
+    """Filter `tar`'s members down to those safe to extract into `dest`.
+
+    Used as a manual stand-in, on Python < 3.12, for the member vetting
+    that :func:`tarfile.TarFile.extractall`'s ``filter="tar"`` performs
+    natively on 3.12+ (see :func:`tar_extract_filter_kwargs`). This is not
+    a byte-for-byte reimplementation of the builtin filter, but closes the
+    same attack surface for our purposes: it rejects members whose path
+    (or, for symlinks/hardlinks, link target) would resolve outside
+    `dest` -- via an absolute path or ``..`` traversal -- and rejects
+    device/FIFO/character-special members.
+
+    Parameters
+    ----------
+    tar : tarfile.TarFile
+        Open archive to filter members from.
+    dest : str
+        Destination directory extraction is intended for.
+
+    Returns
+    -------
+    list of tarfile.TarInfo
+        The subset of `tar`'s members judged safe to extract.
+    """
+    dest_real = op.realpath(dest)
+
+    def _resolves_within_dest(target: str) -> bool:
+        resolved = op.realpath(target)
+        return resolved == dest_real or resolved.startswith(dest_real + os.sep)
+
+    safe = []
+    for member in tar.getmembers():
+        if op.isabs(member.name) or not _resolves_within_dest(
+            op.join(dest, member.name)
+        ):
+            lgr.warning("Refusing to extract %r: escapes %s", member.name, dest)
+            continue
+        if member.isdev():
+            lgr.warning("Refusing to extract device/FIFO member %r", member.name)
+            continue
+        if (member.issym() or member.islnk()) and not _resolves_within_dest(
+            member.linkname
+            if op.isabs(member.linkname)
+            else op.join(dest, op.dirname(member.name), member.linkname)
+        ):
+            lgr.warning(
+                "Refusing to extract %r: link target escapes %s", member.name, dest
+            )
+            continue
+        safe.append(member)
+    return safe
+
+
 def safe_extract_tar(tarball: str, dest: str) -> None:
     """Extract a tar-based archive (``.tar``, ``.tar.gz``, ...) into `dest`.
 
-    Thin wrapper around :func:`tarfile.extractall` applying
-    :func:`tar_extract_filter_kwargs` for safety.
+    On Python >= 3.12, delegates member vetting to
+    :func:`tarfile.TarFile.extractall`'s own ``filter=`` support (see
+    :func:`tar_extract_filter_kwargs`). On older Pythons -- which do not
+    accept ``filter=`` at all -- members are vetted manually first, via
+    :func:`_safe_tar_members`, so this is safe to use on every Python
+    version heudiconv supports.
 
     Parameters
     ----------
@@ -602,7 +690,11 @@ def safe_extract_tar(tarball: str, dest: str) -> None:
         Destination directory (created by ``tarfile`` as needed).
     """
     with tarfile.open(tarball) as tar:
-        tar.extractall(dest, **tar_extract_filter_kwargs())  # type: ignore[arg-type]
+        kwargs = tar_extract_filter_kwargs()
+        if kwargs:
+            tar.extractall(dest, **kwargs)  # type: ignore[arg-type]
+        else:
+            tar.extractall(dest, members=_safe_tar_members(tar, dest))
 
 
 # Borrowed from DataLad (MIT license), with "archives" functionality commented

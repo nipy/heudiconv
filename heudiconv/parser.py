@@ -18,7 +18,7 @@ from .utils import (
     StudySessionInfo,
     TempDirs,
     docstring_parameter,
-    tar_extract_filter_kwargs,
+    safe_extract_tar,
 )
 
 lgr = logging.getLogger(__name__)
@@ -144,12 +144,13 @@ def get_extracted_dicoms(fl: Iterable[str]) -> ItemsView[Optional[str], list[str
 
         # check content and sanitize permission bits before extraction
         os.chmod(tmpdir, mode=0o700)
-        # For tar (only!) starting with 3.12 we should provide filter
-        # (enforced in 3.14) on how to filter/safe-guard filenames.
-        kws: dict[str, str] = (
-            tar_extract_filter_kwargs() if t.endswith(_TAR_UNPACK_FORMATS) else {}
-        )
-        shutil.unpack_archive(t, extract_dir=tmpdir, **kws)  # type: ignore[arg-type]
+        if t.endswith(_TAR_UNPACK_FORMATS):
+            # route through our own tar extraction, which vets members
+            # itself on Python versions where tarfile has no filter=
+            # support at all (< 3.12) rather than extracting unrestricted
+            safe_extract_tar(t, tmpdir)
+        else:
+            shutil.unpack_archive(t, extract_dir=tmpdir)
 
         archive_content = list(find_files(regex=".*", topdir=tmpdir))
 

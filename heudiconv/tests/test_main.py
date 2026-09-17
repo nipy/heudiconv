@@ -317,6 +317,49 @@ def test_add_rows_to_scans_keys_file_upgrades_older_header(tmp_path: Path) -> No
     assert by_filename["new_file.nii.gz"] == ["2018xxxxx", "1.500", "", "newrand01"]
 
 
+@pytest.mark.ai_generated
+def test_add_rows_to_scans_keys_file_preserves_custom_columns(tmp_path: Path) -> None:
+    # BIDS allows additional _scans.tsv columns beyond the ones heudiconv
+    # itself defines; adding a new row must not drop a dataset-specific
+    # column (here "notes") that an existing file already carries.
+    fn = opj(tmp_path, "file.tsv")
+    with open(fn, "w") as f:
+        f.write("filename\tacq_time\toperator\trandstr\tnotes\n")
+        f.write("old_file.nii.gz\t2016adsfasd\tDr. Old\toldrand01\thand-added\n")
+
+    add_rows_to_scans_keys_file(
+        fn, {"new_file.nii.gz": ["2018xxxxx", "1.500", "", "newrand01"]}
+    )
+
+    with open(fn) as f:
+        reader = csv.reader(f, delimiter="\t")
+        header, *rows = list(reader)
+    assert header == [
+        "filename",
+        "acq_time",
+        "duration",
+        "operator",
+        "randstr",
+        "notes",
+    ]
+    by_filename = {row[0]: row[1:] for row in rows}
+    assert by_filename["old_file.nii.gz"] == [
+        "2016adsfasd",
+        "n/a",
+        "Dr. Old",
+        "oldrand01",
+        "hand-added",
+    ]
+    # the new row has no value for the custom column -- filled with 'n/a'
+    assert by_filename["new_file.nii.gz"] == [
+        "2018xxxxx",
+        "1.500",
+        "",
+        "newrand01",
+        "n/a",
+    ]
+
+
 def test__find_subj_ses() -> None:
     assert find_subj_ses(
         "950_bids_test4/sub-phantom1sid1/fmap/"

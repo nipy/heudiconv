@@ -14,6 +14,7 @@ import os.path as op
 from pathlib import Path
 from random import choice, random, seed, shuffle
 import re
+import stat
 import string
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -27,13 +28,18 @@ from heudiconv.bids import (
     AllowedCriteriaForFmapAssignment,
     BIDSFile,
     KeyInfoForForce,
+    _duration_from_nifti_sidecar,
     _find_bids_dataset_root,
+    _get_retrospective_duration,
+    _is_within_directory,
+    _merge_scans_header,
     find_compatible_fmaps_for_run,
     find_compatible_fmaps_for_session,
     find_fmap_groups,
     get_key_info_for_fmap_assignment,
     get_shim_setting,
     maybe_na,
+    populate_bids_templates,
     populate_intended_for,
     populate_scans_duration,
     sanitize_label,
@@ -1662,6 +1668,29 @@ def _make_bids_dataset_stub(bids_root: Path) -> Path:
     return scans_tsv
 
 
+def _make_multivol_func_scan(
+    bids_root: Path,
+    tr: float = 2.0,
+    nvols: int = 10,
+    meta_extra: Optional[dict[str, Any]] = None,
+) -> None:
+    """Populate the func/ nifti+json created by `_make_bids_dataset_stub`.
+
+    Writes an `nvols`-volume image and a JSON sidecar with
+    ``RepetitionTime`` = `tr` (plus any `meta_extra` fields) -- the setup
+    shared by most `populate_scans_duration`/`_duration_from_nifti_sidecar`
+    nifti+json-fallback tests.
+    """
+    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
+    nibabel.Nifti1Image(np.zeros((2, 2, 2, nvols)), np.eye(4)).to_filename(
+        str(nifti_fn)
+    )
+    meta: dict[str, Any] = {"RepetitionTime": tr}
+    if meta_extra:
+        meta.update(meta_extra)
+    save_json(str(bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json"), meta)
+
+
 @pytest.mark.ai_generated
 def test_populate_scans_duration_from_sourcedata(tmp_path: Path) -> None:
     bids_root = tmp_path / "bids"
@@ -1694,53 +1723,37 @@ def test_populate_scans_duration_from_sourcedata(tmp_path: Path) -> None:
 
 
 @pytest.mark.ai_generated
-def test_populate_scans_duration_from_nifti_sidecar(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "nvols,expected",
+    [
+        (10, 20.0),  # multi-volume -- duration falls back to RepetitionTime x nvols
+        # single-volume (e.g. anatomical-like) run -- TR x nvols is not a
+        # sound estimate, and there is no sourcedata/ to fall back to:
+        (1, None),
+    ],
+)
+def test_populate_scans_duration_from_nifti_sidecar(
+    tmp_path: Path, nvols: int, expected: Optional[float]
+) -> None:
     bids_root = tmp_path / "bids"
     scans_tsv = _make_bids_dataset_stub(bids_root)
-    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
-    # a multi-volume run -- duration falls back to RepetitionTime x nvols:
-    nibabel.Nifti1Image(np.zeros((2, 2, 2, 10)), np.eye(4)).to_filename(str(nifti_fn))
-    save_json(
-        str(bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json"),
-        {"RepetitionTime": 2.0},
-    )
+    _make_multivol_func_scan(bids_root, nvols=nvols)
     # no sourcedata/ present -- only the nifti/json fallback is available
 
     populate_scans_duration(str(bids_root))
 
     _, rows = _read_scans_rows(scans_tsv)
-    assert float(rows[0]["duration"]) == pytest.approx(20.0)
-
-
-@pytest.mark.ai_generated
-def test_populate_scans_duration_single_volume_stays_na(tmp_path: Path) -> None:
-    bids_root = tmp_path / "bids"
-    scans_tsv = _make_bids_dataset_stub(bids_root)
-    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
-    # a single-volume (e.g. anatomical-like) run -- TR x nvols is not a sound
-    # estimate, and there is no sourcedata/ to fall back to:
-    nibabel.Nifti1Image(np.zeros((2, 2, 2)), np.eye(4)).to_filename(str(nifti_fn))
-    save_json(
-        str(bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json"),
-        {"RepetitionTime": 2.0},
-    )
-
-    populate_scans_duration(str(bids_root))
-
-    _, rows = _read_scans_rows(scans_tsv)
-    assert rows[0]["duration"] == "n/a"
+    if expected is None:
+        assert rows[0]["duration"] == "n/a"
+    else:
+        assert float(rows[0]["duration"]) == pytest.approx(expected)
 
 
 @pytest.mark.ai_generated
 def test_populate_scans_duration_overwrite(tmp_path: Path) -> None:
     bids_root = tmp_path / "bids"
     scans_tsv = _make_bids_dataset_stub(bids_root)
-    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
-    nibabel.Nifti1Image(np.zeros((2, 2, 2, 10)), np.eye(4)).to_filename(str(nifti_fn))
-    save_json(
-        str(bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json"),
-        {"RepetitionTime": 2.0},
-    )
+    _make_multivol_func_scan(bids_root)
     # pre-populate with a bogus value
     scans_tsv.write_text(
         "filename\tacq_time\tduration\n"
@@ -1769,12 +1782,7 @@ def test_populate_scans_duration_direct_file_path(tmp_path: Path) -> None:
     # pointing directly at a single '_scans.tsv' file also works
     bids_root = tmp_path / "bids"
     scans_tsv = _make_bids_dataset_stub(bids_root)
-    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
-    nibabel.Nifti1Image(np.zeros((2, 2, 2, 10)), np.eye(4)).to_filename(str(nifti_fn))
-    save_json(
-        str(bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json"),
-        {"RepetitionTime": 2.0},
-    )
+    _make_multivol_func_scan(bids_root)
 
     populate_scans_duration(str(scans_tsv))
 
@@ -1791,12 +1799,7 @@ def test_populate_scans_duration_tarball_present_but_unusable_falls_back(
     # tag) -- should transparently fall through to the nifti/json sidecar
     bids_root = tmp_path / "bids"
     scans_tsv = _make_bids_dataset_stub(bids_root)
-    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
-    nibabel.Nifti1Image(np.zeros((2, 2, 2, 10)), np.eye(4)).to_filename(str(nifti_fn))
-    save_json(
-        str(bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json"),
-        {"RepetitionTime": 2.0},
-    )
+    _make_multivol_func_scan(bids_root)
 
     # a single-file "series" cannot yield a duration on its own (neither a
     # tag nor >= 2 timestamps to estimate from)
@@ -1820,12 +1823,7 @@ def test_populate_scans_duration_tarball_present_but_unusable_falls_back(
 def test_populate_scans_duration_via_cli(tmp_path: Path) -> None:
     bids_root = tmp_path / "bids"
     scans_tsv = _make_bids_dataset_stub(bids_root)
-    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
-    nibabel.Nifti1Image(np.zeros((2, 2, 2, 10)), np.eye(4)).to_filename(str(nifti_fn))
-    save_json(
-        str(bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json"),
-        {"RepetitionTime": 2.0},
-    )
+    _make_multivol_func_scan(bids_root)
     # pre-populate with a bogus value to also exercise --overwrite
     scans_tsv.write_text(
         "filename\tacq_time\tduration\n"
@@ -1855,3 +1853,205 @@ def test_find_bids_dataset_root(tmp_path: Path) -> None:
 
     (tmp_path / "dataset_description.json").write_text("{}")
     assert _find_bids_dataset_root(str(session_dir)) == str(tmp_path)
+
+
+@pytest.mark.ai_generated
+def test_populate_scans_duration_tarball_error_falls_back(tmp_path: Path) -> None:
+    # a *corrupt* sourcedata tarball must not abort the whole row (let
+    # alone the whole file) -- it should fall through to the sidecar
+    # estimate exactly as a merely-unusable one does
+    bids_root = tmp_path / "bids"
+    scans_tsv = _make_bids_dataset_stub(bids_root)
+    _make_multivol_func_scan(bids_root)
+
+    sourcedata_dir = bids_root / "sourcedata" / "sub-01" / "func"
+    sourcedata_dir.mkdir(parents=True)
+    (sourcedata_dir / "sub-01_task-rest_bold.dicom.tgz").write_bytes(b"not a tarball")
+
+    populate_scans_duration(str(bids_root))
+
+    _, rows = _read_scans_rows(scans_tsv)
+    assert float(rows[0]["duration"]) == pytest.approx(20.0)
+
+
+@pytest.mark.ai_generated
+def test_get_retrospective_duration_tolerates_corrupt_tarball(tmp_path: Path) -> None:
+    bids_root = tmp_path / "bids"
+    _make_bids_dataset_stub(bids_root)
+    _make_multivol_func_scan(bids_root)
+    sourcedata_dir = bids_root / "sourcedata" / "sub-01" / "func"
+    sourcedata_dir.mkdir(parents=True)
+    (sourcedata_dir / "sub-01_task-rest_bold.dicom.tgz").write_bytes(b"garbage")
+
+    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
+    # must not raise -- falls through to the sidecar estimate
+    assert _get_retrospective_duration(str(nifti_fn), str(bids_root)) == pytest.approx(
+        20.0
+    )
+
+
+@pytest.mark.ai_generated
+def test_populate_scans_duration_header_only_file_still_migrated(
+    tmp_path: Path,
+) -> None:
+    # a legacy _scans.tsv with a header but no data rows should still gain
+    # the 'duration' column (and the dataset get its scans.json synced),
+    # rather than being left untouched just because there is nothing to
+    # compute a per-row value for
+    bids_root = tmp_path / "bids"
+    (bids_root / "sub-01").mkdir(parents=True)
+    save_json(
+        str(bids_root / "dataset_description.json"),
+        {"Name": "test", "BIDSVersion": "1.8.0"},
+    )
+    scans_tsv = bids_root / "sub-01" / "sub-01_scans.tsv"
+    scans_tsv.write_text("filename\tacq_time\n")
+
+    populate_scans_duration(str(bids_root))
+
+    fieldnames, rows = _read_scans_rows(scans_tsv)
+    assert fieldnames == ["filename", "acq_time", "duration"]
+    assert rows == []
+    scans_json = load_json(str(bids_root / "scans.json"))
+    assert "duration" in scans_json
+
+
+@pytest.mark.ai_generated
+def test_populate_scans_duration_preserves_permissions(tmp_path: Path) -> None:
+    bids_root = tmp_path / "bids"
+    scans_tsv = _make_bids_dataset_stub(bids_root)
+    _make_multivol_func_scan(bids_root)
+    os.chmod(scans_tsv, 0o664)
+
+    populate_scans_duration(str(bids_root))
+
+    assert stat.S_IMODE(os.stat(scans_tsv).st_mode) == 0o664
+
+
+@pytest.mark.ai_generated
+def test_duration_from_nifti_sidecar_prefers_acquisition_duration(
+    tmp_path: Path,
+) -> None:
+    bids_root = tmp_path / "bids"
+    _make_bids_dataset_stub(bids_root)
+    # AcquisitionDuration disagrees with what TR x nvols would give --
+    # confirm the (exact) sidecar value wins
+    _make_multivol_func_scan(
+        bids_root, tr=2.0, nvols=10, meta_extra={"AcquisitionDuration": 17.5}
+    )
+
+    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
+    assert _duration_from_nifti_sidecar(str(nifti_fn)) == pytest.approx(17.5)
+
+
+@pytest.mark.ai_generated
+def test_duration_from_nifti_sidecar_ignores_acquisition_duration_with_volume_timing(
+    tmp_path: Path,
+) -> None:
+    bids_root = tmp_path / "bids"
+    _make_bids_dataset_stub(bids_root)
+    _make_multivol_func_scan(
+        bids_root,
+        tr=2.0,
+        nvols=10,
+        meta_extra={
+            "AcquisitionDuration": 17.5,
+            "VolumeTiming": [0.0, 2.0, 4.0],
+        },
+    )
+
+    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
+    # falls through to RepetitionTime x nvols instead of the (per-volume,
+    # in this context) AcquisitionDuration
+    assert _duration_from_nifti_sidecar(str(nifti_fn)) == pytest.approx(20.0)
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize("bad_tr", [-1.0, 0, float("nan"), float("inf"), "abc"])
+def test_duration_from_nifti_sidecar_rejects_invalid_repetition_time(
+    tmp_path: Path, bad_tr: Any
+) -> None:
+    bids_root = tmp_path / "bids"
+    _make_bids_dataset_stub(bids_root)
+    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
+    nibabel.Nifti1Image(np.zeros((2, 2, 2, 10)), np.eye(4)).to_filename(str(nifti_fn))
+    save_json(
+        str(bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json"),
+        {"RepetitionTime": bad_tr},
+    )
+
+    assert _duration_from_nifti_sidecar(str(nifti_fn)) is None
+
+
+@pytest.mark.ai_generated
+def test_is_within_directory() -> None:
+    assert _is_within_directory("/a/b/c", "/a/b")
+    assert _is_within_directory("/a/b", "/a/b")
+    assert not _is_within_directory("/a/c", "/a/b")
+    assert not _is_within_directory("/a/bc", "/a/b")
+
+
+@pytest.mark.ai_generated
+def test_is_within_directory_resolves_symlinks(tmp_path: Path) -> None:
+    inside = tmp_path / "inside"
+    outside = tmp_path / "outside"
+    inside.mkdir()
+    outside.mkdir()
+    escape_link = inside / "escape"
+    escape_link.symlink_to(outside, target_is_directory=True)
+
+    # lexically under `inside`, but resolves outside of it
+    assert not _is_within_directory(str(escape_link / "file.nii.gz"), str(inside))
+    assert _is_within_directory(str(inside / "file.nii.gz"), str(inside))
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "existing_header,additions,expected",
+    [
+        (
+            ["filename", "acq_time"],
+            ["filename", "acq_time", "duration"],
+            ["filename", "acq_time", "duration"],
+        ),
+        (
+            ["filename", "acq_time", "duration"],
+            ["filename", "acq_time", "duration"],
+            ["filename", "acq_time", "duration"],
+        ),
+        (
+            ["filename"],
+            ["filename", "acq_time", "duration"],
+            ["filename", "acq_time", "duration"],
+        ),
+        # a custom, dataset-specific column is preserved as-is
+        (
+            ["filename", "acq_time", "notes"],
+            ["filename", "acq_time", "duration"],
+            ["filename", "acq_time", "duration", "notes"],
+        ),
+    ],
+)
+def test_merge_scans_header(
+    existing_header: list[str], additions: list[str], expected: list[str]
+) -> None:
+    assert _merge_scans_header(existing_header, additions) == expected
+
+
+@pytest.mark.ai_generated
+def test_populate_bids_templates_syncs_existing_scans_json(tmp_path: Path) -> None:
+    # a scans.json predating "duration" should gain it (without losing any
+    # user-added key) the next time BIDS templates are (re-)populated,
+    # rather than only ever being brought up to date by the retrospective
+    # populate_scans_duration() backfill
+    save_json(
+        str(tmp_path / "scans.json"),
+        {"acq_time": {"Description": "old"}, "MyCustomField": {"Description": "x"}},
+    )
+
+    populate_bids_templates(str(tmp_path))
+
+    scans_json = load_json(str(tmp_path / "scans.json"))
+    assert "duration" in scans_json
+    assert scans_json["acq_time"] == {"Description": "old"}  # untouched
+    assert scans_json["MyCustomField"] == {"Description": "x"}  # untouched
