@@ -400,15 +400,14 @@ def test_safe_tar_members_rejects_escaping_members(tmp_path: Path) -> None:
 
 
 @pytest.mark.ai_generated
-def test_safe_extract_tar_manual_fallback_matches_native_filtering(
+def test_safe_extract_tar_manual_fallback_when_filter_unsupported(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # force the pre-3.12 manual-vetting code path regardless of the Python
-    # version actually running the tests, and confirm a malicious member is
-    # still rejected rather than silently extracted
+    # simulate a tarfile.extractall() predating the filter= backport (a
+    # TypeError on that keyword), and confirm safe_extract_tar() falls
+    # back to vetting members itself rather than propagating the error
     import tarfile
-
-    monkeypatch.setattr("heudiconv.utils.tar_extract_filter_kwargs", lambda: {})
+    import warnings
 
     tarball = tmp_path / "evil.tar"
     with tarfile.open(tarball, "w") as tar:
@@ -418,6 +417,25 @@ def test_safe_extract_tar_manual_fallback_matches_native_filtering(
         traversal = tarfile.TarInfo("../escaped.txt")
         traversal.size = 0
         tar.addfile(traversal, io.BytesIO(b""))
+
+    real_extractall = tarfile.TarFile.extractall
+
+    def _extractall_without_filter_support(
+        self: tarfile.TarFile, *args: Any, **kwargs: Any
+    ) -> None:
+        if "filter" in kwargs:
+            raise TypeError("extractall() got an unexpected keyword argument 'filter'")
+        # a genuinely old tarfile also predates the DeprecationWarning
+        # tarfile.extractall() emits on a *current* interpreter when no
+        # filter= is given -- that warning was introduced by the very same
+        # security backport that added filter= support in the first place
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            real_extractall(self, *args, **kwargs)
+
+    monkeypatch.setattr(
+        tarfile.TarFile, "extractall", _extractall_without_filter_support
+    )
 
     dest = tmp_path / "dest"
     dest.mkdir()

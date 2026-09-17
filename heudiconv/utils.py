@@ -593,43 +593,17 @@ def as_finite_positive_float(value: Any) -> Optional[float]:
     return parsed if math.isfinite(parsed) and parsed > 0 else None
 
 
-def tar_extract_filter_kwargs() -> dict[str, str]:
-    """kwargs to pass to a tar-extraction call to guard against unsafe members.
-
-    On Python >= 3.12, ``tarfile``/``shutil.unpack_archive`` accept a
-    ``filter=`` argument controlling which archive members (absolute paths,
-    path traversal, device files, ...) are allowed to be extracted; Python
-    3.14 will make this mandatory by defaulting to the safest filter.  See
-    https://docs.python.org/3/library/tarfile.html#tarfile-extraction-filter
-
-    Returns
-    -------
-    dict
-        ``{"filter": ...}`` on Python >= 3.12 (honoring the
-        ``HEUDICONV_TAR_FILTER`` environment variable as an escape hatch for
-        the rare legitimate archive the default "tar" filter would reject),
-        or ``{}`` on older Pythons, which do not accept the argument at all
-        -- callers extracting a ``tarfile.TarFile`` directly (rather than
-        via :func:`shutil.unpack_archive`) should use :func:`safe_extract_tar`
-        instead of relying on this dict alone, so that members are still
-        vetted manually pre-3.12 (see :func:`_safe_tar_members`).
-    """
-    if sys.version_info >= (3, 12):
-        return {"filter": os.environ.get("HEUDICONV_TAR_FILTER", "tar")}
-    return {}
-
-
 def _safe_tar_members(tar: tarfile.TarFile, dest: str) -> list[tarfile.TarInfo]:
     """Filter `tar`'s members down to those safe to extract into `dest`.
 
-    Used as a manual stand-in, on Python < 3.12, for the member vetting
-    that :func:`tarfile.TarFile.extractall`'s ``filter="tar"`` performs
-    natively on 3.12+ (see :func:`tar_extract_filter_kwargs`). This is not
-    a byte-for-byte reimplementation of the builtin filter, but closes the
-    same attack surface for our purposes: it rejects members whose path
-    (or, for symlinks/hardlinks, link target) would resolve outside
-    `dest` -- via an absolute path or ``..`` traversal -- and rejects
-    device/FIFO/character-special members.
+    Used as a manual stand-in for the member vetting that
+    :func:`tarfile.TarFile.extractall`'s ``filter=`` performs natively,
+    for the rare case that support is unavailable at all (see
+    :func:`safe_extract_tar`). This is not a byte-for-byte reimplementation
+    of the builtin filter, but closes the same attack surface for our
+    purposes: it rejects members whose path (or, for symlinks/hardlinks,
+    link target) would resolve outside `dest` -- via an absolute path or
+    ``..`` traversal -- and rejects device/FIFO/character-special members.
 
     Parameters
     ----------
@@ -675,12 +649,22 @@ def _safe_tar_members(tar: tarfile.TarFile, dest: str) -> list[tarfile.TarInfo]:
 def safe_extract_tar(tarball: str, dest: str) -> None:
     """Extract a tar-based archive (``.tar``, ``.tar.gz``, ...) into `dest`.
 
-    On Python >= 3.12, delegates member vetting to
-    :func:`tarfile.TarFile.extractall`'s own ``filter=`` support (see
-    :func:`tar_extract_filter_kwargs`). On older Pythons -- which do not
-    accept ``filter=`` at all -- members are vetted manually first, via
-    :func:`_safe_tar_members`, so this is safe to use on every Python
-    version heudiconv supports.
+    Always *attempts* to pass ``filter=`` to
+    :func:`tarfile.TarFile.extractall`, which rejects unsafe members
+    (absolute paths, ``..`` traversal, device files, ...); Python 3.14
+    will make this the default behavior. Rather than gating that attempt
+    on a ``sys.version_info`` check, this tries it unconditionally and
+    only falls back on ``TypeError``: security fixes backporting ``filter``
+    support landed in 3.8.17, 3.9.17, 3.10.12, and 3.11.4 as well as
+    natively in 3.12+ (see
+    https://docs.python.org/3/library/tarfile.html#tarfile-extraction-filter),
+    so checking the running interpreter's actual capability is both
+    simpler and more accurate than trying to track every patch release
+    that matters.
+
+    On the rare Python predating all of those (a genuine ``TypeError``),
+    members are vetted manually first, via :func:`_safe_tar_members`, so
+    this is safe to use on every Python version heudiconv supports.
 
     Parameters
     ----------
@@ -689,11 +673,11 @@ def safe_extract_tar(tarball: str, dest: str) -> None:
     dest : str
         Destination directory (created by ``tarfile`` as needed).
     """
+    tar_filter = os.environ.get("HEUDICONV_TAR_FILTER", "tar")
     with tarfile.open(tarball) as tar:
-        kwargs = tar_extract_filter_kwargs()
-        if kwargs:
-            tar.extractall(dest, **kwargs)  # type: ignore[arg-type]
-        else:
+        try:
+            tar.extractall(dest, filter=tar_filter)  # type: ignore[arg-type]
+        except TypeError:
             tar.extractall(dest, members=_safe_tar_members(tar, dest))
 
 
