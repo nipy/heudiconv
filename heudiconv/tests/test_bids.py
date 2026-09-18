@@ -8,11 +8,13 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 from glob import glob
 import itertools
+import logging
 import os
 import os.path as op
 from pathlib import Path
 from random import choice, random, seed, shuffle
 import re
+import shutil
 import string
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -1573,6 +1575,103 @@ def test_BIDSFile() -> None:
     # -for an existing entity, you can overwrite it with "set":
     my_bids_file.set("echo", "2")
     assert my_bids_file["echo"] == "2"
+
+
+@pytest.mark.parametrize(
+    "shuffled,expected",
+    [
+        # entities which heudiconv itself adds, all of them at once
+        (
+            "sub-1_chunk-2_part-mag_echo-1_acq-A_dir-AP_ses-B_run-3_rec-C_ce-D_task-E",
+            "sub-1_ses-B_task-E_acq-A_ce-D_rec-C_dir-AP_run-3_echo-1_part-mag_chunk-2",
+        ),
+        # entities from the non-MR modalities, which the entity table
+        # interleaves with the ones above
+        (
+            "sub-1_stain-A_nuc-1H_trc-C_voi-D_tracksys-E_acq-F_task-G",
+            "sub-1_task-G_tracksys-E_acq-F_nuc-1H_voi-D_trc-C_stain-A",
+        ),
+        # entities we never produce ourselves still have to round-trip
+        ("sub-1_space-T1w_hemi-L_run-1", "sub-1_run-1_hemi-L_space-T1w"),
+    ],
+)
+@pytest.mark.ai_generated
+def test_BIDSFile_entity_order(shuffled: str, expected: str) -> None:
+    """__str__ must order entities as the BIDS entity table mandates"""
+    assert str(BIDSFile.parse(shuffled + "_T1w.nii.gz")) == expected + "_T1w.nii.gz"
+
+
+@pytest.mark.ai_generated
+def test_BIDSFile_unknown_entities(caplog: pytest.LogCaptureFixture) -> None:
+    """Entities we do not know about must be kept, not silently dropped"""
+    with caplog.at_level(logging.WARNING):
+        out = str(BIDSFile.parse("sub-1_run-1_madeup-X_T1w.nii.gz"))
+    assert out == "sub-1_run-1_madeup-X_T1w.nii.gz"
+    assert "madeup" in caplog.text
+
+
+@pytest.mark.ai_generated
+def test_convert_multiorient(
+    tmp_path: Path,
+    heuristic: str = "bids_localizer.py",
+    subID: str = "loc",
+) -> None:
+    """Test conversion of a series which dcm2niix splits into several images
+    because they were acquired with different orientations (a 3-plane
+    localizer): each of them should get its own `chunk-` index.
+    """
+    datadir = op.join(TESTS_DATA_PATH, "01-localizer_64ch")
+    outdir = tmp_path / "out"
+    outdir.mkdir()
+    args = gen_heudiconv_args(datadir, str(outdir), subID, heuristic)
+    runner(args)
+
+    anatdir = outdir / f"sub-{subID}" / "anat"
+    expected = {
+        f"sub-{subID}_chunk-{chunk}_localizer.{ext}"
+        for chunk in (1, 2, 3)
+        for ext in ("nii.gz", "json")
+    }
+    # nothing more, nothing less -- in particular no file left with the
+    # dcm2niix `_i0000<N>` postfix or with a mangled suffix
+    assert {f.name for f in anatdir.iterdir()} == expected
+
+
+@pytest.mark.ai_generated
+def test_convert_multiorient_nonunique(
+    tmp_path: Path,
+    heuristic: str = "bids_localizer.py",
+    subID: str = "loc",
+) -> None:
+    """dcm2niix splits a series on more than the orientation, so it can produce
+    two images which share one.  `chunk-` cannot tell those apart, and we must
+    not end up overwriting (or failing to move onto) our own output.
+    """
+    import pydicom
+
+    datadir = tmp_path / "dicoms"
+    shutil.copytree(op.join(TESTS_DATA_PATH, "01-localizer_64ch"), datadir)
+    # add a 4th image repeating the 1st one's orientation, at a different
+    # matrix size so that dcm2niix writes it out separately
+    ds = pydicom.dcmread(sorted(datadir.iterdir())[0])
+    arr = ds.pixel_array[::2, ::2]
+    ds.PixelData = arr.tobytes()
+    ds.Rows, ds.Columns = arr.shape
+    ds.PixelSpacing = [float(v) * 2 for v in ds.PixelSpacing]
+    ds.SOPInstanceUID = pydicom.uid.generate_uid()
+    ds.InstanceNumber = 99
+    ds.save_as(datadir / "extra.dcm")
+
+    outdir = tmp_path / "out"
+    outdir.mkdir()
+    runner(gen_heudiconv_args(str(datadir), str(outdir), subID, heuristic))
+
+    niftis = sorted((outdir / f"sub-{subID}" / "anat").glob("*.nii.gz"))
+    # every converted image is still there, under a name of its own
+    assert len(niftis) == 4
+    assert len({f.name for f in niftis}) == 4
+    # and since chunk- could not do it, none of them claims to be a chunk
+    assert not any("chunk-" in f.name for f in niftis)
 
 
 @pytest.mark.skipif(not have_datalad, reason="no datalad")
