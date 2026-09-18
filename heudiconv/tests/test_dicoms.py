@@ -5,6 +5,7 @@ from glob import glob
 import json
 import os.path as op
 from pathlib import Path
+from typing import Any
 
 import pydicom as dcm
 import pytest
@@ -15,8 +16,12 @@ from heudiconv.dicoms import (
     create_seqinfo,
     dw,
     embed_dicom_and_nifti_metadata,
+    estimate_scan_duration_from_times,
+    get_acquisition_duration,
     get_datetime_from_dcm,
     get_datetime_strings_from_dcm,
+    get_dicom_acquisition_duration,
+    get_dicom_declared_acquisition_duration,
     get_reproducible_int,
     group_dicoms_into_seqinfos,
     parse_private_csa_header,
@@ -329,3 +334,253 @@ def test_get_reproducible_int_raises_assertion_wo_dt(tmp_path: Path) -> None:
     dcm.dcmwrite(tmp_path, XA30_enhanced_dcm)
     with pytest.raises(AssertionError):
         get_reproducible_int([str(tmp_path)])
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize("dcmfile", TEST_DICOM_PATHS)
+def test_get_dicom_acquisition_duration_absent(dcmfile: str) -> None:
+    # none of our test DICOMs carry AcquisitionDuration-like tags
+    dcm_data = dcm.dcmread(dcmfile, stop_before_pixels=True, force=True)
+    assert get_dicom_acquisition_duration(dcm_data) is None
+
+
+# GE private tag block is only recognized under its own private creator, so
+# every case which sets (0019,105A) also sets (0019,0010) accordingly.
+_GE_CREATOR_TAG = (0x0019, 0x0010)
+_GE_DURATION_TAG = (0x0019, 0x105A)
+_GE_CREATOR = "GEMS_ACQU_01"
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "tags,expected",
+    [
+        # standard tag alone
+        pytest.param({(0x0018, 0x9073): ("FD", 12.5)}, 12.5, id="standard"),
+        # GE private tag alone, under its recognized private creator
+        pytest.param(
+            {
+                _GE_CREATOR_TAG: ("LO", _GE_CREATOR),
+                _GE_DURATION_TAG: ("FL", 3.0118515e08),
+            },
+            pytest.approx(301.185, rel=1e-3),
+            id="ge_private",
+        ),
+        # both present -- the standard tag takes precedence
+        pytest.param(
+            {
+                (0x0018, 0x9073): ("FD", 12.5),
+                _GE_CREATOR_TAG: ("LO", _GE_CREATOR),
+                _GE_DURATION_TAG: ("FL", 999e6),
+            },
+            12.5,
+            id="prefers_standard",
+        ),
+    ],
+)
+def test_get_dicom_acquisition_duration(
+    tags: dict[tuple[int, int], tuple[str, Any]], expected: float
+) -> None:
+    dcm_data = dcm.dcmread(
+        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+    )
+    for tag, (vr, value) in tags.items():
+        dcm_data.add_new(tag, vr, value)
+    assert get_dicom_acquisition_duration(dcm_data) == expected
+
+
+@pytest.mark.ai_generated
+def test_get_dicom_acquisition_duration_ge_tag_wrong_creator() -> None:
+    # private group 0019 is used differently by different vendors -- an
+    # element at the GE offset under an unrelated creator block must not be
+    # mistaken for GE's Acquisition Duration
+    dcm_data = dcm.dcmread(
+        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+    )
+    dcm_data.add_new(_GE_CREATOR_TAG, "LO", "SOME_OTHER_VENDOR_01")
+    dcm_data.add_new(_GE_DURATION_TAG, "FL", 3.0118515e08)
+    assert get_dicom_acquisition_duration(dcm_data) is None
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize("value", [0.0, -5.0])
+def test_get_dicom_acquisition_duration_non_positive(value: float) -> None:
+    # e.g. some scanners write AcquisitionDuration = 0 when unpopulated;
+    # that is not a usable duration
+    dcm_data = dcm.dcmread(
+        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+    )
+    dcm_data.add_new((0x0018, 0x9073), "FD", value)
+    assert get_dicom_acquisition_duration(dcm_data) is None
+
+
+@pytest.mark.ai_generated
+def test_get_dicom_declared_acquisition_duration() -> None:
+    # phantom.dcm is real Siemens data whose embedded CSA series header
+    # protocol dump carries "lTotalScanTimeSec = 14"
+    dcm_data = dcm.dcmread(
+        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+    )
+    assert get_dicom_declared_acquisition_duration(dcm_data) == pytest.approx(14.0)
+
+
+@pytest.mark.ai_generated
+def test_get_dicom_declared_acquisition_duration_absent() -> None:
+    # remove the CSA series header info to test the genuinely-absent case
+    # (e.g. non-Siemens data, or anonymization having stripped it)
+    dcm_data = dcm.dcmread(
+        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+    )
+    del dcm_data[(0x0029, 0x1020)]
+    assert get_dicom_declared_acquisition_duration(dcm_data) is None
+
+
+@pytest.mark.ai_generated
+def test_estimate_scan_duration_from_times() -> None:
+    # 3 DICOMs, ~4.15s apart -- duration is the span plus one more interval
+    dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))
+    assert len(dicom_list) == 3
+    assert estimate_scan_duration_from_times(dicom_list) == pytest.approx(12.45)
+
+
+@pytest.mark.ai_generated
+def test_estimate_scan_duration_from_times_even_intervals(tmp_path: Path) -> None:
+    # 5 timestamps -> 4 intervals (an even count): 1, 2, 4, 1 seconds.
+    # The true median is the average of the two middle (sorted) values,
+    # (1 + 2) / 2 == 1.5 -- not just "the" middle element of a 4-item list,
+    # which has no single middle element.
+    offsets = [0, 1, 3, 7, 8]
+    dicom_list = []
+    for i, offset in enumerate(offsets):
+        dcm_data = dcm.dcmread(
+            op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+        )
+        dcm_data.AcquisitionDate = "20200101"
+        dcm_data.AcquisitionTime = "%06d.000000" % (120000 + offset)
+        out = tmp_path / f"f{i}.dcm"
+        dcm.dcmwrite(str(out), dcm_data)
+        dicom_list.append(str(out))
+
+    # span (8s) + median interval (1.5s)
+    assert estimate_scan_duration_from_times(dicom_list) == pytest.approx(9.5)
+
+
+@pytest.mark.ai_generated
+def test_estimate_scan_duration_from_times_skips_malformed_timestamp(
+    tmp_path: Path,
+) -> None:
+    # a malformed date/time in one (non-first) file should be skipped with
+    # a warning, not raise and abort the whole (best-effort) estimate
+    import warnings
+
+    import pydicom.config as dcm_config
+
+    offsets = [0, 1, 3]
+    dicom_list = []
+    for i, offset in enumerate(offsets):
+        dcm_data = dcm.dcmread(
+            op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+        )
+        dcm_data.AcquisitionDate = "20200101"
+        if i == 1:
+            # bypass pydicom's own VR validation so a genuinely malformed
+            # value (as could come from a non-conformant scanner) can be
+            # written out for this test
+            old_mode = dcm_config.settings.writing_validation_mode
+            dcm_config.settings.writing_validation_mode = dcm_config.IGNORE
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    dcm_data.AcquisitionTime = "not-a-time"
+            finally:
+                dcm_config.settings.writing_validation_mode = old_mode
+        else:
+            dcm_data.AcquisitionTime = "%06d.000000" % (120000 + offset)
+        out = tmp_path / f"f{i}.dcm"
+        dcm.dcmwrite(str(out), dcm_data)
+        dicom_list.append(str(out))
+
+    # the malformed file (offset 1) is skipped; span (3s) + median interval
+    # of the remaining single interval (3s) between the two good timestamps
+    assert estimate_scan_duration_from_times(dicom_list) == pytest.approx(6.0)
+
+
+@pytest.mark.ai_generated
+def test_estimate_scan_duration_from_times_single_file() -> None:
+    dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))[:1]
+    assert estimate_scan_duration_from_times(dicom_list) is None
+
+
+@pytest.mark.ai_generated
+def test_estimate_scan_duration_from_times_wo_dt(tmp_path: Path) -> None:
+    # no usable date/time information (e.g. stripped by anonymization) --
+    # use two distinct files, so this also rules out the "single unique
+    # timestamp" case rather than just a single-file list
+    outs = []
+    for i in range(2):
+        dcm_data = dcm.dcmread(
+            op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+        )
+        for field in (
+            "AcquisitionDate",
+            "AcquisitionTime",
+            "AcquisitionDateTime",
+            "SeriesDate",
+            "SeriesTime",
+        ):
+            if field in dcm_data:
+                delattr(dcm_data, field)
+        out = tmp_path / f"no_dt_{i}.dcm"
+        dcm.dcmwrite(str(out), dcm_data)
+        outs.append(str(out))
+    assert estimate_scan_duration_from_times(outs) is None
+
+
+@pytest.mark.ai_generated
+def test_get_acquisition_duration_empty() -> None:
+    assert get_acquisition_duration([]) is None
+
+
+@pytest.mark.ai_generated
+def test_get_acquisition_duration_prefers_tag(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # when a tag is present, the (more expensive) per-file timestamp scan
+    # should not even be attempted
+    def _boom(_dicom_list: list[str]) -> float:
+        raise AssertionError("should not be called")
+
+    monkeypatch.setattr("heudiconv.dicoms.estimate_scan_duration_from_times", _boom)
+    dcm_data = dcm.dcmread(
+        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+    )
+    dcm_data.add_new((0x0018, 0x9073), "FD", 12.5)
+    out = tmp_path / "with_tag.dcm"
+    dcm.dcmwrite(str(out), dcm_data)
+    assert get_acquisition_duration([str(out)]) == pytest.approx(12.5)
+
+
+@pytest.mark.ai_generated
+def test_get_acquisition_duration_falls_back_to_times() -> None:
+    dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))
+    assert get_acquisition_duration(dicom_list) == pytest.approx(12.45)
+
+
+@pytest.mark.ai_generated
+def test_get_acquisition_duration_falls_back_to_declared_duration() -> None:
+    # a single-volume 3D sequence (e.g. an MPRAGE T1w): every file shares
+    # one AcquisitionTime, so estimate_scan_duration_from_times() cannot
+    # find two distinct timestamps to work with -- Siemens' own declared
+    # duration (embedded in this real fixture's CSA header) is the only
+    # source left
+    dcm_fn = op.join(TESTS_DATA_PATH, "phantom.dcm")
+    assert get_acquisition_duration([dcm_fn]) == pytest.approx(14.0)
+
+
+@pytest.mark.ai_generated
+def test_get_acquisition_duration_prefers_times_over_declared_duration() -> None:
+    # this fixture's own CSA header declares 591s (see test_dicoms data),
+    # wildly more than its real per-file timestamp span (12.45s) -- since a
+    # multi-file timestamp span IS available here, it must be preferred
+    dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))
+    assert get_acquisition_duration(dicom_list) == pytest.approx(12.45)
