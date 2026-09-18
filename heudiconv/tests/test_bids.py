@@ -1945,7 +1945,7 @@ def test_duration_from_nifti_sidecar_prefers_acquisition_duration(
 
 
 @pytest.mark.ai_generated
-def test_duration_from_nifti_sidecar_ignores_acquisition_duration_with_volume_timing(
+def test_duration_from_nifti_sidecar_derives_from_volume_timing(
     tmp_path: Path,
 ) -> None:
     bids_root = tmp_path / "bids"
@@ -1961,9 +1961,69 @@ def test_duration_from_nifti_sidecar_ignores_acquisition_duration_with_volume_ti
     )
 
     nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
-    # falls through to RepetitionTime x nvols instead of the (per-volume,
-    # in this context) AcquisitionDuration
-    assert _duration_from_nifti_sidecar(str(nifti_fn)) == pytest.approx(20.0)
+    # RepetitionTime x nvols is never attempted here -- RepetitionTime and
+    # VolumeTiming are mutually exclusive per BIDS -- so the total is
+    # instead the last volume's onset plus the deprecated per-frame use of
+    # AcquisitionDuration (no FrameAcquisitionDuration given in this case)
+    assert _duration_from_nifti_sidecar(str(nifti_fn)) == pytest.approx(4.0 + 17.5)
+
+
+@pytest.mark.ai_generated
+def test_duration_from_nifti_sidecar_volume_timing_prefers_frame_acquisition_duration(
+    tmp_path: Path,
+) -> None:
+    bids_root = tmp_path / "bids"
+    _make_bids_dataset_stub(bids_root)
+    _make_multivol_func_scan(
+        bids_root,
+        tr=2.0,
+        nvols=10,
+        meta_extra={
+            "AcquisitionDuration": 17.5,
+            "FrameAcquisitionDuration": 0.5,
+            "VolumeTiming": [0.0, 2.0, 4.0],
+        },
+    )
+
+    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
+    assert _duration_from_nifti_sidecar(str(nifti_fn)) == pytest.approx(4.0 + 0.5)
+
+
+@pytest.mark.ai_generated
+def test_duration_from_nifti_sidecar_volume_timing_without_frame_duration(
+    tmp_path: Path,
+) -> None:
+    bids_root = tmp_path / "bids"
+    _make_bids_dataset_stub(bids_root)
+    _make_multivol_func_scan(
+        bids_root,
+        tr=2.0,
+        nvols=10,
+        meta_extra={"VolumeTiming": [0.0, 2.0, 4.0]},
+    )
+
+    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
+    # no per-frame duration available at all -- cannot determine the total
+    assert _duration_from_nifti_sidecar(str(nifti_fn)) is None
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize("bad_content", ["{not valid json", "[1, 2, 3]", '"a string"'])
+def test_duration_from_nifti_sidecar_tolerates_malformed_json(
+    tmp_path: Path, bad_content: str
+) -> None:
+    # an unreadable/malformed sidecar (or one that parses but isn't a JSON
+    # object) should be treated as "duration unavailable", not raise and
+    # abort the rest of that _scans.tsv's rows
+    bids_root = tmp_path / "bids"
+    _make_bids_dataset_stub(bids_root)
+    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
+    nibabel.Nifti1Image(np.zeros((2, 2, 2, 10)), np.eye(4)).to_filename(str(nifti_fn))
+    (bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json").write_text(
+        bad_content
+    )
+
+    assert _duration_from_nifti_sidecar(str(nifti_fn)) is None
 
 
 @pytest.mark.ai_generated

@@ -343,6 +343,7 @@ def test_sanitize_path_invalid(
         (None, None),
         ("not-a-number", None),
         ([1, 2], None),
+        (10**400, None),  # OverflowError from float() on a huge int
     ],
 )
 def test_as_finite_positive_float(value: Any, expected: float | None) -> None:
@@ -397,6 +398,40 @@ def test_safe_tar_members_rejects_escaping_members(tmp_path: Path) -> None:
         safe = _safe_tar_members(tar, str(dest))
 
     assert [m.name for m in safe] == ["good.txt"]
+
+
+@pytest.mark.ai_generated
+def test_safe_tar_members_hardlink_target_relative_to_dest(tmp_path: Path) -> None:
+    # unlike a symlink's, a tar hard link's target is a path relative to
+    # the archive root (`dest`), not to the member's own directory -- so
+    # `dir/link` -> `good.txt` is safe (resolves to `dest/good.txt`), while
+    # the naive dirname-relative interpretation would wrongly resolve it
+    # (and a `../outside` target must be rejected either way)
+    import tarfile
+
+    dest = tmp_path / "dest"
+    dest.mkdir()
+
+    tarball = tmp_path / "hardlinks.tar"
+    with tarfile.open(tarball, "w") as tar:
+        good = tarfile.TarInfo("good.txt")
+        good.size = 5
+        tar.addfile(good, io.BytesIO(b"hello"))
+
+        safe_hardlink = tarfile.TarInfo("dir/link")
+        safe_hardlink.type = tarfile.LNKTYPE
+        safe_hardlink.linkname = "good.txt"
+        tar.addfile(safe_hardlink)
+
+        escaping_hardlink = tarfile.TarInfo("dir/evil-link")
+        escaping_hardlink.type = tarfile.LNKTYPE
+        escaping_hardlink.linkname = "../outside"
+        tar.addfile(escaping_hardlink)
+
+    with tarfile.open(tarball) as tar:
+        safe = _safe_tar_members(tar, str(dest))
+
+    assert [m.name for m in safe] == ["good.txt", "dir/link"]
 
 
 @pytest.mark.ai_generated

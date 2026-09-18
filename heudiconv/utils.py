@@ -588,7 +588,7 @@ def as_finite_positive_float(value: Any) -> Optional[float]:
     """
     try:
         parsed = float(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
     return parsed if math.isfinite(parsed) and parsed > 0 else None
 
@@ -633,11 +633,19 @@ def _safe_tar_members(tar: tarfile.TarFile, dest: str) -> list[tarfile.TarInfo]:
         if member.isdev():
             lgr.warning("Refusing to extract device/FIFO member %r", member.name)
             continue
-        if (member.issym() or member.islnk()) and not _resolves_within_dest(
+        if member.issym() and not _resolves_within_dest(
             member.linkname
             if op.isabs(member.linkname)
             else op.join(dest, op.dirname(member.name), member.linkname)
         ):
+            lgr.warning(
+                "Refusing to extract %r: link target escapes %s", member.name, dest
+            )
+            continue
+        if member.islnk() and not _resolves_within_dest(op.join(dest, member.linkname)):
+            # unlike a symlink's, a tar hard link's target is a path
+            # relative to the archive root (i.e. `dest`), not to the
+            # member's own directory
             lgr.warning(
                 "Refusing to extract %r: link target escapes %s", member.name, dest
             )
@@ -673,7 +681,12 @@ def safe_extract_tar(tarball: str, dest: str) -> None:
     dest : str
         Destination directory (created by ``tarfile`` as needed).
     """
-    tar_filter = os.environ.get("HEUDICONV_TAR_FILTER", "tar")
+    # "data" (not the more permissive "tar") is the default so that, on
+    # interpreters where the native filter is used, special files
+    # (devices/FIFOs) and unsafe link targets are rejected the same way
+    # our own _safe_tar_members() manual fallback rejects them; a weaker
+    # filter can still be opted into explicitly via this variable
+    tar_filter = os.environ.get("HEUDICONV_TAR_FILTER", "data")
     with tarfile.open(tarball) as tar:
         try:
             tar.extractall(dest, filter=tar_filter)  # type: ignore[arg-type]

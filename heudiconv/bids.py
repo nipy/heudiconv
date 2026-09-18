@@ -813,9 +813,12 @@ def _duration_from_nifti_sidecar(nifti_fn: str) -> Optional[float]:
     and valid: per the BIDS `duration` proposal, that field is exactly
     what the `_scans.tsv` ``duration`` column represents for MRI data.
     The one exception is a sidecar carrying ``VolumeTiming`` (e.g. sparse
-    or multiband BOLD/ASL designs): there, ``AcquisitionDuration`` (if any)
-    describes per-volume timing rather than the whole run, so this falls
-    through to the coarser estimate below instead.
+    or multiband BOLD/ASL designs): ``RepetitionTime`` and ``VolumeTiming``
+    are mutually exclusive per BIDS, and ``AcquisitionDuration`` there (if
+    any) describes per-volume/frame timing rather than the whole run, so
+    the total is instead derived from the last volume's onset time plus
+    one frame's acquisition duration (``FrameAcquisitionDuration``, or the
+    deprecated per-frame use of ``AcquisitionDuration``).
 
     Otherwise, computes ``RepetitionTime`` (from the JSON sidecar) times
     the number of volumes (from the NIfTI header), which is only
@@ -839,12 +842,34 @@ def _duration_from_nifti_sidecar(nifti_fn: str) -> Optional[float]:
     json_fn = _nifti_stem(nifti_fn) + ".json"
     if not op.exists(json_fn):
         return None
-    meta = load_json(json_fn)
+    try:
+        meta = load_json(json_fn)
+        if not isinstance(meta, dict):
+            raise ValueError(f"{json_fn} does not contain a JSON object")
+    except Exception as exc:
+        # json_fn is arbitrary, externally-produced (possibly corrupted,
+        # truncated, or not-actually-an-object) user data, so treat any
+        # read/parse failure as "could not determine" rather than
+        # aborting the whole _scans.tsv this row belongs to
+        lgr.warning("Failed to load %s to get acquisition duration: %s", json_fn, exc)
+        return None
 
-    if "VolumeTiming" not in meta:
-        duration = as_finite_positive_float(meta.get("AcquisitionDuration"))
-        if duration is not None:
-            return duration
+    if "VolumeTiming" in meta:
+        volume_timing = meta.get("VolumeTiming")
+        frame_duration = as_finite_positive_float(
+            meta.get("FrameAcquisitionDuration")
+        ) or as_finite_positive_float(meta.get("AcquisitionDuration"))
+        if isinstance(volume_timing, list) and volume_timing and frame_duration:
+            try:
+                last_onset = max(float(t) for t in volume_timing)
+            except (TypeError, ValueError):
+                return None
+            return last_onset + frame_duration
+        return None
+
+    duration = as_finite_positive_float(meta.get("AcquisitionDuration"))
+    if duration is not None:
+        return duration
 
     tr = as_finite_positive_float(meta.get("RepetitionTime"))
     if tr is None:

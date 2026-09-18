@@ -444,6 +444,46 @@ def test_estimate_scan_duration_from_times_even_intervals(tmp_path: Path) -> Non
 
 
 @pytest.mark.ai_generated
+def test_estimate_scan_duration_from_times_skips_malformed_timestamp(
+    tmp_path: Path,
+) -> None:
+    # a malformed date/time in one (non-first) file should be skipped with
+    # a warning, not raise and abort the whole (best-effort) estimate
+    import warnings
+
+    import pydicom.config as dcm_config
+
+    offsets = [0, 1, 3]
+    dicom_list = []
+    for i, offset in enumerate(offsets):
+        dcm_data = dcm.dcmread(
+            op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+        )
+        dcm_data.AcquisitionDate = "20200101"
+        if i == 1:
+            # bypass pydicom's own VR validation so a genuinely malformed
+            # value (as could come from a non-conformant scanner) can be
+            # written out for this test
+            old_mode = dcm_config.settings.writing_validation_mode
+            dcm_config.settings.writing_validation_mode = dcm_config.IGNORE
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    dcm_data.AcquisitionTime = "not-a-time"
+            finally:
+                dcm_config.settings.writing_validation_mode = old_mode
+        else:
+            dcm_data.AcquisitionTime = "%06d.000000" % (120000 + offset)
+        out = tmp_path / f"f{i}.dcm"
+        dcm.dcmwrite(str(out), dcm_data)
+        dicom_list.append(str(out))
+
+    # the malformed file (offset 1) is skipped; span (3s) + median interval
+    # of the remaining single interval (3s) between the two good timestamps
+    assert estimate_scan_duration_from_times(dicom_list) == pytest.approx(6.0)
+
+
+@pytest.mark.ai_generated
 def test_estimate_scan_duration_from_times_single_file() -> None:
     dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))[:1]
     assert estimate_scan_duration_from_times(dicom_list) is None

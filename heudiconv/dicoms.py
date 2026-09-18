@@ -685,7 +685,13 @@ def estimate_scan_duration_from_times(dicom_list: list[str]) -> Optional[float]:
         dcm_data = dcm.dcmread(
             fn, stop_before_pixels=True, force=True, specific_tags=datetime_tags
         )
-        dt = get_datetime_from_dcm(dcm_data)
+        try:
+            dt = get_datetime_from_dcm(dcm_data)
+        except ValueError as exc:
+            # a malformed date/time string in this file should not abort
+            # the whole (best-effort) estimate -- just skip it
+            lgr.warning("Failed to parse acquisition datetime from %s: %s", fn, exc)
+            continue
         if dt is not None:
             timestamps.append(dt)
     unique_timestamps = sorted(set(timestamps))
