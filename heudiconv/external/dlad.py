@@ -148,7 +148,7 @@ def add_to_datalad(
             )
     save_res = ds.save(
         ".",
-        recursive=True
+        recursive=True,
         # not in effect! ?
         # annex_add_opts=['--include-dotfiles']
     )
