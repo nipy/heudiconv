@@ -30,9 +30,11 @@ from heudiconv.bids import (
     KeyInfoForForce,
     _duration_from_nifti_sidecar,
     _find_bids_dataset_root,
+    _find_json_sidecar,
     _get_retrospective_duration,
     _is_within_directory,
     _merge_scans_header,
+    _parse_bids_entities,
     find_compatible_fmaps_for_run,
     find_compatible_fmaps_for_session,
     find_fmap_groups,
@@ -2024,6 +2026,123 @@ def test_duration_from_nifti_sidecar_tolerates_malformed_json(
     )
 
     assert _duration_from_nifti_sidecar(str(nifti_fn)) is None
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "filename,expected_entities,expected_suffix",
+    [
+        (
+            "sub-01_task-rest_run-01_bold.nii.gz",
+            {"sub": "01", "task": "rest", "run": "01"},
+            "bold",
+        ),
+        ("task-rest_bold.json", {"task": "rest"}, "bold"),
+        ("bold.json", {}, "bold"),
+        ("sub-01_ses-test_T1w.nii.gz", {"sub": "01", "ses": "test"}, "T1w"),
+    ],
+)
+def test_parse_bids_entities(
+    filename: str, expected_entities: dict[str, str], expected_suffix: str
+) -> None:
+    entities, suffix = _parse_bids_entities(filename)
+    assert entities == expected_entities
+    assert suffix == expected_suffix
+
+
+@pytest.mark.ai_generated
+def test_find_json_sidecar_prefers_exact_match(tmp_path: Path) -> None:
+    bids_root = tmp_path / "bids"
+    func_dir = bids_root / "sub-01" / "func"
+    func_dir.mkdir(parents=True)
+    save_json(str(bids_root / "dataset_description.json"), {"Name": "test"})
+    # a same-named sidecar right next to the nifti, plus a less-specific
+    # one at the dataset root -- the former must win
+    save_json(str(func_dir / "sub-01_task-rest_bold.json"), {"RepetitionTime": 1.0})
+    save_json(str(bids_root / "task-rest_bold.json"), {"RepetitionTime": 2.0})
+    nifti_fn = func_dir / "sub-01_task-rest_bold.nii.gz"
+    nifti_fn.write_bytes(b"")
+
+    found = _find_json_sidecar(str(nifti_fn), str(bids_root))
+    assert found == str(func_dir / "sub-01_task-rest_bold.json")
+
+
+@pytest.mark.ai_generated
+def test_find_json_sidecar_inherits_from_dataset_root(tmp_path: Path) -> None:
+    # many real-world datasets (e.g. on OpenNeuro) rely on a single shared
+    # task-level sidecar at the dataset root instead of a per-file one --
+    # per the BIDS Inheritance Principle, that must still be found
+    bids_root = tmp_path / "bids"
+    func_dir = bids_root / "sub-01" / "func"
+    func_dir.mkdir(parents=True)
+    save_json(str(bids_root / "dataset_description.json"), {"Name": "test"})
+    save_json(str(bids_root / "task-rest_bold.json"), {"RepetitionTime": 2.0})
+    nifti_fn = func_dir / "sub-01_task-rest_run-01_bold.nii.gz"
+    nifti_fn.write_bytes(b"")
+
+    found = _find_json_sidecar(str(nifti_fn), str(bids_root))
+    assert found == str(bids_root / "task-rest_bold.json")
+
+
+@pytest.mark.ai_generated
+def test_find_json_sidecar_prefers_more_specific_match(tmp_path: Path) -> None:
+    bids_root = tmp_path / "bids"
+    func_dir = bids_root / "sub-01" / "func"
+    func_dir.mkdir(parents=True)
+    save_json(str(bids_root / "dataset_description.json"), {"Name": "test"})
+    # a dataset-wide default, and a more specific one scoped to this task --
+    # only the latter should be picked for a task-rest run
+    save_json(str(bids_root / "bold.json"), {"RepetitionTime": 1.0})
+    save_json(str(bids_root / "task-rest_bold.json"), {"RepetitionTime": 2.0})
+    nifti_fn = func_dir / "sub-01_task-rest_run-01_bold.nii.gz"
+    nifti_fn.write_bytes(b"")
+
+    found = _find_json_sidecar(str(nifti_fn), str(bids_root))
+    assert found == str(bids_root / "task-rest_bold.json")
+
+
+@pytest.mark.ai_generated
+def test_find_json_sidecar_rejects_mismatched_entities(tmp_path: Path) -> None:
+    bids_root = tmp_path / "bids"
+    func_dir = bids_root / "sub-01" / "func"
+    func_dir.mkdir(parents=True)
+    save_json(str(bids_root / "dataset_description.json"), {"Name": "test"})
+    # a sidecar scoped to a *different* task must not apply here
+    save_json(str(bids_root / "task-other_bold.json"), {"RepetitionTime": 2.0})
+    nifti_fn = func_dir / "sub-01_task-rest_run-01_bold.nii.gz"
+    nifti_fn.write_bytes(b"")
+
+    assert _find_json_sidecar(str(nifti_fn), str(bids_root)) is None
+
+
+@pytest.mark.ai_generated
+def test_find_json_sidecar_does_not_search_above_bids_root(tmp_path: Path) -> None:
+    outer = tmp_path / "outer"
+    bids_root = outer / "bids"
+    func_dir = bids_root / "sub-01" / "func"
+    func_dir.mkdir(parents=True)
+    save_json(str(bids_root / "dataset_description.json"), {"Name": "test"})
+    # a same-suffix sidecar *outside* the dataset must be ignored
+    save_json(str(outer / "bold.json"), {"RepetitionTime": 2.0})
+    nifti_fn = func_dir / "sub-01_task-rest_run-01_bold.nii.gz"
+    nifti_fn.write_bytes(b"")
+
+    assert _find_json_sidecar(str(nifti_fn), str(bids_root)) is None
+
+
+@pytest.mark.ai_generated
+def test_duration_from_nifti_sidecar_uses_inherited_sidecar(tmp_path: Path) -> None:
+    # end-to-end: an OpenNeuro-style dataset with only a dataset-root
+    # task-level sidecar (no per-run JSON) should still yield a duration
+    bids_root = tmp_path / "bids"
+    func_dir = bids_root / "sub-01" / "func"
+    func_dir.mkdir(parents=True)
+    save_json(str(bids_root / "dataset_description.json"), {"Name": "test"})
+    save_json(str(bids_root / "task-rest_bold.json"), {"RepetitionTime": 2.0})
+    nifti_fn = func_dir / "sub-01_task-rest_bold.nii.gz"
+    nibabel.Nifti1Image(np.zeros((2, 2, 2, 10)), np.eye(4)).to_filename(str(nifti_fn))
+
+    assert _duration_from_nifti_sidecar(str(nifti_fn)) == pytest.approx(20.0)
 
 
 @pytest.mark.ai_generated

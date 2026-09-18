@@ -806,7 +806,90 @@ def _is_within_directory(path: str, directory: str) -> bool:
     return path == directory or path.startswith(directory + os.sep)
 
 
-def _duration_from_nifti_sidecar(nifti_fn: str) -> Optional[float]:
+def _parse_bids_entities(filename: str) -> tuple[dict[str, str], str]:
+    """Split a BIDS filename into its entities and suffix.
+
+    E.g. ``sub-01_task-rest_run-01_bold.nii.gz`` ->
+    (``{"sub": "01", "task": "rest", "run": "01"}``, ``"bold"``).
+
+    Parameters
+    ----------
+    filename : str
+        A BIDS-valid filename (or just its stem), with or without
+        directory components/extension.
+
+    Returns
+    -------
+    tuple of (dict, str)
+        The entities (in order of appearance) and the suffix (the last
+        underscore-separated component, if it does not itself look like a
+        ``key-value`` entity).
+    """
+    stem = _nifti_stem(op.basename(filename))
+    stem = remove_suffix(stem, ".json")
+    parts = stem.split("_")
+    suffix = ""
+    if parts and "-" not in parts[-1]:
+        suffix = parts.pop()
+    entities = dict(p.split("-", 1) for p in parts if "-" in p)
+    return entities, suffix
+
+
+def _find_json_sidecar(nifti_fn: str, bids_root: str) -> Optional[str]:
+    """Find the JSON sidecar that applies to `nifti_fn`, per BIDS inheritance.
+
+    Tries, in order of preference (most to least specific):
+
+    1. A same-named ``.json`` right next to `nifti_fn` (the common case for
+       heudiconv-produced datasets, where every file gets its own sidecar).
+    2. Per the `BIDS Inheritance Principle
+       <https://bids-specification.readthedocs.io/en/stable/common-principles.html#the-inheritance-principle>`_,
+       a ``.json`` with the same suffix (e.g. ``bold``) found in `nifti_fn`'s
+       directory or one of its ancestors up to `bids_root`, whose own
+       entities (if any, e.g. a shared ``task-*_bold.json`` at the dataset
+       root) are all present with matching values in `nifti_fn`'s filename.
+       Where more than one such candidate exists at the same directory
+       level, the one sharing the most entities with `nifti_fn` (the most
+       specific match) is preferred.
+
+    Parameters
+    ----------
+    nifti_fn : str
+        Path to the ``.nii``/``.nii.gz`` file to find a sidecar for.
+    bids_root : str
+        Path to the root of the BIDS dataset `nifti_fn` belongs to.
+
+    Returns
+    -------
+    Optional[str]
+        Path to the applicable JSON sidecar, or None if none was found.
+    """
+    exact = _nifti_stem(nifti_fn) + ".json"
+    if op.exists(exact):
+        return exact
+
+    target_entities, target_suffix = _parse_bids_entities(nifti_fn)
+    bids_root = op.realpath(bids_root)
+    current = op.realpath(op.dirname(nifti_fn))
+    while True:
+        candidates = []
+        for json_fn in sorted(glob(op.join(current, "*.json"))):
+            entities, suffix = _parse_bids_entities(json_fn)
+            if suffix != target_suffix:
+                continue
+            if all(target_entities.get(k) == v for k, v in entities.items()):
+                candidates.append((len(entities), json_fn))
+        if candidates:
+            # most specific (most shared entities) match wins
+            return max(candidates, key=lambda c: c[0])[1]
+        if current == bids_root or not _is_within_directory(current, bids_root):
+            return None
+        current = op.dirname(current)
+
+
+def _duration_from_nifti_sidecar(
+    nifti_fn: str, bids_root: Optional[str] = None
+) -> Optional[float]:
     """Estimate a run's duration from its NIfTI + JSON sidecar.
 
     Prefers the sidecar's own ``AcquisitionDuration`` field when present
@@ -828,19 +911,30 @@ def _duration_from_nifti_sidecar(nifti_fn: str) -> Optional[float]:
     last resort, when no source DICOMs -- nor a usable
     ``AcquisitionDuration`` -- are available.
 
+    The applicable JSON sidecar is found per the BIDS Inheritance
+    Principle -- see :func:`_find_json_sidecar` -- so this also works for
+    datasets (e.g. many on OpenNeuro) that rely on a shared
+    ``task-*_bold.json`` at the dataset root rather than a per-file
+    sidecar.
+
     Parameters
     ----------
     nifti_fn : str
-        Path to the ``.nii``/``.nii.gz`` file. A same-named ``.json``
-        sidecar is expected alongside it.
+        Path to the ``.nii``/``.nii.gz`` file.
+    bids_root : str, optional
+        Path to the root of the BIDS dataset `nifti_fn` belongs to, used
+        to bound the inheritance search. Computed via
+        :func:`_find_bids_dataset_root` if not given.
 
     Returns
     -------
     Optional[float]
         Duration in seconds, or None if it could not be determined.
     """
-    json_fn = _nifti_stem(nifti_fn) + ".json"
-    if not op.exists(json_fn):
+    if bids_root is None:
+        bids_root = _find_bids_dataset_root(op.dirname(nifti_fn))
+    json_fn = _find_json_sidecar(nifti_fn, bids_root)
+    if json_fn is None:
         return None
     try:
         meta = load_json(json_fn)
@@ -951,7 +1045,7 @@ def _get_retrospective_duration(nifti_fn: str, bids_root: str) -> Optional[float
             tarball,
             nifti_fn,
         )
-    return _duration_from_nifti_sidecar(nifti_fn)
+    return _duration_from_nifti_sidecar(nifti_fn, bids_root)
 
 
 def populate_scans_duration(path: str, overwrite: bool = False) -> None:
