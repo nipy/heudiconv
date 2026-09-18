@@ -1146,7 +1146,7 @@ class BIDSFile:
     def __contains__(self, entity: object) -> bool:
         return entity in self._entities
 
-    def drop(self, entity: str, missing_ok: bool=False) -> None:
+    def drop(self, entity: str, missing_ok: bool = False) -> None:
         if entity not in self._entities:
             if not missing_ok:
                 raise ValueError(f"{self} does not contain entity {entity!r}")
