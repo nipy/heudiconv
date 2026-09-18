@@ -35,7 +35,6 @@ from heudiconv.bids import (
     _get_retrospective_duration,
     _is_within_directory,
     _merge_scans_header,
-    _parse_bids_entities,
     find_compatible_fmaps_for_run,
     find_compatible_fmaps_for_session,
     find_fmap_groups,
@@ -1596,6 +1595,16 @@ def test_BIDSFile() -> None:
     assert my_bids_file["echo"] == "2"
 
 
+@pytest.mark.ai_generated
+def test_BIDSFile_parse_no_entities() -> None:
+    # a filename with no entities at all (e.g. a dataset-wide "T1w.json"
+    # sidecar) used to raise IndexError -- entities_list[-1] on an empty list
+    parsed = BIDSFile.parse("bold.json")
+    assert parsed.entities == {}
+    assert parsed.suffix == "bold"
+    assert parsed.extension == "json"
+
+
 @pytest.mark.skipif(not have_datalad, reason="no datalad")
 def test_ME_mag_phase_conversion(
     monkeypatch: pytest.MonkeyPatch,
@@ -1805,16 +1814,16 @@ def test_populate_scans_duration_tarball_present_but_unusable_falls_back(
     _make_multivol_func_scan(bids_root)
 
     # a single-file "series" cannot yield a duration on its own (neither a
-    # tag nor >= 2 timestamps to estimate from) -- strip the real Siemens
-    # "declared duration" private tag this fixture happens to carry too,
-    # since that alone would otherwise let get_acquisition_duration()
-    # succeed and defeat the point of this test
+    # tag nor >= 2 timestamps to estimate from) -- strip the CSA series
+    # header this fixture happens to carry too (Siemens' own declared
+    # duration), since that alone would otherwise let
+    # get_acquisition_duration() succeed and defeat the point of this test
     import pydicom
 
     dcm_data = pydicom.dcmread(
         op.join(TESTS_DATA_PATH, "01-anat-scout", "0001.dcm"), stop_before_pixels=True
     )
-    del dcm_data[(0x0019, 0x100B)]
+    del dcm_data[(0x0029, 0x1020)]
     single_dicom_fn = tmp_path / "stripped.dcm"
     pydicom.dcmwrite(str(single_dicom_fn), dcm_data)
 
@@ -2157,28 +2166,6 @@ def test_duration_from_nifti_sidecar_tolerates_malformed_json(
     )
 
     assert _duration_from_nifti_sidecar(str(nifti_fn)) is None
-
-
-@pytest.mark.ai_generated
-@pytest.mark.parametrize(
-    "filename,expected_entities,expected_suffix",
-    [
-        (
-            "sub-01_task-rest_run-01_bold.nii.gz",
-            {"sub": "01", "task": "rest", "run": "01"},
-            "bold",
-        ),
-        ("task-rest_bold.json", {"task": "rest"}, "bold"),
-        ("bold.json", {}, "bold"),
-        ("sub-01_ses-test_T1w.nii.gz", {"sub": "01", "ses": "test"}, "T1w"),
-    ],
-)
-def test_parse_bids_entities(
-    filename: str, expected_entities: dict[str, str], expected_suffix: str
-) -> None:
-    entities, suffix = _parse_bids_entities(filename)
-    assert entities == expected_entities
-    assert suffix == expected_suffix
 
 
 @pytest.mark.ai_generated

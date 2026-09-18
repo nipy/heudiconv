@@ -598,42 +598,12 @@ _GE_ACQUISITION_DURATION_GROUP = 0x0019
 _GE_ACQUISITION_DURATION_OFFSET = 0x5A
 _GE_ACQUISITION_DURATION_CREATOR = "GEMS_ACQU_01"
 
-# Private Siemens tag "SliceMeasurementDuration" (in milliseconds): despite
-# the per-slice-sounding name, empirically (confirmed against real Siemens
-# Prisma data) it carries the same, series-wide value across every DICOM of
-# a run, including single-volume (e.g. MPRAGE) 3D sequences where no other
-# tag or per-file timestamp spread lets us determine a duration at all.
-_SIEMENS_SLICE_MEASUREMENT_DURATION_GROUP = 0x0019
-_SIEMENS_SLICE_MEASUREMENT_DURATION_OFFSET = 0x0B
-_SIEMENS_SLICE_MEASUREMENT_DURATION_CREATOR = "SIEMENS MR HEADER"
-
 
 def get_dicom_acquisition_duration(dcm_data: dcm.Dataset) -> Optional[float]:
-    """Extract the total scan duration directly from a DICOM tag, if present.
-
-    Parameters
-    ----------
-    dcm_data : dcm.Dataset
-        DICOM with header, e.g., as read by pydicom.dcmread.
-
-    Returns
-    -------
-    Optional[float]
-        Duration in seconds, or None if no known tag is present/parseable.
-
-    Notes
-    -----
-    Checks, in order:
-
-    1. The standard ``AcquisitionDuration`` tag (0018,9073), populated
-       mostly for Enhanced MR/CT multi-frame DICOMs, already in seconds.
-    2. The private GE tag (0019,105A), in microseconds, for classic
-       (per-slice) GE DICOMs.  Since private group 0019 is used differently
-       by different vendors, the private creator block is checked first --
-       a raw ``(0019,105A) in dcm_data`` check alone could pick up an
-       unrelated element from a non-GE DICOM and silently return a bogus
-       "duration".
-    """
+    """Extract the total scan duration directly from a DICOM tag, if present:
+    the standard ``AcquisitionDuration`` tag (0018,9073, mostly Enhanced
+    MR/CT), else the private GE tag (0019,105A, classic per-slice GE
+    DICOMs). Returns None if neither is present/parseable."""
     if (0x0018, 0x9073) in dcm_data:
         duration = as_finite_positive_float(dcm_data[(0x0018, 0x9073)].value)
         if duration is not None:
@@ -652,69 +622,24 @@ def get_dicom_acquisition_duration(dcm_data: dcm.Dataset) -> Optional[float]:
 
 
 def get_dicom_declared_acquisition_duration(dcm_data: dcm.Dataset) -> Optional[float]:
-    """Extract Siemens' own declared scan duration, if present.
-
-    Unlike :func:`get_dicom_acquisition_duration` and
-    :func:`estimate_scan_duration_from_times`, this reflects the *protocol's
-    prescribed* duration (which can include preparation time not present in
-    the retained image data) rather than a value measured directly off
-    stored images, so it is only used as a last resort -- see
-    :func:`get_acquisition_duration` -- but it is the only source available
-    at all for a single-volume (e.g. anatomical) 3D Siemens sequence, where
-    every image shares one ``AcquisitionTime`` and there is no standard or
-    GE tag to fall back on.
-
-    Parameters
-    ----------
-    dcm_data : dcm.Dataset
-        DICOM with header, e.g., as read by pydicom.dcmread.
-
-    Returns
-    -------
-    Optional[float]
-        Duration in seconds, or None if the tag is absent (e.g. non-Siemens
-        data) or unparsable.
-    """
-    try:
-        elem = dcm_data.get_private_item(
-            _SIEMENS_SLICE_MEASUREMENT_DURATION_GROUP,
-            _SIEMENS_SLICE_MEASUREMENT_DURATION_OFFSET,
-            _SIEMENS_SLICE_MEASUREMENT_DURATION_CREATOR,
-        )
-    except KeyError:
-        return None
-    duration = as_finite_positive_float(elem.value)
-    return duration * 1e-3 if duration is not None else None
+    """Extract Siemens' own declared (prescribed) total scan time, via the
+    CSA/Phoenix protocol's ``lTotalScanTimeSec`` -- a last-resort source
+    (see :func:`get_acquisition_duration`) for e.g. a single-volume 3D
+    sequence, where nothing else is available at all. Returns None if
+    unavailable (e.g. non-Siemens data)."""
+    value = parse_private_csa_header(
+        dcm_data, "AcquisitionDuration", "lTotalScanTimeSec"
+    )
+    return as_finite_positive_float(value) if value else None
 
 
 def estimate_scan_duration_from_times(dicom_list: list[str]) -> Optional[float]:
-    """Estimate a run's total duration from per-file acquisition timestamps.
-
-    Reads the acquisition datetime (see :func:`get_datetime_from_dcm`) of
-    every file in `dicom_list`, and estimates the wallclock duration of the
-    run as the span between the earliest and latest timestamps, plus one
-    "sample interval" -- the median difference between consecutive distinct
-    timestamps -- to account for the fact that the last timestamp marks the
-    *onset*, not the end, of the final acquired volume/slice.
-
-    Using every DICOM file of the run (rather than just the first and last)
-    and a *median* interval makes the estimate robust to a handful of files
-    sharing a timestamp (e.g., multi-echo acquisitions).  Comparing full
-    datetimes (not just time-of-day strings) throughout also avoids
-    mishandling a scan that happens to straddle midnight.
-
-    Parameters
-    ----------
-    dicom_list : list of str
-        Paths to every DICOM file belonging to a single run/series.
-
-    Returns
-    -------
-    Optional[float]
-        Estimated duration in seconds, or None if fewer than two distinct
-        timestamps could be established (e.g., a single-file series, dates/
-        times stripped by anonymization, or all files sharing one timestamp).
-    """
+    """Estimate a run's total duration from per-file acquisition timestamps:
+    the span between the earliest and latest timestamp (see
+    :func:`get_datetime_from_dcm`) across `dicom_list`, plus one median
+    inter-timestamp interval to account for the last timestamp marking the
+    *onset*, not the end, of the final volume/slice. Returns None if fewer
+    than two distinct timestamps could be established."""
     # only parse the handful of tags get_datetime_from_dcm() looks at --
     # meaningfully faster than a full header parse when scanning every file
     # of a (possibly large) run
@@ -756,36 +681,14 @@ def estimate_scan_duration_from_times(dicom_list: list[str]) -> Optional[float]:
 
 
 def get_acquisition_duration(dicom_list: list[str]) -> Optional[float]:
-    """Determine the total wallclock duration, in seconds, of a run.
-
-    Parameters
-    ----------
-    dicom_list : list of str
-        Paths to every DICOM file belonging to a single run/series.  A
-        single representative file also works, but then only
-        :func:`get_dicom_acquisition_duration` has a chance of succeeding.
-
-    Returns
-    -------
-    Optional[float]
-        Duration in seconds, or None if it could not be determined.
-
-    Notes
-    -----
-    Tries, in order of preference:
-
-    1. :func:`get_dicom_acquisition_duration` on the first file -- covers
-       Enhanced MR/CT and classic GE DICOMs, which carry the duration
-       directly.
-    2. :func:`estimate_scan_duration_from_times`, using every file of the
-       run to approximate the wallclock span of the whole acquisition.
-    3. :func:`get_dicom_declared_acquisition_duration` on the first file --
-       Siemens' own declared/prescribed duration.  Tried last (only when
-       neither of the above yields anything) since it can disagree with the
-       actual retained-image timestamp span by a few percent, but it is the
-       only source at all for a single-volume 3D sequence (e.g. an MPRAGE
-       T1w), where every image shares one ``AcquisitionTime``.
-    """
+    """Determine the total wallclock duration, in seconds, of a run given
+    every DICOM file belonging to it (a single representative file also
+    works, but then only :func:`get_dicom_acquisition_duration` has a
+    chance of succeeding). Tries, in order: :func:`get_dicom_acquisition_duration`,
+    :func:`estimate_scan_duration_from_times`, then
+    :func:`get_dicom_declared_acquisition_duration` as a last resort (the
+    only source at all for a single-volume 3D sequence, e.g. an MPRAGE
+    T1w). Returns None if none of them succeed."""
     if not dicom_list:
         return None
     dcm_data = dcm.dcmread(dicom_list[0], stop_before_pixels=True, force=True)
@@ -1058,7 +961,7 @@ def parse_private_csa_header(
         ]["items"][0]
         csastr = csastr.replace("### ASCCONV BEGIN", "### ASCCONV BEGIN ### ")
         parsedhdr = dsextract.parse_phoenix_prot("MrPhoenixProtocol", csastr)
-        val = parsedhdr[private_attr].replace(" ", "")
+        val = str(parsedhdr[private_attr]).replace(" ", "")
     except Exception as e:
         lgr.debug("Failed to parse CSA header: %s", str(e))
         val = default or ""
