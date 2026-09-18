@@ -1,8 +1,22 @@
 name: Linters
 
+# Restrict push to master -- the same way docker.yml and release.yml already
+# do -- so that a branch which has a PR open does not get a run from each of
+# the two events for every single commit.  The trade-off is that a branch
+# pushed to this repository is no longer tested until a PR is opened for it.
 on:
-  - push
-  - pull_request
+  push:
+    branches:
+      - master
+  pull_request:
+
+concurrency:
+  # One group per PR per workflow, so that pushing again to a PR supersedes
+  # the run which is still going.  Everything which is not a PR (a push to
+  # master, a scheduled run) falls back to the run id, i.e. a group of its
+  # own, so that those neither cancel nor queue behind one another.
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   lint:

@@ -1,4 +1,5 @@
 """Utility objects and functions"""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -767,15 +768,13 @@ def create_tree(path: str, tree: TreeSpec, archives_leading_dir: bool = True) ->
 
 
 @overload
-def get_typed_attr(obj: Any, attr: str, _type: type[T], default: V) -> T | V:
-    ...
+def get_typed_attr(obj: Any, attr: str, _type: type[T], default: V) -> T | V: ...
 
 
 @overload
 def get_typed_attr(
     obj: Any, attr: str, _type: type[T], default: None = None
-) -> T | None:
-    ...
+) -> T | None: ...
 
 
 def get_typed_attr(

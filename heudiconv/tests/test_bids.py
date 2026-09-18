@@ -1,5 +1,4 @@
-"""Test functions in heudiconv.bids module.
-"""
+"""Test functions in heudiconv.bids module."""
 
 from __future__ import annotations
 
@@ -1306,13 +1305,13 @@ def test_find_compatible_fmaps_rtol(
 
     if should_match:
         assert len(compatible_fmaps) == 1, (
-            f"Expected fmaps to be compatible with {rel_diff*100:.1f}% difference, "
+            f"Expected fmaps to be compatible with {rel_diff * 100:.1f}% difference, "
             f"but got {len(compatible_fmaps)} compatible groups"
         )
         assert "sub-test_epi" in compatible_fmaps
     else:
         assert len(compatible_fmaps) == 0, (
-            f"Expected fmaps to be incompatible with {rel_diff*100:.1f}% difference, "
+            f"Expected fmaps to be incompatible with {rel_diff * 100:.1f}% difference, "
             f"but got {len(compatible_fmaps)} compatible groups"
         )
 
@@ -1327,13 +1326,13 @@ def test_find_compatible_fmaps_rtol(
 
     if should_match:
         assert len(compatible_fmaps_shims) == 1, (
-            f"Expected fmaps with ShimSettings to be compatible with {rel_diff*100:.1f}% difference, "
+            f"Expected fmaps with ShimSettings to be compatible with {rel_diff * 100:.1f}% difference, "
             f"but got {len(compatible_fmaps_shims)} compatible groups"
         )
         assert "sub-test_epi" in compatible_fmaps_shims
     else:
         assert len(compatible_fmaps_shims) == 0, (
-            f"Expected fmaps with ShimSettings to be incompatible with {rel_diff*100:.1f}% difference, "
+            f"Expected fmaps with ShimSettings to be incompatible with {rel_diff * 100:.1f}% difference, "
             f"but got {len(compatible_fmaps_shims)} compatible groups"
         )
 

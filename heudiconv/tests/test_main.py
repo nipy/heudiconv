@@ -116,24 +116,18 @@ def test_add_participant_record(tmp_path: Path) -> None:
     add_participant_record(str(tmp_path), "sub01", "023Y", "M")
     # should create the file and place corrected record
     sub01 = tf.read_text()
-    assert (
-        sub01
-        == """\
+    assert sub01 == """\
 participant_id	age	sex	group
 sub-sub01	23	M	control
 """
-    )
     add_participant_record(str(tmp_path), "sub01", "023Y", "F")
     assert tf.read_text() == sub01  # nothing was added even though differs in values
     add_participant_record(str(tmp_path), "sub02", "2", "F")
-    assert (
-        tf.read_text()
-        == """\
+    assert tf.read_text() == """\
 participant_id	age	sex	group
 sub-sub01	23	M	control
 sub-sub02	2	F	control
 """
-    )
 
 
 def test_prepare_for_datalad(tmp_path: Path) -> None:

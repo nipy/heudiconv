@@ -1,5 +1,5 @@
-"""Test functions in heudiconv.convert module.
-"""
+"""Test functions in heudiconv.convert module."""
+
 from __future__ import annotations
 
 from glob import glob

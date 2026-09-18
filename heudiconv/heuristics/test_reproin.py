@@ -129,8 +129,9 @@ def test_fix_dbic_protocol() -> None:
         "": [("THESCOUT", "scout")],
     }
 
-    with patch.object(reproin, "protocols2fix", protocols2fix), patch.object(
-        reproin, "series_spec_fields", ["field1"]
+    with (
+        patch.object(reproin, "protocols2fix", protocols2fix),
+        patch.object(reproin, "series_spec_fields", ["field1"]),
     ):
         seqinfos_ = fix_dbic_protocol(seqinfos)  # type: ignore[arg-type]
     assert seqinfos[1] == seqinfos_[1]  # type: ignore[comparison-overlap]
@@ -140,8 +141,9 @@ def test_fix_dbic_protocol() -> None:
     )
 
     # change also field2 please
-    with patch.object(reproin, "protocols2fix", protocols2fix), patch.object(
-        reproin, "series_spec_fields", ["field1", "field2"]
+    with (
+        patch.object(reproin, "protocols2fix", protocols2fix),
+        patch.object(reproin, "series_spec_fields", ["field1", "field2"]),
     ):
         seqinfos_ = fix_dbic_protocol(seqinfos)  # type: ignore[arg-type]
     assert seqinfos[1] == seqinfos_[1]  # type: ignore[comparison-overlap]
@@ -368,39 +370,53 @@ def test_infotodict_entity_ordering(moco: bool, additional_rec: str) -> None:
         custom=None,
     )
 
-    if moco and additional_rec == '':
+    if moco and additional_rec == "":
         result = reproin.infotodict([seqinfo])
         templates = [key[0] for key in result]
         assert len(templates) == 1
         template = templates[0]
 
         # Verify rec-moco has been added in the generated filename
-        expected_order = ["task-rest", "acq-mb4", "rec-moco", "dir-AP", "run-01", "bold"]
+        expected_order = [
+            "task-rest",
+            "acq-mb4",
+            "rec-moco",
+            "dir-AP",
+            "run-01",
+            "bold",
+        ]
         positions = [template.index(e) for e in expected_order]
-        assert positions == sorted(positions), (
-            f"Entities not in BIDS order in {template!r} or rec-moco missing"
-        )
+        assert positions == sorted(
+            positions
+        ), f"Entities not in BIDS order in {template!r} or rec-moco missing"
         pass
 
-    if moco and additional_rec != '':
+    if moco and additional_rec != "":
         with pytest.raises(NotImplementedError) as ce:
             reproin.infotodict([seqinfo])
             # "want to add _rec-moco but there is _rec- already"
         assert str(ce.value) == "want to add _rec-moco but there is _rec- already"
 
-    if not moco and additional_rec == '':
+    if not moco and additional_rec == "":
         # nothing new to test for this combination
         return
 
-    if not moco and additional_rec != '':
+    if not moco and additional_rec != "":
         result = reproin.infotodict([seqinfo])
         templates = [key[0] for key in result]
         assert len(templates) == 1
         template = templates[0]
 
         # Verify entities appear in BIDS order in the generated filename
-        expected_order = ["task-rest", "acq-mb4", "rec-norm", "dir-AP", "run-01", "bold"]
+        expected_order = [
+            "task-rest",
+            "acq-mb4",
+            "rec-norm",
+            "dir-AP",
+            "run-01",
+            "bold",
+        ]
         positions = [template.index(e) for e in expected_order]
-        assert positions == sorted(positions), (
-            f"Entities not in BIDS order in {template!r}"
-        )
+        assert positions == sorted(
+            positions
+        ), f"Entities not in BIDS order in {template!r}"

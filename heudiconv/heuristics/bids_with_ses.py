@@ -91,7 +91,7 @@ def infotodict(
             info[dwi_pa].append([s.series_id])
         elif (s.dim4 == 144) and ("resting" in s.protocol_name):
             if not s.is_motion_corrected:
-                info[rs].append([(s.series_id)])
+                info[rs].append([s.series_id])
         elif (s.dim4 == 183 or s.dim4 == 366) and ("localizer" in s.protocol_name):
             if not s.is_motion_corrected:
                 info[boldt1].append([s.series_id])
