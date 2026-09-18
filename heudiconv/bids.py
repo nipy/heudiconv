@@ -16,6 +16,7 @@ import os.path as op
 from pathlib import Path
 import re
 import stat
+import statistics
 import tempfile
 from typing import Any, Optional
 import warnings
@@ -634,7 +635,12 @@ def add_rows_to_scans_keys_file(fn: str, newrows: dict[str, list[str]]) -> None:
     canonical = list(SCANS_FILE_FIELDS.keys())
     header = canonical
     if op.lexists(fn):
-        with open(fn, "r") as csvfile:
+        # utf-8-sig transparently strips a leading BOM (byte-order mark) if
+        # present -- e.g. some Excel/Windows-authored TSVs carry one -- and
+        # is otherwise identical to plain utf-8; without it, a BOM'd
+        # "filename" header would not match the literal string "filename"
+        # below, silently misaligning every column
+        with open(fn, "r", encoding="utf-8-sig") as csvfile:
             reader = csv.reader(csvfile, delimiter="\t")
             existing_rows = [row for row in reader]
         # Key each row's values by their *own* column name, not by
@@ -896,12 +902,19 @@ def _duration_from_nifti_sidecar(
     and valid: per the BIDS `duration` proposal, that field is exactly
     what the `_scans.tsv` ``duration`` column represents for MRI data.
     The one exception is a sidecar carrying ``VolumeTiming`` (e.g. sparse
-    or multiband BOLD/ASL designs): ``RepetitionTime`` and ``VolumeTiming``
-    are mutually exclusive per BIDS, and ``AcquisitionDuration`` there (if
-    any) describes per-volume/frame timing rather than the whole run, so
-    the total is instead derived from the last volume's onset time plus
-    one frame's acquisition duration (``FrameAcquisitionDuration``, or the
-    deprecated per-frame use of ``AcquisitionDuration``).
+    or multiband BOLD/ASL designs): per BIDS, ``RepetitionTime`` and
+    ``VolumeTiming`` are meant to be mutually exclusive, and
+    ``AcquisitionDuration`` there (if any) describes per-volume/frame
+    timing rather than the whole run, so the total is instead derived from
+    the last volume's onset time plus one frame's acquisition duration --
+    preferring, in order, ``FrameAcquisitionDuration``, the deprecated
+    per-frame use of ``AcquisitionDuration``, ``RepetitionTime`` (some
+    real-world sidecars carry both fields despite the spec, with
+    ``VolumeTiming`` merely a dense/regularly-spaced list -- in which case
+    ``RepetitionTime`` *is* each frame's duration), and finally the median
+    interval between ``VolumeTiming`` onsets themselves as a last-resort
+    proxy (the same reasoning as :func:`heudiconv.dicoms.estimate_scan_duration_from_times`
+    uses for the equivalent gap from DICOM timestamps).
 
     Otherwise, computes ``RepetitionTime`` (from the JSON sidecar) times
     the number of volumes (from the NIfTI header), which is only
@@ -950,16 +963,29 @@ def _duration_from_nifti_sidecar(
 
     if "VolumeTiming" in meta:
         volume_timing = meta.get("VolumeTiming")
-        frame_duration = as_finite_positive_float(
-            meta.get("FrameAcquisitionDuration")
-        ) or as_finite_positive_float(meta.get("AcquisitionDuration"))
-        if isinstance(volume_timing, list) and volume_timing and frame_duration:
-            try:
-                last_onset = max(float(t) for t in volume_timing)
-            except (TypeError, ValueError):
-                return None
-            return last_onset + frame_duration
-        return None
+        if not isinstance(volume_timing, list) or not volume_timing:
+            return None
+        try:
+            onsets = sorted(float(t) for t in volume_timing)
+        except (TypeError, ValueError):
+            return None
+        frame_duration = (
+            as_finite_positive_float(meta.get("FrameAcquisitionDuration"))
+            or as_finite_positive_float(meta.get("AcquisitionDuration"))
+            or as_finite_positive_float(meta.get("RepetitionTime"))
+        )
+        if frame_duration is None and len(onsets) > 1:
+            # last-resort proxy: no per-frame duration was declared at
+            # all, so fall back to the onsets' own median spacing --
+            # coarse for a genuinely sparse design, but better than
+            # nothing, and consistent with how a missing final-frame
+            # duration is estimated from DICOM timestamps elsewhere
+            frame_duration = statistics.median(
+                t2 - t1 for t1, t2 in zip(onsets[:-1], onsets[1:])
+            )
+        if frame_duration is None:
+            return None
+        return onsets[-1] + frame_duration
 
     duration = as_finite_positive_float(meta.get("AcquisitionDuration"))
     if duration is not None:
@@ -1137,7 +1163,10 @@ def _populate_scans_duration_file(scans_tsv: str, overwrite: bool) -> None:
     session_dir = op.dirname(scans_tsv)
     bids_root = _find_bids_dataset_root(session_dir)
 
-    with open(scans_tsv, newline="") as f:
+    # utf-8-sig transparently strips a leading BOM if present (see
+    # add_rows_to_scans_keys_file for why that matters for the "filename"
+    # header check just below)
+    with open(scans_tsv, newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f, delimiter="\t")
         fieldnames = list(reader.fieldnames or [])
         rows = list(reader)
@@ -1540,7 +1569,10 @@ def select_fmap_from_compatible_groups(
         scans_tsv = glob(op.join(sess_folder, "*_scans.tsv"))[0]
     except IndexError:
         raise FileNotFoundError("No '*_scans' file found for session %s" % sess_folder)
-    with open(scans_tsv) as f:
+    # utf-8-sig transparently strips a leading BOM if present, so a BOM'd
+    # "filename" header still matches the literal below instead of making
+    # index() raise
+    with open(scans_tsv, encoding="utf-8-sig") as f:
         # read the contents, splitting by lines and by tab separators:
         scans_tsv_content = [line.split("\t") for line in f.read().splitlines()]
     # get column indices for filename and acq_time from the first line:

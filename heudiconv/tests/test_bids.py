@@ -1919,6 +1919,35 @@ def test_populate_scans_duration_header_only_file_still_migrated(
 
 
 @pytest.mark.ai_generated
+def test_populate_scans_duration_tolerates_byte_order_mark(tmp_path: Path) -> None:
+    # a _scans.tsv with a leading UTF-8 BOM on its header (seen in the
+    # wild, e.g. on OpenNeuro) must still be recognized and migrated,
+    # rather than being skipped as if it had no 'filename' column
+    bids_root = tmp_path / "bids"
+    (bids_root / "sub-01").mkdir(parents=True)
+    save_json(
+        str(bids_root / "dataset_description.json"),
+        {"Name": "test", "BIDSVersion": "1.8.0"},
+    )
+    scans_tsv = bids_root / "sub-01" / "sub-01_scans.tsv"
+    with open(scans_tsv, "w", encoding="utf-8-sig") as f:
+        f.write("filename\tacq_time\n")
+        f.write("meg/sub-01_task-x_meg.fif\t2000-01-01T00:00:00Z\n")
+
+    populate_scans_duration(str(bids_root))
+
+    fieldnames, rows = _read_scans_rows(scans_tsv)
+    assert fieldnames == ["filename", "acq_time", "duration"]
+    assert rows == [
+        {
+            "filename": "meg/sub-01_task-x_meg.fif",
+            "acq_time": "2000-01-01T00:00:00Z",
+            "duration": "n/a",
+        }
+    ]
+
+
+@pytest.mark.ai_generated
 def test_populate_scans_duration_preserves_permissions(tmp_path: Path) -> None:
     bids_root = tmp_path / "bids"
     scans_tsv = _make_bids_dataset_stub(bids_root)
@@ -1992,9 +2021,16 @@ def test_duration_from_nifti_sidecar_volume_timing_prefers_frame_acquisition_dur
 
 
 @pytest.mark.ai_generated
-def test_duration_from_nifti_sidecar_volume_timing_without_frame_duration(
+def test_duration_from_nifti_sidecar_volume_timing_falls_back_to_repetition_time(
     tmp_path: Path,
 ) -> None:
+    # a real-world pattern (e.g. seen on OpenNeuro): a sidecar carries both
+    # RepetitionTime and a VolumeTiming list that is simply a dense,
+    # regularly-TR-spaced one (not an actually-sparse design), with no
+    # FrameAcquisitionDuration/AcquisitionDuration given at all -- BIDS
+    # calls RepetitionTime+VolumeTiming mutually exclusive, but datasets
+    # that include both anyway should still get a usable duration rather
+    # than 'n/a', by treating RepetitionTime as the per-frame duration
     bids_root = tmp_path / "bids"
     _make_bids_dataset_stub(bids_root)
     _make_multivol_func_scan(
@@ -2005,7 +2041,47 @@ def test_duration_from_nifti_sidecar_volume_timing_without_frame_duration(
     )
 
     nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
-    # no per-frame duration available at all -- cannot determine the total
+    assert _duration_from_nifti_sidecar(str(nifti_fn)) == pytest.approx(4.0 + 2.0)
+
+
+@pytest.mark.ai_generated
+def test_duration_from_nifti_sidecar_volume_timing_falls_back_to_onset_interval(
+    tmp_path: Path,
+) -> None:
+    # no per-frame duration declared anywhere (no FrameAcquisitionDuration,
+    # AcquisitionDuration, or RepetitionTime) -- last resort is the onsets'
+    # own median spacing, the same estimator used for DICOM timestamps
+    bids_root = tmp_path / "bids"
+    func_dir = bids_root / "sub-01" / "func"
+    func_dir.mkdir(parents=True)
+    save_json(str(bids_root / "dataset_description.json"), {"Name": "test"})
+    save_json(
+        str(func_dir / "sub-01_task-rest_bold.json"),
+        {"VolumeTiming": [0.0, 1.0, 3.0, 7.0, 8.0]},
+    )
+    nifti_fn = func_dir / "sub-01_task-rest_bold.nii.gz"
+    nibabel.Nifti1Image(np.zeros((2, 2, 2, 5)), np.eye(4)).to_filename(str(nifti_fn))
+
+    # median interval among [1, 2, 4, 1] is 1.5 -- same span+median-interval
+    # logic as estimate_scan_duration_from_times()
+    assert _duration_from_nifti_sidecar(str(nifti_fn)) == pytest.approx(8.0 + 1.5)
+
+
+@pytest.mark.ai_generated
+def test_duration_from_nifti_sidecar_volume_timing_single_onset_no_duration(
+    tmp_path: Path,
+) -> None:
+    # a single VolumeTiming entry and no per-frame duration source at all
+    # (nothing to derive even a fallback interval from) -- must not raise,
+    # just report "could not determine"
+    bids_root = tmp_path / "bids"
+    func_dir = bids_root / "sub-01" / "func"
+    func_dir.mkdir(parents=True)
+    save_json(str(bids_root / "dataset_description.json"), {"Name": "test"})
+    save_json(str(func_dir / "sub-01_task-rest_bold.json"), {"VolumeTiming": [0.0]})
+    nifti_fn = func_dir / "sub-01_task-rest_bold.nii.gz"
+    nibabel.Nifti1Image(np.zeros((2, 2, 2, 1)), np.eye(4)).to_filename(str(nifti_fn))
+
     assert _duration_from_nifti_sidecar(str(nifti_fn)) is None
 
 

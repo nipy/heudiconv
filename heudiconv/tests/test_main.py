@@ -360,6 +360,31 @@ def test_add_rows_to_scans_keys_file_preserves_custom_columns(tmp_path: Path) ->
     ]
 
 
+@pytest.mark.ai_generated
+def test_add_rows_to_scans_keys_file_tolerates_byte_order_mark(tmp_path: Path) -> None:
+    # some real-world _scans.tsv files (observed on OpenNeuro) carry a
+    # leading UTF-8 byte-order mark on the header line -- e.g. from having
+    # been authored/edited with Excel or similar tooling. Left unhandled,
+    # the BOM sticks to the "filename" column name, so it stops matching
+    # the literal string "filename" and every existing row gets treated as
+    # an unrecognized/lost column instead of being preserved.
+    fn = opj(tmp_path, "file.tsv")
+    with open(fn, "w", encoding="utf-8-sig") as f:
+        f.write("filename\tacq_time\n")
+        f.write("old_file.nii.gz\t2016adsfasd\n")
+
+    add_rows_to_scans_keys_file(
+        fn, {"new_file.nii.gz": ["2018xxxxx", "1.500", "", "newrand01"]}
+    )
+
+    with open(fn) as f:
+        reader = csv.reader(f, delimiter="\t")
+        header, *rows = list(reader)
+    assert header == ["filename", "acq_time", "duration", "operator", "randstr"]
+    by_filename = {row[0]: row[1:] for row in rows}
+    assert by_filename["old_file.nii.gz"] == ["2016adsfasd", "n/a", "n/a", "n/a"]
+
+
 def test__find_subj_ses() -> None:
     assert find_subj_ses(
         "950_bids_test4/sub-phantom1sid1/fmap/"
