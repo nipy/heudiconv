@@ -4,6 +4,7 @@ This heuristic also demonstrates on how to create a "derived" heuristic which wo
 behavior of an already existing heuristic without complete rewrite.  Such approach could be
 useful for heuristic like  reproin  to overload mapping etc.
 """
+
 from __future__ import annotations
 
 from typing import Any

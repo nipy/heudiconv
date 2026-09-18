@@ -935,7 +935,7 @@ def select_fmap_from_compatible_groups(
         # read the contents, splitting by lines and by tab separators:
         scans_tsv_content = [line.split("\t") for line in f.read().splitlines()]
     # get column indices for filename and acq_time from the first line:
-    (fname_idx, time_idx) = (
+    fname_idx, time_idx = (
         scans_tsv_content[0].index(k) for k in ["filename", "acq_time"]
     )
     acq_times = {line[fname_idx]: line[time_idx] for line in scans_tsv_content[1:]}

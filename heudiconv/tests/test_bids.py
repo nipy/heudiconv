@@ -1,5 +1,4 @@
-"""Test functions in heudiconv.bids module.
-"""
+"""Test functions in heudiconv.bids module."""
 
 from __future__ import annotations
 
