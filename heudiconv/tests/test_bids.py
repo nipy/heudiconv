@@ -1805,12 +1805,23 @@ def test_populate_scans_duration_tarball_present_but_unusable_falls_back(
     _make_multivol_func_scan(bids_root)
 
     # a single-file "series" cannot yield a duration on its own (neither a
-    # tag nor >= 2 timestamps to estimate from)
-    single_dicom = [op.join(TESTS_DATA_PATH, "01-anat-scout", "0001.dcm")]
+    # tag nor >= 2 timestamps to estimate from) -- strip the real Siemens
+    # "declared duration" private tag this fixture happens to carry too,
+    # since that alone would otherwise let get_acquisition_duration()
+    # succeed and defeat the point of this test
+    import pydicom
+
+    dcm_data = pydicom.dcmread(
+        op.join(TESTS_DATA_PATH, "01-anat-scout", "0001.dcm"), stop_before_pixels=True
+    )
+    del dcm_data[(0x0019, 0x100B)]
+    single_dicom_fn = tmp_path / "stripped.dcm"
+    pydicom.dcmwrite(str(single_dicom_fn), dcm_data)
+
     sourcedata_dir = bids_root / "sourcedata" / "sub-01" / "func"
     sourcedata_dir.mkdir(parents=True)
     compress_dicoms(
-        single_dicom,
+        [str(single_dicom_fn)],
         str(sourcedata_dir / "sub-01_task-rest_bold"),
         TempDirs(),
         overwrite=True,

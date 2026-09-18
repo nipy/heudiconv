@@ -598,6 +598,15 @@ _GE_ACQUISITION_DURATION_GROUP = 0x0019
 _GE_ACQUISITION_DURATION_OFFSET = 0x5A
 _GE_ACQUISITION_DURATION_CREATOR = "GEMS_ACQU_01"
 
+# Private Siemens tag "SliceMeasurementDuration" (in milliseconds): despite
+# the per-slice-sounding name, empirically (confirmed against real Siemens
+# Prisma data) it carries the same, series-wide value across every DICOM of
+# a run, including single-volume (e.g. MPRAGE) 3D sequences where no other
+# tag or per-file timestamp spread lets us determine a duration at all.
+_SIEMENS_SLICE_MEASUREMENT_DURATION_GROUP = 0x0019
+_SIEMENS_SLICE_MEASUREMENT_DURATION_OFFSET = 0x0B
+_SIEMENS_SLICE_MEASUREMENT_DURATION_CREATOR = "SIEMENS MR HEADER"
+
 
 def get_dicom_acquisition_duration(dcm_data: dcm.Dataset) -> Optional[float]:
     """Extract the total scan duration directly from a DICOM tag, if present.
@@ -640,6 +649,42 @@ def get_dicom_acquisition_duration(dcm_data: dcm.Dataset) -> Optional[float]:
         return None
     duration = as_finite_positive_float(elem.value)
     return duration * 1e-6 if duration is not None else None
+
+
+def get_dicom_declared_acquisition_duration(dcm_data: dcm.Dataset) -> Optional[float]:
+    """Extract Siemens' own declared scan duration, if present.
+
+    Unlike :func:`get_dicom_acquisition_duration` and
+    :func:`estimate_scan_duration_from_times`, this reflects the *protocol's
+    prescribed* duration (which can include preparation time not present in
+    the retained image data) rather than a value measured directly off
+    stored images, so it is only used as a last resort -- see
+    :func:`get_acquisition_duration` -- but it is the only source available
+    at all for a single-volume (e.g. anatomical) 3D Siemens sequence, where
+    every image shares one ``AcquisitionTime`` and there is no standard or
+    GE tag to fall back on.
+
+    Parameters
+    ----------
+    dcm_data : dcm.Dataset
+        DICOM with header, e.g., as read by pydicom.dcmread.
+
+    Returns
+    -------
+    Optional[float]
+        Duration in seconds, or None if the tag is absent (e.g. non-Siemens
+        data) or unparsable.
+    """
+    try:
+        elem = dcm_data.get_private_item(
+            _SIEMENS_SLICE_MEASUREMENT_DURATION_GROUP,
+            _SIEMENS_SLICE_MEASUREMENT_DURATION_OFFSET,
+            _SIEMENS_SLICE_MEASUREMENT_DURATION_CREATOR,
+        )
+    except KeyError:
+        return None
+    duration = as_finite_positive_float(elem.value)
+    return duration * 1e-3 if duration is not None else None
 
 
 def estimate_scan_duration_from_times(dicom_list: list[str]) -> Optional[float]:
@@ -734,6 +779,12 @@ def get_acquisition_duration(dicom_list: list[str]) -> Optional[float]:
        directly.
     2. :func:`estimate_scan_duration_from_times`, using every file of the
        run to approximate the wallclock span of the whole acquisition.
+    3. :func:`get_dicom_declared_acquisition_duration` on the first file --
+       Siemens' own declared/prescribed duration.  Tried last (only when
+       neither of the above yields anything) since it can disagree with the
+       actual retained-image timestamp span by a few percent, but it is the
+       only source at all for a single-volume 3D sequence (e.g. an MPRAGE
+       T1w), where every image shares one ``AcquisitionTime``.
     """
     if not dicom_list:
         return None
@@ -741,7 +792,10 @@ def get_acquisition_duration(dicom_list: list[str]) -> Optional[float]:
     duration = get_dicom_acquisition_duration(dcm_data)
     if duration is not None:
         return duration
-    return estimate_scan_duration_from_times(dicom_list)
+    duration = estimate_scan_duration_from_times(dicom_list)
+    if duration is not None:
+        return duration
+    return get_dicom_declared_acquisition_duration(dcm_data)
 
 
 def compress_dicoms(

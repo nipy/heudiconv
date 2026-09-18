@@ -21,6 +21,7 @@ from heudiconv.dicoms import (
     get_datetime_from_dcm,
     get_datetime_strings_from_dcm,
     get_dicom_acquisition_duration,
+    get_dicom_declared_acquisition_duration,
     get_reproducible_int,
     group_dicoms_into_seqinfos,
     parse_private_csa_header,
@@ -413,6 +414,48 @@ def test_get_dicom_acquisition_duration_non_positive(value: float) -> None:
     assert get_dicom_acquisition_duration(dcm_data) is None
 
 
+_SIEMENS_CREATOR_TAG = (0x0019, 0x0010)
+_SIEMENS_DURATION_TAG = (0x0019, 0x100B)
+_SIEMENS_CREATOR = "SIEMENS MR HEADER"
+
+
+@pytest.mark.ai_generated
+def test_get_dicom_declared_acquisition_duration() -> None:
+    # value is in milliseconds -- confirmed empirically against a real
+    # Siemens Prisma MPRAGE (319215 -> 319.215s, a plausible T1w duration)
+    dcm_data = dcm.dcmread(
+        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+    )
+    dcm_data.add_new(_SIEMENS_CREATOR_TAG, "LO", _SIEMENS_CREATOR)
+    dcm_data.add_new(_SIEMENS_DURATION_TAG, "DS", "319215")
+    assert get_dicom_declared_acquisition_duration(dcm_data) == pytest.approx(319.215)
+
+
+@pytest.mark.ai_generated
+def test_get_dicom_declared_acquisition_duration_absent() -> None:
+    # phantom.dcm is itself real Siemens data and already carries this tag
+    # (see test_get_dicom_declared_acquisition_duration above) -- remove it
+    # to test the genuinely-absent case
+    dcm_data = dcm.dcmread(
+        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+    )
+    del dcm_data[_SIEMENS_DURATION_TAG]
+    assert get_dicom_declared_acquisition_duration(dcm_data) is None
+
+
+@pytest.mark.ai_generated
+def test_get_dicom_declared_acquisition_duration_wrong_creator() -> None:
+    # private group 0019 is used differently by different vendors -- an
+    # element at the Siemens offset under an unrelated creator block must
+    # not be mistaken for Siemens' SliceMeasurementDuration
+    dcm_data = dcm.dcmread(
+        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+    )
+    dcm_data.add_new(_SIEMENS_CREATOR_TAG, "LO", "GEMS_ACQU_01")
+    dcm_data.add_new(_SIEMENS_DURATION_TAG, "DS", "319215")
+    assert get_dicom_declared_acquisition_duration(dcm_data) is None
+
+
 @pytest.mark.ai_generated
 def test_estimate_scan_duration_from_times() -> None:
     # 3 DICOMs, ~4.15s apart -- duration is the span plus one more interval
@@ -541,4 +584,43 @@ def test_get_acquisition_duration_prefers_tag(
 @pytest.mark.ai_generated
 def test_get_acquisition_duration_falls_back_to_times() -> None:
     dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))
+    assert get_acquisition_duration(dicom_list) == pytest.approx(12.45)
+
+
+@pytest.mark.ai_generated
+def test_get_acquisition_duration_falls_back_to_declared_duration(
+    tmp_path: Path,
+) -> None:
+    # a single-volume 3D sequence (e.g. an MPRAGE T1w): every file shares
+    # one AcquisitionTime, so estimate_scan_duration_from_times() cannot
+    # find two distinct timestamps to work with -- Siemens' own declared
+    # duration is the only source left
+    dcm_data = dcm.dcmread(
+        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+    )
+    dcm_data.add_new(_SIEMENS_CREATOR_TAG, "LO", _SIEMENS_CREATOR)
+    dcm_data.add_new(_SIEMENS_DURATION_TAG, "DS", "319215")
+    out = tmp_path / "single_volume.dcm"
+    dcm.dcmwrite(str(out), dcm_data)
+    assert get_acquisition_duration([str(out)]) == pytest.approx(319.215)
+
+
+@pytest.mark.ai_generated
+def test_get_acquisition_duration_prefers_times_over_declared_duration(
+    tmp_path: Path,
+) -> None:
+    # when a multi-file timestamp span IS available, it is preferred over
+    # Siemens' declared duration (the latter is the protocol's prescribed
+    # time, which can disagree with the retained-image span by a few
+    # percent)
+    dicom_list = []
+    for i, dcmfile in enumerate(
+        sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))
+    ):
+        dcm_data = dcm.dcmread(dcmfile, stop_before_pixels=True)
+        dcm_data.add_new(_SIEMENS_CREATOR_TAG, "LO", _SIEMENS_CREATOR)
+        dcm_data.add_new(_SIEMENS_DURATION_TAG, "DS", "999000")
+        out = tmp_path / f"f{i}.dcm"
+        dcm.dcmwrite(str(out), dcm_data)
+        dicom_list.append(str(out))
     assert get_acquisition_duration(dicom_list) == pytest.approx(12.45)

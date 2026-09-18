@@ -213,9 +213,10 @@ def test_get_formatted_scans_key_row() -> None:
     row1 = get_formatted_scans_key_row(dcm_fn)
     assert len(row1) == 4
     assert row1[0] == "2016-10-14T09:26:34.692500"
-    # duration cannot be established from a single DICOM without an
-    # AcquisitionDuration-like tag
-    assert row1[1] == "n/a"
+    # a single DICOM has no AcquisitionDuration-like standard/GE tag and no
+    # second timestamp to estimate from, but this real Siemens file does
+    # carry the private "declared duration" tag as a last resort
+    assert row1[1] == "1.222"
     assert row1[2] == "n/a"
     prandstr1 = row1[3]
 
