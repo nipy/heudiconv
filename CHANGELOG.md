@@ -1,3 +1,32 @@
+# v1.5.1 (Fri Sep 18 2026)
+
+#### 🐛 Bug Fix
+
+- Aggregate events.tsv for invalid entities (and rec) (resubmitted fixed #864) [#873](https://github.com/nipy/heudiconv/pull/873) ([@octomike](https://github.com/octomike) [@yarikoptic](https://github.com/yarikoptic) [@claude](https://github.com/claude))
+- chore: boost flake8 and black in pre-commit for compatible to python 3.14 versions [#874](https://github.com/nipy/heudiconv/pull/874) ([@yarikoptic](https://github.com/yarikoptic))
+- Update dcm2niix bundled in the Docker image to v1.0.20260724 [#870](https://github.com/nipy/heudiconv/pull/870) ([@wojzwo](https://github.com/wojzwo))
+- BF: populate SeqInfo date/time from any available DICOM date/time tags [#867](https://github.com/nipy/heudiconv/pull/867) ([@claude](https://github.com/claude) [@yarikoptic-gitmate](https://github.com/yarikoptic-gitmate))
+- Merge branch 'bf-633' [#634](https://github.com/nipy/heudiconv/pull/634) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### 🏠 Internal
+
+- CI: run lint/typing/test once per commit, not twice [#871](https://github.com/nipy/heudiconv/pull/871) ([@claude](https://github.com/claude) [@yarikoptic](https://github.com/yarikoptic))
+- Migrate packaging metadata to pyproject.toml; improve metadata for container (version); convert relative links to images for pypi [#868](https://github.com/nipy/heudiconv/pull/868) ([@claude](https://github.com/claude) [@yarikoptic-gitmate](https://github.com/yarikoptic-gitmate))
+
+#### 📝 Documentation
+
+- DOC: add minimal CLAUDE.md pointing at CONTRIBUTING.rst, and refresh CONTRIBUTING [#866](https://github.com/nipy/heudiconv/pull/866) ([@claude](https://github.com/claude) [@yarikoptic-gitmate](https://github.com/yarikoptic-gitmate))
+
+#### Authors: 5
+
+- [@wojzwo](https://github.com/wojzwo)
+- Claude ([@claude](https://github.com/claude))
+- GitMate for @yarikoptic ([@yarikoptic-gitmate](https://github.com/yarikoptic-gitmate))
+- Michael ([@octomike](https://github.com/octomike))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # v1.5.0 (Thu Aug 06 2026)
 
 #### 🚀 Enhancement
