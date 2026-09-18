@@ -115,6 +115,8 @@ def create_seqinfo(
     global total_files
     total_files += len(series_files)
 
+    date, time = get_datetime_strings_from_dcm(dcminfo)
+
     custom_seqinfo_data = (
         custom_seqinfo(wrapper=mw, series_files=series_files)
         if custom_seqinfo
@@ -155,9 +157,9 @@ def create_seqinfo(
         # For demographics to populate BIDS participants.tsv
         patient_age=dcminfo.get("PatientAge"),
         patient_sex=dcminfo.get("PatientSex"),
-        date=dcminfo.get("AcquisitionDate"),
+        date=date,
         series_uid=dcminfo.get("SeriesInstanceUID"),
-        time=dcminfo.get("AcquisitionTime"),
+        time=time,
         custom=custom_seqinfo_data,
     )
 
@@ -519,12 +521,12 @@ def get_reproducible_int(dicom_list: list[str]) -> int:
     )
 
 
-def get_datetime_from_dcm(dcm_data: dcm.FileDataset) -> Optional[datetime.datetime]:
+def get_datetime_from_dcm(dcm_data: dcm.Dataset) -> Optional[datetime.datetime]:
     """Extract datetime from filedataset, or return None is no datetime information found.
 
     Parameters
     ----------
-    dcm_data : dcm.FileDataset
+    dcm_data : dcm.Dataset
         DICOM with header, e.g., as ready by pydicom.dcmread.
         Objects with __getitem__ and have those keys with values properly formatted may also work
 
@@ -553,6 +555,38 @@ def get_datetime_from_dcm(dcm_data: dcm.FileDataset) -> Optional[datetime.dateti
     if check_tag("SeriesDate") and check_tag("SeriesTime"):
         return strptime_dcm_da_tm(dcm_data, "SeriesDate", "SeriesTime")
     return None
+
+
+def get_datetime_strings_from_dcm(
+    dcm_data: dcm.Dataset,
+) -> tuple[Optional[str], Optional[str]]:
+    """Get DICOM style date (YYYYMMDD) and time (HHMMSS.FFFFFF) strings
+
+    Uses AcquisitionDate and AcquisitionTime whenever both are present, and
+    otherwise falls back to whichever date/time :func:`get_datetime_from_dcm`
+    could establish (e.g. AcquisitionDateTime for XA30 enhanced DICOMs).
+
+    Parameters
+    ----------
+    dcm_data : dcm.Dataset
+        DICOM with header, e.g., as read by pydicom.dcmread.
+
+    Returns
+    -------
+    tuple of two Optional[str]
+        (date, time), each None if no corresponding information was found.
+    """
+    date = dcm_data.get("AcquisitionDate")
+    time = dcm_data.get("AcquisitionTime")
+    if date and time:
+        return str(date), str(time)
+
+    # take both from the same source so they are guaranteed to be consistent
+    datetime_ = get_datetime_from_dcm(dcm_data)
+    if datetime_ is None:
+        # nothing better to offer -- return whatever (if anything) we had
+        return (str(date) if date else None, str(time) if time else None)
+    return datetime_.strftime("%Y%m%d"), datetime_.strftime("%H%M%S.%f")
 
 
 def compress_dicoms(
