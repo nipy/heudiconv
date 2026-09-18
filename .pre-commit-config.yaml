@@ -15,7 +15,7 @@ repos:
       - id: codespell
 
   - repo: https://github.com/psf/black
-    rev: 23.3.0
+    rev: 26.5.1
     hooks:
       - id: black
 
