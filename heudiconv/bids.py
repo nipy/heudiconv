@@ -902,19 +902,31 @@ def _duration_from_nifti_sidecar(
     and valid: per the BIDS `duration` proposal, that field is exactly
     what the `_scans.tsv` ``duration`` column represents for MRI data.
     The one exception is a sidecar carrying ``VolumeTiming`` (e.g. sparse
-    or multiband BOLD/ASL designs): per BIDS, ``RepetitionTime`` and
-    ``VolumeTiming`` are meant to be mutually exclusive, and
-    ``AcquisitionDuration`` there (if any) describes per-volume/frame
-    timing rather than the whole run, so the total is instead derived from
-    the last volume's onset time plus one frame's acquisition duration --
-    preferring, in order, ``FrameAcquisitionDuration``, the deprecated
-    per-frame use of ``AcquisitionDuration``, ``RepetitionTime`` (some
-    real-world sidecars carry both fields despite the spec, with
-    ``VolumeTiming`` merely a dense/regularly-spaced list -- in which case
-    ``RepetitionTime`` *is* each frame's duration), and finally the median
-    interval between ``VolumeTiming`` onsets themselves as a last-resort
-    proxy (the same reasoning as :func:`heudiconv.dicoms.estimate_scan_duration_from_times`
-    uses for the equivalent gap from DICOM timestamps).
+    or multiband BOLD/ASL designs): ``AcquisitionDuration`` there (if any)
+    describes per-volume/frame timing rather than the whole run, so the
+    total is instead derived from the last volume's onset time plus one
+    frame's acquisition duration, preferring ``FrameAcquisitionDuration``,
+    then the deprecated per-frame use of ``AcquisitionDuration``.
+
+    Per BIDS, ``RepetitionTime`` and ``VolumeTiming`` are meant to be
+    mutually exclusive; if a sidecar carries both anyway (some real-world
+    datasets do, typically with ``VolumeTiming`` merely a dense/regularly
+    -TR-spaced list) and neither of the fields above is given, this is
+    inconsistent metadata we cannot safely resolve on our own -- treating
+    ``RepetitionTime`` as the per-frame duration is right for that dense
+    case but would badly overestimate a genuinely sparse design (where
+    ``RepetitionTime`` spans a silent gap much longer than the actual
+    per-frame acquisition). So by default this logs a warning and reports
+    the duration as undetermined rather than guessing; set the
+    ``HEUDICONV_VOLUME_TIMING_FRAME_DURATION`` environment variable to
+    ``"repetition_time"`` to opt into using ``RepetitionTime`` as the
+    per-frame duration in that case, or to ``"onset_interval"`` to instead
+    use the median interval between ``VolumeTiming`` onsets themselves
+    (the same reasoning :func:`heudiconv.dicoms.estimate_scan_duration_from_times`
+    uses for the equivalent gap from DICOM timestamps). That
+    onset-interval estimate is also used, with no opt-in required, when
+    ``RepetitionTime`` is absent entirely (there is no conflicting
+    metadata to arbitrate in that case, just a missing per-frame duration).
 
     Otherwise, computes ``RepetitionTime`` (from the JSON sidecar) times
     the number of volumes (from the NIfTI header), which is only
@@ -969,20 +981,45 @@ def _duration_from_nifti_sidecar(
             onsets = sorted(float(t) for t in volume_timing)
         except (TypeError, ValueError):
             return None
-        frame_duration = (
-            as_finite_positive_float(meta.get("FrameAcquisitionDuration"))
-            or as_finite_positive_float(meta.get("AcquisitionDuration"))
-            or as_finite_positive_float(meta.get("RepetitionTime"))
-        )
-        if frame_duration is None and len(onsets) > 1:
-            # last-resort proxy: no per-frame duration was declared at
-            # all, so fall back to the onsets' own median spacing --
-            # coarse for a genuinely sparse design, but better than
-            # nothing, and consistent with how a missing final-frame
-            # duration is estimated from DICOM timestamps elsewhere
-            frame_duration = statistics.median(
-                t2 - t1 for t1, t2 in zip(onsets[:-1], onsets[1:])
+
+        def median_onset_interval() -> Optional[float]:
+            if len(onsets) < 2:
+                return None
+            return statistics.median(t2 - t1 for t1, t2 in zip(onsets[:-1], onsets[1:]))
+
+        frame_duration = as_finite_positive_float(
+            meta.get("FrameAcquisitionDuration")
+        ) or as_finite_positive_float(meta.get("AcquisitionDuration"))
+
+        if frame_duration is None:
+            has_repetition_time = (
+                as_finite_positive_float(meta.get("RepetitionTime")) is not None
             )
+            if not has_repetition_time:
+                # no conflicting metadata to arbitrate -- just a missing
+                # per-frame duration, so the best-effort onset-interval
+                # proxy applies unconditionally
+                frame_duration = median_onset_interval()
+            else:
+                strategy = os.environ.get("HEUDICONV_VOLUME_TIMING_FRAME_DURATION")
+                if strategy == "repetition_time":
+                    frame_duration = as_finite_positive_float(
+                        meta.get("RepetitionTime")
+                    )
+                elif strategy == "onset_interval":
+                    frame_duration = median_onset_interval()
+                else:
+                    lgr.warning(
+                        "%s has both RepetitionTime and VolumeTiming, which "
+                        "BIDS treats as mutually exclusive; not guessing a "
+                        "duration from this inconsistent metadata (set "
+                        "HEUDICONV_VOLUME_TIMING_FRAME_DURATION to "
+                        "'repetition_time' or 'onset_interval' to opt into "
+                        "one)",
+                        json_fn,
+                    )
+                    return None
+
         if frame_duration is None:
             return None
         return onsets[-1] + frame_duration
