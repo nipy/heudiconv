@@ -8,7 +8,6 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 from glob import glob
 import itertools
-import logging
 import os
 import os.path as op
 from pathlib import Path
@@ -1508,7 +1507,7 @@ def test_populate_intended_for(
                 assert "IntendedFor" not in data.keys()
 
 
-def test_BIDSFile(caplog: pytest.LogCaptureFixture) -> None:
+def test_BIDSFile() -> None:
     """Tests for the BIDSFile class"""
 
     # define entities in the correct order:
@@ -1579,8 +1578,7 @@ def test_BIDSFile(caplog: pytest.LogCaptureFixture) -> None:
     # Test drop method
     my_bids_file.drop("dir")
     assert "dir" not in my_bids_file
-    # dropping an entity which is not set only logs a warning
-    caplog.set_level(logging.WARNING)
+    # dropping an entity which is not set raises unless missing_ok is given.
     # test previously dropped entity and entirely non-existing
     for entity in ['dir', 'not_existing']:
         with pytest.raises(ValueError, match=f"does not contain entity {entity!r}"):
@@ -1589,6 +1587,7 @@ def test_BIDSFile(caplog: pytest.LogCaptureFixture) -> None:
         my_bids_file.drop(entity, missing_ok=True)
 
 
+@pytest.mark.ai_generated
 def test_populate_aggregated_jsons_events(tmp_path: Path) -> None:
     """A single _events.tsv is generated for files differing only in
     entities the events are independent of ('chunk', 'echo', and 'part') """
