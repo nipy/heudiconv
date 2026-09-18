@@ -253,27 +253,13 @@ def populate_aggregated_jsons(path: str) -> None:
         # create a stub onsets file for each one of those
         suf = "_bold.json"
         assert fpath.endswith(suf)
-        # specify the name of the '_events.tsv' file:
-        if "_echo-" in fpath:
-            # multi-echo sequence: bids (1.1.0) specifies just one '_events.tsv'
-            #   file, common for all echoes.  The name will not include _echo-.
-            # TODO: RF to use re.match for better readability/robustness
-            # So, find out the echo number:
-            fpath_split = fpath.split("_echo-", 1)  # split fpath using '_echo-'
-            fpath_split_2 = fpath_split[1].split(
-                "_", 1
-            )  # split the second part of fpath_split using '_'
-            echoNo = fpath_split_2[0]  # get echo number
-            if echoNo == "1":
-                if len(fpath_split_2) != 2:
-                    raise ValueError("Found no trailer after _echo-")
-                # we modify fpath to exclude '_echo-' + echoNo:
-                fpath = fpath_split[0] + "_" + fpath_split_2[1]
-            else:
-                # for echoNo greater than 1, don't create the events file, so go to
-                #   the next for loop iteration:
-                continue
 
+        # specify the name of the '_events.tsv' file:
+        parsed_fpath = BIDSFile.parse(op.basename(fpath))
+        for events_invalid_entity in ['chunk', 'echo', 'part']:
+            # events.tsv with these entities are not specified
+            parsed_fpath.drop(events_invalid_entity, missing_ok=True)
+        fpath = op.join(op.dirname(fpath), str(parsed_fpath))
         events_file = remove_suffix(fpath, suf) + "_events.tsv"
         # do not touch any existing thing, it may be precious
         if not op.lexists(events_file):
@@ -1090,6 +1076,7 @@ class BIDSFile:
         "mt",
         "part",
         "recording",
+        "chunk",
     ]
 
     def __init__(
@@ -1155,6 +1142,16 @@ class BIDSFile:
         self, entity: str, value: str
     ) -> None:  # would puke with some exception if already known
         return self.set(entity, value, overwrite=False)
+
+    def __contains__(self, entity: object) -> bool:
+        return entity in self._entities
+
+    def drop(self, entity: str, missing_ok: bool = False) -> None:
+        if entity not in self._entities:
+            if not missing_ok:
+                raise ValueError(f"{self} does not contain entity {entity!r}")
+            return
+        self._entities.pop(entity)
 
     def set(self, entity: str, value: str, overwrite: bool = True) -> None:
         if entity not in self._entities:
