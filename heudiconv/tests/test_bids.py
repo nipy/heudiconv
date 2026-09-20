@@ -40,6 +40,7 @@ from heudiconv.bids import (
     get_key_info_for_fmap_assignment,
     get_shim_setting,
     maybe_na,
+    populate_aggregated_jsons,
     populate_bids_templates,
     populate_intended_for,
     populate_scans_duration,
@@ -1592,6 +1593,39 @@ def test_BIDSFile() -> None:
     # -for an existing entity, you can overwrite it with "set":
     my_bids_file.set("echo", "2")
     assert my_bids_file["echo"] == "2"
+
+    # Test drop method
+    my_bids_file.drop("dir")
+    assert "dir" not in my_bids_file
+    # dropping an entity which is not set raises unless missing_ok is given.
+    # test previously dropped entity and entirely non-existing
+    for entity in ['dir', 'not_existing']:
+        with pytest.raises(ValueError, match=f"does not contain entity {entity!r}"):
+            my_bids_file.drop(entity)
+        # implicitly assert that no exception is thrown when using missing_ok
+        my_bids_file.drop(entity, missing_ok=True)
+
+
+@pytest.mark.ai_generated
+def test_populate_aggregated_jsons_events(tmp_path: Path) -> None:
+    """A single _events.tsv is generated for files differing only in
+    entities the events are independent of ('chunk', 'echo', and 'part') """
+    func_path = tmp_path / "sub-01" / "func"
+    bold_json = {"RepetitionTime": 1.0, "TaskName": "rest"}
+    create_tree(
+        str(func_path),
+        {
+            f"sub-01_task-rest_{entity}_bold.json": dict(bold_json)
+            for entity in ["chunk-1", "chunk-2", "echo-1", "echo-2", "part-mag", "part-phase"]
+        },
+    )
+
+    populate_aggregated_jsons(str(tmp_path))
+
+    events_files = sorted(func_path.glob("*_events.tsv"))
+    assert events_files == [func_path / "sub-01_task-rest_events.tsv"]
+    # and nothing got written elsewhere in the dataset:
+    assert sorted(tmp_path.rglob("*_events.tsv")) == events_files
 
 
 @pytest.mark.ai_generated
