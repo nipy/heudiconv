@@ -1599,7 +1599,7 @@ def test_BIDSFile() -> None:
     assert "dir" not in my_bids_file
     # dropping an entity which is not set raises unless missing_ok is given.
     # test previously dropped entity and entirely non-existing
-    for entity in ['dir', 'not_existing']:
+    for entity in ["dir", "not_existing"]:
         with pytest.raises(ValueError, match=f"does not contain entity {entity!r}"):
             my_bids_file.drop(entity)
         # implicitly assert that no exception is thrown when using missing_ok
@@ -1609,14 +1609,21 @@ def test_BIDSFile() -> None:
 @pytest.mark.ai_generated
 def test_populate_aggregated_jsons_events(tmp_path: Path) -> None:
     """A single _events.tsv is generated for files differing only in
-    entities the events are independent of ('chunk', 'echo', and 'part') """
+    entities the events are independent of ('chunk', 'echo', and 'part')"""
     func_path = tmp_path / "sub-01" / "func"
     bold_json = {"RepetitionTime": 1.0, "TaskName": "rest"}
     create_tree(
         str(func_path),
         {
             f"sub-01_task-rest_{entity}_bold.json": dict(bold_json)
-            for entity in ["chunk-1", "chunk-2", "echo-1", "echo-2", "part-mag", "part-phase"]
+            for entity in [
+                "chunk-1",
+                "chunk-2",
+                "echo-1",
+                "echo-2",
+                "part-mag",
+                "part-phase",
+            ]
         },
     )
 
