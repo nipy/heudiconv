@@ -22,6 +22,7 @@ from heudiconv.dicoms import (
     get_datetime_strings_from_dcm,
     get_dicom_acquisition_duration,
     get_dicom_declared_acquisition_duration,
+    get_dicom_declared_repetitions,
     get_reproducible_int,
     group_dicoms_into_seqinfos,
     parse_private_csa_header,
@@ -436,6 +437,22 @@ def test_get_dicom_declared_acquisition_duration_absent() -> None:
 
 
 @pytest.mark.ai_generated
+def test_get_dicom_declared_repetitions() -> None:
+    # phantom.dcm's protocol dump omits 'lRepetitions' entirely, as Siemens
+    # does for a single-volume (single-measurement) sequence
+    dcm_data = dcm.dcmread(
+        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+    )
+    assert get_dicom_declared_repetitions(dcm_data) == 0
+
+    # axasc35.dcm's protocol dump declares 'lRepetitions = 1' (2 volumes)
+    dcm_data = dcm.dcmread(
+        op.join(TESTS_DATA_PATH, "axasc35.dcm"), stop_before_pixels=True
+    )
+    assert get_dicom_declared_repetitions(dcm_data) == 1
+
+
+@pytest.mark.ai_generated
 def test_estimate_scan_duration_from_times() -> None:
     # 3 DICOMs, ~4.15s apart -- duration is the span plus one more interval
     dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))
@@ -584,3 +601,18 @@ def test_get_acquisition_duration_prefers_times_over_declared_duration() -> None
     # multi-file timestamp span IS available here, it must be preferred
     dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))
     assert get_acquisition_duration(dicom_list) == pytest.approx(12.45)
+
+
+@pytest.mark.ai_generated
+def test_get_acquisition_duration_does_not_guess_for_truncated_multivolume() -> None:
+    # axasc35.dcm's protocol declares 'lRepetitions = 1' (2 volumes planned),
+    # but only a single file/timestamp is available here -- e.g. an aborted
+    # acquisition stopped after its first volume. Falling back to Siemens'
+    # declared total scan time (17s) would report the full planned protocol
+    # rather than the actual (much shorter) partial one, so this must be
+    # left as unavailable instead of guessed.
+    dcm_fn = op.join(TESTS_DATA_PATH, "axasc35.dcm")
+    assert get_dicom_declared_acquisition_duration(
+        dcm.dcmread(dcm_fn, stop_before_pixels=True)
+    ) == pytest.approx(17.0)
+    assert get_acquisition_duration([dcm_fn]) is None

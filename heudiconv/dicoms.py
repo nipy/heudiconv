@@ -636,6 +636,18 @@ def get_dicom_declared_acquisition_duration(dcm_data: dcm.Dataset) -> Optional[f
     return as_finite_positive_float(value) if value else None
 
 
+def get_dicom_declared_repetitions(dcm_data: dcm.Dataset) -> int:
+    """Number of *additional* repetitions/measurements Siemens' own Phoenix
+    protocol declares for this series (``lRepetitions``), i.e. 0 for a
+    single-volume acquisition -- Siemens omits this field from the protocol
+    dump entirely when it is 0, so an absent field is treated the same as an
+    explicit 0."""
+    value = parse_private_csa_header(
+        dcm_data, "NumberOfTemporalPositions", "lRepetitions"
+    )
+    return int(value) if value else 0
+
+
 def estimate_scan_duration_from_times(dicom_list: list[str]) -> Optional[float]:
     """Estimate a run's total duration from per-file acquisition timestamps:
     the span between the earliest and latest timestamp (see
@@ -691,7 +703,11 @@ def get_acquisition_duration(dicom_list: list[str]) -> Optional[float]:
     :func:`estimate_scan_duration_from_times`, then
     :func:`get_dicom_declared_acquisition_duration` as a last resort (the
     only source at all for a single-volume 3D sequence, e.g. an MPRAGE
-    T1w). Returns None if none of them succeed."""
+    T1w) -- but only when the protocol itself declares a single volume;
+    otherwise a lone/repeated timestamp more likely means a truncated or
+    aborted multi-volume acquisition, for which the declared duration would
+    overstate the actual (partial) one, so we report None rather than guess.
+    Returns None if nothing above succeeds."""
     if not dicom_list:
         return None
     dcm_data = dcm.dcmread(dicom_list[0], stop_before_pixels=True, force=True)
@@ -701,6 +717,16 @@ def get_acquisition_duration(dicom_list: list[str]) -> Optional[float]:
     duration = estimate_scan_duration_from_times(dicom_list)
     if duration is not None:
         return duration
+    if get_dicom_declared_repetitions(dcm_data) > 0:
+        lgr.warning(
+            "Could not establish a duration for %s from timestamps, and its "
+            "protocol declares more than one volume -- this looks like a "
+            "truncated/aborted acquisition, so not using Siemens' declared "
+            "total scan time, which would reflect the full planned protocol "
+            "rather than the actual partial acquisition",
+            dicom_list[0],
+        )
+        return None
     return get_dicom_declared_acquisition_duration(dcm_data)
 
 
