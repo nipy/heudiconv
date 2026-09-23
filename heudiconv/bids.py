@@ -519,12 +519,6 @@ def save_scans_key(
     scan_key_row, acq_datetime, earliest_datetime = _get_scans_key_row_and_times(
         item[-1]
     )
-    check_acq_time_congruency(
-        acq_datetime,
-        earliest_datetime,
-        [f for f in bids_files if f.endswith(".json")],
-        label=remove_suffix(op.basename(bids_files[0]), ".json"),
-    )
     for bids_file in bids_files:
         # get filenames
         f_name = "/".join(bids_file.split("/")[-2:])
@@ -550,6 +544,16 @@ def save_scans_key(
                 % (ses, ses_, f_name)
             )
         ses = ses_
+    try:
+        check_acq_time_congruency(
+            acq_datetime,
+            earliest_datetime,
+            [f for f in bids_files if f.endswith(".json")],
+            label=op.basename(item[0]),
+        )
+    except Exception as exc:
+        # purely diagnostic -- must never abort a conversion
+        lgr.warning("Failed to check acq_time of %s: %s", item[0], exc)
     # where should we store it?
     output_dir = op.dirname(op.dirname(bids_file))
     # save
@@ -746,7 +750,11 @@ def _get_sidecar_acquisition_datetime(
         lgr.debug("Could not parse AcquisitionTime %r in %s", acq_time, json_file)
         return None
     candidates = [
-        datetime.datetime.combine(near.date() + datetime.timedelta(days=d), time_)
+        # the sidecar carries the same local wall time as a timezone-aware
+        # `near` (from DICOM TimezoneOffsetFromUTC), so take its tzinfo
+        datetime.datetime.combine(
+            near.date() + datetime.timedelta(days=d), time_, tzinfo=near.tzinfo
+        )
         for d in (-1, 0, 1)
     ]
     return min(candidates, key=lambda c: abs(c - near))
@@ -766,8 +774,8 @@ def check_acq_time_congruency(
       than the earliest acquisition timestamp across all of them, as happens
       e.g. for interleaved multiband Siemens acquisitions exported as one
       DICOM per slice (https://github.com/nipy/heudiconv/issues/876);
-    - `acq_time` disagrees with the `AcquisitionTime` dcm2niix recorded in
-      any of the run's `json_files` sidecars.  Which of the two (if any)
+    - `acq_time` disagrees with the (earliest) `AcquisitionTime` dcm2niix
+      recorded in the run's `json_files` sidecars.  Which of the two (if any)
       matches the earliest DICOM timestamp is reported, to tell which one is
       off (see also https://github.com/rordenlab/dcm2niix/issues/1039).
 
@@ -809,31 +817,30 @@ def check_acq_time_congruency(
             earliest_datetime.time().isoformat(),
         )
 
-    mismatches = []
-    for json_file in json_files:
-        sidecar_datetime = _get_sidecar_acquisition_datetime(json_file, acq_datetime)
-        if (
-            sidecar_datetime is not None
-            and abs(sidecar_datetime - acq_datetime) > ACQ_TIME_TOLERANCE
-        ):
-            mismatches.append(
-                "%s: AcquisitionTime %s (%+.6f seconds; matches earliest: %s)"
-                % (
-                    op.basename(json_file),
-                    sidecar_datetime.time().isoformat(),
-                    (sidecar_datetime - acq_datetime).total_seconds(),
-                    matches_earliest(sidecar_datetime),
-                )
-            )
-    if mismatches:
+    # dcm2niix may split a series into several outputs (e.g. echoes, or
+    # localizer planes) with legitimately different AcquisitionTimes -- the
+    # earliest of them is what corresponds to acq_time
+    sidecar_times = [
+        (dt, json_file)
+        for json_file in json_files
+        if (dt := _get_sidecar_acquisition_datetime(json_file, acq_datetime))
+        is not None
+    ]
+    if not sidecar_times:
+        return
+    sidecar_datetime, json_file = min(sidecar_times)
+    if abs(sidecar_datetime - acq_datetime) > ACQ_TIME_TOLERANCE:
         lgr.warning(
-            "%s: acq_time %s (matches earliest: %s) disagrees with the "
-            "AcquisitionTime of %d JSON sidecar(s): %s",
+            "%s: acq_time %s (matches earliest: %s) disagrees with "
+            "AcquisitionTime %s (%+.6f seconds; matches earliest: %s) "
+            "recorded by dcm2niix in %s",
             label,
             acq_datetime.time().isoformat(),
             matches_earliest(acq_datetime),
-            len(mismatches),
-            "; ".join(mismatches),
+            sidecar_datetime.time().isoformat(),
+            (sidecar_datetime - acq_datetime).total_seconds(),
+            matches_earliest(sidecar_datetime),
+            op.basename(json_file),
         )
 
 

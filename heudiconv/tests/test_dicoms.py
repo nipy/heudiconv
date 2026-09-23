@@ -6,6 +6,7 @@ import json
 import os.path as op
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 import pydicom as dcm
 import pytest
@@ -18,6 +19,7 @@ from heudiconv.dicoms import (
     embed_dicom_and_nifti_metadata,
     estimate_scan_duration_from_times,
     get_acquisition_duration,
+    get_acquisition_timestamps,
     get_datetime_from_dcm,
     get_datetime_strings_from_dcm,
     get_dicom_acquisition_duration,
@@ -549,6 +551,36 @@ def test_estimate_scan_duration_from_times_skips_malformed_timestamp(
     # the malformed file (offset 1) is skipped; span (3s) + median interval
     # of the remaining single interval (3s) between the two good timestamps
     assert estimate_scan_duration_from_times(dicom_list) == pytest.approx(6.0)
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize("tz_offset", [None, "+0100"])
+def test_get_acquisition_timestamps(tmp_path: Path, tz_offset: str | None) -> None:
+    dicom_list = make_timed_dicoms(tmp_path, [2, 0, 4, 7], tz_offset=tz_offset)
+    timestamps = get_acquisition_timestamps(dicom_list)
+    # in dicom_list order, and exactly what a full header read gives -- in
+    # particular equally timezone-aware, so the two can be compared
+    assert timestamps == [
+        get_datetime_from_dcm(dcm.dcmread(f, stop_before_pixels=True))
+        for f in dicom_list
+    ]
+    assert [t.second for t in timestamps] == [2, 0, 4, 7]
+    assert all((t.tzinfo is not None) == bool(tz_offset) for t in timestamps)
+    # and they can be used along with such a full-read anchor
+    assert get_acquisition_duration(
+        dicom_list, anchor_dt=timestamps[0], timestamps=timestamps
+    ) == pytest.approx(7.0)
+
+
+@pytest.mark.ai_generated
+def test_get_acquisition_duration_uses_given_timestamps(tmp_path: Path) -> None:
+    dicom_list = make_timed_dicoms(tmp_path, [0, 1, 2])
+    timestamps = get_acquisition_timestamps(dicom_list)
+    with patch("heudiconv.dicoms.get_acquisition_timestamps") as mocked:
+        assert get_acquisition_duration(
+            dicom_list, timestamps=timestamps
+        ) == pytest.approx(3.0)
+    mocked.assert_not_called()
 
 
 @pytest.mark.ai_generated

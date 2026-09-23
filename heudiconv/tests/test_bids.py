@@ -2455,51 +2455,55 @@ def test_populate_bids_templates_syncs_existing_scans_json(tmp_path: Path) -> No
 
 
 @pytest.mark.ai_generated
+@pytest.mark.parametrize("tz", ["", "+01:00"])
 @pytest.mark.parametrize(
-    "acq_time,earliest,sidecar_time,expected",
+    "acq_time,earliest,sidecar_times,expected",
     [
         # all consistent
-        ("12:00:00", "12:00:00", "12:00:00.000000", []),
+        ("12:00:00", "12:00:00", ["12:00:00.000000"], []),
         # differences within ACQ_TIME_TOLERANCE are ignored
-        ("12:00:00", "11:59:59.9995", "12:00:00.000500", []),
+        ("12:00:00", "11:59:59.999500", ["12:00:00.000500"], []),
         # no AcquisitionTime in the sidecar -- nothing to compare against
-        ("12:00:00", "12:00:00", None, []),
+        ("12:00:00", "12:00:00", [None], []),
         # https://github.com/nipy/heudiconv/issues/876 as it is today: the
         # first DICOM is not the earliest acquired, and dcm2niix's sidecar
         # is biased the same way (rordenlab/dcm2niix#1039)
         (
-            "12:00:02.586",
-            "12:00:00",
             "12:00:02.586000",
+            "12:00:00",
+            ["12:00:02.586000"],
             ["2.586000 seconds later than the earliest"],
         ),
         # acq_time is right, the sidecar is not
         (
             "12:00:00",
             "12:00:00",
-            "12:00:02.586000",
+            ["12:00:02.586000"],
             [
-                "acq_time 12:00:00 (matches earliest: yes) disagrees",
+                "acq_time 12:00:00 (matches earliest: yes) disagrees with "
                 "AcquisitionTime 12:00:02.586000 (+2.586000 seconds; "
-                "matches earliest: no)",
+                "matches earliest: no) recorded by dcm2niix in f0.json"
             ],
         ),
         # the sidecar is right, acq_time is not
         (
-            "12:00:02.586",
+            "12:00:02.586000",
             "12:00:00",
-            "12:00:00.000000",
+            ["12:00:00.000000"],
             [
                 "2.586000 seconds later than the earliest",
                 "(matches earliest: no) disagrees",
                 "(-2.586000 seconds; matches earliest: yes)",
             ],
         ),
+        # several outputs (e.g. localizer planes) with different times: only
+        # the earliest one corresponds to acq_time
+        ("12:00:00", "12:00:00", ["12:00:05.000000", "12:00:00.000000"], []),
         # a run straddling midnight is compared across it, not a day apart
         (
-            "23:59:59.900",
-            "23:59:59.900",
-            "00:00:00.500000",
+            "23:59:59.900000",
+            "23:59:59.900000",
+            ["00:00:00.500000"],
             ["(+0.600000 seconds; matches earliest: no)"],
         ),
     ],
@@ -2507,18 +2511,24 @@ def test_populate_bids_templates_syncs_existing_scans_json(tmp_path: Path) -> No
 def test_check_acq_time_congruency(
     tmp_path: Path,
     caplog: pytest.LogCaptureFixture,
+    tz: str,
     acq_time: str,
     earliest: str,
-    sidecar_time: Optional[str],
+    sidecar_times: list[Optional[str]],
     expected: list[str],
 ) -> None:
-    sidecar = tmp_path / "sub-01_task-rest_bold.json"
-    save_json(sidecar, {"AcquisitionTime": sidecar_time} if sidecar_time else {})
+    sidecars = []
+    for i, sidecar_time in enumerate(sidecar_times):
+        sidecar = tmp_path / f"f{i}.json"
+        save_json(sidecar, {"AcquisitionTime": sidecar_time} if sidecar_time else {})
+        sidecars.append(str(sidecar))
     caplog.set_level(logging.WARNING, logger="heudiconv.bids")
+    # timezone-aware datetimes come from DICOMs with TimezoneOffsetFromUTC,
+    # and must be comparable to the sidecars' (local wall clock) times
     check_acq_time_congruency(
-        datetime.fromisoformat("2020-01-01T" + acq_time),
-        datetime.fromisoformat("2020-01-01T" + earliest),
-        [str(sidecar)],
+        datetime.fromisoformat("2020-01-01T" + acq_time + tz),
+        datetime.fromisoformat("2020-01-01T" + earliest + tz),
+        sidecars,
         label="sub-01_task-rest_bold",
     )
     warnings_ = "\n".join(
@@ -2556,7 +2566,7 @@ def test_save_scans_key_checks_acq_time_congruency(
     save_scans_key(("prefix", ("nii.gz",), dicom_list), [str(sidecar)])
     warnings_ = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
     assert len(warnings_) == 2
-    assert all(w.startswith("sub-01_task-rest_bold: ") for w in warnings_)
+    assert all(w.startswith("prefix: ") for w in warnings_)
     assert "2.586000 seconds later than the earliest" in warnings_[0]
     assert "(-2.586000 seconds; matches earliest: yes)" in warnings_[1]
     # and the _scans.tsv row is written as before

@@ -533,6 +533,8 @@ _DATETIME_TAGS = [
     "AcquisitionDateTime",
     "SeriesDate",
     "SeriesTime",
+    # makes the datetimes timezone-aware, so they must be read consistently
+    "TimezoneOffsetFromUTC",
 ]
 
 
