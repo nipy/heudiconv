@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from glob import glob
 import logging
 import os.path as op
@@ -90,3 +91,29 @@ def fetch_data(tmpdir: str | Path, dataset: str, getpath: Optional[str] = None) 
     getdir = targetdir + (op.sep + getpath if getpath is not None else "")
     ds.get(getdir)
     return targetdir
+
+
+def make_timed_dicoms(
+    outdir: Path, offsets: Sequence[float], start: str = "2020-01-01T12:00:00"
+) -> list[str]:
+    """Write copies of the phantom.dcm header (no pixel data) into `outdir`
+    as f0.dcm, f1.dcm, ..., each acquired `offsets[i]` seconds after `start`
+    (AcquisitionDate/AcquisitionTime), and return their paths in that
+    order."""
+    import datetime
+
+    import pydicom as dcm
+
+    start_dt = datetime.datetime.fromisoformat(start)
+    dicom_list = []
+    for i, offset in enumerate(offsets):
+        dcm_data = dcm.dcmread(
+            op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+        )
+        acq_dt = start_dt + datetime.timedelta(seconds=offset)
+        dcm_data.AcquisitionDate = acq_dt.strftime("%Y%m%d")
+        dcm_data.AcquisitionTime = acq_dt.strftime("%H%M%S.%f")
+        out = outdir / f"f{i}.dcm"
+        dcm.dcmwrite(str(out), dcm_data)
+        dicom_list.append(str(out))
+    return dicom_list

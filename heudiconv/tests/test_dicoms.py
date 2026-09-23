@@ -28,7 +28,7 @@ from heudiconv.dicoms import (
     parse_private_csa_header,
 )
 
-from .utils import TEST_DICOM_PATHS, TESTS_DATA_PATH
+from .utils import TEST_DICOM_PATHS, TESTS_DATA_PATH, make_timed_dicoms
 
 # Public: Private DICOM tags
 DICOM_FIELDS_TO_TEST = {"ProtocolName": "tProtocolName"}
@@ -467,16 +467,7 @@ def test_estimate_scan_duration_from_times_even_intervals(tmp_path: Path) -> Non
     # (1 + 2) / 2 == 1.5 -- not just "the" middle element of a 4-item list,
     # which has no single middle element.
     offsets = [0, 1, 3, 7, 8]
-    dicom_list = []
-    for i, offset in enumerate(offsets):
-        dcm_data = dcm.dcmread(
-            op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
-        )
-        dcm_data.AcquisitionDate = "20200101"
-        dcm_data.AcquisitionTime = "%06d.000000" % (120000 + offset)
-        out = tmp_path / f"f{i}.dcm"
-        dcm.dcmwrite(str(out), dcm_data)
-        dicom_list.append(str(out))
+    dicom_list = make_timed_dicoms(tmp_path, offsets)
 
     # span (8s) + median interval (1.5s)
     assert estimate_scan_duration_from_times(dicom_list) == pytest.approx(9.5)
@@ -490,16 +481,7 @@ def test_estimate_scan_duration_from_times_anchor_dt(tmp_path: Path) -> None:
     # is not necessarily the earliest-acquired one. Here dicom_list[0] has
     # offset 2s, but the true earliest timestamp is offset 0s (dicom_list[1]).
     offsets = [2, 0, 4, 7]
-    dicom_list = []
-    for i, offset in enumerate(offsets):
-        dcm_data = dcm.dcmread(
-            op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
-        )
-        dcm_data.AcquisitionDate = "20200101"
-        dcm_data.AcquisitionTime = "%06d.000000" % (120000 + offset)
-        out = tmp_path / f"f{i}.dcm"
-        dcm.dcmwrite(str(out), dcm_data)
-        dicom_list.append(str(out))
+    dicom_list = make_timed_dicoms(tmp_path, offsets)
 
     # without an anchor: span (0 to 7 = 7s) + median interval (2s) = 9s,
     # anchored on the true earliest timestamp (offset 0), not dicom_list[0]
@@ -520,16 +502,7 @@ def test_get_acquisition_duration_passes_through_anchor_dt(tmp_path: Path) -> No
     # test_estimate_scan_duration_from_times_anchor_dt, but through the
     # top-level get_acquisition_duration() entry point
     offsets = [2, 0, 4, 7]
-    dicom_list = []
-    for i, offset in enumerate(offsets):
-        dcm_data = dcm.dcmread(
-            op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
-        )
-        dcm_data.AcquisitionDate = "20200101"
-        dcm_data.AcquisitionTime = "%06d.000000" % (120000 + offset)
-        out = tmp_path / f"f{i}.dcm"
-        dcm.dcmwrite(str(out), dcm_data)
-        dicom_list.append(str(out))
+    dicom_list = make_timed_dicoms(tmp_path, offsets)
 
     anchor_dt = datetime.datetime(2020, 1, 1, 12, 0, 2)
     assert get_acquisition_duration(dicom_list) == pytest.approx(9.0)

@@ -39,11 +39,18 @@ from .utils import (
     safe_extract_tar,
     save_json,
     set_readonly,
+    strptime,
     strptime_bids,
     update_json,
 )
 
 lgr = logging.getLogger(__name__)
+
+# How far apart two acquisition times of the same run (e.g. `acq_time` and
+# dcm2niix's sidecar AcquisitionTime) may be and still be considered the
+# same: DICOM TM carries microseconds, but dcm2niix goes through a double
+# when printing its AcquisitionTime, so allow for rounding
+ACQ_TIME_TOLERANCE = datetime.timedelta(milliseconds=1)
 
 # Fields to be populated in _scans files. Order matters
 SCANS_FILE_FIELDS = OrderedDict(
@@ -509,7 +516,15 @@ def save_scans_key(
     # all bids_files of this item share the same source DICOMs, so the row
     # (including the possibly-expensive `duration` estimation) is the same
     # for every one of them -- compute it once rather than per file
-    scan_key_row = get_formatted_scans_key_row(item[-1])
+    scan_key_row, acq_datetime, earliest_datetime = _get_scans_key_row_and_times(
+        item[-1]
+    )
+    check_acq_time_congruency(
+        acq_datetime,
+        earliest_datetime,
+        [f for f in bids_files if f.endswith(".json")],
+        label=remove_suffix(op.basename(bids_files[0]), ".json"),
+    )
     for bids_file in bids_files:
         # get filenames
         f_name = "/".join(bids_file.split("/")[-2:])
@@ -673,13 +688,25 @@ def get_formatted_scans_key_row(
         physician name, random string]
 
     """
+    return _get_scans_key_row_and_times(dcm_fns)[0]
+
+
+def _get_scans_key_row_and_times(
+    dcm_fns: str | Path | Sequence[str | Path],
+) -> tuple[list[str], Optional[datetime.datetime], Optional[datetime.datetime]]:
+    """Return what :func:`get_formatted_scans_key_row` does, plus the
+    datetime reported as `acq_time` and the earliest acquisition timestamp
+    across all of `dcm_fns` (each None if it could not be established)."""
     if isinstance(dcm_fns, (str, Path)):
         dcm_fns = [dcm_fns]
     dcm_fn_strs: list[str] = [str(f) for f in dcm_fns]
     dcm_data = dcm.dcmread(dcm_fn_strs[0], stop_before_pixels=True, force=True)
     # we need to store filenames and acquisition datetimes
     acq_datetime = dicoms.get_datetime_from_dcm(dcm_data=dcm_data)
-    acq_duration = dicoms.get_acquisition_duration(dcm_fn_strs, anchor_dt=acq_datetime)
+    timestamps = dicoms.get_acquisition_timestamps(dcm_fn_strs)
+    acq_duration = dicoms.get_acquisition_duration(
+        dcm_fn_strs, anchor_dt=acq_datetime, timestamps=timestamps
+    )
     # add random string
     # But let's make it reproducible by using all UIDs
     # (might change across versions?)
@@ -700,7 +727,114 @@ def get_formatted_scans_key_row(
     # empty entries should be 'n/a'
     # https://github.com/dartmouth-pbs/heudiconv/issues/32
     row = ["n/a" if not str(e) else e for e in row]
-    return row
+    return row, acq_datetime, min(timestamps) if timestamps else None
+
+
+def _get_sidecar_acquisition_datetime(
+    json_file: str, near: datetime.datetime
+) -> Optional[datetime.datetime]:
+    """Return the time-of-day `AcquisitionTime` from a (dcm2niix produced)
+    JSON sidecar as a datetime -- on whichever day puts it closest to `near`,
+    so a run straddling midnight is handled -- or None if the sidecar has no
+    (parseable) `AcquisitionTime`."""
+    acq_time = load_json(json_file).get("AcquisitionTime")
+    if not acq_time:
+        return None
+    try:
+        time_ = strptime(str(acq_time), ["%H:%M:%S.%f", "%H:%M:%S"]).time()
+    except ValueError:
+        lgr.debug("Could not parse AcquisitionTime %r in %s", acq_time, json_file)
+        return None
+    candidates = [
+        datetime.datetime.combine(near.date() + datetime.timedelta(days=d), time_)
+        for d in (-1, 0, 1)
+    ]
+    return min(candidates, key=lambda c: abs(c - near))
+
+
+def check_acq_time_congruency(
+    acq_datetime: Optional[datetime.datetime],
+    earliest_datetime: Optional[datetime.datetime],
+    json_files: Sequence[str],
+    label: str,
+) -> None:
+    """Warn if a run's `acq_time` is likely not when its acquisition started.
+
+    Two checks are done, each logging a warning when failed:
+
+    - `acq_time`, which is taken from the first of the run's DICOMs, is later
+      than the earliest acquisition timestamp across all of them, as happens
+      e.g. for interleaved multiband Siemens acquisitions exported as one
+      DICOM per slice (https://github.com/nipy/heudiconv/issues/876);
+    - `acq_time` disagrees with the `AcquisitionTime` dcm2niix recorded in
+      any of the run's `json_files` sidecars.  Which of the two (if any)
+      matches the earliest DICOM timestamp is reported, to tell which one is
+      off (see also https://github.com/rordenlab/dcm2niix/issues/1039).
+
+    Times within :data:`ACQ_TIME_TOLERANCE` of each other are considered
+    equal.  Nothing is changed -- this is purely diagnostic.
+
+    Parameters
+    ----------
+    acq_datetime: datetime or None
+        The datetime reported as `acq_time` for the run.  Nothing is checked
+        if None.
+    earliest_datetime: datetime or None
+        The earliest acquisition timestamp across all DICOMs of the run.
+    json_files: sequence of str
+        JSON sidecars produced for the run.
+    label: str
+        What to refer to the run as in the warnings, e.g. its file name.
+    """
+    if acq_datetime is None:
+        return
+
+    def matches_earliest(dt: datetime.datetime) -> str:
+        if earliest_datetime is None:
+            return "unknown"
+        return "yes" if abs(dt - earliest_datetime) <= ACQ_TIME_TOLERANCE else "no"
+
+    if (
+        earliest_datetime is not None
+        and acq_datetime - earliest_datetime > ACQ_TIME_TOLERANCE
+    ):
+        lgr.warning(
+            "%s: acq_time %s, taken from the first of its DICOMs, is %.6f "
+            "seconds later than the earliest acquisition timestamp among "
+            "them (%s), so it is likely not when the acquisition started. "
+            "See https://github.com/nipy/heudiconv/issues/876",
+            label,
+            acq_datetime.time().isoformat(),
+            (acq_datetime - earliest_datetime).total_seconds(),
+            earliest_datetime.time().isoformat(),
+        )
+
+    mismatches = []
+    for json_file in json_files:
+        sidecar_datetime = _get_sidecar_acquisition_datetime(json_file, acq_datetime)
+        if (
+            sidecar_datetime is not None
+            and abs(sidecar_datetime - acq_datetime) > ACQ_TIME_TOLERANCE
+        ):
+            mismatches.append(
+                "%s: AcquisitionTime %s (%+.6f seconds; matches earliest: %s)"
+                % (
+                    op.basename(json_file),
+                    sidecar_datetime.time().isoformat(),
+                    (sidecar_datetime - acq_datetime).total_seconds(),
+                    matches_earliest(sidecar_datetime),
+                )
+            )
+    if mismatches:
+        lgr.warning(
+            "%s: acq_time %s (matches earliest: %s) disagrees with the "
+            "AcquisitionTime of %d JSON sidecar(s): %s",
+            label,
+            acq_datetime.time().isoformat(),
+            matches_earliest(acq_datetime),
+            len(mismatches),
+            "; ".join(mismatches),
+        )
 
 
 def _find_bids_dataset_root(path: str) -> str:

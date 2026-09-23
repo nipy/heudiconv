@@ -12,7 +12,6 @@ from pathlib import Path
 import stat
 from unittest.mock import patch
 
-import pydicom as dcm
 import pytest
 
 from heudiconv import __version__
@@ -29,7 +28,7 @@ from heudiconv.external.dlad import MIN_VERSION, add_to_datalad
 from heudiconv.main import process_extra_commands, workflow
 from heudiconv.utils import create_file_if_missing, is_readonly, load_json, set_readonly
 
-from .utils import TESTS_DATA_PATH
+from .utils import TESTS_DATA_PATH, make_timed_dicoms
 
 
 @patch("sys.stdout", new_callable=StringIO)
@@ -249,16 +248,7 @@ def test_get_formatted_scans_key_row_duration_anchored_on_acq_time(
     # duration` never overshoots past the run's true last timestamp into the
     # next scan (a spurious negative gap/overlap).
     offsets = [2, 0, 4, 7]
-    dicom_list = []
-    for i, offset in enumerate(offsets):
-        dcm_data = dcm.dcmread(
-            op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
-        )
-        dcm_data.AcquisitionDate = "20200101"
-        dcm_data.AcquisitionTime = "%06d.000000" % (120000 + offset)
-        out = tmp_path / f"f{i}.dcm"
-        dcm.dcmwrite(str(out), dcm_data)
-        dicom_list.append(str(out))
+    dicom_list = make_timed_dicoms(tmp_path, offsets)
 
     row = get_formatted_scans_key_row(dicom_list)
     acq_time = datetime.datetime.fromisoformat(row[0])
