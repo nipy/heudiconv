@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import datetime
 from glob import glob
 from io import StringIO
 import logging
@@ -11,6 +12,7 @@ from pathlib import Path
 import stat
 from unittest.mock import patch
 
+import pydicom as dcm
 import pytest
 
 from heudiconv import __version__
@@ -234,6 +236,40 @@ def test_get_formatted_scans_key_row() -> None:
     dicom_list = sorted(glob("%s/b0dwiForFmap/*.dcm" % TESTS_DATA_PATH))
     row4 = get_formatted_scans_key_row(dicom_list)
     assert float(row4[1]) == pytest.approx(12.45)
+
+
+@pytest.mark.ai_generated
+def test_get_formatted_scans_key_row_duration_anchored_on_acq_time(
+    tmp_path: Path,
+) -> None:
+    # Regression test for https://github.com/nipy/heudiconv/issues/875:
+    # interleaved multiband slice acquisition can mean the file passed first
+    # (whose timestamp becomes `acq_time`) is not the earliest-acquired one.
+    # `duration` must be anchored on that same `acq_time`, so `acq_time +
+    # duration` never overshoots past the run's true last timestamp into the
+    # next scan (a spurious negative gap/overlap).
+    offsets = [2, 0, 4, 7]
+    dicom_list = []
+    for i, offset in enumerate(offsets):
+        dcm_data = dcm.dcmread(
+            op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+        )
+        dcm_data.AcquisitionDate = "20200101"
+        dcm_data.AcquisitionTime = "%06d.000000" % (120000 + offset)
+        out = tmp_path / f"f{i}.dcm"
+        dcm.dcmwrite(str(out), dcm_data)
+        dicom_list.append(str(out))
+
+    row = get_formatted_scans_key_row(dicom_list)
+    acq_time = datetime.datetime.fromisoformat(row[0])
+    duration = float(row[1])
+    # true last raw timestamp (offset 7s) plus the median inter-timestamp
+    # interval (2s, from offsets 0/2/4/7) -- the estimated end of
+    # acquisition, independent of which file's timestamp became `acq_time`
+    estimated_end = datetime.datetime(2020, 1, 1, 12, 0, 9)
+    assert abs(
+        (acq_time + datetime.timedelta(seconds=duration)) - estimated_end
+    ) <= datetime.timedelta(milliseconds=1)
 
 
 # TODO: finish this

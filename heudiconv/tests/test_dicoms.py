@@ -483,6 +483,62 @@ def test_estimate_scan_duration_from_times_even_intervals(tmp_path: Path) -> Non
 
 
 @pytest.mark.ai_generated
+def test_estimate_scan_duration_from_times_anchor_dt(tmp_path: Path) -> None:
+    # Reproduces https://github.com/nipy/heudiconv/issues/875: interleaved
+    # multiband slice acquisition means the file conventionally treated as
+    # "first" (e.g. DICOM InstanceNumber 1, whatever dcm_fns[0] resolves to)
+    # is not necessarily the earliest-acquired one. Here dicom_list[0] has
+    # offset 2s, but the true earliest timestamp is offset 0s (dicom_list[1]).
+    offsets = [2, 0, 4, 7]
+    dicom_list = []
+    for i, offset in enumerate(offsets):
+        dcm_data = dcm.dcmread(
+            op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+        )
+        dcm_data.AcquisitionDate = "20200101"
+        dcm_data.AcquisitionTime = "%06d.000000" % (120000 + offset)
+        out = tmp_path / f"f{i}.dcm"
+        dcm.dcmwrite(str(out), dcm_data)
+        dicom_list.append(str(out))
+
+    # without an anchor: span (0 to 7 = 7s) + median interval (2s) = 9s,
+    # anchored on the true earliest timestamp (offset 0), not dicom_list[0]
+    assert estimate_scan_duration_from_times(dicom_list) == pytest.approx(9.0)
+
+    # anchored on dicom_list[0]'s own timestamp (offset 2, as acq_time would
+    # be) instead: (7 - 2) + median interval (2s) = 7s -- consistent with
+    # acq_time + duration landing exactly on the true last timestamp
+    anchor_dt = datetime.datetime(2020, 1, 1, 12, 0, 2)
+    assert estimate_scan_duration_from_times(
+        dicom_list, anchor_dt=anchor_dt
+    ) == pytest.approx(7.0)
+
+
+@pytest.mark.ai_generated
+def test_get_acquisition_duration_passes_through_anchor_dt(tmp_path: Path) -> None:
+    # same interleaved-instance scenario as
+    # test_estimate_scan_duration_from_times_anchor_dt, but through the
+    # top-level get_acquisition_duration() entry point
+    offsets = [2, 0, 4, 7]
+    dicom_list = []
+    for i, offset in enumerate(offsets):
+        dcm_data = dcm.dcmread(
+            op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+        )
+        dcm_data.AcquisitionDate = "20200101"
+        dcm_data.AcquisitionTime = "%06d.000000" % (120000 + offset)
+        out = tmp_path / f"f{i}.dcm"
+        dcm.dcmwrite(str(out), dcm_data)
+        dicom_list.append(str(out))
+
+    anchor_dt = datetime.datetime(2020, 1, 1, 12, 0, 2)
+    assert get_acquisition_duration(dicom_list) == pytest.approx(9.0)
+    assert get_acquisition_duration(dicom_list, anchor_dt=anchor_dt) == pytest.approx(
+        7.0
+    )
+
+
+@pytest.mark.ai_generated
 def test_estimate_scan_duration_from_times_skips_malformed_timestamp(
     tmp_path: Path,
 ) -> None:

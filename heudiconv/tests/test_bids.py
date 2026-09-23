@@ -1775,6 +1775,73 @@ def test_populate_scans_duration_from_sourcedata(tmp_path: Path) -> None:
 
 
 @pytest.mark.ai_generated
+def test_populate_scans_duration_from_sourcedata_anchors_on_acq_time(
+    tmp_path: Path,
+) -> None:
+    # Regression test for https://github.com/nipy/heudiconv/issues/875: the
+    # retrospective backfill must anchor 'duration' on the scan's existing
+    # 'acq_time' (as originally written at conversion time from whichever
+    # file dcm2niix/heudiconv treated as "first"), not on whichever
+    # timestamp happens to be earliest among the sourcedata DICOMs --
+    # otherwise acq_time + duration can overshoot into the next scan even
+    # though it was self-consistent when first written (interleaved
+    # multiband slice acquisition means "first" isn't always earliest).
+    import pydicom
+
+    bids_root = tmp_path / "bids"
+    func_dir = bids_root / "sub-01" / "func"
+    func_dir.mkdir(parents=True)
+    save_json(
+        str(bids_root / "dataset_description.json"),
+        {"Name": "test", "BIDSVersion": "1.8.0"},
+    )
+    (func_dir / "sub-01_task-rest_bold.nii.gz").write_bytes(b"")
+    save_json(str(func_dir / "sub-01_task-rest_bold.json"), {})
+
+    # 'acq_time' as it would have been written at conversion time: from the
+    # file with offset 2s, which is NOT actually the earliest-acquired one
+    scans_tsv = bids_root / "sub-01" / "sub-01_scans.tsv"
+    scans_tsv.write_text(
+        "filename\tacq_time\n"
+        "func/sub-01_task-rest_bold.nii.gz\t2020-01-01T12:00:02\n"
+    )
+
+    offsets = [2, 0, 4, 7]
+    dicom_list = []
+    for i, offset in enumerate(offsets):
+        dcm_data = pydicom.dcmread(
+            op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+        )
+        dcm_data.AcquisitionDate = "20200101"
+        dcm_data.AcquisitionTime = "%06d.000000" % (120000 + offset)
+        out = tmp_path / f"f{i}.dcm"
+        pydicom.dcmwrite(str(out), dcm_data)
+        dicom_list.append(str(out))
+
+    sourcedata_dir = bids_root / "sourcedata" / "sub-01" / "func"
+    sourcedata_dir.mkdir(parents=True)
+    compress_dicoms(
+        dicom_list,
+        str(sourcedata_dir / "sub-01_task-rest_bold"),
+        TempDirs(),
+        overwrite=True,
+    )
+
+    populate_scans_duration(str(bids_root))
+
+    _, rows = _read_scans_rows(scans_tsv)
+    acq_time = datetime.fromisoformat(rows[0]["acq_time"])
+    duration = float(rows[0]["duration"])
+    # true last raw timestamp (offset 7s) plus the median inter-timestamp
+    # interval (2s, from offsets 0/2/4/7) -- the estimated end of
+    # acquisition, independent of which file's timestamp is 'acq_time'
+    estimated_end = datetime(2020, 1, 1, 12, 0, 9)
+    assert abs((acq_time + timedelta(seconds=duration)) - estimated_end) <= timedelta(
+        milliseconds=1
+    )
+
+
+@pytest.mark.ai_generated
 @pytest.mark.parametrize(
     "nvols,expected",
     [

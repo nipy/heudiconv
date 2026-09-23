@@ -648,13 +648,22 @@ def get_dicom_declared_repetitions(dcm_data: dcm.Dataset) -> int:
     return int(value) if value else 0
 
 
-def estimate_scan_duration_from_times(dicom_list: list[str]) -> Optional[float]:
+def estimate_scan_duration_from_times(
+    dicom_list: list[str], anchor_dt: Optional[datetime.datetime] = None
+) -> Optional[float]:
     """Estimate a run's total duration from per-file acquisition timestamps:
     the span between the earliest and latest timestamp (see
     :func:`get_datetime_from_dcm`) across `dicom_list`, plus one median
     inter-timestamp interval to account for the last timestamp marking the
     *onset*, not the end, of the final volume/slice. Returns None if fewer
-    than two distinct timestamps could be established."""
+    than two distinct timestamps could be established.
+
+    `anchor_dt`, if given, replaces the earliest timestamp found here as the
+    start point -- pass the same timestamp already reported as the run's
+    `acq_time` so the two stay self-consistent even when the file
+    conventionally treated as "first" is not actually the earliest-acquired
+    one (a known dcm2niix/Siemens multiband slice-order quirk; see
+    https://github.com/nipy/heudiconv/issues/875)."""
     # only parse the handful of tags get_datetime_from_dcm() looks at --
     # meaningfully faster than a full header parse when scanning every file
     # of a (possibly large) run
@@ -690,12 +699,13 @@ def estimate_scan_duration_from_times(dicom_list: list[str]) -> Optional[float]:
     # to get the *true* median -- averaging the two middle values -- when
     # there is an even number of intervals
     median_interval = statistics.median(intervals)
-    return (
-        unique_timestamps[-1] - unique_timestamps[0]
-    ).total_seconds() + median_interval
+    anchor = anchor_dt if anchor_dt is not None else unique_timestamps[0]
+    return (unique_timestamps[-1] - anchor).total_seconds() + median_interval
 
 
-def get_acquisition_duration(dicom_list: list[str]) -> Optional[float]:
+def get_acquisition_duration(
+    dicom_list: list[str], anchor_dt: Optional[datetime.datetime] = None
+) -> Optional[float]:
     """Determine the total wallclock duration, in seconds, of a run given
     every DICOM file belonging to it (a single representative file also
     works, but then only :func:`get_dicom_acquisition_duration` has a
@@ -707,6 +717,7 @@ def get_acquisition_duration(dicom_list: list[str]) -> Optional[float]:
     otherwise a lone/repeated timestamp more likely means a truncated or
     aborted multi-volume acquisition, for which the declared duration would
     overstate the actual (partial) one, so we report None rather than guess.
+    `anchor_dt` is passed through to :func:`estimate_scan_duration_from_times`.
     Returns None if nothing above succeeds."""
     if not dicom_list:
         return None
@@ -714,7 +725,7 @@ def get_acquisition_duration(dicom_list: list[str]) -> Optional[float]:
     duration = get_dicom_acquisition_duration(dcm_data)
     if duration is not None:
         return duration
-    duration = estimate_scan_duration_from_times(dicom_list)
+    duration = estimate_scan_duration_from_times(dicom_list, anchor_dt=anchor_dt)
     if duration is not None:
         return duration
     if get_dicom_declared_repetitions(dcm_data) > 0:

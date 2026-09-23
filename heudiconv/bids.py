@@ -7,6 +7,7 @@ __docformat__ = "numpy"
 from collections import OrderedDict
 from collections.abc import Sequence
 import csv
+import datetime
 import errno
 from glob import glob
 import hashlib
@@ -678,7 +679,7 @@ def get_formatted_scans_key_row(
     dcm_data = dcm.dcmread(dcm_fn_strs[0], stop_before_pixels=True, force=True)
     # we need to store filenames and acquisition datetimes
     acq_datetime = dicoms.get_datetime_from_dcm(dcm_data=dcm_data)
-    acq_duration = dicoms.get_acquisition_duration(dcm_fn_strs)
+    acq_duration = dicoms.get_acquisition_duration(dcm_fn_strs, anchor_dt=acq_datetime)
     # add random string
     # But let's make it reproducible by using all UIDs
     # (might change across versions?)
@@ -715,16 +716,20 @@ def _find_bids_dataset_root(path: str) -> str:
         current = parent
 
 
-def _duration_from_dicom_tarball(tarball: str) -> Optional[float]:
+def _duration_from_dicom_tarball(
+    tarball: str, anchor_dt: Optional[datetime.datetime] = None
+) -> Optional[float]:
     """Compute acquisition duration from a heudiconv-produced ``*.dicom.tgz``
-    sourcedata tarball (see :func:`heudiconv.dicoms.compress_dicoms`)."""
+    sourcedata tarball (see :func:`heudiconv.dicoms.compress_dicoms`).
+    `anchor_dt` is passed through to :func:`heudiconv.dicoms.get_acquisition_duration`.
+    """
     with tempfile.TemporaryDirectory() as tmpdir:
         safe_extract_tar(tarball, tmpdir)
         dicom_files = sorted(str(p) for p in Path(tmpdir).rglob("*") if p.is_file())
         if not dicom_files:
             lgr.warning("No files found within %s", tarball)
             return None
-        return dicoms.get_acquisition_duration(dicom_files)
+        return dicoms.get_acquisition_duration(dicom_files, anchor_dt=anchor_dt)
 
 
 def _nifti_stem(nifti_fn: str) -> str:
@@ -891,15 +896,19 @@ def _duration_from_nifti_sidecar(
     return tr * nvols
 
 
-def _get_retrospective_duration(nifti_fn: str, bids_root: str) -> Optional[float]:
+def _get_retrospective_duration(
+    nifti_fn: str, bids_root: str, anchor_dt: Optional[datetime.datetime] = None
+) -> Optional[float]:
     """Best-effort acquisition duration for an already-converted BIDS scan:
     tries the heudiconv-produced sourcedata DICOM tarball first, then falls
-    back to the NIfTI + JSON sidecar."""
+    back to the NIfTI + JSON sidecar. `anchor_dt` -- typically the scan's
+    existing `acq_time` -- is passed through to the tarball-based estimate
+    for consistency (see :func:`heudiconv.dicoms.estimate_scan_duration_from_times`)."""
     rel = op.relpath(nifti_fn, bids_root)
     tarball = op.join(bids_root, "sourcedata", _nifti_stem(rel) + ".dicom.tgz")
     if op.exists(tarball):
         try:
-            duration = _duration_from_dicom_tarball(tarball)
+            duration = _duration_from_dicom_tarball(tarball, anchor_dt=anchor_dt)
         except Exception as exc:
             # a corrupt archive, an extraction-filter rejection, or a
             # malformed DICOM inside it must not abort backfilling this
@@ -1022,7 +1031,14 @@ def _populate_scans_duration_file(scans_tsv: str, overwrite: bool) -> None:
                 bids_root,
             )
             continue
-        duration = _get_retrospective_duration(nifti_fn, bids_root)
+        anchor_dt = None
+        acq_time = row.get("acq_time")
+        if acq_time:
+            try:
+                anchor_dt = strptime_bids(acq_time)
+            except ValueError:
+                pass
+        duration = _get_retrospective_duration(nifti_fn, bids_root, anchor_dt=anchor_dt)
         new_value = _format_duration(duration)
         if row.get("duration") != new_value:
             changed = True
