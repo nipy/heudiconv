@@ -5,7 +5,7 @@ from glob import glob
 import json
 import os.path as op
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import pydicom as dcm
 import pytest
@@ -377,10 +377,25 @@ _GE_CREATOR = "GEMS_ACQU_01"
             12.5,
             id="prefers_standard",
         ),
+        # private group 0019 is used differently by different vendors -- an
+        # element at the GE offset under an unrelated creator block must not
+        # be mistaken for GE's Acquisition Duration
+        pytest.param(
+            {
+                _GE_CREATOR_TAG: ("LO", "SOME_OTHER_VENDOR_01"),
+                _GE_DURATION_TAG: ("FL", 3.0118515e08),
+            },
+            None,
+            id="ge_wrong_creator",
+        ),
+        # e.g. some scanners write AcquisitionDuration = 0 when unpopulated;
+        # that is not a usable duration
+        pytest.param({(0x0018, 0x9073): ("FD", 0.0)}, None, id="zero"),
+        pytest.param({(0x0018, 0x9073): ("FD", -5.0)}, None, id="negative"),
     ],
 )
 def test_get_dicom_acquisition_duration(
-    tags: dict[tuple[int, int], tuple[str, Any]], expected: float
+    tags: dict[tuple[int, int], tuple[str, Any]], expected: Optional[float]
 ) -> None:
     dcm_data = dcm.dcmread(
         op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
@@ -391,49 +406,26 @@ def test_get_dicom_acquisition_duration(
 
 
 @pytest.mark.ai_generated
-def test_get_dicom_acquisition_duration_ge_tag_wrong_creator() -> None:
-    # private group 0019 is used differently by different vendors -- an
-    # element at the GE offset under an unrelated creator block must not be
-    # mistaken for GE's Acquisition Duration
+@pytest.mark.parametrize(
+    "strip_csa_header,expected",
+    [
+        # phantom.dcm is real Siemens data whose embedded CSA series header
+        # protocol dump carries "lTotalScanTimeSec = 14"
+        pytest.param(False, pytest.approx(14.0), id="present"),
+        # remove the CSA series header info to test the genuinely-absent
+        # case (e.g. non-Siemens data, or anonymization having stripped it)
+        pytest.param(True, None, id="absent"),
+    ],
+)
+def test_get_dicom_declared_acquisition_duration(
+    strip_csa_header: bool, expected: Optional[float]
+) -> None:
     dcm_data = dcm.dcmread(
         op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
     )
-    dcm_data.add_new(_GE_CREATOR_TAG, "LO", "SOME_OTHER_VENDOR_01")
-    dcm_data.add_new(_GE_DURATION_TAG, "FL", 3.0118515e08)
-    assert get_dicom_acquisition_duration(dcm_data) is None
-
-
-@pytest.mark.ai_generated
-@pytest.mark.parametrize("value", [0.0, -5.0])
-def test_get_dicom_acquisition_duration_non_positive(value: float) -> None:
-    # e.g. some scanners write AcquisitionDuration = 0 when unpopulated;
-    # that is not a usable duration
-    dcm_data = dcm.dcmread(
-        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
-    )
-    dcm_data.add_new((0x0018, 0x9073), "FD", value)
-    assert get_dicom_acquisition_duration(dcm_data) is None
-
-
-@pytest.mark.ai_generated
-def test_get_dicom_declared_acquisition_duration() -> None:
-    # phantom.dcm is real Siemens data whose embedded CSA series header
-    # protocol dump carries "lTotalScanTimeSec = 14"
-    dcm_data = dcm.dcmread(
-        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
-    )
-    assert get_dicom_declared_acquisition_duration(dcm_data) == pytest.approx(14.0)
-
-
-@pytest.mark.ai_generated
-def test_get_dicom_declared_acquisition_duration_absent() -> None:
-    # remove the CSA series header info to test the genuinely-absent case
-    # (e.g. non-Siemens data, or anonymization having stripped it)
-    dcm_data = dcm.dcmread(
-        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
-    )
-    del dcm_data[(0x0029, 0x1020)]
-    assert get_dicom_declared_acquisition_duration(dcm_data) is None
+    if strip_csa_header:
+        del dcm_data[(0x0029, 0x1020)]
+    assert get_dicom_declared_acquisition_duration(dcm_data) == expected
 
 
 @pytest.mark.ai_generated

@@ -2088,131 +2088,101 @@ def test_populate_scans_duration_preserves_permissions(tmp_path: Path) -> None:
 
 
 @pytest.mark.ai_generated
-def test_duration_from_nifti_sidecar_prefers_acquisition_duration(
+@pytest.mark.parametrize(
+    "tr,meta_extra,env_var,expected,expect_warning",
+    [
+        # AcquisitionDuration disagrees with what TR x nvols would give --
+        # confirm the (exact) sidecar value wins
+        pytest.param(
+            2.0,
+            {"AcquisitionDuration": 17.5},
+            None,
+            pytest.approx(17.5),
+            False,
+            id="prefers_acquisition_duration",
+        ),
+        # RepetitionTime x nvols is never attempted here -- RepetitionTime
+        # and VolumeTiming are mutually exclusive per BIDS -- so the total
+        # is instead the last volume's onset plus the deprecated per-frame
+        # use of AcquisitionDuration (no FrameAcquisitionDuration given)
+        pytest.param(
+            2.0,
+            {"AcquisitionDuration": 17.5, "VolumeTiming": [0.0, 2.0, 4.0]},
+            None,
+            pytest.approx(4.0 + 17.5),
+            False,
+            id="derives_from_volume_timing",
+        ),
+        pytest.param(
+            2.0,
+            {
+                "AcquisitionDuration": 17.5,
+                "FrameAcquisitionDuration": 0.5,
+                "VolumeTiming": [0.0, 2.0, 4.0],
+            },
+            None,
+            pytest.approx(4.0 + 0.5),
+            False,
+            id="volume_timing_prefers_frame_acquisition_duration",
+        ),
+        # a real-world pattern (e.g. seen on OpenNeuro): a sidecar carries
+        # both RepetitionTime and VolumeTiming -- mutually exclusive per
+        # BIDS -- with no FrameAcquisitionDuration/AcquisitionDuration given
+        # to disambiguate. Guessing which one is authoritative is unsafe
+        # (RepetitionTime could describe a much longer silent gap for a
+        # genuinely sparse design), so by default this must warn and report
+        # "undetermined" rather than silently picking one.
+        pytest.param(
+            2.0,
+            {"VolumeTiming": [0.0, 2.0, 4.0]},
+            None,
+            None,
+            True,
+            id="volume_timing_conflict_warns_by_default",
+        ),
+        # explicit opt-in: RepetitionTime (5.0) wins over the onsets' own
+        # median interval, despite VolumeTiming also being present
+        pytest.param(
+            5.0,
+            {"VolumeTiming": [0.0, 2.0, 4.0]},
+            "repetition_time",
+            pytest.approx(4.0 + 5.0),
+            False,
+            id="volume_timing_opt_in_repetition_time",
+        ),
+        # explicit opt-in: RepetitionTime (5.0) is ignored in favor of the
+        # onsets' own median interval (2.0), despite being present
+        pytest.param(
+            5.0,
+            {"VolumeTiming": [0.0, 2.0, 4.0]},
+            "onset_interval",
+            pytest.approx(4.0 + 2.0),
+            False,
+            id="volume_timing_opt_in_onset_interval",
+        ),
+    ],
+)
+def test_duration_from_nifti_sidecar_volume_timing_variants(
     tmp_path: Path,
-) -> None:
-    bids_root = tmp_path / "bids"
-    _make_bids_dataset_stub(bids_root)
-    # AcquisitionDuration disagrees with what TR x nvols would give --
-    # confirm the (exact) sidecar value wins
-    _make_multivol_func_scan(
-        bids_root, tr=2.0, nvols=10, meta_extra={"AcquisitionDuration": 17.5}
-    )
-
-    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
-    assert _duration_from_nifti_sidecar(str(nifti_fn)) == pytest.approx(17.5)
-
-
-@pytest.mark.ai_generated
-def test_duration_from_nifti_sidecar_derives_from_volume_timing(
-    tmp_path: Path,
-) -> None:
-    bids_root = tmp_path / "bids"
-    _make_bids_dataset_stub(bids_root)
-    _make_multivol_func_scan(
-        bids_root,
-        tr=2.0,
-        nvols=10,
-        meta_extra={
-            "AcquisitionDuration": 17.5,
-            "VolumeTiming": [0.0, 2.0, 4.0],
-        },
-    )
-
-    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
-    # RepetitionTime x nvols is never attempted here -- RepetitionTime and
-    # VolumeTiming are mutually exclusive per BIDS -- so the total is
-    # instead the last volume's onset plus the deprecated per-frame use of
-    # AcquisitionDuration (no FrameAcquisitionDuration given in this case)
-    assert _duration_from_nifti_sidecar(str(nifti_fn)) == pytest.approx(4.0 + 17.5)
-
-
-@pytest.mark.ai_generated
-def test_duration_from_nifti_sidecar_volume_timing_prefers_frame_acquisition_duration(
-    tmp_path: Path,
-) -> None:
-    bids_root = tmp_path / "bids"
-    _make_bids_dataset_stub(bids_root)
-    _make_multivol_func_scan(
-        bids_root,
-        tr=2.0,
-        nvols=10,
-        meta_extra={
-            "AcquisitionDuration": 17.5,
-            "FrameAcquisitionDuration": 0.5,
-            "VolumeTiming": [0.0, 2.0, 4.0],
-        },
-    )
-
-    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
-    assert _duration_from_nifti_sidecar(str(nifti_fn)) == pytest.approx(4.0 + 0.5)
-
-
-@pytest.mark.ai_generated
-def test_duration_from_nifti_sidecar_volume_timing_conflict_warns_by_default(
-    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
+    tr: float,
+    meta_extra: dict[str, Any],
+    env_var: Optional[str],
+    expected: Optional[float],
+    expect_warning: bool,
 ) -> None:
-    # a real-world pattern (e.g. seen on OpenNeuro): a sidecar carries both
-    # RepetitionTime and VolumeTiming -- mutually exclusive per BIDS -- with
-    # no FrameAcquisitionDuration/AcquisitionDuration given to disambiguate.
-    # Guessing which one is authoritative is unsafe (RepetitionTime could
-    # describe a much longer silent gap for a genuinely sparse design), so
-    # by default this must warn and report "undetermined" rather than
-    # silently picking one.
+    if env_var is not None:
+        monkeypatch.setenv("HEUDICONV_VOLUME_TIMING_FRAME_DURATION", env_var)
     bids_root = tmp_path / "bids"
     _make_bids_dataset_stub(bids_root)
-    _make_multivol_func_scan(
-        bids_root,
-        tr=2.0,
-        nvols=10,
-        meta_extra={"VolumeTiming": [0.0, 2.0, 4.0]},
-    )
+    _make_multivol_func_scan(bids_root, tr=tr, nvols=10, meta_extra=meta_extra)
 
     nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
     caplog.set_level(logging.WARNING)
-    assert _duration_from_nifti_sidecar(str(nifti_fn)) is None
-    assert "mutually exclusive" in caplog.text
-
-
-@pytest.mark.ai_generated
-def test_duration_from_nifti_sidecar_volume_timing_opt_in_repetition_time(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("HEUDICONV_VOLUME_TIMING_FRAME_DURATION", "repetition_time")
-    bids_root = tmp_path / "bids"
-    _make_bids_dataset_stub(bids_root)
-    _make_multivol_func_scan(
-        bids_root,
-        tr=5.0,
-        nvols=10,
-        meta_extra={"VolumeTiming": [0.0, 2.0, 4.0]},
-    )
-
-    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
-    assert _duration_from_nifti_sidecar(str(nifti_fn)) == pytest.approx(4.0 + 5.0)
-
-
-@pytest.mark.ai_generated
-def test_duration_from_nifti_sidecar_volume_timing_opt_in_onset_interval(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("HEUDICONV_VOLUME_TIMING_FRAME_DURATION", "onset_interval")
-    bids_root = tmp_path / "bids"
-    _make_bids_dataset_stub(bids_root)
-    _make_multivol_func_scan(
-        bids_root,
-        tr=5.0,
-        nvols=10,
-        meta_extra={"VolumeTiming": [0.0, 2.0, 4.0]},
-    )
-
-    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
-    # RepetitionTime (5.0) is ignored in favor of the onsets' own median
-    # interval (2.0), despite being present -- an explicit opt-in
-    assert _duration_from_nifti_sidecar(str(nifti_fn)) == pytest.approx(4.0 + 2.0)
+    assert _duration_from_nifti_sidecar(str(nifti_fn)) == expected
+    if expect_warning:
+        assert "mutually exclusive" in caplog.text
 
 
 @pytest.mark.ai_generated
