@@ -436,7 +436,7 @@ def test_safe_tar_members_hardlink_target_relative_to_dest(tmp_path: Path) -> No
 
 @pytest.mark.ai_generated
 def test_safe_extract_tar_manual_fallback_when_filter_unsupported(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     # simulate a tarfile.extractall() predating the filter= backport (a
     # TypeError on that keyword), and confirm safe_extract_tar() falls
@@ -474,7 +474,9 @@ def test_safe_extract_tar_manual_fallback_when_filter_unsupported(
 
     dest = tmp_path / "dest"
     dest.mkdir()
+    caplog.set_level(logging.DEBUG)
     safe_extract_tar(str(tarball), str(dest))
 
     assert (dest / "good.txt").read_text() == "hello"
     assert not (tmp_path / "escaped.txt").exists()
+    assert "vetting members" in caplog.text

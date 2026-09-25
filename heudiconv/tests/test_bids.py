@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import nibabel
 import numpy as np
 from numpy import testing as np_testing
+import pydicom
 import pytest
 
 from heudiconv.bids import (
@@ -1720,6 +1721,17 @@ def _make_bids_dataset_stub(bids_root: Path) -> Path:
     return scans_tsv
 
 
+@pytest.fixture
+def tmp_bids_with_scans(tmp_path: Path) -> tuple[Path, Path]:
+    """A minimal BIDS dataset (see `_make_bids_dataset_stub`) at
+    `tmp_path / "bids"`, paired with its `_scans.tsv` path -- the setup
+    shared by most `populate_scans_duration`/`_duration_from_nifti_sidecar`
+    tests."""
+    bids_root = tmp_path / "bids"
+    scans_tsv = _make_bids_dataset_stub(bids_root)
+    return bids_root, scans_tsv
+
+
 def _make_multivol_func_scan(
     bids_root: Path,
     tr: float = 2.0,
@@ -1744,9 +1756,10 @@ def _make_multivol_func_scan(
 
 
 @pytest.mark.ai_generated
-def test_populate_scans_duration_from_sourcedata(tmp_path: Path) -> None:
-    bids_root = tmp_path / "bids"
-    scans_tsv = _make_bids_dataset_stub(bids_root)
+def test_populate_scans_duration_from_sourcedata(
+    tmp_bids_with_scans: tuple[Path, Path],
+) -> None:
+    bids_root, scans_tsv = tmp_bids_with_scans
     (bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz").write_bytes(b"")
     save_json(str(bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json"), {})
 
@@ -1776,7 +1789,7 @@ def test_populate_scans_duration_from_sourcedata(tmp_path: Path) -> None:
 
 @pytest.mark.ai_generated
 def test_populate_scans_duration_from_sourcedata_anchors_on_acq_time(
-    tmp_path: Path,
+    tmp_path: Path, tmp_bids_with_scans: tuple[Path, Path]
 ) -> None:
     # Regression test for https://github.com/nipy/heudiconv/issues/875: the
     # retrospective backfill must anchor 'duration' on the scan's existing
@@ -1786,21 +1799,12 @@ def test_populate_scans_duration_from_sourcedata_anchors_on_acq_time(
     # otherwise acq_time + duration can overshoot into the next scan even
     # though it was self-consistent when first written (interleaved
     # multiband slice acquisition means "first" isn't always earliest).
-    import pydicom
-
-    bids_root = tmp_path / "bids"
-    func_dir = bids_root / "sub-01" / "func"
-    func_dir.mkdir(parents=True)
-    save_json(
-        str(bids_root / "dataset_description.json"),
-        {"Name": "test", "BIDSVersion": "1.8.0"},
-    )
-    (func_dir / "sub-01_task-rest_bold.nii.gz").write_bytes(b"")
-    save_json(str(func_dir / "sub-01_task-rest_bold.json"), {})
+    bids_root, scans_tsv = tmp_bids_with_scans
+    (bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz").write_bytes(b"")
+    save_json(str(bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json"), {})
 
     # 'acq_time' as it would have been written at conversion time: from the
     # file with offset 2s, which is NOT actually the earliest-acquired one
-    scans_tsv = bids_root / "sub-01" / "sub-01_scans.tsv"
     scans_tsv.write_text(
         "filename\tacq_time\n"
         "func/sub-01_task-rest_bold.nii.gz\t2020-01-01T12:00:02\n"
@@ -1852,10 +1856,9 @@ def test_populate_scans_duration_from_sourcedata_anchors_on_acq_time(
     ],
 )
 def test_populate_scans_duration_from_nifti_sidecar(
-    tmp_path: Path, nvols: int, expected: Optional[float]
+    tmp_bids_with_scans: tuple[Path, Path], nvols: int, expected: Optional[float]
 ) -> None:
-    bids_root = tmp_path / "bids"
-    scans_tsv = _make_bids_dataset_stub(bids_root)
+    bids_root, scans_tsv = tmp_bids_with_scans
     _make_multivol_func_scan(bids_root, nvols=nvols)
     # no sourcedata/ present -- only the nifti/json fallback is available
 
@@ -1869,9 +1872,10 @@ def test_populate_scans_duration_from_nifti_sidecar(
 
 
 @pytest.mark.ai_generated
-def test_populate_scans_duration_overwrite(tmp_path: Path) -> None:
-    bids_root = tmp_path / "bids"
-    scans_tsv = _make_bids_dataset_stub(bids_root)
+def test_populate_scans_duration_overwrite(
+    tmp_bids_with_scans: tuple[Path, Path],
+) -> None:
+    bids_root, scans_tsv = tmp_bids_with_scans
     _make_multivol_func_scan(bids_root)
     # pre-populate with a bogus value
     scans_tsv.write_text(
@@ -1891,16 +1895,23 @@ def test_populate_scans_duration_overwrite(tmp_path: Path) -> None:
 
 
 @pytest.mark.ai_generated
-def test_populate_scans_duration_no_scans_tsv(tmp_path: Path) -> None:
-    # should warn and do nothing, rather than raise, when nothing is found
+def test_populate_scans_duration_no_scans_tsv(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    # warns and returns without creating/modifying anything, rather than
+    # raising, when no '*_scans.tsv' is found under the given path
+    caplog.set_level(logging.WARNING)
     populate_scans_duration(str(tmp_path))
+    assert "No '*_scans.tsv' files found" in caplog.text
+    assert list(tmp_path.iterdir()) == []
 
 
 @pytest.mark.ai_generated
-def test_populate_scans_duration_direct_file_path(tmp_path: Path) -> None:
+def test_populate_scans_duration_direct_file_path(
+    tmp_bids_with_scans: tuple[Path, Path],
+) -> None:
     # pointing directly at a single '_scans.tsv' file also works
-    bids_root = tmp_path / "bids"
-    scans_tsv = _make_bids_dataset_stub(bids_root)
+    bids_root, scans_tsv = tmp_bids_with_scans
     _make_multivol_func_scan(bids_root)
 
     populate_scans_duration(str(scans_tsv))
@@ -1911,13 +1922,12 @@ def test_populate_scans_duration_direct_file_path(tmp_path: Path) -> None:
 
 @pytest.mark.ai_generated
 def test_populate_scans_duration_tarball_present_but_unusable_falls_back(
-    tmp_path: Path,
+    tmp_path: Path, tmp_bids_with_scans: tuple[Path, Path]
 ) -> None:
     # a sourcedata tarball exists for the scan, but it does not yield a
     # usable duration (e.g. a single DICOM with no AcquisitionDuration-like
     # tag) -- should transparently fall through to the nifti/json sidecar
-    bids_root = tmp_path / "bids"
-    scans_tsv = _make_bids_dataset_stub(bids_root)
+    bids_root, scans_tsv = tmp_bids_with_scans
     _make_multivol_func_scan(bids_root)
 
     # a single-file "series" cannot yield a duration on its own (neither a
@@ -1925,8 +1935,6 @@ def test_populate_scans_duration_tarball_present_but_unusable_falls_back(
     # header this fixture happens to carry too (Siemens' own declared
     # duration), since that alone would otherwise let
     # get_acquisition_duration() succeed and defeat the point of this test
-    import pydicom
-
     dcm_data = pydicom.dcmread(
         op.join(TESTS_DATA_PATH, "01-anat-scout", "0001.dcm"), stop_before_pixels=True
     )
@@ -1950,9 +1958,10 @@ def test_populate_scans_duration_tarball_present_but_unusable_falls_back(
 
 
 @pytest.mark.ai_generated
-def test_populate_scans_duration_via_cli(tmp_path: Path) -> None:
-    bids_root = tmp_path / "bids"
-    scans_tsv = _make_bids_dataset_stub(bids_root)
+def test_populate_scans_duration_via_cli(
+    tmp_bids_with_scans: tuple[Path, Path],
+) -> None:
+    bids_root, scans_tsv = tmp_bids_with_scans
     _make_multivol_func_scan(bids_root)
     # pre-populate with a bogus value to also exercise --overwrite
     scans_tsv.write_text(
@@ -1986,12 +1995,13 @@ def test_find_bids_dataset_root(tmp_path: Path) -> None:
 
 
 @pytest.mark.ai_generated
-def test_populate_scans_duration_tarball_error_falls_back(tmp_path: Path) -> None:
+def test_populate_scans_duration_tarball_error_falls_back(
+    tmp_bids_with_scans: tuple[Path, Path],
+) -> None:
     # a *corrupt* sourcedata tarball must not abort the whole row (let
     # alone the whole file) -- it should fall through to the sidecar
     # estimate exactly as a merely-unusable one does
-    bids_root = tmp_path / "bids"
-    scans_tsv = _make_bids_dataset_stub(bids_root)
+    bids_root, scans_tsv = tmp_bids_with_scans
     _make_multivol_func_scan(bids_root)
 
     sourcedata_dir = bids_root / "sourcedata" / "sub-01" / "func"
@@ -2005,9 +2015,10 @@ def test_populate_scans_duration_tarball_error_falls_back(tmp_path: Path) -> Non
 
 
 @pytest.mark.ai_generated
-def test_get_retrospective_duration_tolerates_corrupt_tarball(tmp_path: Path) -> None:
-    bids_root = tmp_path / "bids"
-    _make_bids_dataset_stub(bids_root)
+def test_get_retrospective_duration_tolerates_corrupt_tarball(
+    tmp_bids_with_scans: tuple[Path, Path],
+) -> None:
+    bids_root, _ = tmp_bids_with_scans
     _make_multivol_func_scan(bids_root)
     sourcedata_dir = bids_root / "sourcedata" / "sub-01" / "func"
     sourcedata_dir.mkdir(parents=True)
@@ -2076,9 +2087,10 @@ def test_populate_scans_duration_tolerates_byte_order_mark(tmp_path: Path) -> No
 
 
 @pytest.mark.ai_generated
-def test_populate_scans_duration_preserves_permissions(tmp_path: Path) -> None:
-    bids_root = tmp_path / "bids"
-    scans_tsv = _make_bids_dataset_stub(bids_root)
+def test_populate_scans_duration_preserves_permissions(
+    tmp_bids_with_scans: tuple[Path, Path],
+) -> None:
+    bids_root, scans_tsv = tmp_bids_with_scans
     _make_multivol_func_scan(bids_root)
     os.chmod(scans_tsv, 0o664)
 
@@ -2163,7 +2175,7 @@ def test_populate_scans_duration_preserves_permissions(tmp_path: Path) -> None:
     ],
 )
 def test_duration_from_nifti_sidecar_volume_timing_variants(
-    tmp_path: Path,
+    tmp_bids_with_scans: tuple[Path, Path],
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
     tr: float,
@@ -2174,8 +2186,7 @@ def test_duration_from_nifti_sidecar_volume_timing_variants(
 ) -> None:
     if env_var is not None:
         monkeypatch.setenv("HEUDICONV_VOLUME_TIMING_FRAME_DURATION", env_var)
-    bids_root = tmp_path / "bids"
-    _make_bids_dataset_stub(bids_root)
+    bids_root, _ = tmp_bids_with_scans
     _make_multivol_func_scan(bids_root, tr=tr, nvols=10, meta_extra=meta_extra)
 
     nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
@@ -2229,13 +2240,12 @@ def test_duration_from_nifti_sidecar_volume_timing_single_onset_no_duration(
 @pytest.mark.ai_generated
 @pytest.mark.parametrize("bad_content", ["{not valid json", "[1, 2, 3]", '"a string"'])
 def test_duration_from_nifti_sidecar_tolerates_malformed_json(
-    tmp_path: Path, bad_content: str
+    tmp_bids_with_scans: tuple[Path, Path], bad_content: str
 ) -> None:
     # an unreadable/malformed sidecar (or one that parses but isn't a JSON
     # object) should be treated as "duration unavailable", not raise and
     # abort the rest of that _scans.tsv's rows
-    bids_root = tmp_path / "bids"
-    _make_bids_dataset_stub(bids_root)
+    bids_root, _ = tmp_bids_with_scans
     nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
     nibabel.Nifti1Image(np.zeros((2, 2, 2, 10)), np.eye(4)).to_filename(str(nifti_fn))
     (bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json").write_text(
@@ -2343,10 +2353,9 @@ def test_duration_from_nifti_sidecar_uses_inherited_sidecar(tmp_path: Path) -> N
 @pytest.mark.ai_generated
 @pytest.mark.parametrize("bad_tr", [-1.0, 0, float("nan"), float("inf"), "abc"])
 def test_duration_from_nifti_sidecar_rejects_invalid_repetition_time(
-    tmp_path: Path, bad_tr: Any
+    tmp_bids_with_scans: tuple[Path, Path], bad_tr: Any
 ) -> None:
-    bids_root = tmp_path / "bids"
-    _make_bids_dataset_stub(bids_root)
+    bids_root, _ = tmp_bids_with_scans
     nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
     nibabel.Nifti1Image(np.zeros((2, 2, 2, 10)), np.eye(4)).to_filename(str(nifti_fn))
     save_json(
