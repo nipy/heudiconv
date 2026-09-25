@@ -1135,21 +1135,23 @@ class BIDSFile:
             If no ``key-value`` pair could be found at all, i.e. the name is
             not a BIDS one.
         """
-        # Entities are the leading run of lower-case-letters + '-' + alphanumeric
-        # pairs; everything after it is the suffix (+ extension).  Matching the
-        # run as a whole, rather than every such pair anywhere in the name, keeps
-        # us from mistaking a part of the suffix for an entity: reproin marks
-        # duplicate series with a trailing '__dup-01', and a 'T1w-mod' suffix
-        # contains a 'w-mod' pair.
-        match = re.match(
-            r"((?:[a-z]+-[a-zA-Z0-9]+_)*[a-z]+-[a-zA-Z0-9]+)(?=_|\.|$)", filename
-        )
+        # Entities are the leading run of '_'-separated lower-case-letters + '-' +
+        # value pairs; everything after it is the suffix (+ extension).  Matching
+        # the run as a whole, rather than every such pair anywhere in the name,
+        # keeps us from mistaking a part of the suffix for an entity: reproin
+        # marks duplicate series with a trailing '__dup-01', and a 'T1w-mod'
+        # suffix contains a 'w-mod' pair.  Values are not restricted to
+        # alphanumerics, so that a non-compliant label coming from a heuristic
+        # (e.g. 'task-rest-state') does not hide all the entities after it.
+        match = re.match(r"((?:[a-z]+-[^_.]+_)*[a-z]+-[^_.]+)(?=_|\.|$)", filename)
         if not match:
             raise ValueError(f"No BIDS entities found in {filename!r}")
         # keep all of them: dropping the ones we do not know about would silently
         # lose information from the filename (see __str__, which puts the unknown
         # ones back at the end).
-        entities = dict(re.findall("([a-z]+)-([a-zA-Z0-9]+)", match.group(1)))
+        entities = {
+            k: v for k, v in (e.split("-", 1) for e in match.group(1).split("_"))
+        }
         # get whatever comes after the entities, and remove any '_' that
         # might come in front:
         ending = remove_prefix(filename[match.end() :], "_")

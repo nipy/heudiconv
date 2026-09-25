@@ -1634,6 +1634,41 @@ def test_BIDSFile_entity_order(shuffled: str, expected: str) -> None:
     assert str(BIDSFile.parse(shuffled + "_T1w.nii.gz")) == expected + "_T1w.nii.gz"
 
 
+@pytest.mark.parametrize(
+    "filename,entities,suffix",
+    [
+        # reproin's marker for duplicated series is part of the suffix
+        (
+            "sub-1_task-rest_bold__dup-01.json",
+            {"sub": "1", "task": "rest"},
+            "bold__dup-01",
+        ),
+        # so is a '-' within the suffix itself
+        ("sub-1_run-1_T1w-mod.nii.gz", {"sub": "1", "run": "1"}, "T1w-mod"),
+        # a non-alphanumeric value (e.g. from a heuristic) is kept whole, and
+        # does not hide the entities which follow it
+        (
+            "sub-01_task-rest-state_acq-fmri_dir-AP_epi.json",
+            {"sub": "01", "task": "rest-state", "acq": "fmri", "dir": "AP"},
+            "epi",
+        ),
+        (
+            "sub-01_acq-a+b_run-2_T1w.json",
+            {"sub": "01", "acq": "a+b", "run": "2"},
+            "T1w",
+        ),
+    ],
+)
+@pytest.mark.ai_generated
+def test_BIDSFile_parse(filename: str, entities: dict[str, str], suffix: str) -> None:
+    """parse must split entities from the suffix, and round-trip the name"""
+    bids_file = BIDSFile.parse(filename)
+    assert {e: bids_file[e] for e in entities} == entities
+    assert all(bids_file[e] is None for e in ("ses", "chunk"))
+    assert bids_file.suffix == suffix
+    assert str(bids_file) == filename
+
+
 @pytest.mark.ai_generated
 def test_BIDSFile_unknown_entities(caplog: pytest.LogCaptureFixture) -> None:
     """Entities we do not know about must be kept, not silently dropped"""
