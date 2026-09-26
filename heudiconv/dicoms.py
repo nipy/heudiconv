@@ -603,10 +603,12 @@ _GE_ACQUISITION_DURATION_CREATOR = "GEMS_ACQU_01"
 
 
 def get_dicom_acquisition_duration(dcm_data: dcm.Dataset) -> Optional[float]:
-    """Extract the total scan duration directly from a DICOM tag, if present:
-    the standard ``AcquisitionDuration`` tag (0018,9073, mostly Enhanced
-    MR/CT), else the private GE tag (0019,105A, classic per-slice GE
-    DICOMs). Returns None if neither is present/parseable."""
+    """Extract the total scan duration directly from a DICOM tag, if present.
+
+    Checks the standard ``AcquisitionDuration`` tag (0018,9073, mostly
+    Enhanced MR/CT), else the private GE tag (0019,105A, classic per-slice
+    GE DICOMs). Returns None if neither is present/parseable.
+    """
     if (0x0018, 0x9073) in dcm_data:
         duration = as_finite_positive_float(dcm_data[(0x0018, 0x9073)].value)
         if duration is not None:
@@ -625,11 +627,13 @@ def get_dicom_acquisition_duration(dcm_data: dcm.Dataset) -> Optional[float]:
 
 
 def get_dicom_declared_acquisition_duration(dcm_data: dcm.Dataset) -> Optional[float]:
-    """Extract Siemens' own declared (prescribed) total scan time, via the
-    CSA/Phoenix protocol's ``lTotalScanTimeSec`` -- a last-resort source
-    (see :func:`get_acquisition_duration`) for e.g. a single-volume 3D
-    sequence, where nothing else is available at all. Returns None if
-    unavailable (e.g. non-Siemens data)."""
+    """Extract Siemens' own declared (prescribed) total scan time.
+
+    Parsed from the CSA/Phoenix protocol's ``lTotalScanTimeSec`` -- a
+    last-resort source (see :func:`get_acquisition_duration`) for e.g. a
+    single-volume 3D sequence, where nothing else is available at all.
+    Returns None if unavailable (e.g. non-Siemens data).
+    """
     value = parse_private_csa_header(
         dcm_data, "AcquisitionDuration", "lTotalScanTimeSec"
     )
@@ -637,11 +641,12 @@ def get_dicom_declared_acquisition_duration(dcm_data: dcm.Dataset) -> Optional[f
 
 
 def get_dicom_declared_repetitions(dcm_data: dcm.Dataset) -> int:
-    """Number of *additional* repetitions/measurements Siemens' own Phoenix
-    protocol declares for this series (``lRepetitions``), i.e. 0 for a
-    single-volume acquisition -- Siemens omits this field from the protocol
-    dump entirely when it is 0, so an absent field is treated the same as an
-    explicit 0."""
+    """Number of extra volumes Siemens' Phoenix protocol declares for this series.
+
+    0 for a single-volume acquisition -- Siemens omits ``lRepetitions``
+    entirely from the protocol dump when it is 0, so an absent field is
+    treated the same as an explicit 0.
+    """
     value = parse_private_csa_header(
         dcm_data, "NumberOfTemporalPositions", "lRepetitions"
     )
@@ -651,8 +656,9 @@ def get_dicom_declared_repetitions(dcm_data: dcm.Dataset) -> int:
 def estimate_scan_duration_from_times(
     dicom_list: list[str], anchor_dt: Optional[datetime.datetime] = None
 ) -> Optional[float]:
-    """Estimate a run's total duration from per-file acquisition timestamps:
-    the span between the earliest and latest timestamp (see
+    """Estimate a run's total duration from per-file acquisition timestamps.
+
+    The span between the earliest and latest timestamp (see
     :func:`get_datetime_from_dcm`) across `dicom_list`, plus one median
     inter-timestamp interval to account for the last timestamp marking the
     *onset*, not the end, of the final volume/slice. Returns None if fewer
@@ -663,7 +669,8 @@ def estimate_scan_duration_from_times(
     `acq_time` so the two stay self-consistent even when the file
     conventionally treated as "first" is not actually the earliest-acquired
     one (a known dcm2niix/Siemens multiband slice-order quirk; see
-    https://github.com/nipy/heudiconv/issues/875)."""
+    https://github.com/nipy/heudiconv/issues/875).
+    """
     # only parse the handful of tags get_datetime_from_dcm() looks at --
     # meaningfully faster than a full header parse when scanning every file
     # of a (possibly large) run
@@ -706,19 +713,19 @@ def estimate_scan_duration_from_times(
 def get_acquisition_duration(
     dicom_list: list[str], anchor_dt: Optional[datetime.datetime] = None
 ) -> Optional[float]:
-    """Determine the total wallclock duration, in seconds, of a run given
-    every DICOM file belonging to it (a single representative file also
-    works, but then only :func:`get_dicom_acquisition_duration` has a
-    chance of succeeding). Tries, in order: :func:`get_dicom_acquisition_duration`,
-    :func:`estimate_scan_duration_from_times`, then
-    :func:`get_dicom_declared_acquisition_duration` as a last resort (the
-    only source at all for a single-volume 3D sequence, e.g. an MPRAGE
-    T1w) -- but only when the protocol itself declares a single volume;
-    otherwise a lone/repeated timestamp more likely means a truncated or
-    aborted multi-volume acquisition, for which the declared duration would
-    overstate the actual (partial) one, so we report None rather than guess.
-    `anchor_dt` is passed through to :func:`estimate_scan_duration_from_times`.
-    Returns None if nothing above succeeds."""
+    """Determine the total wallclock duration, in seconds, of a run.
+
+    `dicom_list` should ideally be every DICOM file belonging to the run (a
+    single representative file also works, but then only
+    :func:`get_dicom_acquisition_duration` has a chance of succeeding).
+    Tries, in order: the standard/GE DICOM tag, per-file timestamps, then
+    Siemens' own declared duration as a last resort -- but only for a
+    genuinely single-volume protocol, to avoid overstating a truncated or
+    aborted multi-volume acquisition (see the code below for the exact
+    conditions). `anchor_dt` is passed through to
+    :func:`estimate_scan_duration_from_times`. Returns None if nothing
+    succeeds.
+    """
     if not dicom_list:
         return None
     dcm_data = dcm.dcmread(dicom_list[0], stop_before_pixels=True, force=True)

@@ -545,8 +545,11 @@ def save_scans_key(
 
 
 def _sync_scans_json_fields(scans_json: str) -> None:
-    """Add any missing ``SCANS_FILE_FIELDS`` key to an existing `scans_json`,
-    leaving everything else untouched. No-op if it does not exist yet."""
+    """Add any missing ``SCANS_FILE_FIELDS`` key to an existing `scans_json`.
+
+    Leaves everything else (including user-defined keys) untouched, and is
+    a no-op if `scans_json` does not exist yet.
+    """
     if not op.lexists(scans_json):
         return
     meta = load_json(scans_json)
@@ -557,10 +560,12 @@ def _sync_scans_json_fields(scans_json: str) -> None:
 
 
 def _merge_scans_header(existing_header: list[str], additions: list[str]) -> list[str]:
-    """Extend `existing_header` with whichever of `additions` it is missing,
-    preserving every existing column (BIDS allows custom ones) and
-    inserting each missing one right after its nearest earlier neighbor in
-    `additions` (so a new "duration" lands next to "acq_time", say)."""
+    """Extend `existing_header` with whichever of `additions` it is missing.
+
+    Preserves every existing column (BIDS allows custom ones), inserting
+    each missing one right after its nearest earlier neighbor in
+    `additions` (so a new "duration" lands next to "acq_time", say).
+    """
     merged = list(existing_header)
     for i, column in enumerate(additions):
         if column in merged:
@@ -577,8 +582,11 @@ def _merge_scans_header(existing_header: list[str], additions: list[str]) -> lis
 def _read_scans_tsv(
     scans_tsv: str,
 ) -> tuple[list[str], list[dict[str, Optional[str]]]]:
-    """Read a `_scans.tsv` file into (fieldnames, rows-as-dicts), tolerating
-    a leading UTF-8 byte-order mark some Excel/Windows-authored TSVs carry."""
+    """Read a `_scans.tsv` file into (fieldnames, rows-as-dicts).
+
+    Tolerates a leading UTF-8 byte-order mark some Excel/Windows-authored
+    TSVs carry.
+    """
     with open(scans_tsv, newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f, delimiter="\t")
         return list(reader.fieldnames or []), list(reader)
@@ -658,7 +666,8 @@ def add_rows_to_scans_keys_file(fn: str, newrows: dict[str, list[str]]) -> None:
 def get_formatted_scans_key_row(
     dcm_fns: str | Path | Sequence[str | Path],
 ) -> list[str]:
-    """
+    """Build a `_scans.tsv` data row for one converted item.
+
     Parameters
     ----------
     dcm_fns: str or Path, or sequence of str or Path
@@ -671,7 +680,6 @@ def get_formatted_scans_key_row(
     row: list
         [ISO acquisition time, duration in seconds (or 'n/a'), performing
         physician name, random string]
-
     """
     if isinstance(dcm_fns, (str, Path)):
         dcm_fns = [dcm_fns]
@@ -719,9 +727,11 @@ def _find_bids_dataset_root(path: str) -> str:
 def _duration_from_dicom_tarball(
     tarball: str, anchor_dt: Optional[datetime.datetime] = None
 ) -> Optional[float]:
-    """Compute acquisition duration from a heudiconv-produced ``*.dicom.tgz``
-    sourcedata tarball (see :func:`heudiconv.dicoms.compress_dicoms`).
-    `anchor_dt` is passed through to :func:`heudiconv.dicoms.get_acquisition_duration`.
+    """Compute acquisition duration from a heudiconv-produced sourcedata DICOM tarball.
+
+    See :func:`heudiconv.dicoms.compress_dicoms` for how it's produced.
+    `anchor_dt` is passed through to
+    :func:`heudiconv.dicoms.get_acquisition_duration`.
     """
     with tempfile.TemporaryDirectory() as tmpdir:
         safe_extract_tar(tarball, tmpdir)
@@ -756,11 +766,14 @@ def _is_within_directory(path: str, directory: str) -> bool:
 
 
 def _find_json_sidecar(nifti_fn: str, bids_root: str) -> Optional[str]:
-    """Find the JSON sidecar applicable to `nifti_fn`: a same-named one next
-    to it, else per the `BIDS Inheritance Principle
+    """Find the JSON sidecar applicable to `nifti_fn`.
+
+    A same-named one right next to it if present, else -- per the `BIDS
+    Inheritance Principle
     <https://bids-specification.readthedocs.io/en/stable/common-principles.html#the-inheritance-principle>`_
-    the most-specific same-suffix ``.json`` (matching entities) found in an
-    ancestor directory up to `bids_root`, or None."""
+    -- the most-specific same-suffix ``.json`` (matching entities) found in
+    an ancestor directory up to `bids_root`. None if neither exists.
+    """
     exact = _nifti_stem(nifti_fn) + ".json"
     if op.exists(exact):
         return exact
@@ -787,19 +800,15 @@ def _find_json_sidecar(nifti_fn: str, bids_root: str) -> Optional[str]:
 def _duration_from_nifti_sidecar(
     nifti_fn: str, bids_root: Optional[str] = None
 ) -> Optional[float]:
-    """Estimate a run's duration from its NIfTI + JSON sidecar (found per
-    :func:`_find_json_sidecar`, so this also covers datasets relying on a
-    shared dataset-root sidecar rather than a per-file one).
+    """Estimate a run's duration from its NIfTI + JSON sidecar.
 
-    Prefers the sidecar's own ``AcquisitionDuration``. For a ``VolumeTiming``
-    sidecar (sparse/multiband designs), derives it from the last onset plus
-    one frame's duration instead -- see the code below for the exact
-    fallback order and the ``HEUDICONV_VOLUME_TIMING_FRAME_DURATION`` opt-in
-    for resolving it against a conflicting ``RepetitionTime``. Otherwise
-    falls back to ``RepetitionTime`` x number of volumes, a coarse estimate
-    used only as a last resort for multi-volume runs.
-
-    `bids_root`, if not given, is computed via :func:`_find_bids_dataset_root`.
+    The sidecar is found per :func:`_find_json_sidecar`, so this also
+    covers datasets relying on a shared dataset-root sidecar rather than a
+    per-file one. For a ``VolumeTiming`` sidecar (sparse/multiband
+    designs), honors the ``HEUDICONV_VOLUME_TIMING_FRAME_DURATION`` opt-in
+    to resolve it against a conflicting ``RepetitionTime`` (see the code
+    below for the exact fallback order). `bids_root`, if not given, is
+    computed via :func:`_find_bids_dataset_root`.
     """
     if bids_root is None:
         bids_root = _find_bids_dataset_root(op.dirname(nifti_fn))
@@ -899,11 +908,14 @@ def _duration_from_nifti_sidecar(
 def _get_retrospective_duration(
     nifti_fn: str, bids_root: str, anchor_dt: Optional[datetime.datetime] = None
 ) -> Optional[float]:
-    """Best-effort acquisition duration for an already-converted BIDS scan:
-    tries the heudiconv-produced sourcedata DICOM tarball first, then falls
-    back to the NIfTI + JSON sidecar. `anchor_dt` -- typically the scan's
-    existing `acq_time` -- is passed through to the tarball-based estimate
-    for consistency (see :func:`heudiconv.dicoms.estimate_scan_duration_from_times`)."""
+    """Best-effort acquisition duration for an already-converted BIDS scan.
+
+    Tries the heudiconv-produced sourcedata DICOM tarball first, then
+    falls back to the NIfTI + JSON sidecar. `anchor_dt` -- typically the
+    scan's existing `acq_time` -- is passed through to the tarball-based
+    estimate for consistency (see
+    :func:`heudiconv.dicoms.estimate_scan_duration_from_times`).
+    """
     rel = op.relpath(nifti_fn, bids_root)
     tarball = op.join(bids_root, "sourcedata", _nifti_stem(rel) + ".dicom.tgz")
     if op.exists(tarball):
@@ -932,12 +944,15 @@ def _get_retrospective_duration(
 
 
 def populate_scans_duration(path: str, overwrite: bool = False) -> None:
-    """Retrospectively populate the 'duration' column of every ``*_scans.tsv``
-    found at or under `path` (or of `path` itself, if it is one such file),
-    complementing the automatic population done at conversion time (see
-    :func:`get_formatted_scans_key_row`) for datasets converted before this
-    feature existed. With `overwrite`, also recompute already-populated rows.
-    See :func:`_get_retrospective_duration` for the per-scan resolution order.
+    """Retrospectively populate the 'duration' column of `_scans.tsv` file(s).
+
+    Processes every ``*_scans.tsv`` found at or under `path` (or `path`
+    itself, if it is one such file) -- complementing the automatic
+    population done at conversion time (see
+    :func:`get_formatted_scans_key_row`) for datasets converted before
+    this feature existed. With `overwrite`, also recomputes
+    already-populated rows. See :func:`_get_retrospective_duration` for
+    the per-scan resolution order.
     """
     if op.isfile(path):
         scans_tsvs = [path] if path.endswith("_scans.tsv") else []
@@ -960,12 +975,15 @@ def populate_scans_duration(path: str, overwrite: bool = False) -> None:
 def _write_scans_tsv_atomically(
     scans_tsv: str, fieldnames: list[str], rows: list[dict[str, Optional[str]]]
 ) -> None:
-    """Rewrite `scans_tsv` in place, atomically: write to a temp file in the
-    same directory, restore the original's permission bits (``mkstemp``
-    otherwise creates it owner-only), then ``os.replace`` it over `scans_tsv`.
-    This works even when `scans_tsv` is read-only or a symlink into
-    git-annex, since replacing a directory entry only needs write permission
-    on the directory, and leaves the original intact on failure."""
+    """Rewrite `scans_tsv` in place, atomically.
+
+    Writes to a temp file in the same directory, restores the original's
+    permission bits (``mkstemp`` otherwise creates it owner-only), then
+    ``os.replace``s it over `scans_tsv`. This works even when `scans_tsv`
+    is read-only or a symlink into git-annex, since replacing a directory
+    entry only needs write permission on the directory, and leaves the
+    original intact on failure.
+    """
     original_mode: Optional[int] = None
     if op.exists(scans_tsv):  # dereferences a symlink, e.g. into git-annex
         original_mode = stat.S_IMODE(os.stat(scans_tsv).st_mode)
