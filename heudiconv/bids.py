@@ -5,7 +5,9 @@ from __future__ import annotations
 __docformat__ = "numpy"
 
 from collections import OrderedDict
+from collections.abc import Sequence
 import csv
+import datetime
 import errno
 from glob import glob
 import hashlib
@@ -14,21 +16,27 @@ import os
 import os.path as op
 from pathlib import Path
 import re
+import stat
+import statistics
+import tempfile
 from typing import Any, Optional
 import warnings
 
+from nibabel.filename_parser import splitext_addext
 import numpy as np
 import pydicom as dcm
 
 from . import __version__, dicoms
 from .parser import find_files
 from .utils import (
+    as_finite_positive_float,
     create_file_if_missing,
     is_readonly,
     json_dumps,
     load_json,
     remove_prefix,
     remove_suffix,
+    safe_extract_tar,
     save_json,
     set_readonly,
     strptime_bids,
@@ -47,6 +55,24 @@ SCANS_FILE_FIELDS = OrderedDict(
                 [
                     ("LongName", "Acquisition time"),
                     ("Description", "Acquisition time of the particular scan"),
+                ]
+            ),
+        ),
+        (
+            "duration",
+            OrderedDict(
+                [
+                    ("LongName", "Scan duration"),
+                    (
+                        "Description",
+                        "Wallclock duration of the scan, in seconds, from the "
+                        "onset of the first to the end of the last acquired "
+                        "volume or sample. Estimated from the DICOM headers "
+                        "(see heudiconv.dicoms.get_acquisition_duration) or, "
+                        "retrospectively, from the NIfTI/JSON sidecar. See also "
+                        "https://github.com/bids-standard/bids-specification/pull/2508",
+                    ),
+                    ("Units", "s"),
                 ]
             ),
         ),
@@ -199,9 +225,13 @@ def populate_bids_templates(
         # TODO: get from schema
         glob_suffixes=[".md", ".txt", ".rst", ""],
     )
-    create_file_if_missing(
-        op.join(path, "scans.json"), json_dumps(SCANS_FILE_FIELDS, sort_keys=False)
-    )
+    scans_json = op.join(path, "scans.json")
+    create_file_if_missing(scans_json, json_dumps(SCANS_FILE_FIELDS, sort_keys=False))
+    # an existing scans.json (e.g. from before "duration" was introduced)
+    # is left alone by create_file_if_missing above -- bring it up to date
+    # with any SCANS_FILE_FIELDS key it is missing, without touching
+    # anything else (including a user's own additions)
+    _sync_scans_json_fields(scans_json)
     create_file_if_missing(op.join(path, ".bidsignore"), ".duecredit.p")
     if op.lexists(op.join(path, ".git")):
         create_file_if_missing(op.join(path, ".gitignore"), ".duecredit.p")
@@ -256,7 +286,7 @@ def populate_aggregated_jsons(path: str) -> None:
 
         # specify the name of the '_events.tsv' file:
         parsed_fpath = BIDSFile.parse(op.basename(fpath))
-        for events_invalid_entity in ['chunk', 'echo', 'part']:
+        for events_invalid_entity in ["chunk", "echo", "part"]:
             # events.tsv with these entities are not specified
             parsed_fpath.drop(events_invalid_entity, missing_ok=True)
         fpath = op.join(op.dirname(fpath), str(parsed_fpath))
@@ -476,11 +506,15 @@ def save_scans_key(
     # as I see it, so should have the same subject/session
     subj: Optional[str] = None
     ses: Optional[str] = None
+    # all bids_files of this item share the same source DICOMs, so the row
+    # (including the possibly-expensive `duration` estimation) is the same
+    # for every one of them -- compute it once rather than per file
+    scan_key_row = get_formatted_scans_key_row(item[-1])
     for bids_file in bids_files:
         # get filenames
         f_name = "/".join(bids_file.split("/")[-2:])
         f_name = f_name.replace("json", "nii.gz")
-        rows[f_name] = get_formatted_scans_key_row(item[-1][0])
+        rows[f_name] = scan_key_row
         subj_, ses_ = find_subj_ses(f_name)
         if not subj_:
             lgr.warning(
@@ -510,6 +544,54 @@ def save_scans_key(
     )
 
 
+def _sync_scans_json_fields(scans_json: str) -> None:
+    """Add any missing ``SCANS_FILE_FIELDS`` key to an existing `scans_json`.
+
+    Leaves everything else (including user-defined keys) untouched, and is
+    a no-op if `scans_json` does not exist yet.
+    """
+    if not op.lexists(scans_json):
+        return
+    meta = load_json(scans_json)
+    missing = {k: v for k, v in SCANS_FILE_FIELDS.items() if k not in meta}
+    if missing:
+        meta.update(missing)
+        save_json(scans_json, meta, sort_keys=False)
+
+
+def _merge_scans_header(existing_header: list[str], additions: list[str]) -> list[str]:
+    """Extend `existing_header` with whichever of `additions` it is missing.
+
+    Preserves every existing column (BIDS allows custom ones), inserting
+    each missing one right after its nearest earlier neighbor in
+    `additions` (so a new "duration" lands next to "acq_time", say).
+    """
+    merged = list(existing_header)
+    for i, column in enumerate(additions):
+        if column in merged:
+            continue
+        insert_at = len(merged)
+        for prev in reversed(additions[:i]):
+            if prev in merged:
+                insert_at = merged.index(prev) + 1
+                break
+        merged.insert(insert_at, column)
+    return merged
+
+
+def _read_scans_tsv(
+    scans_tsv: str,
+) -> tuple[list[str], list[dict[str, Optional[str]]]]:
+    """Read a `_scans.tsv` file into (fieldnames, rows-as-dicts).
+
+    Tolerates a leading UTF-8 byte-order mark some Excel/Windows-authored
+    TSVs carry.
+    """
+    with open(scans_tsv, newline="", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        return list(reader.fieldnames or []), list(reader)
+
+
 def add_rows_to_scans_keys_file(fn: str, newrows: dict[str, list[str]]) -> None:
     """Add new rows to the _scans file.
 
@@ -518,27 +600,57 @@ def add_rows_to_scans_keys_file(fn: str, newrows: dict[str, list[str]]) -> None:
     fn: str
       filename
     newrows: dict
-      extra rows to add (acquisition time, referring physician, random string)
+      extra rows to add (acquisition time, duration, referring physician,
+      random string), in the order of ``SCANS_FILE_FIELDS`` (excluding
+      "filename")
     """
+    canonical = list(SCANS_FILE_FIELDS.keys())
+    header = canonical
     if op.lexists(fn):
-        with open(fn, "r") as csvfile:
-            reader = csv.reader(csvfile, delimiter="\t")
-            existing_rows = [row for row in reader]
-        # skip header
-        fnames2info = {row[0]: row[1:] for row in existing_rows[1:]}
+        # Key each row's values by their *own* column name, not by
+        # position: a file written by an older heudiconv version may have
+        # fewer/differently-ordered columns (e.g. no "duration"), and
+        # zipping those positionally against the current, wider header
+        # would silently misassign values (e.g. "operator" ending up under
+        # "duration").
+        existing_header, existing_rows = _read_scans_tsv(fn)
+        # BIDS allows additional scan columns beyond the ones we define, so
+        # keep any that are already there (e.g. user-added), only adding
+        # whichever canonical ones (e.g. a newly introduced "duration")
+        # the existing file lacks -- rather than rebuilding the header from
+        # SCANS_FILE_FIELDS alone and silently dropping the rest.
+        header = _merge_scans_header(existing_header or canonical, canonical)
+        fnames2info: dict[str, dict[str, Optional[str]]] = {}
+        for row in existing_rows:
+            existing_filename = row.get("filename")
+            if existing_filename is not None:
+                fnames2info[existing_filename] = {
+                    k: v for k, v in row.items() if k != "filename"
+                }
 
         newrows_key = newrows.keys()
         newrows_toadd = list(set(newrows_key) - set(fnames2info.keys()))
         for key_toadd in newrows_toadd:
-            fnames2info[key_toadd] = newrows[key_toadd]
+            fnames2info[key_toadd] = dict(zip(canonical[1:], newrows[key_toadd]))
         # remove
         os.unlink(fn)
     else:
-        fnames2info = newrows
+        fnames2info = {k: dict(zip(canonical[1:], v)) for k, v in newrows.items()}
 
-    header = list(SCANS_FILE_FIELDS.keys())
-    # prepare all the data rows
-    data_rows = [[k] + v for k, v in fnames2info.items()]
+    # prepare all the data rows, filling any column missing from a given
+    # row (e.g. "duration" for a row carried over from an older file, or a
+    # custom column only some rows had) with 'n/a' rather than shifting
+    # the remaining columns into its place
+    def _value_or_na(value: Optional[str]) -> str:
+        # unlike maybe_na(), an explicitly blank value (e.g. an empty
+        # PerformingPhysicianName) is preserved as-is -- only a column
+        # missing from this particular row becomes 'n/a'
+        return "n/a" if value is None else value
+
+    data_rows = [
+        [filename] + [_value_or_na(info.get(col)) for col in header[1:]]
+        for filename, info in fnames2info.items()
+    ]
     # sort by the date/filename
     try:
         data_rows_sorted = sorted(data_rows, key=lambda x: (x[1], x[0]))
@@ -551,21 +663,31 @@ def add_rows_to_scans_keys_file(fn: str, newrows: dict[str, list[str]]) -> None:
         writer.writerows([header] + data_rows_sorted)
 
 
-def get_formatted_scans_key_row(dcm_fn: str | Path) -> list[str]:
-    """
+def get_formatted_scans_key_row(
+    dcm_fns: str | Path | Sequence[str | Path],
+) -> list[str]:
+    """Build a `_scans.tsv` data row for one converted item.
+
     Parameters
     ----------
-    dcm_fn: str
+    dcm_fns: str or Path, or sequence of str or Path
+        A single representative DICOM, or -- preferably -- every DICOM of
+        the run, letting `duration` be estimated from timestamps when no
+        `AcquisitionDuration` tag is available.
 
     Returns
     -------
     row: list
-        [ISO acquisition time, performing physician name, random string]
-
+        [ISO acquisition time, duration in seconds (or 'n/a'), performing
+        physician name, random string]
     """
-    dcm_data = dcm.dcmread(dcm_fn, stop_before_pixels=True, force=True)
+    if isinstance(dcm_fns, (str, Path)):
+        dcm_fns = [dcm_fns]
+    dcm_fn_strs: list[str] = [str(f) for f in dcm_fns]
+    dcm_data = dcm.dcmread(dcm_fn_strs[0], stop_before_pixels=True, force=True)
     # we need to store filenames and acquisition datetimes
     acq_datetime = dicoms.get_datetime_from_dcm(dcm_data=dcm_data)
+    acq_duration = dicoms.get_acquisition_duration(dcm_fn_strs, anchor_dt=acq_datetime)
     # add random string
     # But let's make it reproducible by using all UIDs
     # (might change across versions?)
@@ -577,11 +699,384 @@ def get_formatted_scans_key_row(dcm_fn: str | Path) -> list[str]:
         perfphys = dcm_data.PerformingPhysicianName
     except AttributeError:
         perfphys = ""
-    row = [acq_datetime.isoformat() if acq_datetime else "", perfphys, randstr]
+    row = [
+        acq_datetime.isoformat() if acq_datetime else "",
+        _format_duration(acq_duration),
+        perfphys,
+        randstr,
+    ]
     # empty entries should be 'n/a'
     # https://github.com/dartmouth-pbs/heudiconv/issues/32
     row = ["n/a" if not str(e) else e for e in row]
     return row
+
+
+def _find_bids_dataset_root(path: str) -> str:
+    """Walk upward from `path` to the closest ancestor with a
+    ``dataset_description.json``, or `path` itself if none is found."""
+    current = op.abspath(path)
+    while True:
+        if op.exists(op.join(current, "dataset_description.json")):
+            return current
+        parent = op.dirname(current)
+        if parent == current:
+            return op.abspath(path)
+        current = parent
+
+
+def _duration_from_dicom_tarball(
+    tarball: str, anchor_dt: Optional[datetime.datetime] = None
+) -> Optional[float]:
+    """Compute acquisition duration from a heudiconv-produced sourcedata DICOM tarball.
+
+    See :func:`heudiconv.dicoms.compress_dicoms` for how it's produced.
+    `anchor_dt` is passed through to
+    :func:`heudiconv.dicoms.get_acquisition_duration`.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        safe_extract_tar(tarball, tmpdir)
+        dicom_files = sorted(str(p) for p in Path(tmpdir).rglob("*") if p.is_file())
+        if not dicom_files:
+            lgr.warning("No files found within %s", tarball)
+            return None
+        return dicoms.get_acquisition_duration(dicom_files, anchor_dt=anchor_dt)
+
+
+def _nifti_stem(nifti_fn: str) -> str:
+    """Strip a NIfTI extension (``.nii`` or ``.nii.gz``) off `nifti_fn`."""
+    return splitext_addext(nifti_fn)[0]
+
+
+def _format_duration(duration: Optional[float]) -> str:
+    """Format a duration in seconds as a `_scans.tsv` cell (``'n/a'`` if None)."""
+    return "%.3f" % duration if duration is not None else "n/a"
+
+
+def _is_within_directory(path: str, directory: str) -> bool:
+    """Return True if `path` resolves to somewhere at or under `directory`.
+
+    Resolves symlinks (via `os.path.realpath`) on both sides, so a
+    dataset-internal symlink that points outside `directory` is correctly
+    treated as escaping it, rather than merely comparing lexical
+    (unresolved) absolute paths.
+    """
+    path = op.realpath(path)
+    directory = op.realpath(directory)
+    return path == directory or path.startswith(directory + os.sep)
+
+
+def _find_json_sidecar(nifti_fn: str, bids_root: str) -> Optional[str]:
+    """Find the JSON sidecar applicable to `nifti_fn`.
+
+    A same-named one right next to it if present, else -- per the `BIDS
+    Inheritance Principle
+    <https://bids-specification.readthedocs.io/en/stable/common-principles.html#the-inheritance-principle>`_
+    -- the most-specific same-suffix ``.json`` (matching entities) found in
+    an ancestor directory up to `bids_root`. None if neither exists.
+    """
+    exact = _nifti_stem(nifti_fn) + ".json"
+    if op.exists(exact):
+        return exact
+
+    target = BIDSFile.parse(op.basename(nifti_fn))
+    bids_root = op.realpath(bids_root)
+    current = op.realpath(op.dirname(nifti_fn))
+    while True:
+        candidates = []
+        for json_fn in sorted(glob(op.join(current, "*.json"))):
+            candidate = BIDSFile.parse(op.basename(json_fn))
+            if candidate.suffix != target.suffix:
+                continue
+            if all(target[k] == v for k, v in candidate.entities.items()):
+                candidates.append((len(candidate.entities), json_fn))
+        if candidates:
+            # most specific (most shared entities) match wins
+            return max(candidates, key=lambda c: c[0])[1]
+        if current == bids_root or not _is_within_directory(current, bids_root):
+            return None
+        current = op.dirname(current)
+
+
+def _duration_from_nifti_sidecar(
+    nifti_fn: str, bids_root: Optional[str] = None
+) -> Optional[float]:
+    """Estimate a run's duration from its NIfTI + JSON sidecar.
+
+    The sidecar is found per :func:`_find_json_sidecar`, so this also
+    covers datasets relying on a shared dataset-root sidecar rather than a
+    per-file one. For a ``VolumeTiming`` sidecar (sparse/multiband
+    designs), honors the ``HEUDICONV_VOLUME_TIMING_FRAME_DURATION`` opt-in
+    to resolve it against a conflicting ``RepetitionTime`` (see the code
+    below for the exact fallback order). `bids_root`, if not given, is
+    computed via :func:`_find_bids_dataset_root`.
+    """
+    if bids_root is None:
+        bids_root = _find_bids_dataset_root(op.dirname(nifti_fn))
+    json_fn = _find_json_sidecar(nifti_fn, bids_root)
+    if json_fn is None:
+        return None
+    try:
+        meta = load_json(json_fn)
+        if not isinstance(meta, dict):
+            raise ValueError(f"{json_fn} does not contain a JSON object")
+    except Exception as exc:
+        # json_fn is arbitrary, externally-produced (possibly corrupted,
+        # truncated, or not-actually-an-object) user data, so treat any
+        # read/parse failure as "could not determine" rather than
+        # aborting the whole _scans.tsv this row belongs to
+        lgr.warning("Failed to load %s to get acquisition duration: %s", json_fn, exc)
+        return None
+
+    if "VolumeTiming" in meta:
+        volume_timing = meta.get("VolumeTiming")
+        if not isinstance(volume_timing, list) or not volume_timing:
+            return None
+        try:
+            onsets = sorted(float(t) for t in volume_timing)
+        except (TypeError, ValueError):
+            return None
+
+        def median_onset_interval() -> Optional[float]:
+            if len(onsets) < 2:
+                return None
+            return statistics.median(t2 - t1 for t1, t2 in zip(onsets[:-1], onsets[1:]))
+
+        frame_duration = as_finite_positive_float(
+            meta.get("FrameAcquisitionDuration")
+        ) or as_finite_positive_float(meta.get("AcquisitionDuration"))
+
+        if frame_duration is None:
+            has_repetition_time = (
+                as_finite_positive_float(meta.get("RepetitionTime")) is not None
+            )
+            if not has_repetition_time:
+                # no conflicting metadata to arbitrate -- just a missing
+                # per-frame duration, so the best-effort onset-interval
+                # proxy applies unconditionally
+                frame_duration = median_onset_interval()
+            else:
+                strategy = os.environ.get("HEUDICONV_VOLUME_TIMING_FRAME_DURATION")
+                if strategy == "repetition_time":
+                    frame_duration = as_finite_positive_float(
+                        meta.get("RepetitionTime")
+                    )
+                elif strategy == "onset_interval":
+                    frame_duration = median_onset_interval()
+                else:
+                    lgr.warning(
+                        "%s has both RepetitionTime and VolumeTiming, which "
+                        "BIDS treats as mutually exclusive; not guessing a "
+                        "duration from this inconsistent metadata (set "
+                        "HEUDICONV_VOLUME_TIMING_FRAME_DURATION to "
+                        "'repetition_time' or 'onset_interval' to opt into "
+                        "one)",
+                        json_fn,
+                    )
+                    return None
+
+        if frame_duration is None:
+            return None
+        return onsets[-1] + frame_duration
+
+    duration = as_finite_positive_float(meta.get("AcquisitionDuration"))
+    if duration is not None:
+        return duration
+
+    tr = as_finite_positive_float(meta.get("RepetitionTime"))
+    if tr is None:
+        return None
+    try:
+        from nibabel import load as nb_load
+
+        shape = nb_load(nifti_fn).shape  # type: ignore[attr-defined]
+    except Exception as exc:
+        # nifti_fn is arbitrary, externally-produced (possibly corrupted or
+        # truncated) user data, so we deliberately catch broadly here and
+        # treat it as "could not determine", but do log at 'warning' since
+        # -- unlike a missing sourcedata tarball -- this is a case we
+        # otherwise expected to be able to measure
+        lgr.warning("Failed to load %s to get the number of volumes: %s", nifti_fn, exc)
+        return None
+    nvols = shape[3] if len(shape) > 3 else 1
+    if nvols <= 1:
+        # a single-volume (e.g., anatomical) scan -- TR x 1 vastly
+        # underestimates its actual acquisition time, so we do not guess
+        return None
+    return tr * nvols
+
+
+def _get_retrospective_duration(
+    nifti_fn: str, bids_root: str, anchor_dt: Optional[datetime.datetime] = None
+) -> Optional[float]:
+    """Best-effort acquisition duration for an already-converted BIDS scan.
+
+    Tries the heudiconv-produced sourcedata DICOM tarball first, then
+    falls back to the NIfTI + JSON sidecar. `anchor_dt` -- typically the
+    scan's existing `acq_time` -- is passed through to the tarball-based
+    estimate for consistency (see
+    :func:`heudiconv.dicoms.estimate_scan_duration_from_times`).
+    """
+    rel = op.relpath(nifti_fn, bids_root)
+    tarball = op.join(bids_root, "sourcedata", _nifti_stem(rel) + ".dicom.tgz")
+    if op.exists(tarball):
+        try:
+            duration = _duration_from_dicom_tarball(tarball, anchor_dt=anchor_dt)
+        except Exception as exc:
+            # a corrupt archive, an extraction-filter rejection, or a
+            # malformed DICOM inside it must not abort backfilling this
+            # scan entirely -- fall through to the sidecar-based estimate
+            # just as if the tarball had not yielded a duration
+            lgr.warning(
+                "Failed to read source DICOMs from %s for %s: %s",
+                tarball,
+                nifti_fn,
+                exc,
+            )
+            duration = None
+        if duration is not None:
+            return duration
+        lgr.debug(
+            "Could not establish duration from source DICOMs %s for %s",
+            tarball,
+            nifti_fn,
+        )
+    return _duration_from_nifti_sidecar(nifti_fn, bids_root)
+
+
+def populate_scans_duration(path: str, overwrite: bool = False) -> None:
+    """Retrospectively populate the 'duration' column of `_scans.tsv` file(s).
+
+    Processes every ``*_scans.tsv`` found at or under `path` (or `path`
+    itself, if it is one such file) -- complementing the automatic
+    population done at conversion time (see
+    :func:`get_formatted_scans_key_row`) for datasets converted before
+    this feature existed. With `overwrite`, also recomputes
+    already-populated rows. See :func:`_get_retrospective_duration` for
+    the per-scan resolution order.
+    """
+    if op.isfile(path):
+        scans_tsvs = [path] if path.endswith("_scans.tsv") else []
+    else:
+        scans_tsvs = sorted(
+            find_files(r".*_scans\.tsv$", topdir=path, exclude_vcs=True)
+        )
+    if not scans_tsvs:
+        lgr.warning("No '*_scans.tsv' files found under %s", path)
+        return
+    for scans_tsv in scans_tsvs:
+        try:
+            _populate_scans_duration_file(scans_tsv, overwrite=overwrite)
+        except Exception as exc:
+            # do not let one malformed/unexpected file abort the backfill
+            # for the rest of the dataset
+            lgr.error("Failed to populate 'duration' in %s: %s", scans_tsv, exc)
+
+
+def _write_scans_tsv_atomically(
+    scans_tsv: str, fieldnames: list[str], rows: list[dict[str, Optional[str]]]
+) -> None:
+    """Rewrite `scans_tsv` in place, atomically.
+
+    Writes to a temp file in the same directory, restores the original's
+    permission bits (``mkstemp`` otherwise creates it owner-only), then
+    ``os.replace``s it over `scans_tsv`. This works even when `scans_tsv`
+    is read-only or a symlink into git-annex, since replacing a directory
+    entry only needs write permission on the directory, and leaves the
+    original intact on failure.
+    """
+    original_mode: Optional[int] = None
+    if op.exists(scans_tsv):  # dereferences a symlink, e.g. into git-annex
+        original_mode = stat.S_IMODE(os.stat(scans_tsv).st_mode)
+    directory = op.dirname(scans_tsv) or "."
+    fd, tmp_path = tempfile.mkstemp(
+        dir=directory, prefix=".heudiconv-scans-", suffix=".tsv"
+    )
+    try:
+        with os.fdopen(fd, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter="\t")
+            writer.writeheader()
+            writer.writerows(rows)
+        if original_mode is not None:
+            os.chmod(tmp_path, original_mode)
+        os.replace(tmp_path, scans_tsv)
+    except BaseException:
+        os.unlink(tmp_path)
+        raise
+
+
+def _populate_scans_duration_file(scans_tsv: str, overwrite: bool) -> None:
+    """Backfill the 'duration' column of a single ``_scans.tsv`` file, in place."""
+    session_dir = op.dirname(scans_tsv)
+    bids_root = _find_bids_dataset_root(session_dir)
+
+    fieldnames, rows = _read_scans_tsv(scans_tsv)
+    if not fieldnames:
+        return
+    if "filename" not in fieldnames:
+        lgr.warning("%s has no 'filename' column, skipping", scans_tsv)
+        return
+    if any(None in row for row in rows):
+        lgr.warning(
+            "%s has row(s) with more fields than its header (possibly "
+            "malformed); skipping duration backfill for this file",
+            scans_tsv,
+        )
+        return
+
+    # do this (and the scans.json sync below) even for a header-only file
+    # with no data rows: a legacy _scans.tsv missing 'duration' should
+    # still gain the column and get its dataset-level definition, not just
+    # be left alone because there was nothing to compute per-row
+    changed = "duration" not in fieldnames
+    if changed:
+        fieldnames = _merge_scans_header(
+            fieldnames, ["filename", "acq_time", "duration"]
+        )
+
+    for row in rows:
+        filename = row.get("filename")
+        if not filename:
+            lgr.warning("%s has a row with no filename, skipping it", scans_tsv)
+            continue
+        if maybe_na(row.get("duration")) != "n/a" and not overwrite:
+            continue
+        nifti_fn = op.join(session_dir, filename)
+        if not _is_within_directory(nifti_fn, bids_root):
+            lgr.warning(
+                "Refusing %r in %s: resolves outside of the dataset (%s)",
+                filename,
+                scans_tsv,
+                bids_root,
+            )
+            continue
+        anchor_dt = None
+        acq_time = row.get("acq_time")
+        if acq_time:
+            try:
+                anchor_dt = strptime_bids(acq_time)
+            except ValueError:
+                pass
+        duration = _get_retrospective_duration(nifti_fn, bids_root, anchor_dt=anchor_dt)
+        new_value = _format_duration(duration)
+        if row.get("duration") != new_value:
+            changed = True
+        row["duration"] = new_value
+
+    if changed:
+        _write_scans_tsv_atomically(scans_tsv, fieldnames, rows)
+        lgr.info("Updated 'duration' column in %s", scans_tsv)
+    else:
+        lgr.info("No new 'duration' values could be established for %s", scans_tsv)
+
+    # keep the data dictionary in sync, regardless of whether the tsv
+    # itself needed a rewrite this time (e.g. it may already carry correct
+    # durations from a previous run, while scans.json still lacks the
+    # description)
+    scans_json = op.join(bids_root, "scans.json")
+    if op.lexists(scans_json):
+        _sync_scans_json_fields(scans_json)
+    else:
+        save_json(scans_json, SCANS_FILE_FIELDS, sort_keys=False)
 
 
 def convert_sid_bids(subject_id: str) -> str:
@@ -917,14 +1412,12 @@ def select_fmap_from_compatible_groups(
         scans_tsv = glob(op.join(sess_folder, "*_scans.tsv"))[0]
     except IndexError:
         raise FileNotFoundError("No '*_scans' file found for session %s" % sess_folder)
-    with open(scans_tsv) as f:
-        # read the contents, splitting by lines and by tab separators:
-        scans_tsv_content = [line.split("\t") for line in f.read().splitlines()]
-    # get column indices for filename and acq_time from the first line:
-    fname_idx, time_idx = (
-        scans_tsv_content[0].index(k) for k in ["filename", "acq_time"]
-    )
-    acq_times = {line[fname_idx]: line[time_idx] for line in scans_tsv_content[1:]}
+    _, scans_rows = _read_scans_tsv(scans_tsv)
+    acq_times: dict[str, str] = {}
+    for row in scans_rows:
+        filename = row.get("filename")
+        if filename is not None:
+            acq_times[filename] = row.get("acq_time") or ""
     # acq_times for the compatible fmaps:
     acq_times_fmaps = {
         k: acq_times[
@@ -1105,9 +1598,14 @@ class BIDSFile:
         entities_list = re.findall("([a-z]+)-([a-zA-Z0-9]+)[_]*", filename)
         # keep only those in the _known_entities list:
         entities = {k: v for k, v in entities_list if k in BIDSFile._known_entities}
-        # get whatever comes after the last key-value pair, and remove any '_' that
-        # might come in front:
-        ending = filename.split("-".join(entities_list[-1]))[-1]
+        # get whatever comes after the last key-value pair (or the whole
+        # filename, if it has no entities at all -- e.g. a bare "T1w.json"),
+        # and remove any '_' that might come in front:
+        ending = (
+            filename.split("-".join(entities_list[-1]))[-1]
+            if entities_list
+            else filename
+        )
         ending = remove_prefix(ending, "_")
         # the first dot ('.') separates the suffix from the extension:
         if "." in ending:
@@ -1182,6 +1680,10 @@ class BIDSFile:
     @property
     def extension(self) -> Optional[str]:
         return self._extension
+
+    @property
+    def entities(self) -> dict[str, str]:
+        return dict(self._entities)
 
 
 def sanitize_label(label: str) -> str:
