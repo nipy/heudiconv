@@ -784,7 +784,14 @@ def _find_json_sidecar(nifti_fn: str, bids_root: str) -> Optional[str]:
     while True:
         candidates = []
         for json_fn in sorted(glob(op.join(current, "*.json"))):
-            candidate = BIDSFile.parse(op.basename(json_fn))
+            try:
+                candidate = BIDSFile.parse(op.basename(json_fn))
+            except ValueError:
+                # a fully generic sidecar (e.g. a bare "T1w.json" at the
+                # dataset root) has no entities at all -- still a legitimate,
+                # maximally-generic Inheritance Principle candidate
+                suffix, _, extension = op.basename(json_fn).partition(".")
+                candidate = BIDSFile({}, suffix, extension or None)
             if candidate.suffix != target.suffix:
                 continue
             if all(target[k] == v for k, v in candidate.entities.items()):
@@ -1553,12 +1560,25 @@ class BIDSFile:
     order matters
     """
 
+    # The full list of entities, in the order mandated by the BIDS entity table
+    # (``rules/entities.yaml`` of the BIDS schema).  Entities we do not produce
+    # ourselves are listed as well, so that a filename which carries them (e.g.
+    # coming from a heuristic) survives a parse/serialize round-trip in the
+    # right order.
     _known_entities = [
         "sub",
+        "tpl",
         "ses",
+        "cohort",
+        "sample",
         "task",
+        "tracksys",
         "acq",
+        "nuc",
+        "voi",
         "ce",
+        "trc",
+        "stain",
         "rec",
         "dir",
         "run",
@@ -1568,8 +1588,22 @@ class BIDSFile:
         "inv",
         "mt",
         "part",
+        # not a BIDS entity: heudiconv's own, for uncombined multi-channel data.
+        # Kept at the position update_uncombined_name() places it at.
+        "ch",
+        "proc",
+        "hemi",
+        "space",
+        "split",
         "recording",
         "chunk",
+        "atlas",
+        "seg",
+        "scale",
+        "res",
+        "den",
+        "label",
+        "desc",
     ]
 
     def __init__(
@@ -1593,20 +1627,34 @@ class BIDSFile:
 
     @classmethod
     def parse(cls, filename: str) -> BIDSFile:
-        """Parse the filename for BIDS entities, suffix and extension"""
-        # use re.findall to find all lower-case-letters + '-' + alphanumeric + '_' pairs:
-        entities_list = re.findall("([a-z]+)-([a-zA-Z0-9]+)[_]*", filename)
-        # keep only those in the _known_entities list:
-        entities = {k: v for k, v in entities_list if k in BIDSFile._known_entities}
-        # get whatever comes after the last key-value pair (or the whole
-        # filename, if it has no entities at all -- e.g. a bare "T1w.json"),
-        # and remove any '_' that might come in front:
-        ending = (
-            filename.split("-".join(entities_list[-1]))[-1]
-            if entities_list
-            else filename
-        )
-        ending = remove_prefix(ending, "_")
+        """Parse the filename for BIDS entities, suffix and extension
+
+        Raises
+        ------
+        ValueError
+            If no ``key-value`` pair could be found at all, i.e. the name is
+            not a BIDS one.
+        """
+        # Entities are the leading run of '_'-separated lower-case-letters + '-' +
+        # value pairs; everything after it is the suffix (+ extension).  Matching
+        # the run as a whole, rather than every such pair anywhere in the name,
+        # keeps us from mistaking a part of the suffix for an entity: reproin
+        # marks duplicate series with a trailing '__dup-01', and a 'T1w-mod'
+        # suffix contains a 'w-mod' pair.  Values are not restricted to
+        # alphanumerics, so that a non-compliant label coming from a heuristic
+        # (e.g. 'task-rest-state') does not hide all the entities after it.
+        match = re.match(r"((?:[a-z]+-[^_.]+_)*[a-z]+-[^_.]+)(?=_|\.|$)", filename)
+        if not match:
+            raise ValueError(f"No BIDS entities found in {filename!r}")
+        # keep all of them: dropping the ones we do not know about would silently
+        # lose information from the filename (see __str__, which puts the unknown
+        # ones back at the end).
+        entities = {
+            k: v for k, v in (e.split("-", 1) for e in match.group(1).split("_"))
+        }
+        # get whatever comes after the entities, and remove any '_' that
+        # might come in front:
+        ending = remove_prefix(filename[match.end() :], "_")
         # the first dot ('.') separates the suffix from the extension:
         if "." in ending:
             suffix, extension = ending.split(".", 1)
@@ -1621,17 +1669,24 @@ class BIDSFile:
         # reconstitute the ending for the filename:
         suffix = "_" + self.suffix if self.suffix else ""
         extension = "." + self.extension if self.extension else ""
-        return (
-            "_".join(
-                [
-                    "-".join([e, self._entities[e]])
-                    for e in self._known_entities
-                    if e in self._entities
-                ]
-            )
+        ordered = [e for e in self._known_entities if e in self._entities]
+        # entities we do not know about cannot be placed within the entity table
+        # order, so keep them (in the order they were given) right before the
+        # suffix rather than dropping them on the floor
+        unknown = [e for e in self._entities if e not in self._known_entities]
+        out = (
+            "_".join(["-".join([e, self._entities[e]]) for e in ordered + unknown])
             + suffix
             + extension
         )
+        if unknown:
+            lgr.warning(
+                "Unknown BIDS entities (%s) in %s: keeping them, but their "
+                "placement within the filename might not be BIDS-compliant.",
+                ", ".join(unknown),
+                out,
+            )
+        return out
 
     def __getitem__(self, entity: str) -> Optional[str]:
         return self._entities[entity] if entity in self._entities else None
