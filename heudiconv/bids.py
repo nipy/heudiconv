@@ -564,8 +564,11 @@ def save_scans_key(
 
 
 def _sync_scans_json_fields(scans_json: str) -> None:
-    """Add any missing ``SCANS_FILE_FIELDS`` key to an existing `scans_json`,
-    leaving everything else untouched. No-op if it does not exist yet."""
+    """Add any missing ``SCANS_FILE_FIELDS`` key to an existing `scans_json`.
+
+    Leaves everything else (including user-defined keys) untouched, and is
+    a no-op if `scans_json` does not exist yet.
+    """
     if not op.lexists(scans_json):
         return
     meta = load_json(scans_json)
@@ -576,10 +579,12 @@ def _sync_scans_json_fields(scans_json: str) -> None:
 
 
 def _merge_scans_header(existing_header: list[str], additions: list[str]) -> list[str]:
-    """Extend `existing_header` with whichever of `additions` it is missing,
-    preserving every existing column (BIDS allows custom ones) and
-    inserting each missing one right after its nearest earlier neighbor in
-    `additions` (so a new "duration" lands next to "acq_time", say)."""
+    """Extend `existing_header` with whichever of `additions` it is missing.
+
+    Preserves every existing column (BIDS allows custom ones), inserting
+    each missing one right after its nearest earlier neighbor in
+    `additions` (so a new "duration" lands next to "acq_time", say).
+    """
     merged = list(existing_header)
     for i, column in enumerate(additions):
         if column in merged:
@@ -596,8 +601,11 @@ def _merge_scans_header(existing_header: list[str], additions: list[str]) -> lis
 def _read_scans_tsv(
     scans_tsv: str,
 ) -> tuple[list[str], list[dict[str, Optional[str]]]]:
-    """Read a `_scans.tsv` file into (fieldnames, rows-as-dicts), tolerating
-    a leading UTF-8 byte-order mark some Excel/Windows-authored TSVs carry."""
+    """Read a `_scans.tsv` file into (fieldnames, rows-as-dicts).
+
+    Tolerates a leading UTF-8 byte-order mark some Excel/Windows-authored
+    TSVs carry.
+    """
     with open(scans_tsv, newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f, delimiter="\t")
         return list(reader.fieldnames or []), list(reader)
@@ -677,7 +685,8 @@ def add_rows_to_scans_keys_file(fn: str, newrows: dict[str, list[str]]) -> None:
 def get_formatted_scans_key_row(
     dcm_fns: str | Path | Sequence[str | Path],
 ) -> list[str]:
-    """
+    """Build a `_scans.tsv` data row for one converted item.
+
     Parameters
     ----------
     dcm_fns: str or Path, or sequence of str or Path
@@ -690,7 +699,6 @@ def get_formatted_scans_key_row(
     row: list
         [ISO acquisition time, duration in seconds (or 'n/a'), performing
         physician name, random string]
-
     """
     return _get_scans_key_row_and_times(dcm_fns)[0]
 
@@ -698,9 +706,10 @@ def get_formatted_scans_key_row(
 def _get_scans_key_row_and_times(
     dcm_fns: str | Path | Sequence[str | Path],
 ) -> tuple[list[str], Optional[datetime.datetime], Optional[datetime.datetime]]:
-    """Return what :func:`get_formatted_scans_key_row` does, plus the
-    datetime reported as `acq_time` and the earliest acquisition timestamp
-    across all of `dcm_fns` (each None if it could not be established)."""
+    """Return the `_scans.tsv` row, its `acq_time`, and the run's earliest timestamp.
+
+    The datetimes are None if they could not be established.
+    """
     if isinstance(dcm_fns, (str, Path)):
         dcm_fns = [dcm_fns]
     dcm_fn_strs: list[str] = [str(f) for f in dcm_fns]
@@ -737,10 +746,11 @@ def _get_scans_key_row_and_times(
 def _get_sidecar_acquisition_datetime(
     json_file: str, near: datetime.datetime
 ) -> Optional[datetime.datetime]:
-    """Return the time-of-day `AcquisitionTime` from a (dcm2niix produced)
-    JSON sidecar as a datetime -- on whichever day puts it closest to `near`,
-    so a run straddling midnight is handled -- or None if the sidecar has no
-    (parseable) `AcquisitionTime`."""
+    """Return a sidecar's time-of-day `AcquisitionTime` as a datetime nearest `near`.
+
+    Taking the day nearest `near` handles runs straddling midnight. Returns
+    None if the sidecar has no (parseable) `AcquisitionTime`.
+    """
     acq_time = load_json(json_file).get("AcquisitionTime")
     if not acq_time:
         return None
@@ -860,9 +870,11 @@ def _find_bids_dataset_root(path: str) -> str:
 def _duration_from_dicom_tarball(
     tarball: str, anchor_dt: Optional[datetime.datetime] = None
 ) -> Optional[float]:
-    """Compute acquisition duration from a heudiconv-produced ``*.dicom.tgz``
-    sourcedata tarball (see :func:`heudiconv.dicoms.compress_dicoms`).
-    `anchor_dt` is passed through to :func:`heudiconv.dicoms.get_acquisition_duration`.
+    """Compute acquisition duration from a heudiconv-produced sourcedata DICOM tarball.
+
+    See :func:`heudiconv.dicoms.compress_dicoms` for how it's produced.
+    `anchor_dt` is passed through to
+    :func:`heudiconv.dicoms.get_acquisition_duration`.
     """
     with tempfile.TemporaryDirectory() as tmpdir:
         safe_extract_tar(tarball, tmpdir)
@@ -897,11 +909,14 @@ def _is_within_directory(path: str, directory: str) -> bool:
 
 
 def _find_json_sidecar(nifti_fn: str, bids_root: str) -> Optional[str]:
-    """Find the JSON sidecar applicable to `nifti_fn`: a same-named one next
-    to it, else per the `BIDS Inheritance Principle
+    """Find the JSON sidecar applicable to `nifti_fn`.
+
+    A same-named one right next to it if present, else -- per the `BIDS
+    Inheritance Principle
     <https://bids-specification.readthedocs.io/en/stable/common-principles.html#the-inheritance-principle>`_
-    the most-specific same-suffix ``.json`` (matching entities) found in an
-    ancestor directory up to `bids_root`, or None."""
+    -- the most-specific same-suffix ``.json`` (matching entities) found in
+    an ancestor directory up to `bids_root`. None if neither exists.
+    """
     exact = _nifti_stem(nifti_fn) + ".json"
     if op.exists(exact):
         return exact
@@ -912,7 +927,14 @@ def _find_json_sidecar(nifti_fn: str, bids_root: str) -> Optional[str]:
     while True:
         candidates = []
         for json_fn in sorted(glob(op.join(current, "*.json"))):
-            candidate = BIDSFile.parse(op.basename(json_fn))
+            try:
+                candidate = BIDSFile.parse(op.basename(json_fn))
+            except ValueError:
+                # a fully generic sidecar (e.g. a bare "T1w.json" at the
+                # dataset root) has no entities at all -- still a legitimate,
+                # maximally-generic Inheritance Principle candidate
+                suffix, _, extension = op.basename(json_fn).partition(".")
+                candidate = BIDSFile({}, suffix, extension or None)
             if candidate.suffix != target.suffix:
                 continue
             if all(target[k] == v for k, v in candidate.entities.items()):
@@ -928,19 +950,15 @@ def _find_json_sidecar(nifti_fn: str, bids_root: str) -> Optional[str]:
 def _duration_from_nifti_sidecar(
     nifti_fn: str, bids_root: Optional[str] = None
 ) -> Optional[float]:
-    """Estimate a run's duration from its NIfTI + JSON sidecar (found per
-    :func:`_find_json_sidecar`, so this also covers datasets relying on a
-    shared dataset-root sidecar rather than a per-file one).
+    """Estimate a run's duration from its NIfTI + JSON sidecar.
 
-    Prefers the sidecar's own ``AcquisitionDuration``. For a ``VolumeTiming``
-    sidecar (sparse/multiband designs), derives it from the last onset plus
-    one frame's duration instead -- see the code below for the exact
-    fallback order and the ``HEUDICONV_VOLUME_TIMING_FRAME_DURATION`` opt-in
-    for resolving it against a conflicting ``RepetitionTime``. Otherwise
-    falls back to ``RepetitionTime`` x number of volumes, a coarse estimate
-    used only as a last resort for multi-volume runs.
-
-    `bids_root`, if not given, is computed via :func:`_find_bids_dataset_root`.
+    The sidecar is found per :func:`_find_json_sidecar`, so this also
+    covers datasets relying on a shared dataset-root sidecar rather than a
+    per-file one. For a ``VolumeTiming`` sidecar (sparse/multiband
+    designs), honors the ``HEUDICONV_VOLUME_TIMING_FRAME_DURATION`` opt-in
+    to resolve it against a conflicting ``RepetitionTime`` (see the code
+    below for the exact fallback order). `bids_root`, if not given, is
+    computed via :func:`_find_bids_dataset_root`.
     """
     if bids_root is None:
         bids_root = _find_bids_dataset_root(op.dirname(nifti_fn))
@@ -1040,11 +1058,14 @@ def _duration_from_nifti_sidecar(
 def _get_retrospective_duration(
     nifti_fn: str, bids_root: str, anchor_dt: Optional[datetime.datetime] = None
 ) -> Optional[float]:
-    """Best-effort acquisition duration for an already-converted BIDS scan:
-    tries the heudiconv-produced sourcedata DICOM tarball first, then falls
-    back to the NIfTI + JSON sidecar. `anchor_dt` -- typically the scan's
-    existing `acq_time` -- is passed through to the tarball-based estimate
-    for consistency (see :func:`heudiconv.dicoms.estimate_scan_duration_from_times`)."""
+    """Best-effort acquisition duration for an already-converted BIDS scan.
+
+    Tries the heudiconv-produced sourcedata DICOM tarball first, then
+    falls back to the NIfTI + JSON sidecar. `anchor_dt` -- typically the
+    scan's existing `acq_time` -- is passed through to the tarball-based
+    estimate for consistency (see
+    :func:`heudiconv.dicoms.estimate_scan_duration_from_times`).
+    """
     rel = op.relpath(nifti_fn, bids_root)
     tarball = op.join(bids_root, "sourcedata", _nifti_stem(rel) + ".dicom.tgz")
     if op.exists(tarball):
@@ -1073,12 +1094,15 @@ def _get_retrospective_duration(
 
 
 def populate_scans_duration(path: str, overwrite: bool = False) -> None:
-    """Retrospectively populate the 'duration' column of every ``*_scans.tsv``
-    found at or under `path` (or of `path` itself, if it is one such file),
-    complementing the automatic population done at conversion time (see
-    :func:`get_formatted_scans_key_row`) for datasets converted before this
-    feature existed. With `overwrite`, also recompute already-populated rows.
-    See :func:`_get_retrospective_duration` for the per-scan resolution order.
+    """Retrospectively populate the 'duration' column of `_scans.tsv` file(s).
+
+    Processes every ``*_scans.tsv`` found at or under `path` (or `path`
+    itself, if it is one such file) -- complementing the automatic
+    population done at conversion time (see
+    :func:`get_formatted_scans_key_row`) for datasets converted before
+    this feature existed. With `overwrite`, also recomputes
+    already-populated rows. See :func:`_get_retrospective_duration` for
+    the per-scan resolution order.
     """
     if op.isfile(path):
         scans_tsvs = [path] if path.endswith("_scans.tsv") else []
@@ -1101,12 +1125,15 @@ def populate_scans_duration(path: str, overwrite: bool = False) -> None:
 def _write_scans_tsv_atomically(
     scans_tsv: str, fieldnames: list[str], rows: list[dict[str, Optional[str]]]
 ) -> None:
-    """Rewrite `scans_tsv` in place, atomically: write to a temp file in the
-    same directory, restore the original's permission bits (``mkstemp``
-    otherwise creates it owner-only), then ``os.replace`` it over `scans_tsv`.
-    This works even when `scans_tsv` is read-only or a symlink into
-    git-annex, since replacing a directory entry only needs write permission
-    on the directory, and leaves the original intact on failure."""
+    """Rewrite `scans_tsv` in place, atomically.
+
+    Writes to a temp file in the same directory, restores the original's
+    permission bits (``mkstemp`` otherwise creates it owner-only), then
+    ``os.replace``s it over `scans_tsv`. This works even when `scans_tsv`
+    is read-only or a symlink into git-annex, since replacing a directory
+    entry only needs write permission on the directory, and leaves the
+    original intact on failure.
+    """
     original_mode: Optional[int] = None
     if op.exists(scans_tsv):  # dereferences a symlink, e.g. into git-annex
         original_mode = stat.S_IMODE(os.stat(scans_tsv).st_mode)
@@ -1676,12 +1703,25 @@ class BIDSFile:
     order matters
     """
 
+    # The full list of entities, in the order mandated by the BIDS entity table
+    # (``rules/entities.yaml`` of the BIDS schema).  Entities we do not produce
+    # ourselves are listed as well, so that a filename which carries them (e.g.
+    # coming from a heuristic) survives a parse/serialize round-trip in the
+    # right order.
     _known_entities = [
         "sub",
+        "tpl",
         "ses",
+        "cohort",
+        "sample",
         "task",
+        "tracksys",
         "acq",
+        "nuc",
+        "voi",
         "ce",
+        "trc",
+        "stain",
         "rec",
         "dir",
         "run",
@@ -1691,8 +1731,22 @@ class BIDSFile:
         "inv",
         "mt",
         "part",
+        # not a BIDS entity: heudiconv's own, for uncombined multi-channel data.
+        # Kept at the position update_uncombined_name() places it at.
+        "ch",
+        "proc",
+        "hemi",
+        "space",
+        "split",
         "recording",
         "chunk",
+        "atlas",
+        "seg",
+        "scale",
+        "res",
+        "den",
+        "label",
+        "desc",
     ]
 
     def __init__(
@@ -1716,20 +1770,34 @@ class BIDSFile:
 
     @classmethod
     def parse(cls, filename: str) -> BIDSFile:
-        """Parse the filename for BIDS entities, suffix and extension"""
-        # use re.findall to find all lower-case-letters + '-' + alphanumeric + '_' pairs:
-        entities_list = re.findall("([a-z]+)-([a-zA-Z0-9]+)[_]*", filename)
-        # keep only those in the _known_entities list:
-        entities = {k: v for k, v in entities_list if k in BIDSFile._known_entities}
-        # get whatever comes after the last key-value pair (or the whole
-        # filename, if it has no entities at all -- e.g. a bare "T1w.json"),
-        # and remove any '_' that might come in front:
-        ending = (
-            filename.split("-".join(entities_list[-1]))[-1]
-            if entities_list
-            else filename
-        )
-        ending = remove_prefix(ending, "_")
+        """Parse the filename for BIDS entities, suffix and extension
+
+        Raises
+        ------
+        ValueError
+            If no ``key-value`` pair could be found at all, i.e. the name is
+            not a BIDS one.
+        """
+        # Entities are the leading run of '_'-separated lower-case-letters + '-' +
+        # value pairs; everything after it is the suffix (+ extension).  Matching
+        # the run as a whole, rather than every such pair anywhere in the name,
+        # keeps us from mistaking a part of the suffix for an entity: reproin
+        # marks duplicate series with a trailing '__dup-01', and a 'T1w-mod'
+        # suffix contains a 'w-mod' pair.  Values are not restricted to
+        # alphanumerics, so that a non-compliant label coming from a heuristic
+        # (e.g. 'task-rest-state') does not hide all the entities after it.
+        match = re.match(r"((?:[a-z]+-[^_.]+_)*[a-z]+-[^_.]+)(?=_|\.|$)", filename)
+        if not match:
+            raise ValueError(f"No BIDS entities found in {filename!r}")
+        # keep all of them: dropping the ones we do not know about would silently
+        # lose information from the filename (see __str__, which puts the unknown
+        # ones back at the end).
+        entities = {
+            k: v for k, v in (e.split("-", 1) for e in match.group(1).split("_"))
+        }
+        # get whatever comes after the entities, and remove any '_' that
+        # might come in front:
+        ending = remove_prefix(filename[match.end() :], "_")
         # the first dot ('.') separates the suffix from the extension:
         if "." in ending:
             suffix, extension = ending.split(".", 1)
@@ -1744,17 +1812,24 @@ class BIDSFile:
         # reconstitute the ending for the filename:
         suffix = "_" + self.suffix if self.suffix else ""
         extension = "." + self.extension if self.extension else ""
-        return (
-            "_".join(
-                [
-                    "-".join([e, self._entities[e]])
-                    for e in self._known_entities
-                    if e in self._entities
-                ]
-            )
+        ordered = [e for e in self._known_entities if e in self._entities]
+        # entities we do not know about cannot be placed within the entity table
+        # order, so keep them (in the order they were given) right before the
+        # suffix rather than dropping them on the floor
+        unknown = [e for e in self._entities if e not in self._known_entities]
+        out = (
+            "_".join(["-".join([e, self._entities[e]]) for e in ordered + unknown])
             + suffix
             + extension
         )
+        if unknown:
+            lgr.warning(
+                "Unknown BIDS entities (%s) in %s: keeping them, but their "
+                "placement within the filename might not be BIDS-compliant.",
+                ", ".join(unknown),
+                out,
+            )
+        return out
 
     def __getitem__(self, entity: str) -> Optional[str]:
         return self._entities[entity] if entity in self._entities else None

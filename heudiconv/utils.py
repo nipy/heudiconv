@@ -692,6 +692,12 @@ def safe_extract_tar(tarball: str, dest: str) -> None:
         try:
             tar.extractall(dest, filter=tar_filter)  # type: ignore[arg-type]
         except TypeError:
+            lgr.debug(
+                "%s's tarfile does not support extraction filters; "
+                "vetting members of %s manually instead",
+                sys.version.split()[0],
+                tarball,
+            )
             tar.extractall(dest, members=_safe_tar_members(tar, dest))
 
 
