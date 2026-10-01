@@ -30,7 +30,7 @@ from heudiconv.dicoms import (
     parse_private_csa_header,
 )
 
-from .utils import TEST_DICOM_PATHS, TESTS_DATA_PATH
+from .utils import TEST_DICOM_PATHS, TESTS_DATA_PATH, make_timed_dicoms
 
 # Public: Private DICOM tags
 DICOM_FIELDS_TO_TEST = {"ProtocolName": "tProtocolName"}
@@ -461,16 +461,7 @@ def test_estimate_scan_duration_from_times_even_intervals(tmp_path: Path) -> Non
     # (1 + 2) / 2 == 1.5 -- not just "the" middle element of a 4-item list,
     # which has no single middle element.
     offsets = [0, 1, 3, 7, 8]
-    dicom_list = []
-    for i, offset in enumerate(offsets):
-        dcm_data = dcm.dcmread(
-            op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
-        )
-        dcm_data.AcquisitionDate = "20200101"
-        dcm_data.AcquisitionTime = "%06d.000000" % (120000 + offset)
-        out = tmp_path / f"f{i}.dcm"
-        dcm.dcmwrite(str(out), dcm_data)
-        dicom_list.append(str(out))
+    dicom_list = make_timed_dicoms(tmp_path, offsets)
 
     # span (8s) + median interval (1.5s)
     assert estimate_scan_duration_from_times(dicom_list) == pytest.approx(9.5)
@@ -486,16 +477,7 @@ def test_estimate_scan_duration_from_times_ignores_file_order(tmp_path: Path) ->
     # regardless -- dicom_list[0] has offset 2s here, but the true earliest
     # is offset 0s (dicom_list[1]).
     offsets = [2, 0, 4, 7]
-    dicom_list = []
-    for i, offset in enumerate(offsets):
-        dcm_data = dcm.dcmread(
-            op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
-        )
-        dcm_data.AcquisitionDate = "20200101"
-        dcm_data.AcquisitionTime = "%06d.000000" % (120000 + offset)
-        out = tmp_path / f"f{i}.dcm"
-        dcm.dcmwrite(str(out), dcm_data)
-        dicom_list.append(str(out))
+    dicom_list = make_timed_dicoms(tmp_path, offsets)
 
     # span (0 to 7 = 7s) + median interval (2s) = 9s
     assert estimate_scan_duration_from_times(dicom_list) == pytest.approx(9.0)
@@ -504,16 +486,7 @@ def test_estimate_scan_duration_from_times_ignores_file_order(tmp_path: Path) ->
 @pytest.mark.ai_generated
 def test_get_acquisition_duration_uses_given_timestamps(tmp_path: Path) -> None:
     offsets = [2, 0, 4, 7]
-    dicom_list = []
-    for i, offset in enumerate(offsets):
-        dcm_data = dcm.dcmread(
-            op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
-        )
-        dcm_data.AcquisitionDate = "20200101"
-        dcm_data.AcquisitionTime = "%06d.000000" % (120000 + offset)
-        out = tmp_path / f"f{i}.dcm"
-        dcm.dcmwrite(str(out), dcm_data)
-        dicom_list.append(str(out))
+    dicom_list = make_timed_dicoms(tmp_path, offsets)
 
     timestamps = get_acquisition_timestamps(dicom_list)
     assert get_acquisition_duration(dicom_list) == pytest.approx(9.0)
@@ -564,6 +537,25 @@ def test_estimate_scan_duration_from_times_skips_malformed_timestamp(
     # the malformed file (offset 1) is skipped; span (3s) + median interval
     # of the remaining single interval (3s) between the two good timestamps
     assert estimate_scan_duration_from_times(dicom_list) == pytest.approx(6.0)
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize("tz_offset", [None, "+0100"])
+def test_get_acquisition_timestamps(tmp_path: Path, tz_offset: str | None) -> None:
+    dicom_list = make_timed_dicoms(tmp_path, [2, 0, 4, 7], tz_offset=tz_offset)
+    timestamps = get_acquisition_timestamps(dicom_list)
+    # in dicom_list order, and exactly what a full header read gives -- in
+    # particular equally timezone-aware, so the two can be compared
+    assert timestamps == [
+        get_datetime_from_dcm(dcm.dcmread(f, stop_before_pixels=True))
+        for f in dicom_list
+    ]
+    assert [t.second for t in timestamps] == [2, 0, 4, 7]
+    assert all((t.tzinfo is not None) == bool(tz_offset) for t in timestamps)
+    # and can be used for estimating the duration
+    assert get_acquisition_duration(dicom_list, timestamps=timestamps) == pytest.approx(
+        9.0
+    )
 
 
 @pytest.mark.ai_generated

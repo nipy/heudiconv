@@ -62,7 +62,7 @@ from heudiconv.utils import (
     save_json,
 )
 
-from .utils import TESTS_DATA_PATH, fetch_data, gen_heudiconv_args
+from .utils import TESTS_DATA_PATH, fetch_data, gen_heudiconv_args, make_timed_dicoms
 
 have_datalad = True
 try:
@@ -1947,16 +1947,7 @@ def test_populate_scans_duration_warns_and_optionally_fixes_acq_time(
     )
 
     offsets = [2, 0, 4, 7]
-    dicom_list = []
-    for i, offset in enumerate(offsets):
-        dcm_data = pydicom.dcmread(
-            op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
-        )
-        dcm_data.AcquisitionDate = "20200101"
-        dcm_data.AcquisitionTime = "%06d.000000" % (120000 + offset)
-        out = tmp_path / f"f{i}.dcm"
-        pydicom.dcmwrite(str(out), dcm_data)
-        dicom_list.append(str(out))
+    dicom_list = make_timed_dicoms(tmp_path, offsets)
 
     sourcedata_dir = bids_root / "sourcedata" / "sub-01" / "func"
     sourcedata_dir.mkdir(parents=True)
@@ -1988,6 +1979,7 @@ def test_populate_scans_duration_warns_and_optionally_fixes_acq_time(
 
 
 @pytest.mark.ai_generated
+@pytest.mark.parametrize("tz", ["", "+01:00"])
 @pytest.mark.parametrize(
     "acq_time,sidecar_times,expected",
     [
@@ -2022,6 +2014,7 @@ def test_populate_scans_duration_warns_and_optionally_fixes_acq_time(
 def test_check_acq_time_congruency(
     tmp_path: Path,
     caplog: pytest.LogCaptureFixture,
+    tz: str,
     acq_time: str,
     sidecar_times: list[Optional[str]],
     expected: list[str],
@@ -2032,8 +2025,10 @@ def test_check_acq_time_congruency(
         save_json(sidecar, {"AcquisitionTime": sidecar_time} if sidecar_time else {})
         sidecars.append(str(sidecar))
     caplog.set_level(logging.WARNING, logger="heudiconv.bids")
+    # timezone-aware datetimes come from DICOMs with TimezoneOffsetFromUTC,
+    # and must be comparable to the sidecars' (local wall clock) times
     check_acq_time_congruency(
-        datetime.fromisoformat("2020-01-01T" + acq_time),
+        datetime.fromisoformat("2020-01-01T" + acq_time + tz),
         sidecars,
         label="sub-01_task-rest_bold",
     )

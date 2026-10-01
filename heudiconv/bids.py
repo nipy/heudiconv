@@ -757,7 +757,11 @@ def _get_sidecar_acquisition_datetime(
         lgr.debug("Could not parse AcquisitionTime %r in %s", acq_time, json_file)
         return None
     candidates = [
-        datetime.datetime.combine(near.date() + datetime.timedelta(days=d), time_)
+        # the sidecar carries the same local wall time as a timezone-aware
+        # `near` (from DICOM TimezoneOffsetFromUTC), so take its tzinfo
+        datetime.datetime.combine(
+            near.date() + datetime.timedelta(days=d), time_, tzinfo=near.tzinfo
+        )
         for d in (-1, 0, 1)
     ]
     return min(candidates, key=lambda c: abs(c - near))
