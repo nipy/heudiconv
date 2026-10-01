@@ -148,6 +148,18 @@ def get_parser() -> ArgumentParser:
         "values which are already filled in.",
     )
     parser.add_argument(
+        "--fix-acq-time",
+        action="store_true",
+        default=False,
+        help="For --command populate-scans-duration: also overwrite "
+        "'acq_time' with the earliest acquisition timestamp re-derived "
+        "from the source DICOMs, when it disagrees with the value "
+        "already stored (see https://github.com/nipy/heudiconv/issues/876). "
+        "A disagreement is logged as a warning regardless of this flag, but "
+        "only for rows actually (re)examined -- combine with --overwrite to "
+        "also check/fix rows whose 'duration' is already populated.",
+    )
+    parser.add_argument(
         "--datalad",
         action="store_true",
         help="Store the entire collection as DataLad dataset(s). Small files "

@@ -39,11 +39,18 @@ from .utils import (
     safe_extract_tar,
     save_json,
     set_readonly,
+    strptime,
     strptime_bids,
     update_json,
 )
 
 lgr = logging.getLogger(__name__)
+
+# How far apart two acquisition times of the same run (e.g. `acq_time` and
+# dcm2niix's sidecar AcquisitionTime) may be and still be considered the
+# same: DICOM TM carries microseconds, but dcm2niix goes through a double
+# when printing its AcquisitionTime, so allow for rounding
+ACQ_TIME_TOLERANCE = datetime.timedelta(milliseconds=1)
 
 # Fields to be populated in _scans files. Order matters
 SCANS_FILE_FIELDS = OrderedDict(
@@ -509,7 +516,7 @@ def save_scans_key(
     # all bids_files of this item share the same source DICOMs, so the row
     # (including the possibly-expensive `duration` estimation) is the same
     # for every one of them -- compute it once rather than per file
-    scan_key_row = get_formatted_scans_key_row(item[-1])
+    scan_key_row, acq_datetime = _get_scans_key_row_and_acq_datetime(item[-1])
     for bids_file in bids_files:
         # get filenames
         f_name = "/".join(bids_file.split("/")[-2:])
@@ -535,6 +542,15 @@ def save_scans_key(
                 % (ses, ses_, f_name)
             )
         ses = ses_
+    try:
+        check_acq_time_congruency(
+            acq_datetime,
+            [f for f in bids_files if f.endswith(".json")],
+            label=op.basename(item[0]),
+        )
+    except Exception as exc:
+        # purely diagnostic -- must never abort a conversion
+        lgr.warning("Failed to check acq_time of %s: %s", item[0], exc)
     # where should we store it?
     output_dir = op.dirname(op.dirname(bids_file))
     # save
@@ -673,7 +689,8 @@ def get_formatted_scans_key_row(
     dcm_fns: str or Path, or sequence of str or Path
         A single representative DICOM, or -- preferably -- every DICOM of
         the run, letting `duration` be estimated from timestamps when no
-        `AcquisitionDuration` tag is available.
+        `AcquisitionDuration` tag is available, and `acq_time` be the
+        earliest of them rather than whichever sorts first.
 
     Returns
     -------
@@ -681,13 +698,26 @@ def get_formatted_scans_key_row(
         [ISO acquisition time, duration in seconds (or 'n/a'), performing
         physician name, random string]
     """
+    return _get_scans_key_row_and_acq_datetime(dcm_fns)[0]
+
+
+def _get_scans_key_row_and_acq_datetime(
+    dcm_fns: str | Path | Sequence[str | Path],
+) -> tuple[list[str], Optional[datetime.datetime]]:
+    """Return what :func:`get_formatted_scans_key_row` does, plus the
+    datetime reported as `acq_time` (None if it could not be established)."""
     if isinstance(dcm_fns, (str, Path)):
         dcm_fns = [dcm_fns]
     dcm_fn_strs: list[str] = [str(f) for f in dcm_fns]
     dcm_data = dcm.dcmread(dcm_fn_strs[0], stop_before_pixels=True, force=True)
-    # we need to store filenames and acquisition datetimes
-    acq_datetime = dicoms.get_datetime_from_dcm(dcm_data=dcm_data)
-    acq_duration = dicoms.get_acquisition_duration(dcm_fn_strs, anchor_dt=acq_datetime)
+    # acq_time is the earliest acquisition timestamp across every DICOM of
+    # the run, not just whichever one sorts/is listed first -- for
+    # interleaved multiband Siemens acquisitions exported one DICOM per
+    # slice, that one is not always the earliest-acquired
+    # (https://github.com/nipy/heudiconv/issues/876)
+    timestamps = dicoms.get_acquisition_timestamps(dcm_fn_strs)
+    acq_datetime = min(timestamps) if timestamps else None
+    acq_duration = dicoms.get_acquisition_duration(dcm_fn_strs, timestamps=timestamps)
     # add random string
     # But let's make it reproducible by using all UIDs
     # (might change across versions?)
@@ -708,7 +738,82 @@ def get_formatted_scans_key_row(
     # empty entries should be 'n/a'
     # https://github.com/dartmouth-pbs/heudiconv/issues/32
     row = ["n/a" if not str(e) else e for e in row]
-    return row
+    return row, acq_datetime
+
+
+def _get_sidecar_acquisition_datetime(
+    json_file: str, near: datetime.datetime
+) -> Optional[datetime.datetime]:
+    """Return the time-of-day `AcquisitionTime` from a (dcm2niix produced)
+    JSON sidecar as a datetime -- on whichever day puts it closest to `near`,
+    so a run straddling midnight is handled -- or None if the sidecar has no
+    (parseable) `AcquisitionTime`."""
+    acq_time = load_json(json_file).get("AcquisitionTime")
+    if not acq_time:
+        return None
+    try:
+        time_ = strptime(str(acq_time), ["%H:%M:%S.%f", "%H:%M:%S"]).time()
+    except ValueError:
+        lgr.debug("Could not parse AcquisitionTime %r in %s", acq_time, json_file)
+        return None
+    candidates = [
+        datetime.datetime.combine(near.date() + datetime.timedelta(days=d), time_)
+        for d in (-1, 0, 1)
+    ]
+    return min(candidates, key=lambda c: abs(c - near))
+
+
+def check_acq_time_congruency(
+    acq_datetime: Optional[datetime.datetime],
+    json_files: Sequence[str],
+    label: str,
+) -> None:
+    """Warn if `acq_time` disagrees with dcm2niix's own sidecar AcquisitionTime.
+
+    `acq_time` is now the earliest acquisition timestamp across the run's
+    own DICOMs (see :func:`get_formatted_scans_key_row`), but dcm2niix's
+    sidecar `AcquisitionTime` is computed independently by dcm2niix itself,
+    and can be biased by the same interleaved-multiband-slice issue heudiconv
+    just fixed on its own side (see
+    https://github.com/nipy/heudiconv/issues/876 and
+    https://github.com/rordenlab/dcm2niix/issues/1039) -- so the two are
+    worth cross-checking. Nothing is changed; this is purely diagnostic.
+
+    Parameters
+    ----------
+    acq_datetime: datetime or None
+        The datetime reported as `acq_time` for the run. Nothing is checked
+        if None.
+    json_files: sequence of str
+        JSON sidecars produced for the run.
+    label: str
+        What to refer to the run as in the warning, e.g. its file name.
+    """
+    if acq_datetime is None:
+        return
+
+    # dcm2niix may split a series into several outputs (e.g. echoes, or
+    # localizer planes) with legitimately different AcquisitionTimes -- the
+    # earliest of them is what corresponds to acq_time
+    sidecar_times = [
+        (dt, json_file)
+        for json_file in json_files
+        if (dt := _get_sidecar_acquisition_datetime(json_file, acq_datetime))
+        is not None
+    ]
+    if not sidecar_times:
+        return
+    sidecar_datetime, json_file = min(sidecar_times)
+    if abs(sidecar_datetime - acq_datetime) > ACQ_TIME_TOLERANCE:
+        lgr.warning(
+            "%s: acq_time %s disagrees with AcquisitionTime %s (%+.6f "
+            "seconds) recorded by dcm2niix in %s",
+            label,
+            acq_datetime.time().isoformat(),
+            sidecar_datetime.time().isoformat(),
+            (sidecar_datetime - acq_datetime).total_seconds(),
+            op.basename(json_file),
+        )
 
 
 def _find_bids_dataset_root(path: str) -> str:
@@ -724,22 +829,24 @@ def _find_bids_dataset_root(path: str) -> str:
         current = parent
 
 
-def _duration_from_dicom_tarball(
-    tarball: str, anchor_dt: Optional[datetime.datetime] = None
-) -> Optional[float]:
-    """Compute acquisition duration from a heudiconv-produced sourcedata DICOM tarball.
+def _duration_and_earliest_from_dicom_tarball(
+    tarball: str,
+) -> tuple[Optional[float], Optional[datetime.datetime]]:
+    """Compute acquisition duration, and the earliest acquisition timestamp,
+    from a heudiconv-produced sourcedata DICOM tarball.
 
     See :func:`heudiconv.dicoms.compress_dicoms` for how it's produced.
-    `anchor_dt` is passed through to
-    :func:`heudiconv.dicoms.get_acquisition_duration`.
     """
     with tempfile.TemporaryDirectory() as tmpdir:
         safe_extract_tar(tarball, tmpdir)
         dicom_files = sorted(str(p) for p in Path(tmpdir).rglob("*") if p.is_file())
         if not dicom_files:
             lgr.warning("No files found within %s", tarball)
-            return None
-        return dicoms.get_acquisition_duration(dicom_files, anchor_dt=anchor_dt)
+            return None, None
+        timestamps = dicoms.get_acquisition_timestamps(dicom_files)
+        duration = dicoms.get_acquisition_duration(dicom_files, timestamps=timestamps)
+        earliest = min(timestamps) if timestamps else None
+        return duration, earliest
 
 
 def _nifti_stem(nifti_fn: str) -> str:
@@ -913,21 +1020,21 @@ def _duration_from_nifti_sidecar(
 
 
 def _get_retrospective_duration(
-    nifti_fn: str, bids_root: str, anchor_dt: Optional[datetime.datetime] = None
-) -> Optional[float]:
-    """Best-effort acquisition duration for an already-converted BIDS scan.
+    nifti_fn: str, bids_root: str
+) -> tuple[Optional[float], Optional[datetime.datetime]]:
+    """Best-effort acquisition duration for an already-converted BIDS scan,
+    plus the earliest acquisition timestamp across its source DICOMs.
 
-    Tries the heudiconv-produced sourcedata DICOM tarball first, then
-    falls back to the NIfTI + JSON sidecar. `anchor_dt` -- typically the
-    scan's existing `acq_time` -- is passed through to the tarball-based
-    estimate for consistency (see
-    :func:`heudiconv.dicoms.estimate_scan_duration_from_times`).
+    Tries the heudiconv-produced sourcedata DICOM tarball first, then falls
+    back to the NIfTI + JSON sidecar for `duration` alone -- the earliest
+    timestamp needs the actual DICOMs, so it is None whenever no tarball is
+    found or it yields nothing.
     """
     rel = op.relpath(nifti_fn, bids_root)
     tarball = op.join(bids_root, "sourcedata", _nifti_stem(rel) + ".dicom.tgz")
     if op.exists(tarball):
         try:
-            duration = _duration_from_dicom_tarball(tarball, anchor_dt=anchor_dt)
+            duration, earliest = _duration_and_earliest_from_dicom_tarball(tarball)
         except Exception as exc:
             # a corrupt archive, an extraction-filter rejection, or a
             # malformed DICOM inside it must not abort backfilling this
@@ -939,18 +1046,20 @@ def _get_retrospective_duration(
                 nifti_fn,
                 exc,
             )
-            duration = None
+            duration, earliest = None, None
         if duration is not None:
-            return duration
+            return duration, earliest
         lgr.debug(
             "Could not establish duration from source DICOMs %s for %s",
             tarball,
             nifti_fn,
         )
-    return _duration_from_nifti_sidecar(nifti_fn, bids_root)
+    return _duration_from_nifti_sidecar(nifti_fn, bids_root), None
 
 
-def populate_scans_duration(path: str, overwrite: bool = False) -> None:
+def populate_scans_duration(
+    path: str, overwrite: bool = False, fix_acq_time: bool = False
+) -> None:
     """Retrospectively populate the 'duration' column of `_scans.tsv` file(s).
 
     Processes every ``*_scans.tsv`` found at or under `path` (or `path`
@@ -960,6 +1069,18 @@ def populate_scans_duration(path: str, overwrite: bool = False) -> None:
     this feature existed. With `overwrite`, also recomputes
     already-populated rows. See :func:`_get_retrospective_duration` for
     the per-scan resolution order.
+
+    Re-deriving `duration` from the source DICOMs also re-derives the
+    earliest acquisition timestamp among them, which may disagree with the
+    scan's already-stored `acq_time` (see
+    https://github.com/nipy/heudiconv/issues/876); such a disagreement is
+    logged as a warning for every row actually (re)examined -- i.e. every
+    row `duration` is (re)computed for, so a row already carrying a
+    `duration` needs `overwrite` too for this check (and `fix_acq_time`) to
+    reach it. With `fix_acq_time`, `acq_time` itself is also overwritten
+    with that re-derived value -- off by default since, unlike `duration`,
+    `acq_time` is never blank, so this overwrites a value downstream
+    analyses may already key off of.
     """
     if op.isfile(path):
         scans_tsvs = [path] if path.endswith("_scans.tsv") else []
@@ -972,7 +1093,9 @@ def populate_scans_duration(path: str, overwrite: bool = False) -> None:
         return
     for scans_tsv in scans_tsvs:
         try:
-            _populate_scans_duration_file(scans_tsv, overwrite=overwrite)
+            _populate_scans_duration_file(
+                scans_tsv, overwrite=overwrite, fix_acq_time=fix_acq_time
+            )
         except Exception as exc:
             # do not let one malformed/unexpected file abort the backfill
             # for the rest of the dataset
@@ -1011,7 +1134,9 @@ def _write_scans_tsv_atomically(
         raise
 
 
-def _populate_scans_duration_file(scans_tsv: str, overwrite: bool) -> None:
+def _populate_scans_duration_file(
+    scans_tsv: str, overwrite: bool, fix_acq_time: bool = False
+) -> None:
     """Backfill the 'duration' column of a single ``_scans.tsv`` file, in place."""
     session_dir = op.dirname(scans_tsv)
     bids_root = _find_bids_dataset_root(session_dir)
@@ -1056,18 +1181,45 @@ def _populate_scans_duration_file(scans_tsv: str, overwrite: bool) -> None:
                 bids_root,
             )
             continue
-        anchor_dt = None
+        stored_dt = None
         acq_time = row.get("acq_time")
         if acq_time:
             try:
-                anchor_dt = strptime_bids(acq_time)
+                stored_dt = strptime_bids(acq_time)
             except ValueError:
                 pass
-        duration = _get_retrospective_duration(nifti_fn, bids_root, anchor_dt=anchor_dt)
+        duration, earliest = _get_retrospective_duration(nifti_fn, bids_root)
         new_value = _format_duration(duration)
         if row.get("duration") != new_value:
             changed = True
         row["duration"] = new_value
+
+        if (
+            earliest is not None
+            and stored_dt is not None
+            and abs(earliest - stored_dt) > ACQ_TIME_TOLERANCE
+        ):
+            lgr.warning(
+                "%s: stored acq_time %s differs from the earliest acquisition "
+                "timestamp re-derived from its source DICOMs (%+.6f seconds; "
+                "%s). See https://github.com/nipy/heudiconv/issues/876",
+                filename,
+                stored_dt.isoformat(),
+                (earliest - stored_dt).total_seconds(),
+                "fixing" if fix_acq_time else "not fixed -- pass --fix-acq-time to",
+            )
+            if fix_acq_time:
+                row["acq_time"] = earliest.isoformat()
+                changed = True
+                stored_dt = earliest
+        try:
+            json_fn = _find_json_sidecar(nifti_fn, bids_root)
+            check_acq_time_congruency(
+                stored_dt, [json_fn] if json_fn else [], label=filename
+            )
+        except Exception as exc:
+            # purely diagnostic -- must never abort the backfill
+            lgr.warning("Failed to check acq_time of %s: %s", filename, exc)
 
     if changed:
         _write_scans_tsv_atomically(scans_tsv, fieldnames, rows)

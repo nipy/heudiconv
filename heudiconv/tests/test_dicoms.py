@@ -6,6 +6,7 @@ import json
 import os.path as op
 from pathlib import Path
 from typing import Any, Optional
+from unittest.mock import patch
 
 import pydicom as dcm
 import pytest
@@ -18,6 +19,7 @@ from heudiconv.dicoms import (
     embed_dicom_and_nifti_metadata,
     estimate_scan_duration_from_times,
     get_acquisition_duration,
+    get_acquisition_timestamps,
     get_datetime_from_dcm,
     get_datetime_strings_from_dcm,
     get_dicom_acquisition_duration,
@@ -475,12 +477,14 @@ def test_estimate_scan_duration_from_times_even_intervals(tmp_path: Path) -> Non
 
 
 @pytest.mark.ai_generated
-def test_estimate_scan_duration_from_times_anchor_dt(tmp_path: Path) -> None:
-    # Reproduces https://github.com/nipy/heudiconv/issues/875: interleaved
-    # multiband slice acquisition means the file conventionally treated as
-    # "first" (e.g. DICOM InstanceNumber 1, whatever dcm_fns[0] resolves to)
-    # is not necessarily the earliest-acquired one. Here dicom_list[0] has
-    # offset 2s, but the true earliest timestamp is offset 0s (dicom_list[1]).
+def test_estimate_scan_duration_from_times_ignores_file_order(tmp_path: Path) -> None:
+    # Relevant to https://github.com/nipy/heudiconv/issues/875/876:
+    # interleaved multiband slice acquisition means the file conventionally
+    # treated as "first" (e.g. DICOM InstanceNumber 1, whatever dicom_list[0]
+    # resolves to) is not necessarily the earliest-acquired one. The
+    # duration estimate must use the true earliest/latest timestamps
+    # regardless -- dicom_list[0] has offset 2s here, but the true earliest
+    # is offset 0s (dicom_list[1]).
     offsets = [2, 0, 4, 7]
     dicom_list = []
     for i, offset in enumerate(offsets):
@@ -493,24 +497,12 @@ def test_estimate_scan_duration_from_times_anchor_dt(tmp_path: Path) -> None:
         dcm.dcmwrite(str(out), dcm_data)
         dicom_list.append(str(out))
 
-    # without an anchor: span (0 to 7 = 7s) + median interval (2s) = 9s,
-    # anchored on the true earliest timestamp (offset 0), not dicom_list[0]
+    # span (0 to 7 = 7s) + median interval (2s) = 9s
     assert estimate_scan_duration_from_times(dicom_list) == pytest.approx(9.0)
-
-    # anchored on dicom_list[0]'s own timestamp (offset 2, as acq_time would
-    # be) instead: (7 - 2) + median interval (2s) = 7s -- consistent with
-    # acq_time + duration landing exactly on the true last timestamp
-    anchor_dt = datetime.datetime(2020, 1, 1, 12, 0, 2)
-    assert estimate_scan_duration_from_times(
-        dicom_list, anchor_dt=anchor_dt
-    ) == pytest.approx(7.0)
 
 
 @pytest.mark.ai_generated
-def test_get_acquisition_duration_passes_through_anchor_dt(tmp_path: Path) -> None:
-    # same interleaved-instance scenario as
-    # test_estimate_scan_duration_from_times_anchor_dt, but through the
-    # top-level get_acquisition_duration() entry point
+def test_get_acquisition_duration_uses_given_timestamps(tmp_path: Path) -> None:
     offsets = [2, 0, 4, 7]
     dicom_list = []
     for i, offset in enumerate(offsets):
@@ -523,11 +515,15 @@ def test_get_acquisition_duration_passes_through_anchor_dt(tmp_path: Path) -> No
         dcm.dcmwrite(str(out), dcm_data)
         dicom_list.append(str(out))
 
-    anchor_dt = datetime.datetime(2020, 1, 1, 12, 0, 2)
+    timestamps = get_acquisition_timestamps(dicom_list)
     assert get_acquisition_duration(dicom_list) == pytest.approx(9.0)
-    assert get_acquisition_duration(dicom_list, anchor_dt=anchor_dt) == pytest.approx(
-        7.0
-    )
+    # reusing already-collected timestamps gives the same result, without
+    # re-reading the files
+    with patch("heudiconv.dicoms.get_acquisition_timestamps") as mocked:
+        assert get_acquisition_duration(
+            dicom_list, timestamps=timestamps
+        ) == pytest.approx(9.0)
+    mocked.assert_not_called()
 
 
 @pytest.mark.ai_generated
