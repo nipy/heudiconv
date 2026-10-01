@@ -238,24 +238,24 @@ def test_get_formatted_scans_key_row() -> None:
 
 
 @pytest.mark.ai_generated
-def test_get_formatted_scans_key_row_duration_anchored_on_acq_time(
+def test_get_formatted_scans_key_row_acq_time_is_earliest_timestamp(
     tmp_path: Path,
 ) -> None:
-    # Regression test for https://github.com/nipy/heudiconv/issues/875:
+    # Regression test for https://github.com/nipy/heudiconv/issues/876:
     # interleaved multiband slice acquisition can mean the file passed first
-    # (whose timestamp becomes `acq_time`) is not the earliest-acquired one.
-    # `duration` must be anchored on that same `acq_time`, so `acq_time +
-    # duration` never overshoots past the run's true last timestamp into the
-    # next scan (a spurious negative gap/overlap).
+    # is not the earliest-acquired one. `acq_time` must be the earliest
+    # timestamp across every file of the run, not dicom_list[0]'s own one.
     offsets = [2, 0, 4, 7]
     dicom_list = make_timed_dicoms(tmp_path, offsets)
 
     row = get_formatted_scans_key_row(dicom_list)
     acq_time = datetime.datetime.fromisoformat(row[0])
     duration = float(row[1])
+    # dicom_list[0] has offset 2s, but the true earliest is offset 0s
+    assert acq_time == datetime.datetime(2020, 1, 1, 12, 0, 0)
     # true last raw timestamp (offset 7s) plus the median inter-timestamp
     # interval (2s, from offsets 0/2/4/7) -- the estimated end of
-    # acquisition, independent of which file's timestamp became `acq_time`
+    # acquisition -- so acq_time + duration lands exactly there
     estimated_end = datetime.datetime(2020, 1, 1, 12, 0, 9)
     assert abs(
         (acq_time + datetime.timedelta(seconds=duration)) - estimated_end

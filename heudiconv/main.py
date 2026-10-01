@@ -67,6 +67,7 @@ def process_extra_commands(
     subjs: Optional[list[str]],
     grouping: str,
     overwrite: bool = False,
+    fix_acq_time: bool = False,
 ) -> None:
     """
     Perform custom command instead of regular operations. Supported commands:
@@ -93,6 +94,10 @@ def process_extra_commands(
     overwrite : bool, optional
         For 'populate-scans-duration': also recompute `duration` for scans
         which already have a value. Default is False.
+    fix_acq_time : bool, optional
+        For 'populate-scans-duration': also overwrite `acq_time` with the
+        earliest acquisition timestamp re-derived from the source DICOMs,
+        when it disagrees with the one already stored. Default is False.
     """
 
     def ensure_has_files() -> None:
@@ -144,7 +149,9 @@ def process_extra_commands(
         ensure_has_files()
         assert files is not None  # for mypy now
         for fname in files:
-            populate_scans_duration(fname, overwrite=overwrite)
+            populate_scans_duration(
+                fname, overwrite=overwrite, fix_acq_time=fix_acq_time
+            )
     elif command == "heuristics":
         from .utils import get_known_heuristics_with_descriptions
 
@@ -251,6 +258,7 @@ def workflow(
     dcmconfig: Optional[str] = None,
     queue: Optional[str] = None,
     queue_args: Optional[str] = None,
+    fix_acq_time: bool = False,
 ) -> None:
     """Run the HeuDiConv conversion workflow.
 
@@ -339,6 +347,11 @@ def workflow(
     queue_args : str or None, optional
         Additional queue arguments passed as single string of space-separated
         Argument=Value pairs. Default is None.
+    fix_acq_time : bool, optional
+        For --command populate-scans-duration: also overwrite `acq_time`
+        with the earliest acquisition timestamp re-derived from the source
+        DICOMs, when it disagrees with the one already stored. Default is
+        False.
 
     Notes
     -----
@@ -402,6 +415,7 @@ def workflow(
             subjs,
             grouping,
             overwrite,
+            fix_acq_time,
         )
         return
     #

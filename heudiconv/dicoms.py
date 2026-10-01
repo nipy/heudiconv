@@ -1,7 +1,7 @@
 # dicom operations
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 import datetime
 import logging
 import os
@@ -526,18 +526,6 @@ def get_reproducible_int(dicom_list: list[str]) -> int:
     )
 
 
-# the tags get_datetime_from_dcm() looks at
-_DATETIME_TAGS = [
-    "AcquisitionDate",
-    "AcquisitionTime",
-    "AcquisitionDateTime",
-    "SeriesDate",
-    "SeriesTime",
-    # makes the datetimes timezone-aware, so they must be read consistently
-    "TimezoneOffsetFromUTC",
-]
-
-
 def get_datetime_from_dcm(dcm_data: dcm.Dataset) -> Optional[datetime.datetime]:
     """Extract datetime from filedataset, or return None is no datetime information found.
 
@@ -665,12 +653,24 @@ def get_dicom_declared_repetitions(dcm_data: dcm.Dataset) -> int:
     return int(value) if value else 0
 
 
-def get_acquisition_timestamps(dicom_list: Sequence[str]) -> list[datetime.datetime]:
-    """Return the acquisition timestamps of the files in `dicom_list`.
+# the tags get_datetime_from_dcm() looks at -- parsing only these is
+# meaningfully faster than a full header parse when scanning every file of
+# a (possibly large) run
+_DATETIME_TAGS = [
+    "AcquisitionDate",
+    "AcquisitionTime",
+    "AcquisitionDateTime",
+    "SeriesDate",
+    "SeriesTime",
+    # makes the datetimes timezone-aware, so they must be read consistently
+    "TimezoneOffsetFromUTC",
+]
 
-    As established by :func:`get_datetime_from_dcm`, in `dicom_list` order,
-    skipping files without a (parseable) date/time.
-    """
+
+def get_acquisition_timestamps(dicom_list: list[str]) -> list[datetime.datetime]:
+    """Collect the acquisition timestamp (see :func:`get_datetime_from_dcm`)
+    of every file in `dicom_list`, skipping files for which none could be
+    established (missing or malformed date/time)."""
     timestamps = []
     for fn in dicom_list:
         dcm_data = dcm.dcmread(
@@ -689,27 +689,20 @@ def get_acquisition_timestamps(dicom_list: Sequence[str]) -> list[datetime.datet
 
 
 def estimate_scan_duration_from_times(
-    dicom_list: Sequence[str],
-    anchor_dt: Optional[datetime.datetime] = None,
+    dicom_list: list[str],
     timestamps: Optional[list[datetime.datetime]] = None,
 ) -> Optional[float]:
     """Estimate a run's total duration from per-file acquisition timestamps.
 
     The span between the earliest and latest timestamp (see
-    :func:`get_datetime_from_dcm`) across `dicom_list`, plus one median
+    :func:`get_acquisition_timestamps`) across `dicom_list`, plus one median
     inter-timestamp interval to account for the last timestamp marking the
     *onset*, not the end, of the final volume/slice. Returns None if fewer
     than two distinct timestamps could be established.
 
-    `anchor_dt`, if given, replaces the earliest timestamp found here as the
-    start point -- pass the same timestamp already reported as the run's
-    `acq_time` so the two stay self-consistent even when the file
-    conventionally treated as "first" is not actually the earliest-acquired
-    one (a known dcm2niix/Siemens multiband slice-order quirk; see
-    https://github.com/nipy/heudiconv/issues/875).
-
     `timestamps`, if given, must be what :func:`get_acquisition_timestamps`
-    returns for `dicom_list`, saving re-reading the files.
+    returns for `dicom_list`; it saves re-reading the files when the caller
+    already has them.
     """
     if timestamps is None:
         timestamps = get_acquisition_timestamps(dicom_list)
@@ -724,13 +717,13 @@ def estimate_scan_duration_from_times(
     # to get the *true* median -- averaging the two middle values -- when
     # there is an even number of intervals
     median_interval = statistics.median(intervals)
-    anchor = anchor_dt if anchor_dt is not None else unique_timestamps[0]
-    return (unique_timestamps[-1] - anchor).total_seconds() + median_interval
+    return (unique_timestamps[-1] - unique_timestamps[0]).total_seconds() + (
+        median_interval
+    )
 
 
 def get_acquisition_duration(
-    dicom_list: Sequence[str],
-    anchor_dt: Optional[datetime.datetime] = None,
+    dicom_list: list[str],
     timestamps: Optional[list[datetime.datetime]] = None,
 ) -> Optional[float]:
     """Determine the total wallclock duration, in seconds, of a run.
@@ -742,7 +735,7 @@ def get_acquisition_duration(
     Siemens' own declared duration as a last resort -- but only for a
     genuinely single-volume protocol, to avoid overstating a truncated or
     aborted multi-volume acquisition (see the code below for the exact
-    conditions). `anchor_dt` and `timestamps` are passed through to
+    conditions). `timestamps` is passed through to
     :func:`estimate_scan_duration_from_times`. Returns None if nothing
     succeeds.
     """
@@ -752,9 +745,7 @@ def get_acquisition_duration(
     duration = get_dicom_acquisition_duration(dcm_data)
     if duration is not None:
         return duration
-    duration = estimate_scan_duration_from_times(
-        dicom_list, anchor_dt=anchor_dt, timestamps=timestamps
-    )
+    duration = estimate_scan_duration_from_times(dicom_list, timestamps=timestamps)
     if duration is not None:
         return duration
     if get_dicom_declared_repetitions(dcm_data) > 0:

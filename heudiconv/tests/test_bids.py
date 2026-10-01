@@ -34,7 +34,6 @@ from heudiconv.bids import (
     _find_bids_dataset_root,
     _find_json_sidecar,
     _get_retrospective_duration,
-    _get_scans_key_row_and_times,
     _is_within_directory,
     _merge_scans_header,
     check_acq_time_congruency,
@@ -49,7 +48,6 @@ from heudiconv.bids import (
     populate_intended_for,
     populate_scans_duration,
     sanitize_label,
-    save_scans_key,
     select_fmap_from_compatible_groups,
     treat_age,
 )
@@ -1924,23 +1922,25 @@ def test_populate_scans_duration_from_sourcedata(
 
 
 @pytest.mark.ai_generated
-def test_populate_scans_duration_from_sourcedata_anchors_on_acq_time(
-    tmp_path: Path, tmp_bids_with_scans: tuple[Path, Path]
+def test_populate_scans_duration_warns_and_optionally_fixes_acq_time(
+    tmp_path: Path,
+    tmp_bids_with_scans: tuple[Path, Path],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    # Regression test for https://github.com/nipy/heudiconv/issues/875: the
-    # retrospective backfill must anchor 'duration' on the scan's existing
-    # 'acq_time' (as originally written at conversion time from whichever
-    # file dcm2niix/heudiconv treated as "first"), not on whichever
-    # timestamp happens to be earliest among the sourcedata DICOMs --
-    # otherwise acq_time + duration can overshoot into the next scan even
-    # though it was self-consistent when first written (interleaved
-    # multiband slice acquisition means "first" isn't always earliest).
+    # Regression test for https://github.com/nipy/heudiconv/issues/876: the
+    # retrospective backfill computes 'duration' from the sourcedata DICOMs'
+    # true earliest/latest timestamps, independent of whatever 'acq_time' is
+    # already stored (which may itself be biased -- interleaved multiband
+    # slice acquisition means the file conventionally treated as "first"
+    # isn't always earliest). When the two disagree, it warns -- and, only
+    # with fix_acq_time, overwrites the stored 'acq_time' too.
     bids_root, scans_tsv = tmp_bids_with_scans
     (bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz").write_bytes(b"")
     save_json(str(bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json"), {})
 
-    # 'acq_time' as it would have been written at conversion time: from the
-    # file with offset 2s, which is NOT actually the earliest-acquired one
+    # 'acq_time' as it would have been written at conversion time before
+    # this fix: from the file with offset 2s, which is NOT actually the
+    # earliest-acquired one
     scans_tsv.write_text(
         "filename\tacq_time\n"
         "func/sub-01_task-rest_bold.nii.gz\t2020-01-01T12:00:02\n"
@@ -1958,18 +1958,92 @@ def test_populate_scans_duration_from_sourcedata_anchors_on_acq_time(
         overwrite=True,
     )
 
+    caplog.set_level(logging.WARNING, logger="heudiconv.bids")
     populate_scans_duration(str(bids_root))
 
     _, rows = _read_scans_rows(scans_tsv)
-    acq_time = datetime.fromisoformat(rows[0]["acq_time"])
-    duration = float(rows[0]["duration"])
-    # true last raw timestamp (offset 7s) plus the median inter-timestamp
-    # interval (2s, from offsets 0/2/4/7) -- the estimated end of
-    # acquisition, independent of which file's timestamp is 'acq_time'
-    estimated_end = datetime(2020, 1, 1, 12, 0, 9)
-    assert abs((acq_time + timedelta(seconds=duration)) - estimated_end) <= timedelta(
-        milliseconds=1
+    # duration is the true span (0 to 7 = 7s) + median interval (2s) = 9s,
+    # not anchored on the stored (biased) acq_time
+    assert float(rows[0]["duration"]) == pytest.approx(9.0)
+    # acq_time itself is left untouched without fix_acq_time...
+    assert rows[0]["acq_time"] == "2020-01-01T12:00:02"
+    # ...but the disagreement (2s stored vs. 0s re-derived) was warned about
+    assert "differs from the earliest acquisition" in caplog.text
+    assert "--fix-acq-time" in caplog.text
+
+    caplog.clear()
+    populate_scans_duration(str(bids_root), overwrite=True, fix_acq_time=True)
+    _, rows = _read_scans_rows(scans_tsv)
+    assert rows[0]["acq_time"] == "2020-01-01T12:00:00"
+    assert float(rows[0]["duration"]) == pytest.approx(9.0)
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize("tz", ["", "+01:00"])
+@pytest.mark.parametrize(
+    "acq_time,sidecar_times,expected",
+    [
+        # agreement
+        ("12:00:00", ["12:00:00.000000"], []),
+        # differences within ACQ_TIME_TOLERANCE are ignored
+        ("12:00:00", ["12:00:00.000500"], []),
+        # no (parseable) AcquisitionTime in the sidecar -- nothing to compare
+        ("12:00:00", [None], []),
+        ("12:00:00", [], []),
+        # dcm2niix's own AcquisitionTime disagrees
+        # (https://github.com/rordenlab/dcm2niix/issues/1039)
+        (
+            "12:00:00",
+            ["12:00:02.586000"],
+            [
+                "acq_time 12:00:00 disagrees with AcquisitionTime 12:00:02.586000 "
+                "(+2.586000 seconds) recorded by dcm2niix in f0.json"
+            ],
+        ),
+        # several outputs (e.g. localizer planes) with different times: only
+        # the earliest one corresponds to acq_time
+        ("12:00:00", ["12:00:05.000000", "12:00:00.000000"], []),
+        # a run straddling midnight is compared across it, not a day apart
+        (
+            "23:59:59.900000",
+            ["00:00:00.500000"],
+            ["(+0.600000 seconds)"],
+        ),
+    ],
+)
+def test_check_acq_time_congruency(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+    tz: str,
+    acq_time: str,
+    sidecar_times: list[Optional[str]],
+    expected: list[str],
+) -> None:
+    sidecars = []
+    for i, sidecar_time in enumerate(sidecar_times):
+        sidecar = tmp_path / f"f{i}.json"
+        save_json(sidecar, {"AcquisitionTime": sidecar_time} if sidecar_time else {})
+        sidecars.append(str(sidecar))
+    caplog.set_level(logging.WARNING, logger="heudiconv.bids")
+    # timezone-aware datetimes come from DICOMs with TimezoneOffsetFromUTC,
+    # and must be comparable to the sidecars' (local wall clock) times
+    check_acq_time_congruency(
+        datetime.fromisoformat("2020-01-01T" + acq_time + tz),
+        sidecars,
+        label="sub-01_task-rest_bold",
     )
+    warnings_ = "\n".join(
+        r.getMessage() for r in caplog.records if r.levelno == logging.WARNING
+    )
+    if not expected:
+        assert not warnings_
+    for e in expected:
+        assert e in warnings_
+
+
+def test_check_acq_time_congruency_none_acq_time() -> None:
+    # nothing to check -- must not raise
+    check_acq_time_congruency(None, ["whatever.json"], label="x")
 
 
 @pytest.mark.ai_generated
@@ -2111,6 +2185,53 @@ def test_populate_scans_duration_via_cli(
 
 
 @pytest.mark.ai_generated
+def test_populate_scans_duration_fix_acq_time_via_cli(
+    tmp_path: Path, tmp_bids_with_scans: tuple[Path, Path]
+) -> None:
+    bids_root, scans_tsv = tmp_bids_with_scans
+    (bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz").write_bytes(b"")
+    save_json(str(bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json"), {})
+    scans_tsv.write_text(
+        "filename\tacq_time\n"
+        "func/sub-01_task-rest_bold.nii.gz\t2020-01-01T12:00:02\n"
+    )
+
+    offsets = [2, 0, 4, 7]
+    dicom_list = []
+    for i, offset in enumerate(offsets):
+        dcm_data = pydicom.dcmread(
+            op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+        )
+        dcm_data.AcquisitionDate = "20200101"
+        dcm_data.AcquisitionTime = "%06d.000000" % (120000 + offset)
+        out = tmp_path / f"f{i}.dcm"
+        pydicom.dcmwrite(str(out), dcm_data)
+        dicom_list.append(str(out))
+    sourcedata_dir = bids_root / "sourcedata" / "sub-01" / "func"
+    sourcedata_dir.mkdir(parents=True)
+    compress_dicoms(
+        dicom_list,
+        str(sourcedata_dir / "sub-01_task-rest_bold"),
+        TempDirs(),
+        overwrite=True,
+    )
+
+    runner(
+        [
+            "--command",
+            "populate-scans-duration",
+            "--files",
+            str(bids_root),
+            "--fix-acq-time",
+        ]
+    )
+
+    _, rows = _read_scans_rows(scans_tsv)
+    assert rows[0]["acq_time"] == "2020-01-01T12:00:00"
+    assert float(rows[0]["duration"]) == pytest.approx(9.0)
+
+
+@pytest.mark.ai_generated
 def test_find_bids_dataset_root(tmp_path: Path) -> None:
     session_dir = tmp_path / "sub-01" / "ses-01"
     session_dir.mkdir(parents=True)
@@ -2153,9 +2274,9 @@ def test_get_retrospective_duration_tolerates_corrupt_tarball(
 
     nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
     # must not raise -- falls through to the sidecar estimate
-    assert _get_retrospective_duration(str(nifti_fn), str(bids_root)) == pytest.approx(
-        20.0
-    )
+    duration, earliest = _get_retrospective_duration(str(nifti_fn), str(bids_root))
+    assert duration == pytest.approx(20.0)
+    assert earliest is None
 
 
 @pytest.mark.ai_generated
@@ -2565,123 +2686,3 @@ def test_populate_bids_templates_syncs_existing_scans_json(tmp_path: Path) -> No
     assert "duration" in scans_json
     assert scans_json["acq_time"] == {"Description": "old"}  # untouched
     assert scans_json["MyCustomField"] == {"Description": "x"}  # untouched
-
-
-@pytest.mark.ai_generated
-@pytest.mark.parametrize("tz", ["", "+01:00"])
-@pytest.mark.parametrize(
-    "acq_time,earliest,sidecar_times,expected",
-    [
-        # all consistent
-        ("12:00:00", "12:00:00", ["12:00:00.000000"], []),
-        # differences within ACQ_TIME_TOLERANCE are ignored
-        ("12:00:00", "11:59:59.999500", ["12:00:00.000500"], []),
-        # no AcquisitionTime in the sidecar -- nothing to compare against
-        ("12:00:00", "12:00:00", [None], []),
-        # https://github.com/nipy/heudiconv/issues/876 as it is today: the
-        # first DICOM is not the earliest acquired, and dcm2niix's sidecar
-        # is biased the same way (rordenlab/dcm2niix#1039)
-        (
-            "12:00:02.586000",
-            "12:00:00",
-            ["12:00:02.586000"],
-            ["2.586000 seconds later than the earliest"],
-        ),
-        # acq_time is right, the sidecar is not
-        (
-            "12:00:00",
-            "12:00:00",
-            ["12:00:02.586000"],
-            [
-                "acq_time 12:00:00 (matches earliest: yes) disagrees with "
-                "AcquisitionTime 12:00:02.586000 (+2.586000 seconds; "
-                "matches earliest: no) recorded by dcm2niix in f0.json"
-            ],
-        ),
-        # the sidecar is right, acq_time is not
-        (
-            "12:00:02.586000",
-            "12:00:00",
-            ["12:00:00.000000"],
-            [
-                "2.586000 seconds later than the earliest",
-                "(matches earliest: no) disagrees",
-                "(-2.586000 seconds; matches earliest: yes)",
-            ],
-        ),
-        # several outputs (e.g. localizer planes) with different times: only
-        # the earliest one corresponds to acq_time
-        ("12:00:00", "12:00:00", ["12:00:05.000000", "12:00:00.000000"], []),
-        # a run straddling midnight is compared across it, not a day apart
-        (
-            "23:59:59.900000",
-            "23:59:59.900000",
-            ["00:00:00.500000"],
-            ["(+0.600000 seconds; matches earliest: no)"],
-        ),
-    ],
-)
-def test_check_acq_time_congruency(
-    tmp_path: Path,
-    caplog: pytest.LogCaptureFixture,
-    tz: str,
-    acq_time: str,
-    earliest: str,
-    sidecar_times: list[Optional[str]],
-    expected: list[str],
-) -> None:
-    sidecars = []
-    for i, sidecar_time in enumerate(sidecar_times):
-        sidecar = tmp_path / f"f{i}.json"
-        save_json(sidecar, {"AcquisitionTime": sidecar_time} if sidecar_time else {})
-        sidecars.append(str(sidecar))
-    caplog.set_level(logging.WARNING, logger="heudiconv.bids")
-    # timezone-aware datetimes come from DICOMs with TimezoneOffsetFromUTC,
-    # and must be comparable to the sidecars' (local wall clock) times
-    check_acq_time_congruency(
-        datetime.fromisoformat("2020-01-01T" + acq_time + tz),
-        datetime.fromisoformat("2020-01-01T" + earliest + tz),
-        sidecars,
-        label="sub-01_task-rest_bold",
-    )
-    warnings_ = "\n".join(
-        r.getMessage() for r in caplog.records if r.levelno == logging.WARNING
-    )
-    if not expected:
-        assert not warnings_
-    for e in expected:
-        assert e in warnings_
-
-
-@pytest.mark.ai_generated
-def test_save_scans_key_checks_acq_time_congruency(
-    tmp_path: Path, caplog: pytest.LogCaptureFixture
-) -> None:
-    # the first DICOM (as ordered for conversion) is acquired 2.586s after
-    # the earliest one, as observed for interleaved multiband Siemens
-    # acquisitions (https://github.com/nipy/heudiconv/issues/876), and
-    # dcm2niix's sidecar AcquisitionTime agrees with the earliest one
-    dicom_dir = tmp_path / "dicoms"
-    dicom_dir.mkdir()
-    dicom_list = make_timed_dicoms(dicom_dir, [2.586, 0, 1, 2, 3])
-    row, acq_datetime, earliest_datetime = _get_scans_key_row_and_times(dicom_list)
-    assert acq_datetime == datetime(2020, 1, 1, 12, 0, 2, 586000)
-    assert earliest_datetime == datetime(2020, 1, 1, 12, 0, 0)
-    # diagnostics only: acq_time is still taken from the first DICOM
-    assert row[0] == "2020-01-01T12:00:02.586000"
-
-    func_dir = tmp_path / "bids" / "sub-01" / "func"
-    func_dir.mkdir(parents=True)
-    sidecar = func_dir / "sub-01_task-rest_bold.json"
-    save_json(sidecar, {"AcquisitionTime": "12:00:00.000000"})
-
-    caplog.set_level(logging.WARNING, logger="heudiconv.bids")
-    save_scans_key(("prefix", ("nii.gz",), dicom_list), [str(sidecar)])
-    warnings_ = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
-    assert len(warnings_) == 2
-    assert all(w.startswith("prefix: ") for w in warnings_)
-    assert "2.586000 seconds later than the earliest" in warnings_[0]
-    assert "(-2.586000 seconds; matches earliest: yes)" in warnings_[1]
-    # and the _scans.tsv row is written as before
-    scans = (tmp_path / "bids" / "sub-01" / "sub-01_scans.tsv").read_text()
-    assert "func/sub-01_task-rest_bold.nii.gz\t2020-01-01T12:00:02.586000" in scans
