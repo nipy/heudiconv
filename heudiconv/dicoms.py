@@ -703,6 +703,13 @@ def get_acquisition_timestamps(dicom_list: list[str]) -> list[datetime.datetime]
             timestamps.append(dt)
         else:
             series_timestamps.append(dt)
+    if timestamps and series_timestamps:
+        lgr.debug(
+            "Ignoring %d file(s) with only the series' date/time among %d "
+            "with an acquisition date/time",
+            len(series_timestamps),
+            len(timestamps),
+        )
     return timestamps or series_timestamps
 
 
