@@ -48,6 +48,7 @@ from heudiconv.bids import (
     populate_intended_for,
     populate_scans_duration,
     sanitize_label,
+    save_scans_key,
     select_fmap_from_compatible_groups,
     treat_age,
 )
@@ -57,9 +58,11 @@ from heudiconv.utils import (
     Load,
     TempDirs,
     create_tree,
+    is_readonly,
     load_json,
     remove_suffix,
     save_json,
+    set_readonly,
 )
 
 from .utils import TESTS_DATA_PATH, fetch_data, gen_heudiconv_args, make_timed_dicoms
@@ -1936,7 +1939,12 @@ def test_populate_scans_duration_warns_and_optionally_fixes_acq_time(
     # with fix_acq_time, overwrites the stored 'acq_time' too.
     bids_root, scans_tsv = tmp_bids_with_scans
     (bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz").write_bytes(b"")
-    save_json(str(bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json"), {})
+    # dcm2niix's AcquisitionTime is biased the same way
+    # (https://github.com/rordenlab/dcm2niix/issues/1039), and heudiconv
+    # leaves converted files read-only
+    sidecar = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json"
+    save_json(str(sidecar), {"AcquisitionTime": "12:00:02.000000"})
+    set_readonly(str(sidecar))
 
     # 'acq_time' as it would have been written at conversion time before
     # this fix: from the file with offset 2s, which is NOT actually the
@@ -1970,12 +1978,18 @@ def test_populate_scans_duration_warns_and_optionally_fixes_acq_time(
     # ...but the disagreement (2s stored vs. 0s re-derived) was warned about
     assert "differs from the earliest acquisition" in caplog.text
     assert "--fix-acq-time" in caplog.text
+    # as is the sidecar's AcquisitionTime -- not yet compared to anything but
+    # the (equally biased) stored acq_time, so silently
+    assert load_json(sidecar)["AcquisitionTime"] == "12:00:02.000000"
 
     caplog.clear()
     populate_scans_duration(str(bids_root), overwrite=True, fix_acq_time=True)
     _, rows = _read_scans_rows(scans_tsv)
     assert rows[0]["acq_time"] == "2020-01-01T12:00:00"
     assert float(rows[0]["duration"]) == pytest.approx(9.0)
+    # and, once acq_time is fixed, the sidecar's AcquisitionTime too
+    assert load_json(sidecar)["AcquisitionTime"] == "12:00:00.000000"
+    assert is_readonly(str(sidecar))
 
 
 @pytest.mark.ai_generated
@@ -2044,6 +2058,155 @@ def test_check_acq_time_congruency(
 def test_check_acq_time_congruency_none_acq_time() -> None:
     # nothing to check -- must not raise
     check_acq_time_congruency(None, ["whatever.json"], label="x")
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize("tz", ["", "+01:00"])
+@pytest.mark.parametrize(
+    "fix,acq,timestamps,sidecars,corrected,expected_log",
+    [
+        # https://github.com/rordenlab/dcm2niix/issues/1039: dcm2niix took
+        # the time of a DICOM which is not the earliest acquired
+        (
+            True,
+            0,
+            [2.586, 0, 1],
+            [2.586],
+            [0],
+            [
+                "INFO: run: corrected AcquisitionTime recorded by dcm2niix "
+                "from 12:00:02.586000 to 12:00:00.000000"
+            ],
+        ),
+        # ... in all outputs alike, e.g. echoes
+        (True, 0, [2.586, 0, 1], [2.586, 2.586], [0, 0], ["INFO: run: corrected"]),
+        # ... but not asked to fix it
+        (
+            False,
+            0,
+            [2.586, 0, 1],
+            [2.586],
+            [2.586],
+            ["WARNING: ", "--fix-acq-time` would fix it"],
+        ),
+        # not one of the run's DICOM timestamps: unclear what happened
+        (True, 0, [2.586, 0, 1], [5], [5], ["WARNING: ", "(+5.000000 seconds)"]),
+        # not all sidecars record an AcquisitionTime
+        (True, 0, [2.586, 0, 1], [2.586, None], [2.586, None], ["WARNING: "]),
+        # sidecars disagree among themselves
+        (True, 0, [2.586, 0, 1], [1, 2.586], [1, 2.586], ["WARNING: "]),
+        # acq_time is not the earliest DICOM timestamp
+        (True, 1, [2.586, 0, 1], [2.586], [2.586], ["WARNING: "]),
+        # no DICOM timestamps to tell by
+        (True, 0, [], [2.586], [2.586], ["WARNING: "]),
+    ],
+)
+def test_check_acq_time_congruency_fix(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+    tz: str,
+    fix: bool,
+    acq: float,
+    timestamps: list[float],
+    sidecars: list[Optional[float]],
+    corrected: list[Optional[float]],
+    expected_log: list[str],
+) -> None:
+    start = datetime.fromisoformat("2020-01-01T12:00:00" + tz)
+
+    def at(offset: float) -> datetime:
+        return start + timedelta(seconds=offset)
+
+    def fmt(offset: Optional[float]) -> Optional[str]:
+        return at(offset).strftime("%H:%M:%S.%f") if offset is not None else None
+
+    json_files = []
+    for i, offset in enumerate(sidecars):
+        json_file = tmp_path / f"f{i}.json"
+        save_json(
+            json_file, {"AcquisitionTime": fmt(offset)} if offset is not None else {}
+        )
+        set_readonly(str(json_file))
+        json_files.append(str(json_file))
+    caplog.set_level(logging.INFO, logger="heudiconv.bids")
+    check_acq_time_congruency(
+        at(acq),
+        json_files,
+        label="run",
+        timestamps=[at(t) for t in timestamps],
+        fix=fix,
+    )
+    assert [load_json(f).get("AcquisitionTime") for f in json_files] == [
+        fmt(o) for o in corrected
+    ]
+    assert all(is_readonly(f) for f in json_files)
+    log = "\n".join(
+        "%s: %s" % (r.levelname, r.getMessage())
+        for r in caplog.records
+        if r.name == "heudiconv.bids"
+    )
+    for e in expected_log:
+        assert e in log
+    if fix:
+        # nothing to suggest -- it either got fixed or is not unambiguous
+        assert "--fix-acq-time" not in log
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize("case", ["inherited", "no_tarball"])
+def test_populate_scans_duration_fix_acq_time_leaves_sidecar(
+    tmp_path: Path,
+    tmp_bids_with_scans: tuple[Path, Path],
+    caplog: pytest.LogCaptureFixture,
+    case: str,
+) -> None:
+    # --fix-acq-time must neither touch a sidecar shared with other scans
+    # (Inheritance Principle), nor one it cannot tell is off, without the
+    # source DICOMs to tell by
+    bids_root, scans_tsv = tmp_bids_with_scans
+    (bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz").write_bytes(b"")
+    if case == "inherited":
+        sidecar = bids_root / "task-rest_bold.json"
+    else:
+        sidecar = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json"
+    save_json(str(sidecar), {"AcquisitionTime": "12:00:02.000000"})
+    scans_tsv.write_text(
+        "filename\tacq_time\n"
+        "func/sub-01_task-rest_bold.nii.gz\t2020-01-01T12:00:02\n"
+    )
+    if case == "inherited":
+        sourcedata_dir = bids_root / "sourcedata" / "sub-01" / "func"
+        sourcedata_dir.mkdir(parents=True)
+        compress_dicoms(
+            make_timed_dicoms(tmp_path, [2, 0, 4, 7]),
+            str(sourcedata_dir / "sub-01_task-rest_bold"),
+            TempDirs(),
+            overwrite=True,
+        )
+
+    caplog.set_level(logging.WARNING, logger="heudiconv.bids")
+    populate_scans_duration(str(bids_root), overwrite=True, fix_acq_time=True)
+    assert load_json(sidecar)["AcquisitionTime"] == "12:00:02.000000"
+    # nor suggest that it would
+    assert "would fix it" not in caplog.text
+
+
+@pytest.mark.ai_generated
+def test_save_scans_key_fixes_sidecar_acquisition_time(tmp_path: Path) -> None:
+    # the first DICOM (as ordered for conversion) is acquired 2s after the
+    # earliest one, and dcm2niix recorded its time as the AcquisitionTime
+    dicom_dir = tmp_path / "dicoms"
+    dicom_dir.mkdir()
+    dicom_list = make_timed_dicoms(dicom_dir, [2, 0, 1, 3])
+    func_dir = tmp_path / "bids" / "sub-01" / "func"
+    func_dir.mkdir(parents=True)
+    sidecar = func_dir / "sub-01_task-rest_bold.json"
+    save_json(sidecar, {"AcquisitionTime": "12:00:02.000000"})
+
+    save_scans_key(("prefix", ("nii.gz",), dicom_list), [str(sidecar)])
+    assert load_json(sidecar)["AcquisitionTime"] == "12:00:00.000000"
+    scans = (tmp_path / "bids" / "sub-01" / "sub-01_scans.tsv").read_text()
+    assert "func/sub-01_task-rest_bold.nii.gz\t2020-01-01T12:00:00\t4.000" in scans
 
 
 @pytest.mark.ai_generated
@@ -2274,9 +2437,9 @@ def test_get_retrospective_duration_tolerates_corrupt_tarball(
 
     nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
     # must not raise -- falls through to the sidecar estimate
-    duration, earliest = _get_retrospective_duration(str(nifti_fn), str(bids_root))
+    duration, timestamps = _get_retrospective_duration(str(nifti_fn), str(bids_root))
     assert duration == pytest.approx(20.0)
-    assert earliest is None
+    assert timestamps == []
 
 
 @pytest.mark.ai_generated
