@@ -97,7 +97,8 @@ def process_extra_commands(
     fix_acq_time : bool, optional
         For 'populate-scans-duration': also overwrite `acq_time` with the
         earliest acquisition timestamp re-derived from the source DICOMs,
-        when it disagrees with the one already stored. Default is False.
+        when it disagrees with the one already stored, and likewise the JSON
+        sidecar's `AcquisitionTime` where unambiguous. Default is False.
     """
 
     def ensure_has_files() -> None:
@@ -350,7 +351,8 @@ def workflow(
     fix_acq_time : bool, optional
         For --command populate-scans-duration: also overwrite `acq_time`
         with the earliest acquisition timestamp re-derived from the source
-        DICOMs, when it disagrees with the one already stored. Default is
+        DICOMs, when it disagrees with the one already stored, and likewise
+        the JSON sidecar's `AcquisitionTime` where unambiguous. Default is
         False.
 
     Notes
