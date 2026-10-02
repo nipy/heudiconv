@@ -559,6 +559,28 @@ def test_get_acquisition_timestamps(tmp_path: Path, tz_offset: str | None) -> No
 
 
 @pytest.mark.ai_generated
+@pytest.mark.parametrize("n_series_only", [1, 3])
+def test_get_acquisition_timestamps_series_fallback(
+    tmp_path: Path, n_series_only: int
+) -> None:
+    # files which only have the (earlier) series start time must not be
+    # mixed in with the actual acquisition times of the others -- unless
+    # there are no others
+    dicom_list = make_timed_dicoms(tmp_path, [0, 1, 2])
+    for fn in dicom_list[-n_series_only:]:
+        dcm_data = dcm.dcmread(fn, stop_before_pixels=True)
+        del dcm_data.AcquisitionTime
+        dcm_data.SeriesDate = "20200101"
+        dcm_data.SeriesTime = "115930.000000"
+        dcm.dcmwrite(fn, dcm_data)
+    timestamps = get_acquisition_timestamps(dicom_list)
+    if n_series_only < len(dicom_list):
+        assert [t.second for t in timestamps] == [0, 1]
+    else:
+        assert timestamps == [datetime.datetime(2020, 1, 1, 11, 59, 30)] * 3
+
+
+@pytest.mark.ai_generated
 def test_estimate_scan_duration_from_times_single_file() -> None:
     dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))[:1]
     assert estimate_scan_duration_from_times(dicom_list) is None
