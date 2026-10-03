@@ -7,6 +7,7 @@ import logging
 import os
 import os.path as op
 from pathlib import Path
+import statistics
 import sys
 import tarfile
 from typing import (
@@ -29,6 +30,7 @@ import pydicom as dcm
 from .utils import (
     SeqInfo,
     TempDirs,
+    as_finite_positive_float,
     get_typed_attr,
     load_json,
     set_readonly,
@@ -548,16 +550,23 @@ def get_datetime_from_dcm(dcm_data: dcm.Dataset) -> Optional[datetime.datetime]:
 
     """
 
-    def check_tag(x: str) -> bool:
-        return x in dcm_data and dcm_data[x].value.strip()
-
-    if check_tag("AcquisitionDate") and check_tag("AcquisitionTime"):
+    if _has_value(dcm_data, "AcquisitionDate", "AcquisitionTime"):
         return strptime_dcm_da_tm(dcm_data, "AcquisitionDate", "AcquisitionTime")
-    if check_tag("AcquisitionDateTime"):
+    if _has_value(dcm_data, "AcquisitionDateTime"):
         return strptime_dcm_dt(dcm_data, "AcquisitionDateTime")
-    if check_tag("SeriesDate") and check_tag("SeriesTime"):
+    if _has_value(dcm_data, "SeriesDate", "SeriesTime"):
         return strptime_dcm_da_tm(dcm_data, "SeriesDate", "SeriesTime")
     return None
+
+
+def _has_value(dcm_data: dcm.Dataset, *tags: str) -> bool:
+    """Return True if all `tags` are present in `dcm_data` with non-blank values."""
+    return all(
+        tag in dcm_data
+        and dcm_data[tag].value is not None
+        and str(dcm_data[tag].value).strip()
+        for tag in tags
+    )
 
 
 def get_datetime_strings_from_dcm(
@@ -590,6 +599,191 @@ def get_datetime_strings_from_dcm(
         # nothing better to offer -- return whatever (if anything) we had
         return (str(date) if date else None, str(time) if time else None)
     return datetime_.strftime("%Y%m%d"), datetime_.strftime("%H%M%S.%f")
+
+
+# Private GE tag reporting the "Acquisition Duration" (in microseconds) for
+# classic (per-slice) GE DICOMs; see
+# https://github.com/rordenlab/dcm2niix/issues/808
+_GE_ACQUISITION_DURATION_GROUP = 0x0019
+_GE_ACQUISITION_DURATION_OFFSET = 0x5A
+_GE_ACQUISITION_DURATION_CREATOR = "GEMS_ACQU_01"
+
+
+def get_dicom_acquisition_duration(dcm_data: dcm.Dataset) -> Optional[float]:
+    """Extract the total scan duration directly from a DICOM tag, if present.
+
+    Checks the standard ``AcquisitionDuration`` tag (0018,9073, mostly
+    Enhanced MR/CT), else the private GE tag (0019,105A, classic per-slice
+    GE DICOMs). Returns None if neither is present/parseable.
+    """
+    if (0x0018, 0x9073) in dcm_data:
+        duration = as_finite_positive_float(dcm_data[(0x0018, 0x9073)].value)
+        if duration is not None:
+            return duration
+
+    try:
+        elem = dcm_data.get_private_item(
+            _GE_ACQUISITION_DURATION_GROUP,
+            _GE_ACQUISITION_DURATION_OFFSET,
+            _GE_ACQUISITION_DURATION_CREATOR,
+        )
+    except KeyError:
+        return None
+    duration = as_finite_positive_float(elem.value)
+    return duration * 1e-6 if duration is not None else None
+
+
+def get_dicom_declared_acquisition_duration(dcm_data: dcm.Dataset) -> Optional[float]:
+    """Extract Siemens' own declared (prescribed) total scan time.
+
+    Parsed from the CSA/Phoenix protocol's ``lTotalScanTimeSec`` -- a
+    last-resort source (see :func:`get_acquisition_duration`) for e.g. a
+    single-volume 3D sequence, where nothing else is available at all.
+    Returns None if unavailable (e.g. non-Siemens data).
+    """
+    value = parse_private_csa_header(
+        dcm_data, "AcquisitionDuration", "lTotalScanTimeSec"
+    )
+    return as_finite_positive_float(value) if value else None
+
+
+def get_dicom_declared_repetitions(dcm_data: dcm.Dataset) -> int:
+    """Number of extra volumes Siemens' Phoenix protocol declares for this series.
+
+    0 for a single-volume acquisition -- Siemens omits ``lRepetitions``
+    entirely from the protocol dump when it is 0, so an absent field is
+    treated the same as an explicit 0.
+    """
+    value = parse_private_csa_header(
+        dcm_data, "NumberOfTemporalPositions", "lRepetitions"
+    )
+    return int(value) if value else 0
+
+
+# the tags get_datetime_from_dcm() looks at -- parsing only these is
+# meaningfully faster than a full header parse when scanning every file of
+# a (possibly large) run
+_DATETIME_TAGS = [
+    "AcquisitionDate",
+    "AcquisitionTime",
+    "AcquisitionDateTime",
+    "SeriesDate",
+    "SeriesTime",
+    # makes the datetimes timezone-aware, so they must be read consistently
+    "TimezoneOffsetFromUTC",
+]
+
+
+def get_acquisition_timestamps(dicom_list: list[str]) -> list[datetime.datetime]:
+    """Return the acquisition timestamps of the files in `dicom_list`.
+
+    As established by :func:`get_datetime_from_dcm`, in `dicom_list` order,
+    skipping files without a (parseable) date/time.  Files which only have
+    the series' (start) date/time are skipped too, unless no file has an
+    acquisition date/time.
+    """
+    timestamps = []
+    series_timestamps = []
+    for fn in dicom_list:
+        dcm_data = dcm.dcmread(
+            fn, stop_before_pixels=True, force=True, specific_tags=_DATETIME_TAGS
+        )
+        try:
+            dt = get_datetime_from_dcm(dcm_data)
+        except ValueError as exc:
+            # a malformed date/time string in this file should not abort
+            # the whole (best-effort) collection -- just skip it
+            lgr.warning("Failed to parse acquisition datetime from %s: %s", fn, exc)
+            continue
+        if dt is None:
+            continue
+        if _has_value(dcm_data, "AcquisitionDate", "AcquisitionTime") or _has_value(
+            dcm_data, "AcquisitionDateTime"
+        ):
+            timestamps.append(dt)
+        else:
+            series_timestamps.append(dt)
+    if timestamps and series_timestamps:
+        lgr.debug(
+            "Ignoring %d file(s) with only the series' date/time among %d "
+            "with an acquisition date/time",
+            len(series_timestamps),
+            len(timestamps),
+        )
+    return timestamps or series_timestamps
+
+
+def estimate_scan_duration_from_times(
+    dicom_list: list[str],
+    timestamps: Optional[list[datetime.datetime]] = None,
+) -> Optional[float]:
+    """Estimate a run's total duration from per-file acquisition timestamps.
+
+    The span between the earliest and latest timestamp (see
+    :func:`get_acquisition_timestamps`) across `dicom_list`, plus one median
+    inter-timestamp interval to account for the last timestamp marking the
+    *onset*, not the end, of the final volume/slice. Returns None if fewer
+    than two distinct timestamps could be established.
+
+    `timestamps`, if given, must be what :func:`get_acquisition_timestamps`
+    returns for `dicom_list`; it saves re-reading the files when the caller
+    already has them.
+    """
+    if timestamps is None:
+        timestamps = get_acquisition_timestamps(dicom_list)
+    unique_timestamps = sorted(set(timestamps))
+    if len(unique_timestamps) < 2:
+        return None
+    intervals = [
+        (t2 - t1).total_seconds()
+        for t1, t2 in zip(unique_timestamps[:-1], unique_timestamps[1:])
+    ]
+    # statistics.median() (not a hand-rolled "middle of the sorted list")
+    # to get the *true* median -- averaging the two middle values -- when
+    # there is an even number of intervals
+    median_interval = statistics.median(intervals)
+    return (unique_timestamps[-1] - unique_timestamps[0]).total_seconds() + (
+        median_interval
+    )
+
+
+def get_acquisition_duration(
+    dicom_list: list[str],
+    timestamps: Optional[list[datetime.datetime]] = None,
+) -> Optional[float]:
+    """Determine the total wallclock duration, in seconds, of a run.
+
+    `dicom_list` should ideally be every DICOM file belonging to the run (a
+    single representative file also works, but then only
+    :func:`get_dicom_acquisition_duration` has a chance of succeeding).
+    Tries, in order: the standard/GE DICOM tag, per-file timestamps, then
+    Siemens' own declared duration as a last resort -- but only for a
+    genuinely single-volume protocol, to avoid overstating a truncated or
+    aborted multi-volume acquisition (see the code below for the exact
+    conditions). `timestamps` is passed through to
+    :func:`estimate_scan_duration_from_times`. Returns None if nothing
+    succeeds.
+    """
+    if not dicom_list:
+        return None
+    dcm_data = dcm.dcmread(dicom_list[0], stop_before_pixels=True, force=True)
+    duration = get_dicom_acquisition_duration(dcm_data)
+    if duration is not None:
+        return duration
+    duration = estimate_scan_duration_from_times(dicom_list, timestamps=timestamps)
+    if duration is not None:
+        return duration
+    if get_dicom_declared_repetitions(dcm_data) > 0:
+        lgr.warning(
+            "Could not establish a duration for %s from timestamps, and its "
+            "protocol declares more than one volume -- this looks like a "
+            "truncated/aborted acquisition, so not using Siemens' declared "
+            "total scan time, which would reflect the full planned protocol "
+            "rather than the actual partial acquisition",
+            dicom_list[0],
+        )
+        return None
+    return get_dicom_declared_acquisition_duration(dcm_data)
 
 
 def compress_dicoms(
@@ -852,7 +1046,7 @@ def parse_private_csa_header(
         ]["items"][0]
         csastr = csastr.replace("### ASCCONV BEGIN", "### ASCCONV BEGIN ### ")
         parsedhdr = dsextract.parse_phoenix_prot("MrPhoenixProtocol", csastr)
-        val = parsedhdr[private_attr].replace(" ", "")
+        val = str(parsedhdr[private_attr]).replace(" ", "")
     except Exception as e:
         lgr.debug("Failed to parse CSA header: %s", str(e))
         val = default or ""
