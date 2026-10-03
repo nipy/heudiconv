@@ -516,7 +516,7 @@ def save_scans_key(
     # all bids_files of this item share the same source DICOMs, so the row
     # (including the possibly-expensive `duration` estimation) is the same
     # for every one of them -- compute it once rather than per file
-    scan_key_row, acq_datetime = _get_scans_key_row_and_acq_datetime(item[-1])
+    scan_key_row, timestamps = _get_scans_key_row_and_timestamps(item[-1])
     for bids_file in bids_files:
         # get filenames
         f_name = "/".join(bids_file.split("/")[-2:])
@@ -544,12 +544,14 @@ def save_scans_key(
         ses = ses_
     try:
         check_acq_time_congruency(
-            acq_datetime,
+            min(timestamps) if timestamps else None,
             [f for f in bids_files if f.endswith(".json")],
             label=op.basename(item[0]),
+            timestamps=timestamps,
+            fix=True,
         )
     except Exception as exc:
-        # purely diagnostic -- must never abort a conversion
+        # must never abort a conversion
         lgr.warning("Failed to check acq_time of %s: %s", item[0], exc)
     # where should we store it?
     output_dir = op.dirname(op.dirname(bids_file))
@@ -698,14 +700,16 @@ def get_formatted_scans_key_row(
         [ISO acquisition time, duration in seconds (or 'n/a'), performing
         physician name, random string]
     """
-    return _get_scans_key_row_and_acq_datetime(dcm_fns)[0]
+    return _get_scans_key_row_and_timestamps(dcm_fns)[0]
 
 
-def _get_scans_key_row_and_acq_datetime(
+def _get_scans_key_row_and_timestamps(
     dcm_fns: str | Path | Sequence[str | Path],
-) -> tuple[list[str], Optional[datetime.datetime]]:
-    """Return what :func:`get_formatted_scans_key_row` does, plus the
-    datetime reported as `acq_time` (None if it could not be established)."""
+) -> tuple[list[str], list[datetime.datetime]]:
+    """Return the `_scans.tsv` row, plus the run's DICOM timestamps.
+
+    `acq_time` is the earliest of those timestamps.
+    """
     if isinstance(dcm_fns, (str, Path)):
         dcm_fns = [dcm_fns]
     dcm_fn_strs: list[str] = [str(f) for f in dcm_fns]
@@ -738,7 +742,7 @@ def _get_scans_key_row_and_acq_datetime(
     # empty entries should be 'n/a'
     # https://github.com/dartmouth-pbs/heudiconv/issues/32
     row = ["n/a" if not str(e) else e for e in row]
-    return row, acq_datetime
+    return row, timestamps
 
 
 def _get_sidecar_acquisition_datetime(
@@ -771,17 +775,20 @@ def check_acq_time_congruency(
     acq_datetime: Optional[datetime.datetime],
     json_files: Sequence[str],
     label: str,
+    timestamps: Sequence[datetime.datetime] = (),
+    fix: bool = False,
 ) -> None:
-    """Warn if `acq_time` disagrees with dcm2niix's own sidecar AcquisitionTime.
+    """Check `acq_time` against dcm2niix's sidecar `AcquisitionTime`, fixing it if `fix`.
 
-    `acq_time` is now the earliest acquisition timestamp across the run's
-    own DICOMs (see :func:`get_formatted_scans_key_row`), but dcm2niix's
-    sidecar `AcquisitionTime` is computed independently by dcm2niix itself,
-    and can be biased by the same interleaved-multiband-slice issue heudiconv
-    just fixed on its own side (see
-    https://github.com/nipy/heudiconv/issues/876 and
-    https://github.com/rordenlab/dcm2niix/issues/1039) -- so the two are
-    worth cross-checking. Nothing is changed; this is purely diagnostic.
+    `acq_time` is the earliest acquisition timestamp across the run's DICOMs
+    (`timestamps`, see :func:`get_formatted_scans_key_row`), whereas dcm2niix
+    records that of the first DICOM in its own order, which can be later
+    (https://github.com/nipy/heudiconv/issues/876,
+    https://github.com/rordenlab/dcm2niix/issues/1039).  When that is
+    unambiguously what happened -- `acq_time` is the earliest of
+    `timestamps`, and all `json_files` record the same `AcquisitionTime`,
+    one of the later `timestamps` -- the sidecars are corrected in place if
+    `fix`.  Any other disagreement is only warned about.
 
     Parameters
     ----------
@@ -791,33 +798,80 @@ def check_acq_time_congruency(
     json_files: sequence of str
         JSON sidecars produced for the run.
     label: str
-        What to refer to the run as in the warning, e.g. its file name.
+        What to refer to the run as in the log, e.g. its file name.
+    timestamps: sequence of datetime, optional
+        Acquisition timestamps of all DICOMs of the run.  Without them,
+        nothing is considered unambiguous enough to fix.
+    fix: bool, optional
+        Whether to correct the sidecars when unambiguous.
     """
     if acq_datetime is None:
         return
 
-    # dcm2niix may split a series into several outputs (e.g. echoes, or
-    # localizer planes) with legitimately different AcquisitionTimes -- the
-    # earliest of them is what corresponds to acq_time
-    sidecar_times = [
-        (dt, json_file)
+    def close(dt1: datetime.datetime, dt2: datetime.datetime) -> bool:
+        return abs(dt1 - dt2) <= ACQ_TIME_TOLERANCE
+
+    sidecar_times = {
+        json_file: dt
         for json_file in json_files
         if (dt := _get_sidecar_acquisition_datetime(json_file, acq_datetime))
         is not None
-    ]
+    }
     if not sidecar_times:
         return
-    sidecar_datetime, json_file = min(sidecar_times)
-    if abs(sidecar_datetime - acq_datetime) > ACQ_TIME_TOLERANCE:
-        lgr.warning(
-            "%s: acq_time %s disagrees with AcquisitionTime %s (%+.6f "
-            "seconds) recorded by dcm2niix in %s",
+    # dcm2niix may split a series into several outputs (e.g. echoes, or
+    # localizer planes) with legitimately different AcquisitionTimes -- the
+    # earliest of them is what corresponds to acq_time
+    json_file, sidecar_datetime = min(sidecar_times.items(), key=lambda i: i[1])
+    if close(sidecar_datetime, acq_datetime):
+        return
+    fixable = (
+        bool(timestamps)
+        and close(acq_datetime, min(timestamps))
+        and len(sidecar_times) == len(json_files)
+        and all(close(dt, sidecar_datetime) for dt in sidecar_times.values())
+        and any(close(sidecar_datetime, t) for t in timestamps)
+    )
+    if fixable and fix:
+        acq_time_str = acq_datetime.strftime("%H:%M:%S.%f")
+        for f in sidecar_times:
+            _set_sidecar_acquisition_time(f, acq_time_str)
+        lgr.info(
+            "%s: corrected AcquisitionTime recorded by dcm2niix from %s to "
+            "%s, the earliest of its DICOMs, in %s -- see "
+            "https://github.com/rordenlab/dcm2niix/issues/1039",
             label,
-            acq_datetime.time().isoformat(),
             sidecar_datetime.time().isoformat(),
-            (sidecar_datetime - acq_datetime).total_seconds(),
-            op.basename(json_file),
+            acq_time_str,
+            ", ".join(op.basename(f) for f in sidecar_times),
         )
+        return
+    lgr.warning(
+        "%s: acq_time %s disagrees with AcquisitionTime %s (%+.6f "
+        "seconds) recorded by dcm2niix in %s%s",
+        label,
+        acq_datetime.time().isoformat(),
+        sidecar_datetime.time().isoformat(),
+        (sidecar_datetime - acq_datetime).total_seconds(),
+        op.basename(json_file),
+        (
+            " -- `heudiconv --command populate-scans-duration --overwrite "
+            "--fix-acq-time` would fix it"
+            if fixable
+            else ""
+        ),
+    )
+
+
+def _set_sidecar_acquisition_time(json_file: str, acq_time: str) -> None:
+    """Set `AcquisitionTime` in `json_file`, keeping it read-only if it was."""
+    json_ = load_json(json_file)
+    json_["AcquisitionTime"] = acq_time
+    was_readonly = is_readonly(json_file)
+    # save_json() replaces the file (or e.g. a git-annex symlink) altogether
+    save_json(json_file, json_)
+    if was_readonly:
+        set_readonly(json_file)
 
 
 def _find_bids_dataset_root(path: str) -> str:
@@ -833,10 +887,10 @@ def _find_bids_dataset_root(path: str) -> str:
         current = parent
 
 
-def _duration_and_earliest_from_dicom_tarball(
+def _duration_and_timestamps_from_dicom_tarball(
     tarball: str,
-) -> tuple[Optional[float], Optional[datetime.datetime]]:
-    """Compute acquisition duration, and the earliest acquisition timestamp,
+) -> tuple[Optional[float], list[datetime.datetime]]:
+    """Compute acquisition duration, and the acquisition timestamps,
     from a heudiconv-produced sourcedata DICOM tarball.
 
     See :func:`heudiconv.dicoms.compress_dicoms` for how it's produced.
@@ -846,11 +900,10 @@ def _duration_and_earliest_from_dicom_tarball(
         dicom_files = sorted(str(p) for p in Path(tmpdir).rglob("*") if p.is_file())
         if not dicom_files:
             lgr.warning("No files found within %s", tarball)
-            return None, None
+            return None, []
         timestamps = dicoms.get_acquisition_timestamps(dicom_files)
         duration = dicoms.get_acquisition_duration(dicom_files, timestamps=timestamps)
-        earliest = min(timestamps) if timestamps else None
-        return duration, earliest
+        return duration, timestamps
 
 
 def _nifti_stem(nifti_fn: str) -> str:
@@ -1025,20 +1078,20 @@ def _duration_from_nifti_sidecar(
 
 def _get_retrospective_duration(
     nifti_fn: str, bids_root: str
-) -> tuple[Optional[float], Optional[datetime.datetime]]:
+) -> tuple[Optional[float], list[datetime.datetime]]:
     """Best-effort acquisition duration for an already-converted BIDS scan,
-    plus the earliest acquisition timestamp across its source DICOMs.
+    plus the acquisition timestamps of its source DICOMs.
 
     Tries the heudiconv-produced sourcedata DICOM tarball first, then falls
-    back to the NIfTI + JSON sidecar for `duration` alone -- the earliest
-    timestamp needs the actual DICOMs, so it is None whenever no tarball is
-    found or it yields nothing.
+    back to the NIfTI + JSON sidecar for `duration` alone -- the timestamps
+    need the actual DICOMs, so they are empty whenever no tarball is found
+    or it yields nothing.
     """
     rel = op.relpath(nifti_fn, bids_root)
     tarball = op.join(bids_root, "sourcedata", _nifti_stem(rel) + ".dicom.tgz")
     if op.exists(tarball):
         try:
-            duration, earliest = _duration_and_earliest_from_dicom_tarball(tarball)
+            duration, timestamps = _duration_and_timestamps_from_dicom_tarball(tarball)
         except Exception as exc:
             # a corrupt archive, an extraction-filter rejection, or a
             # malformed DICOM inside it must not abort backfilling this
@@ -1050,15 +1103,15 @@ def _get_retrospective_duration(
                 nifti_fn,
                 exc,
             )
-            duration, earliest = None, None
+            duration, timestamps = None, []
         if duration is not None:
-            return duration, earliest
+            return duration, timestamps
         lgr.debug(
             "Could not establish duration from source DICOMs %s for %s",
             tarball,
             nifti_fn,
         )
-    return _duration_from_nifti_sidecar(nifti_fn, bids_root), None
+    return _duration_from_nifti_sidecar(nifti_fn, bids_root), []
 
 
 def populate_scans_duration(
@@ -1084,7 +1137,9 @@ def populate_scans_duration(
     reach it. With `fix_acq_time`, `acq_time` itself is also overwritten
     with that re-derived value -- off by default since, unlike `duration`,
     `acq_time` is never blank, so this overwrites a value downstream
-    analyses may already key off of.
+    analyses may already key off of.  The same goes for the JSON sidecar's
+    `AcquisitionTime`, as recorded by dcm2niix: with `fix_acq_time` it is
+    corrected too, where unambiguous (see :func:`check_acq_time_congruency`).
     """
     if op.isfile(path):
         scans_tsvs = [path] if path.endswith("_scans.tsv") else []
@@ -1192,7 +1247,8 @@ def _populate_scans_duration_file(
                 stored_dt = strptime_bids(acq_time)
             except ValueError:
                 pass
-        duration, earliest = _get_retrospective_duration(nifti_fn, bids_root)
+        duration, timestamps = _get_retrospective_duration(nifti_fn, bids_root)
+        earliest = min(timestamps) if timestamps else None
         new_value = _format_duration(duration)
         if row.get("duration") != new_value:
             changed = True
@@ -1218,11 +1274,18 @@ def _populate_scans_duration_file(
                 stored_dt = earliest
         try:
             json_fn = _find_json_sidecar(nifti_fn, bids_root)
+            # never touch (or suggest fixing) an inherited sidecar, which is
+            # shared with other scans
+            own_sidecar = json_fn == _nifti_stem(nifti_fn) + ".json"
             check_acq_time_congruency(
-                stored_dt, [json_fn] if json_fn else [], label=filename
+                stored_dt,
+                [json_fn] if json_fn else [],
+                label=filename,
+                timestamps=timestamps if own_sidecar else (),
+                fix=fix_acq_time and own_sidecar,
             )
         except Exception as exc:
-            # purely diagnostic -- must never abort the backfill
+            # must never abort the backfill
             lgr.warning("Failed to check acq_time of %s: %s", filename, exc)
 
     if changed:

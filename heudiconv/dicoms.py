@@ -550,16 +550,23 @@ def get_datetime_from_dcm(dcm_data: dcm.Dataset) -> Optional[datetime.datetime]:
 
     """
 
-    def check_tag(x: str) -> bool:
-        return x in dcm_data and dcm_data[x].value.strip()
-
-    if check_tag("AcquisitionDate") and check_tag("AcquisitionTime"):
+    if _has_value(dcm_data, "AcquisitionDate", "AcquisitionTime"):
         return strptime_dcm_da_tm(dcm_data, "AcquisitionDate", "AcquisitionTime")
-    if check_tag("AcquisitionDateTime"):
+    if _has_value(dcm_data, "AcquisitionDateTime"):
         return strptime_dcm_dt(dcm_data, "AcquisitionDateTime")
-    if check_tag("SeriesDate") and check_tag("SeriesTime"):
+    if _has_value(dcm_data, "SeriesDate", "SeriesTime"):
         return strptime_dcm_da_tm(dcm_data, "SeriesDate", "SeriesTime")
     return None
+
+
+def _has_value(dcm_data: dcm.Dataset, *tags: str) -> bool:
+    """Return True if all `tags` are present in `dcm_data` with non-blank values."""
+    return all(
+        tag in dcm_data
+        and dcm_data[tag].value is not None
+        and str(dcm_data[tag].value).strip()
+        for tag in tags
+    )
 
 
 def get_datetime_strings_from_dcm(
@@ -668,10 +675,15 @@ _DATETIME_TAGS = [
 
 
 def get_acquisition_timestamps(dicom_list: list[str]) -> list[datetime.datetime]:
-    """Collect the acquisition timestamp (see :func:`get_datetime_from_dcm`)
-    of every file in `dicom_list`, skipping files for which none could be
-    established (missing or malformed date/time)."""
+    """Return the acquisition timestamps of the files in `dicom_list`.
+
+    As established by :func:`get_datetime_from_dcm`, in `dicom_list` order,
+    skipping files without a (parseable) date/time.  Files which only have
+    the series' (start) date/time are skipped too, unless no file has an
+    acquisition date/time.
+    """
     timestamps = []
+    series_timestamps = []
     for fn in dicom_list:
         dcm_data = dcm.dcmread(
             fn, stop_before_pixels=True, force=True, specific_tags=_DATETIME_TAGS
@@ -683,9 +695,22 @@ def get_acquisition_timestamps(dicom_list: list[str]) -> list[datetime.datetime]
             # the whole (best-effort) collection -- just skip it
             lgr.warning("Failed to parse acquisition datetime from %s: %s", fn, exc)
             continue
-        if dt is not None:
+        if dt is None:
+            continue
+        if _has_value(dcm_data, "AcquisitionDate", "AcquisitionTime") or _has_value(
+            dcm_data, "AcquisitionDateTime"
+        ):
             timestamps.append(dt)
-    return timestamps
+        else:
+            series_timestamps.append(dt)
+    if timestamps and series_timestamps:
+        lgr.debug(
+            "Ignoring %d file(s) with only the series' date/time among %d "
+            "with an acquisition date/time",
+            len(series_timestamps),
+            len(timestamps),
+        )
+    return timestamps or series_timestamps
 
 
 def estimate_scan_duration_from_times(
