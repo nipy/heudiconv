@@ -359,7 +359,7 @@ def tuneup_bids_json_files(json_files: list[str]) -> None:
         # freshly produced
         assert HEUDICONV_VERSION_JSON_KEY not in json_
         json_[HEUDICONV_VERSION_JSON_KEY] = str(__version__)
-        save_json(jsonfile, json_)
+        save_json(jsonfile, json_, pretty=True)
 
     # Load the beast
     seqtype = op.basename(op.dirname(jsonfile))
@@ -390,7 +390,7 @@ def tuneup_bids_json_files(json_files: list[str]) -> None:
             was_readonly = is_readonly(json_phasediffname)
             if was_readonly:
                 set_readonly(json_phasediffname, False)
-            save_json(json_phasediffname, json_)
+            save_json(json_phasediffname, json_, pretty=True)
             if was_readonly:
                 set_readonly(json_phasediffname)
 

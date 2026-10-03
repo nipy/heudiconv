@@ -50,6 +50,7 @@ from heudiconv.bids import (
     sanitize_label,
     select_fmap_from_compatible_groups,
     treat_age,
+    tuneup_bids_json_files,
 )
 from heudiconv.cli.run import main as runner
 from heudiconv.dicoms import compress_dicoms
@@ -2686,3 +2687,23 @@ def test_populate_bids_templates_syncs_existing_scans_json(tmp_path: Path) -> No
     assert "duration" in scans_json
     assert scans_json["acq_time"] == {"Description": "old"}  # untouched
     assert scans_json["MyCustomField"] == {"Description": "x"}  # untouched
+
+
+@pytest.mark.ai_generated
+def test_tuneup_bids_json_files_writes_pretty_json(tmp_path: Path) -> None:
+    # tuneup_bids_json_files() rewrites every sidecar it touches (to strip
+    # date fields and stamp the heudiconv version), so without pretty=True
+    # a long numeric array (e.g. ShimSetting, bvecs/bvals-adjacent fields)
+    # gets reformatted one value per line -- a huge, pure-noise diff on
+    # datasets re-converted across heudiconv versions, unrelated to any
+    # actual change in the values themselves
+    json_fn = tmp_path / "sub-01_task-rest_bold.json"
+    save_json(str(json_fn), {"ShimSetting": [1, 2, 3, 4, 5, 6, 7, 8]}, pretty=True)
+
+    tuneup_bids_json_files([str(json_fn)])
+
+    # the array must stay collapsed on one line, not one value per line
+    lines = json_fn.read_text().splitlines()
+    assert sum("ShimSetting" in line for line in lines) == 1
+    assert [line for line in lines if "ShimSetting" in line][0].count(",") == 7
+    assert load_json(str(json_fn))["ShimSetting"] == [1, 2, 3, 4, 5, 6, 7, 8]
