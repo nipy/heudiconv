@@ -401,12 +401,13 @@ def test_safe_tar_members_rejects_escaping_members(tmp_path: Path) -> None:
 
 
 @pytest.mark.ai_generated
-def test_safe_tar_members_hardlink_target_relative_to_dest(tmp_path: Path) -> None:
-    # unlike a symlink's, a tar hard link's target is a path relative to
-    # the archive root (`dest`), not to the member's own directory -- so
-    # `dir/link` -> `good.txt` is safe (resolves to `dest/good.txt`), while
-    # the naive dirname-relative interpretation would wrongly resolve it
-    # (and a `../outside` target must be rejected either way)
+def test_safe_tar_members_rejects_every_link(tmp_path: Path) -> None:
+    # a per-member check cannot safely tell a link apart from one that is
+    # only safe-looking in isolation but escapes dest once a chain of
+    # links is actually extracted (e.g. a -> ".", a/b -> "..", then a
+    # regular file "b/evil") -- this manual fallback (old Python only; see
+    # safe_extract_tar) closes that gap by rejecting every link member,
+    # not just ones that individually resolve outside dest
     import tarfile
 
     dest = tmp_path / "dest"
@@ -418,10 +419,10 @@ def test_safe_tar_members_hardlink_target_relative_to_dest(tmp_path: Path) -> No
         good.size = 5
         tar.addfile(good, io.BytesIO(b"hello"))
 
-        safe_hardlink = tarfile.TarInfo("dir/link")
-        safe_hardlink.type = tarfile.LNKTYPE
-        safe_hardlink.linkname = "good.txt"
-        tar.addfile(safe_hardlink)
+        safe_looking_hardlink = tarfile.TarInfo("dir/link")
+        safe_looking_hardlink.type = tarfile.LNKTYPE
+        safe_looking_hardlink.linkname = "good.txt"
+        tar.addfile(safe_looking_hardlink)
 
         escaping_hardlink = tarfile.TarInfo("dir/evil-link")
         escaping_hardlink.type = tarfile.LNKTYPE
@@ -431,7 +432,7 @@ def test_safe_tar_members_hardlink_target_relative_to_dest(tmp_path: Path) -> No
     with tarfile.open(tarball) as tar:
         safe = _safe_tar_members(tar, str(dest))
 
-    assert [m.name for m in safe] == ["good.txt", "dir/link"]
+    assert [m.name for m in safe] == ["good.txt"]
 
 
 @pytest.mark.ai_generated
@@ -480,3 +481,22 @@ def test_safe_extract_tar_manual_fallback_when_filter_unsupported(
     assert (dest / "good.txt").read_text() == "hello"
     assert not (tmp_path / "escaped.txt").exists()
     assert "vetting members" in caplog.text
+
+
+@pytest.mark.ai_generated
+def test_safe_extract_tar_filter_error_mentions_env_var(tmp_path: Path) -> None:
+    # the native "data" filter already names the offending member in its
+    # own exception; augment it with the HEUDICONV_TAR_FILTER escape hatch
+    # rather than leaving the caller to guess one exists
+    import tarfile
+
+    tarball = tmp_path / "evil.tar"
+    with tarfile.open(tarball, "w") as tar:
+        symlink = tarfile.TarInfo("link")
+        symlink.type = tarfile.SYMTYPE
+        symlink.linkname = "/etc/passwd"
+        tar.addfile(symlink)
+
+    dest = tmp_path / "dest"
+    with pytest.raises(tarfile.FilterError, match="HEUDICONV_TAR_FILTER"):
+        safe_extract_tar(str(tarball), str(dest))

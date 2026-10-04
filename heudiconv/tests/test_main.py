@@ -262,6 +262,42 @@ def test_get_formatted_scans_key_row_acq_time_is_earliest_timestamp(
     ) <= datetime.timedelta(milliseconds=1)
 
 
+@pytest.mark.ai_generated
+def test_get_formatted_scans_key_row_mixed_timezone_awareness(tmp_path: Path) -> None:
+    # Regression test for a real pre-merge review finding on PR #872: real
+    # DICOMs of the same run do not always agree on carrying
+    # TimezoneOffsetFromUTC -- this must not raise and abort conversion.
+    import pydicom as dcm
+
+    dicom_list = make_timed_dicoms(tmp_path, [2, 0, 4, 7], tz_offset="+0100")
+    dcm_data = dcm.dcmread(dicom_list[1], stop_before_pixels=True)
+    del dcm_data.TimezoneOffsetFromUTC
+    dcm.dcmwrite(dicom_list[1], dcm_data)
+
+    row = get_formatted_scans_key_row(dicom_list)  # must not raise
+    assert row[0] == "2020-01-01T12:00:00"
+    assert float(row[1]) == pytest.approx(9.0)
+
+
+@pytest.mark.ai_generated
+def test_get_formatted_scans_key_row_tolerates_unexpected_failure(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # the acq_time/duration estimate is best-effort and must never abort
+    # conversion over an unexpected failure (e.g. a pydicom/data edge case
+    # not otherwise anticipated) -- it degrades to 'n/a' with a warning
+    dicom_list = sorted(glob("%s/b0dwiForFmap/*.dcm" % TESTS_DATA_PATH))
+    caplog.set_level(logging.WARNING, logger="heudiconv.bids")
+    with patch(
+        "heudiconv.dicoms.get_acquisition_timestamps",
+        side_effect=RuntimeError("boom"),
+    ):
+        row = get_formatted_scans_key_row(dicom_list)  # must not raise
+    assert row[0] == "n/a"
+    assert row[1] == "n/a"
+    assert "Failed to determine acq_time/duration" in caplog.text
+
+
 # TODO: finish this
 def test_add_rows_to_scans_keys_file(tmp_path: Path) -> None:
     fn = opj(tmp_path, "file.tsv")

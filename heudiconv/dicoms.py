@@ -710,7 +710,40 @@ def get_acquisition_timestamps(dicom_list: list[str]) -> list[datetime.datetime]
             len(series_timestamps),
             len(timestamps),
         )
-    return timestamps or series_timestamps
+    result = timestamps or series_timestamps
+    # DICOMs of one run should agree on carrying TimezoneOffsetFromUTC or
+    # not, but when they don't, comparing the resulting mix of aware and
+    # naive datetimes raises TypeError -- fall back to comparing all of
+    # them as local wall-clock time rather than letting that happen
+    if len({dt.tzinfo is None for dt in result}) > 1:
+        lgr.warning(
+            "Only some of %d files have a timezone-aware acquisition "
+            "timestamp (DICOM TimezoneOffsetFromUTC present on some but "
+            "not others) -- comparing all of them as timezone-naive",
+            len(result),
+        )
+        result = [dt.replace(tzinfo=None) for dt in result]
+    return result
+
+
+def _timestamp_span_and_median_interval(
+    timestamps: list[datetime.datetime],
+) -> Optional[tuple[float, float]]:
+    """Return (span, median inter-timestamp interval), in seconds, across
+    the distinct `timestamps`. None if fewer than two are distinct."""
+    unique_timestamps = sorted(set(timestamps))
+    if len(unique_timestamps) < 2:
+        return None
+    intervals = [
+        (t2 - t1).total_seconds()
+        for t1, t2 in zip(unique_timestamps[:-1], unique_timestamps[1:])
+    ]
+    # statistics.median() (not a hand-rolled "middle of the sorted list")
+    # to get the *true* median -- averaging the two middle values -- when
+    # there is an even number of intervals
+    median_interval = statistics.median(intervals)
+    span = (unique_timestamps[-1] - unique_timestamps[0]).total_seconds()
+    return span, median_interval
 
 
 def estimate_scan_duration_from_times(
@@ -731,20 +764,11 @@ def estimate_scan_duration_from_times(
     """
     if timestamps is None:
         timestamps = get_acquisition_timestamps(dicom_list)
-    unique_timestamps = sorted(set(timestamps))
-    if len(unique_timestamps) < 2:
+    span_and_median = _timestamp_span_and_median_interval(timestamps)
+    if span_and_median is None:
         return None
-    intervals = [
-        (t2 - t1).total_seconds()
-        for t1, t2 in zip(unique_timestamps[:-1], unique_timestamps[1:])
-    ]
-    # statistics.median() (not a hand-rolled "middle of the sorted list")
-    # to get the *true* median -- averaging the two middle values -- when
-    # there is an even number of intervals
-    median_interval = statistics.median(intervals)
-    return (unique_timestamps[-1] - unique_timestamps[0]).total_seconds() + (
-        median_interval
-    )
+    span, median_interval = span_and_median
+    return span + median_interval
 
 
 def get_acquisition_duration(
@@ -760,7 +784,11 @@ def get_acquisition_duration(
     Siemens' own declared duration as a last resort -- but only for a
     genuinely single-volume protocol, to avoid overstating a truncated or
     aborted multi-volume acquisition (see the code below for the exact
-    conditions). `timestamps` is passed through to
+    conditions). The DICOM tag itself is cross-checked against the
+    timestamps when available, and ignored in favor of the timestamp
+    estimate if it is far larger than their span -- it otherwise reflects
+    the full planned protocol even for a truncated/aborted acquisition.
+    `timestamps` is passed through to
     :func:`estimate_scan_duration_from_times`. Returns None if nothing
     succeeds.
     """
@@ -769,6 +797,28 @@ def get_acquisition_duration(
     dcm_data = dcm.dcmread(dicom_list[0], stop_before_pixels=True, force=True)
     duration = get_dicom_acquisition_duration(dcm_data)
     if duration is not None:
+        if timestamps is None:
+            timestamps = get_acquisition_timestamps(dicom_list)
+        span_and_median = _timestamp_span_and_median_interval(timestamps)
+        if span_and_median is not None:
+            span, median_interval = span_and_median
+            # the tag reflects the full planned protocol, not a truncated
+            # or aborted acquisition -- a generous margin (one more median
+            # interval beyond the normal span + 1 estimate) avoids
+            # second-guessing a merely slightly-longer-than-expected tag
+            if duration > span + 2 * median_interval:
+                lgr.warning(
+                    "%s: AcquisitionDuration tag declares %.3fs, far more "
+                    "than the %.3fs spanned by its %d distinct acquisition "
+                    "timestamps -- likely a truncated/aborted multi-volume "
+                    "acquisition reporting the full planned protocol "
+                    "duration; using the timestamp-based estimate instead",
+                    dicom_list[0],
+                    duration,
+                    span,
+                    len(set(timestamps)),
+                )
+                return span + median_interval
         return duration
     duration = estimate_scan_duration_from_times(dicom_list, timestamps=timestamps)
     if duration is not None:

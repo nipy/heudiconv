@@ -52,6 +52,13 @@ lgr = logging.getLogger(__name__)
 # when printing its AcquisitionTime, so allow for rounding
 ACQ_TIME_TOLERANCE = datetime.timedelta(milliseconds=1)
 
+# A gap between a stored acq_time and one re-derived from source DICOMs
+# beyond this is not the few-second interleaved-slice bias the retrospective
+# backfill's congruency check targets (see ACQ_TIME_TOLERANCE's use in
+# _populate_scans_duration_file) -- more likely the dataset's dates were
+# deliberately shifted for anonymization
+ACQ_TIME_DATE_SHIFT_THRESHOLD = datetime.timedelta(hours=12)
+
 # Fields to be populated in _scans files. Order matters
 SCANS_FILE_FIELDS = OrderedDict(
     [
@@ -570,7 +577,16 @@ def _sync_scans_json_fields(scans_json: str) -> None:
     """
     if not op.lexists(scans_json):
         return
-    meta = load_json(scans_json)
+    try:
+        meta = load_json(scans_json)
+        if not isinstance(meta, dict):
+            raise ValueError(f"{scans_json} does not contain a JSON object")
+    except Exception as exc:
+        # scans_json is arbitrary, possibly user-edited (or an unfetched
+        # git-annex placeholder) data, so a read/parse failure must not
+        # abort conversion -- just leave it as-is
+        lgr.warning("Failed to load %s to sync its fields: %s", scans_json, exc)
+        return
     missing = {k: v for k, v in SCANS_FILE_FIELDS.items() if k not in meta}
     if missing:
         meta.update(missing)
@@ -611,16 +627,17 @@ def _read_scans_tsv(
 
 
 def add_rows_to_scans_keys_file(fn: str, newrows: dict[str, list[str]]) -> None:
-    """Add new rows to the _scans file.
+    """Add or refresh rows in the _scans file.
 
     Parameters
     ----------
     fn: str
       filename
     newrows: dict
-      extra rows to add (acquisition time, duration, referring physician,
-      random string), in the order of ``SCANS_FILE_FIELDS`` (excluding
-      "filename")
+      rows to add or, for a file already in `fn` (e.g. re-converted with
+      `--overwrite`), replace (acquisition time, duration, referring
+      physician, random string), in the order of ``SCANS_FILE_FIELDS``
+      (excluding "filename")
     """
     canonical = list(SCANS_FILE_FIELDS.keys())
     header = canonical
@@ -646,9 +663,13 @@ def add_rows_to_scans_keys_file(fn: str, newrows: dict[str, list[str]]) -> None:
                     k: v for k, v in row.items() if k != "filename"
                 }
 
-        newrows_key = newrows.keys()
-        newrows_toadd = list(set(newrows_key) - set(fnames2info.keys()))
-        for key_toadd in newrows_toadd:
+        # newrows reflects a file just (re-)converted, so it is always
+        # authoritative for any filename it carries -- replacing a stale
+        # existing row for a file re-converted with --overwrite, not just
+        # adding rows for genuinely new files (otherwise e.g. a corrected
+        # sidecar AcquisitionTime and the _scans.tsv acq_time it was
+        # corrected against would disagree after re-conversion)
+        for key_toadd in newrows:
             fnames2info[key_toadd] = dict(zip(canonical[1:], newrows[key_toadd]))
         # remove
         os.unlink(fn)
@@ -669,14 +690,17 @@ def add_rows_to_scans_keys_file(fn: str, newrows: dict[str, list[str]]) -> None:
         [filename] + [_value_or_na(info.get(col)) for col in header[1:]]
         for filename, info in fnames2info.items()
     ]
-    # sort by the date/filename
+    # sort by the date/filename -- acq_time's position in a row matches its
+    # position in `header`, which may not be right after "filename" if an
+    # existing file had a custom column inserted before it
+    acq_time_idx = header.index("acq_time") if "acq_time" in header else 1
     try:
-        data_rows_sorted = sorted(data_rows, key=lambda x: (x[1], x[0]))
+        data_rows_sorted = sorted(data_rows, key=lambda x: (x[acq_time_idx], x[0]))
     except TypeError as exc:
         lgr.warning("Sorting scans by date failed: %s", str(exc))
         data_rows_sorted = sorted(data_rows)
     # save
-    with open(fn, "a") as csvfile:
+    with open(fn, "a", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile, delimiter="\t")
         writer.writerows([header] + data_rows_sorted)
 
@@ -719,9 +743,18 @@ def _get_scans_key_row_and_timestamps(
     # interleaved multiband Siemens acquisitions exported one DICOM per
     # slice, that one is not always the earliest-acquired
     # (https://github.com/nipy/heudiconv/issues/876)
-    timestamps = dicoms.get_acquisition_timestamps(dcm_fn_strs)
-    acq_datetime = min(timestamps) if timestamps else None
-    acq_duration = dicoms.get_acquisition_duration(dcm_fn_strs, timestamps=timestamps)
+    try:
+        timestamps = dicoms.get_acquisition_timestamps(dcm_fn_strs)
+        acq_datetime = min(timestamps) if timestamps else None
+        acq_duration = dicoms.get_acquisition_duration(
+            dcm_fn_strs, timestamps=timestamps
+        )
+    except Exception as exc:
+        # must never abort a conversion over a best-effort estimate
+        lgr.warning(
+            "Failed to determine acq_time/duration for %s: %s", dcm_fn_strs[0], exc
+        )
+        timestamps, acq_datetime, acq_duration = [], None, None
     # add random string
     # But let's make it reproducible by using all UIDs
     # (might change across versions?)
@@ -743,6 +776,18 @@ def _get_scans_key_row_and_timestamps(
     # https://github.com/dartmouth-pbs/heudiconv/issues/32
     row = ["n/a" if not str(e) else e for e in row]
     return row, timestamps
+
+
+def _comparable_acq_times(
+    dt1: datetime.datetime, dt2: datetime.datetime
+) -> tuple[datetime.datetime, datetime.datetime]:
+    """Return (dt1, dt2), dropping tzinfo from both if only one of them has
+    it, so two acquisition times derived differently -- e.g. a historical
+    `acq_time` string and one freshly re-derived from DICOMs -- remain
+    comparable as local wall-clock time instead of raising `TypeError`."""
+    if (dt1.tzinfo is None) != (dt2.tzinfo is None):
+        return dt1.replace(tzinfo=None), dt2.replace(tzinfo=None)
+    return dt1, dt2
 
 
 def _get_sidecar_acquisition_datetime(
@@ -809,6 +854,7 @@ def check_acq_time_congruency(
         return
 
     def close(dt1: datetime.datetime, dt2: datetime.datetime) -> bool:
+        dt1, dt2 = _comparable_acq_times(dt1, dt2)
         return abs(dt1 - dt2) <= ACQ_TIME_TOLERANCE
 
     sidecar_times = {
@@ -869,7 +915,7 @@ def _set_sidecar_acquisition_time(json_file: str, acq_time: str) -> None:
     json_["AcquisitionTime"] = acq_time
     was_readonly = is_readonly(json_file)
     # save_json() replaces the file (or e.g. a git-annex symlink) altogether
-    save_json(json_file, json_)
+    save_json(json_file, json_, pretty=True)
     if was_readonly:
         set_readonly(json_file)
 
@@ -1076,20 +1122,43 @@ def _duration_from_nifti_sidecar(
     return tr * nvols
 
 
+def _find_sourcedata_tarball(nifti_fn: str, bids_root: str) -> Optional[str]:
+    """Find the heudiconv-produced sourcedata DICOM tarball for `nifti_fn`.
+
+    Usually named after `nifti_fn`'s own stem, but dcm2niix can split one
+    converted item into several outputs (e.g. ``echo-``, ``magnitude1``/
+    ``2``, ``part-mag``/``phase``) that all share one tarball, named after
+    the item's own prefix rather than any single output's full stem -- the
+    longest-matching-prefix tarball in the same sourcedata directory covers
+    that case too. None if no tarball at all is found.
+    """
+    rel = op.relpath(nifti_fn, bids_root)
+    sourcedata_dir = op.join(bids_root, "sourcedata", op.dirname(rel))
+    stem = _nifti_stem(op.basename(rel))
+    exact = op.join(sourcedata_dir, stem + ".dicom.tgz")
+    if op.exists(exact):
+        return exact
+    candidates = [
+        p
+        for p in glob(op.join(sourcedata_dir, "*.dicom.tgz"))
+        if stem.startswith(op.basename(p)[: -len(".dicom.tgz")])
+    ]
+    return max(candidates, key=len) if candidates else None
+
+
 def _get_retrospective_duration(
     nifti_fn: str, bids_root: str
 ) -> tuple[Optional[float], list[datetime.datetime]]:
     """Best-effort acquisition duration for an already-converted BIDS scan,
     plus the acquisition timestamps of its source DICOMs.
 
-    Tries the heudiconv-produced sourcedata DICOM tarball first, then falls
-    back to the NIfTI + JSON sidecar for `duration` alone -- the timestamps
-    need the actual DICOMs, so they are empty whenever no tarball is found
-    or it yields nothing.
+    Tries the heudiconv-produced sourcedata DICOM tarball first (see
+    :func:`_find_sourcedata_tarball`), then falls back to the NIfTI + JSON
+    sidecar for `duration` alone -- the timestamps need the actual DICOMs,
+    so they are empty whenever no tarball is found or it yields nothing.
     """
-    rel = op.relpath(nifti_fn, bids_root)
-    tarball = op.join(bids_root, "sourcedata", _nifti_stem(rel) + ".dicom.tgz")
-    if op.exists(tarball):
+    tarball = _find_sourcedata_tarball(nifti_fn, bids_root)
+    if tarball is not None:
         try:
             duration, timestamps = _duration_and_timestamps_from_dicom_tarball(tarball)
         except Exception as exc:
@@ -1181,8 +1250,10 @@ def _write_scans_tsv_atomically(
         dir=directory, prefix=".heudiconv-scans-", suffix=".tsv"
     )
     try:
-        with os.fdopen(fd, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter="\t")
+        with os.fdopen(fd, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(
+                f, fieldnames=fieldnames, delimiter="\t", restval="n/a"
+            )
             writer.writeheader()
             writer.writerows(rows)
         if original_mode is not None:
@@ -1254,24 +1325,47 @@ def _populate_scans_duration_file(
             changed = True
         row["duration"] = new_value
 
-        if (
-            earliest is not None
-            and stored_dt is not None
-            and abs(earliest - stored_dt) > ACQ_TIME_TOLERANCE
-        ):
-            lgr.warning(
-                "%s: stored acq_time %s differs from the earliest acquisition "
-                "timestamp re-derived from its source DICOMs (%+.6f seconds; "
-                "%s). See https://github.com/nipy/heudiconv/issues/876",
-                filename,
-                stored_dt.isoformat(),
-                (earliest - stored_dt).total_seconds(),
-                "fixing" if fix_acq_time else "not fixed -- pass --fix-acq-time to",
-            )
-            if fix_acq_time:
-                row["acq_time"] = earliest.isoformat()
-                changed = True
-                stored_dt = earliest
+        if earliest is not None and stored_dt is not None:
+            # a historical acq_time may be timezone-naive while the
+            # re-derived one is aware (or vice versa) -- compare as local
+            # wall-clock time rather than raising TypeError
+            earliest_cmp, stored_cmp = _comparable_acq_times(earliest, stored_dt)
+            gap = earliest_cmp - stored_cmp
+            if abs(gap) > ACQ_TIME_DATE_SHIFT_THRESHOLD:
+                # a gap this large is not the few-second interleaved-slice
+                # bias this check targets -- more likely the dataset's
+                # dates were deliberately shifted for anonymization, which
+                # fixing (or warning about on every row) would undo
+                lgr.debug(
+                    "%s: stored acq_time %s differs from the re-derived "
+                    "one by %.1f hours, too large to be the bias "
+                    "https://github.com/nipy/heudiconv/issues/876 "
+                    "targets -- likely anonymized/date-shifted data; not "
+                    "warning or fixing",
+                    filename,
+                    stored_dt.isoformat(),
+                    gap.total_seconds() / 3600,
+                )
+            elif abs(gap) > ACQ_TIME_TOLERANCE:
+                lgr.warning(
+                    "%s: stored acq_time %s differs from the earliest "
+                    "acquisition timestamp re-derived from its source "
+                    "DICOMs (%+.6f seconds; %s). See "
+                    "https://github.com/nipy/heudiconv/issues/876",
+                    filename,
+                    stored_dt.isoformat(),
+                    gap.total_seconds(),
+                    (
+                        "fixing"
+                        if fix_acq_time
+                        else "not fixed -- pass --fix-acq-time to"
+                    ),
+                )
+                if fix_acq_time:
+                    # keep the stored value's timezone style (naive/aware)
+                    row["acq_time"] = earliest_cmp.isoformat()
+                    changed = True
+                    stored_dt = earliest_cmp
         try:
             json_fn = _find_json_sidecar(nifti_fn, bids_root)
             # never touch (or suggest fixing) an inherited sidecar, which is

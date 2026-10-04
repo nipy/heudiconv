@@ -634,21 +634,26 @@ def _safe_tar_members(tar: tarfile.TarFile, dest: str) -> list[tarfile.TarInfo]:
         if member.isdev():
             lgr.warning("Refusing to extract device/FIFO member %r", member.name)
             continue
-        if member.issym() and not _resolves_within_dest(
-            member.linkname
-            if op.isabs(member.linkname)
-            else op.join(dest, op.dirname(member.name), member.linkname)
-        ):
+        if member.issym() or member.islnk():
+            # a per-member check here (as for the other cases above) is not
+            # enough: resolving a link's target against dest only tells
+            # whether it looks safe assuming no other member has been
+            # extracted yet, but a chain of links (e.g. a -> ".", a/b ->
+            # "..", then a regular file "b/evil") can still resolve outside
+            # dest once members are actually extracted in order, even
+            # though each one looked safe in isolation. tarfile's own
+            # extraction-filter support (the normal path; see
+            # safe_extract_tar) checks incrementally against the real
+            # filesystem state and does not have this gap -- this manual
+            # fallback only runs on a Python old enough to lack it at all,
+            # so simply refusing every link member here closes it.
             lgr.warning(
-                "Refusing to extract %r: link target escapes %s", member.name, dest
-            )
-            continue
-        if member.islnk() and not _resolves_within_dest(op.join(dest, member.linkname)):
-            # unlike a symlink's, a tar hard link's target is a path
-            # relative to the archive root (i.e. `dest`), not to the
-            # member's own directory
-            lgr.warning(
-                "Refusing to extract %r: link target escapes %s", member.name, dest
+                "Refusing to extract link member %r: this Python's "
+                "tarfile lacks native extraction-filter support, under "
+                "which a chain of links could resolve outside %s even if "
+                "each looks safe on its own",
+                member.name,
+                dest,
             )
             continue
         safe.append(member)
@@ -699,6 +704,12 @@ def safe_extract_tar(tarball: str, dest: str) -> None:
                 tarball,
             )
             tar.extractall(dest, members=_safe_tar_members(tar, dest))
+        except tarfile.FilterError as exc:
+            raise tarfile.FilterError(
+                f"{exc} -- set the HEUDICONV_TAR_FILTER environment "
+                f"variable to a less restrictive filter (e.g. 'tar') if "
+                f"you trust {tarball!r} and need this member kept"
+            ) from exc
 
 
 # Borrowed from DataLad (MIT license), with "archives" functionality commented

@@ -36,6 +36,9 @@ from heudiconv.bids import (
     _get_retrospective_duration,
     _is_within_directory,
     _merge_scans_header,
+    _read_scans_tsv,
+    _set_sidecar_acquisition_time,
+    add_rows_to_scans_keys_file,
     check_acq_time_congruency,
     find_compatible_fmaps_for_run,
     find_compatible_fmaps_for_session,
@@ -1926,6 +1929,48 @@ def test_populate_scans_duration_from_sourcedata(
 
 
 @pytest.mark.ai_generated
+def test_populate_scans_duration_from_sourcedata_multi_output_item(
+    tmp_bids_with_scans: tuple[Path, Path],
+) -> None:
+    # Regression test for a real pre-merge review finding on PR #872:
+    # dcm2niix can split one converted item into several outputs (e.g.
+    # echo-1/echo-2) that all share one sourcedata tarball, named after the
+    # item's own prefix rather than any single output's full stem -- so an
+    # exact-stem tarball lookup misses it for every such output.
+    bids_root, scans_tsv = tmp_bids_with_scans
+    func_dir = bids_root / "sub-01" / "func"
+    for echo in (1, 2):
+        nifti_fn = func_dir / f"sub-01_task-rest_echo-{echo}_bold.nii.gz"
+        nifti_fn.write_bytes(b"")
+        save_json(str(func_dir / f"sub-01_task-rest_echo-{echo}_bold.json"), {})
+    scans_tsv.write_text(
+        "filename\tacq_time\n"
+        "func/sub-01_task-rest_echo-1_bold.nii.gz\tn/a\n"
+        "func/sub-01_task-rest_echo-2_bold.nii.gz\tn/a\n"
+    )
+
+    # the tarball is named after the shared item prefix, with neither
+    # output's own echo-N suffix
+    dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))
+    sourcedata_dir = bids_root / "sourcedata" / "sub-01" / "func"
+    sourcedata_dir.mkdir(parents=True)
+    compress_dicoms(
+        dicom_list,
+        str(sourcedata_dir / "sub-01_task-rest"),
+        TempDirs(),
+        overwrite=True,
+    )
+
+    populate_scans_duration(str(bids_root))
+
+    _, rows = _read_scans_rows(scans_tsv)
+    assert [float(row["duration"]) for row in rows] == [
+        pytest.approx(12.45),
+        pytest.approx(12.45),
+    ]
+
+
+@pytest.mark.ai_generated
 def test_populate_scans_duration_warns_and_optionally_fixes_acq_time(
     tmp_path: Path,
     tmp_bids_with_scans: tuple[Path, Path],
@@ -1994,6 +2039,193 @@ def test_populate_scans_duration_warns_and_optionally_fixes_acq_time(
 
 
 @pytest.mark.ai_generated
+def test_populate_scans_duration_naive_stored_vs_aware_dicoms(
+    tmp_path: Path,
+    tmp_bids_with_scans: tuple[Path, Path],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # Regression test for a real pre-merge review finding on PR #872: a
+    # stored acq_time written before heudiconv 1.3.0 (6a666fe) is
+    # timezone-naive, while the sourcedata DICOMs being backfilled from may
+    # carry TimezoneOffsetFromUTC (timezone-aware) -- comparing the two
+    # must not raise TypeError and abort the whole _scans.tsv.
+    bids_root, scans_tsv = tmp_bids_with_scans
+    (bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz").write_bytes(b"")
+    save_json(str(bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json"), {})
+    scans_tsv.write_text(
+        "filename\tacq_time\n"
+        "func/sub-01_task-rest_bold.nii.gz\t2020-01-01T12:00:02\n"
+    )
+
+    dicom_list = make_timed_dicoms(tmp_path, [2, 0, 4, 7], tz_offset="+0100")
+    sourcedata_dir = bids_root / "sourcedata" / "sub-01" / "func"
+    sourcedata_dir.mkdir(parents=True)
+    compress_dicoms(
+        dicom_list,
+        str(sourcedata_dir / "sub-01_task-rest_bold"),
+        TempDirs(),
+        overwrite=True,
+    )
+
+    caplog.set_level(logging.WARNING, logger="heudiconv.bids")
+    populate_scans_duration(str(bids_root))  # must not raise
+
+    _, rows = _read_scans_rows(scans_tsv)
+    assert float(rows[0]["duration"]) == pytest.approx(9.0)
+    assert "differs from the earliest acquisition" in caplog.text
+
+    caplog.clear()
+    populate_scans_duration(str(bids_root), overwrite=True, fix_acq_time=True)
+    _, rows = _read_scans_rows(scans_tsv)
+    # fixed value keeps the stored value's (naive) style, not the DICOMs'
+    assert rows[0]["acq_time"] == "2020-01-01T12:00:00"
+
+
+@pytest.mark.ai_generated
+def test_populate_scans_duration_ignores_large_anonymization_gap(
+    tmp_path: Path,
+    tmp_bids_with_scans: tuple[Path, Path],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # a gap of days (e.g. from date-shifting anonymization), unlike the
+    # few-second interleaved-slice bias this check targets, must not be
+    # warned about or fixed -- fixing it would undo the anonymization
+    bids_root, scans_tsv = tmp_bids_with_scans
+    (bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz").write_bytes(b"")
+    save_json(str(bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json"), {})
+    scans_tsv.write_text(
+        "filename\tacq_time\n"
+        "func/sub-01_task-rest_bold.nii.gz\t1900-01-01T12:00:02\n"
+    )
+
+    dicom_list = make_timed_dicoms(tmp_path, [2, 0, 4, 7])
+    sourcedata_dir = bids_root / "sourcedata" / "sub-01" / "func"
+    sourcedata_dir.mkdir(parents=True)
+    compress_dicoms(
+        dicom_list,
+        str(sourcedata_dir / "sub-01_task-rest_bold"),
+        TempDirs(),
+        overwrite=True,
+    )
+
+    caplog.set_level(logging.WARNING, logger="heudiconv.bids")
+    populate_scans_duration(str(bids_root), fix_acq_time=True)
+
+    assert not caplog.records  # no warning for an anonymization-sized gap
+    _, rows = _read_scans_rows(scans_tsv)
+    assert rows[0]["acq_time"] == "1900-01-01T12:00:02"  # left untouched
+
+
+@pytest.mark.ai_generated
+def test_set_sidecar_acquisition_time_writes_pretty_json(tmp_path: Path) -> None:
+    # Regression test for a real pre-merge review finding on PR #872:
+    # _set_sidecar_acquisition_time() must not reintroduce the
+    # formatting-only diffs that 77e1a07 removed from tuneup_bids_json_files
+    json_fn = tmp_path / "sub-01_task-rest_bold.json"
+    save_json(
+        str(json_fn),
+        {"AcquisitionTime": "12:00:02.000000", "ShimSetting": [1, 2, 3, 4, 5, 6]},
+        pretty=True,
+    )
+
+    _set_sidecar_acquisition_time(str(json_fn), "12:00:00.000000")
+
+    lines = json_fn.read_text().splitlines()
+    assert sum("ShimSetting" in line for line in lines) == 1
+    assert load_json(str(json_fn))["AcquisitionTime"] == "12:00:00.000000"
+
+
+@pytest.mark.ai_generated
+def test_add_rows_to_scans_keys_file_refreshes_existing_row(tmp_path: Path) -> None:
+    # Regression test for a real pre-merge review finding on PR #872:
+    # re-converting a file (e.g. with --overwrite) must update its existing
+    # _scans.tsv row, not just add rows for genuinely new files -- otherwise
+    # a corrected sidecar AcquisitionTime and the row it was corrected
+    # against disagree after re-conversion
+    scans_tsv = tmp_path / "sub-01_scans.tsv"
+    add_rows_to_scans_keys_file(
+        str(scans_tsv),
+        {
+            "func/sub-01_task-rest_bold.nii.gz": [
+                "2020-01-01T12:00:02",
+                "9.000",
+                "",
+                "x",
+            ]
+        },
+    )
+    add_rows_to_scans_keys_file(
+        str(scans_tsv),
+        {
+            "func/sub-01_task-rest_bold.nii.gz": [
+                "2020-01-01T12:00:00",
+                "9.000",
+                "",
+                "y",
+            ],
+            "func/sub-01_task-rest_run-2_bold.nii.gz": [
+                "2020-01-01T12:30:00",
+                "9.000",
+                "",
+                "z",
+            ],
+        },
+    )
+
+    _, rows = _read_scans_rows(scans_tsv)
+    by_filename = {row["filename"]: row for row in rows}
+    assert by_filename["func/sub-01_task-rest_bold.nii.gz"]["acq_time"] == (
+        "2020-01-01T12:00:00"
+    )
+    assert by_filename["func/sub-01_task-rest_bold.nii.gz"]["randstr"] == "y"
+    assert (
+        by_filename["func/sub-01_task-rest_run-2_bold.nii.gz"]["acq_time"]
+        == "2020-01-01T12:30:00"
+    )
+
+
+@pytest.mark.ai_generated
+def test_add_rows_to_scans_keys_file_sorts_by_acq_time_with_custom_column(
+    tmp_path: Path,
+) -> None:
+    # Regression test for a real pre-merge review finding on PR #872:
+    # sorting used to assume acq_time is always at row index 1, which broke
+    # once an existing file had a custom column inserted before it
+    scans_tsv = tmp_path / "sub-01_scans.tsv"
+    scans_tsv.write_text(
+        "filename\tnotes\tacq_time\tduration\toperator\trandstr\n"
+        "func/sub-01_task-rest_run-2_bold.nii.gz\tn\t2020-01-01T12:30:00\t"
+        "9.000\t\tz\n"
+    )
+    add_rows_to_scans_keys_file(
+        str(scans_tsv),
+        {
+            "func/sub-01_task-rest_bold.nii.gz": [
+                "2020-01-01T12:00:00",
+                "9.000",
+                "",
+                "x",
+            ]
+        },
+    )
+
+    fieldnames, rows = _read_scans_tsv(str(scans_tsv))
+    assert fieldnames == [
+        "filename",
+        "notes",
+        "acq_time",
+        "duration",
+        "operator",
+        "randstr",
+    ]
+    # sorted by acq_time (header[2]), not alphabetically by filename
+    assert [row["filename"] for row in rows] == [
+        "func/sub-01_task-rest_bold.nii.gz",
+        "func/sub-01_task-rest_run-2_bold.nii.gz",
+    ]
+
+
+@pytest.mark.ai_generated
 @pytest.mark.parametrize("tz", ["", "+01:00"])
 @pytest.mark.parametrize(
     "acq_time,sidecar_times,expected",
@@ -2056,6 +2288,7 @@ def test_check_acq_time_congruency(
         assert e in warnings_
 
 
+@pytest.mark.ai_generated
 def test_check_acq_time_congruency_none_acq_time() -> None:
     # nothing to check -- must not raise
     check_acq_time_congruency(None, ["whatever.json"], label="x")
