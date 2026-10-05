@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+import datetime
 from glob import glob
 import logging
 import os.path as op
 from pathlib import Path
 from typing import Optional
+
+import pydicom as dcm
 
 import heudiconv.heuristics
 
@@ -90,3 +94,31 @@ def fetch_data(tmpdir: str | Path, dataset: str, getpath: Optional[str] = None) 
     getdir = targetdir + (op.sep + getpath if getpath is not None else "")
     ds.get(getdir)
     return targetdir
+
+
+def make_timed_dicoms(
+    outdir: Path,
+    offsets: Sequence[float],
+    start: str = "2020-01-01T12:00:00",
+    tz_offset: Optional[str] = None,
+) -> list[str]:
+    """Write copies of the phantom.dcm header (no pixel data) into `outdir`
+    as f0.dcm, f1.dcm, ..., each acquired `offsets[i]` seconds after `start`
+    (AcquisitionDate/AcquisitionTime) -- in timezone `tz_offset` (DICOM
+    TimezoneOffsetFromUTC, e.g. "+0100") if given -- and return their paths
+    in that order."""
+    start_dt = datetime.datetime.fromisoformat(start)
+    dicom_list = []
+    for i, offset in enumerate(offsets):
+        dcm_data = dcm.dcmread(
+            op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
+        )
+        acq_dt = start_dt + datetime.timedelta(seconds=offset)
+        dcm_data.AcquisitionDate = acq_dt.strftime("%Y%m%d")
+        dcm_data.AcquisitionTime = acq_dt.strftime("%H%M%S.%f")
+        if tz_offset:
+            dcm_data.TimezoneOffsetFromUTC = tz_offset
+        out = outdir / f"f{i}.dcm"
+        dcm.dcmwrite(str(out), dcm_data)
+        dicom_list.append(str(out))
+    return dicom_list

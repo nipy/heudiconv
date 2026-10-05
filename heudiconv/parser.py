@@ -9,12 +9,17 @@ import os
 import os.path as op
 import re
 import shutil
-import sys
 from types import ModuleType
 from typing import Optional
 
 from .dicoms import group_dicoms_into_seqinfos
-from .utils import SeqInfo, StudySessionInfo, TempDirs, docstring_parameter
+from .utils import (
+    SeqInfo,
+    StudySessionInfo,
+    TempDirs,
+    docstring_parameter,
+    safe_extract_tar,
+)
 
 lgr = logging.getLogger(__name__)
 tempdirs = TempDirs()
@@ -139,14 +144,13 @@ def get_extracted_dicoms(fl: Iterable[str]) -> ItemsView[Optional[str], list[str
 
         # check content and sanitize permission bits before extraction
         os.chmod(tmpdir, mode=0o700)
-        # For tar (only!) starting with 3.12 we should provide filter
-        # (enforced in 3.14) on how to filter/safe-guard filenames.
-        kws: dict[str, str] = {}
-        if sys.version_info >= (3, 12) and t.endswith(_TAR_UNPACK_FORMATS):
-            # Allow for a user-workaround if would be desired
-            # see e.g. https://docs.python.org/3.12/library/tarfile.html#extraction-filters
-            kws["filter"] = os.environ.get("HEUDICONV_TAR_FILTER", "tar")
-        shutil.unpack_archive(t, extract_dir=tmpdir, **kws)  # type: ignore[arg-type]
+        if t.endswith(_TAR_UNPACK_FORMATS):
+            # route through our own tar extraction, which vets members
+            # itself on Python versions where tarfile has no filter=
+            # support at all (< 3.12) rather than extracting unrestricted
+            safe_extract_tar(t, tmpdir)
+        else:
+            shutil.unpack_archive(t, extract_dir=tmpdir)
 
         archive_content = list(find_files(regex=".*", topdir=tmpdir))
 

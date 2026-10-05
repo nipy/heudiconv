@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import io
 import json
 from json.decoder import JSONDecodeError
 import logging
@@ -14,6 +15,8 @@ import pydicom as dcm
 import pytest
 
 from heudiconv.utils import (
+    _safe_tar_members,
+    as_finite_positive_float,
     create_tree,
     get_datetime,
     get_heuristic_description,
@@ -23,6 +26,7 @@ from heudiconv.utils import (
     load_json,
     remove_prefix,
     remove_suffix,
+    safe_extract_tar,
     sanitize_path,
     save_json,
     strptime_bids,
@@ -323,3 +327,176 @@ def test_sanitize_path_invalid(
     assert value in msg
     assert target in msg
     assert "contained problematic character(s)" in msg
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        (12.5, 12.5),
+        ("3.0", 3.0),
+        (0, None),
+        (-1.0, None),
+        (float("nan"), None),
+        (float("inf"), None),
+        (float("-inf"), None),
+        (None, None),
+        ("not-a-number", None),
+        ([1, 2], None),
+        (10**400, None),  # OverflowError from float() on a huge int
+    ],
+)
+def test_as_finite_positive_float(value: Any, expected: float | None) -> None:
+    assert as_finite_positive_float(value) == expected
+
+
+@pytest.mark.ai_generated
+def test_safe_extract_tar(tmp_path: Path) -> None:
+    import tarfile
+
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "file.txt").write_text("hello")
+    tarball = tmp_path / "archive.tar.gz"
+    with tarfile.open(tarball, "w:gz") as tar:
+        tar.add(src / "file.txt", arcname="file.txt")
+
+    dest = tmp_path / "dest"
+    dest.mkdir()
+    safe_extract_tar(str(tarball), str(dest))
+    assert (dest / "file.txt").read_text() == "hello"
+
+
+@pytest.mark.ai_generated
+def test_safe_tar_members_rejects_escaping_members(tmp_path: Path) -> None:
+    import tarfile
+
+    dest = tmp_path / "dest"
+    dest.mkdir()
+
+    tarball = tmp_path / "evil.tar"
+    with tarfile.open(tarball, "w") as tar:
+        # a legitimate member
+        good = tarfile.TarInfo("good.txt")
+        good.size = 5
+        tar.addfile(good, io.BytesIO(b"hello"))
+        # absolute path
+        absolute = tarfile.TarInfo("/etc/passwd")
+        absolute.size = 0
+        tar.addfile(absolute, io.BytesIO(b""))
+        # '..' traversal
+        traversal = tarfile.TarInfo("../../escaped.txt")
+        traversal.size = 0
+        tar.addfile(traversal, io.BytesIO(b""))
+        # symlink pointing outside dest
+        symlink = tarfile.TarInfo("link")
+        symlink.type = tarfile.SYMTYPE
+        symlink.linkname = "../../outside"
+        tar.addfile(symlink)
+
+    with tarfile.open(tarball) as tar:
+        safe = _safe_tar_members(tar, str(dest))
+
+    assert [m.name for m in safe] == ["good.txt"]
+
+
+@pytest.mark.ai_generated
+def test_safe_tar_members_rejects_every_link(tmp_path: Path) -> None:
+    # a per-member check cannot safely tell a link apart from one that is
+    # only safe-looking in isolation but escapes dest once a chain of
+    # links is actually extracted (e.g. a -> ".", a/b -> "..", then a
+    # regular file "b/evil") -- this manual fallback (old Python only; see
+    # safe_extract_tar) closes that gap by rejecting every link member,
+    # not just ones that individually resolve outside dest
+    import tarfile
+
+    dest = tmp_path / "dest"
+    dest.mkdir()
+
+    tarball = tmp_path / "hardlinks.tar"
+    with tarfile.open(tarball, "w") as tar:
+        good = tarfile.TarInfo("good.txt")
+        good.size = 5
+        tar.addfile(good, io.BytesIO(b"hello"))
+
+        safe_looking_hardlink = tarfile.TarInfo("dir/link")
+        safe_looking_hardlink.type = tarfile.LNKTYPE
+        safe_looking_hardlink.linkname = "good.txt"
+        tar.addfile(safe_looking_hardlink)
+
+        escaping_hardlink = tarfile.TarInfo("dir/evil-link")
+        escaping_hardlink.type = tarfile.LNKTYPE
+        escaping_hardlink.linkname = "../outside"
+        tar.addfile(escaping_hardlink)
+
+    with tarfile.open(tarball) as tar:
+        safe = _safe_tar_members(tar, str(dest))
+
+    assert [m.name for m in safe] == ["good.txt"]
+
+
+@pytest.mark.ai_generated
+def test_safe_extract_tar_manual_fallback_when_filter_unsupported(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    # simulate a tarfile.extractall() predating the filter= backport (a
+    # TypeError on that keyword), and confirm safe_extract_tar() falls
+    # back to vetting members itself rather than propagating the error
+    import tarfile
+    import warnings
+
+    tarball = tmp_path / "evil.tar"
+    with tarfile.open(tarball, "w") as tar:
+        good = tarfile.TarInfo("good.txt")
+        good.size = 5
+        tar.addfile(good, io.BytesIO(b"hello"))
+        traversal = tarfile.TarInfo("../escaped.txt")
+        traversal.size = 0
+        tar.addfile(traversal, io.BytesIO(b""))
+
+    real_extractall = tarfile.TarFile.extractall
+
+    def _extractall_without_filter_support(
+        self: tarfile.TarFile, *args: Any, **kwargs: Any
+    ) -> None:
+        if "filter" in kwargs:
+            raise TypeError("extractall() got an unexpected keyword argument 'filter'")
+        # a genuinely old tarfile also predates the DeprecationWarning
+        # tarfile.extractall() emits on a *current* interpreter when no
+        # filter= is given -- that warning was introduced by the very same
+        # security backport that added filter= support in the first place
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            real_extractall(self, *args, **kwargs)
+
+    monkeypatch.setattr(
+        tarfile.TarFile, "extractall", _extractall_without_filter_support
+    )
+
+    dest = tmp_path / "dest"
+    dest.mkdir()
+    caplog.set_level(logging.DEBUG)
+    safe_extract_tar(str(tarball), str(dest))
+
+    assert (dest / "good.txt").read_text() == "hello"
+    assert not (tmp_path / "escaped.txt").exists()
+    assert "vetting members" in caplog.text
+
+
+@pytest.mark.ai_generated
+def test_safe_extract_tar_filter_error_mentions_env_var(tmp_path: Path) -> None:
+    # the native "data" filter already names the offending member in its
+    # own exception; augment it with the HEUDICONV_TAR_FILTER escape hatch
+    # rather than leaving the caller to guess one exists
+    import tarfile
+
+    tarball = tmp_path / "evil.tar"
+    with tarfile.open(tarball, "w") as tar:
+        symlink = tarfile.TarInfo("link")
+        symlink.type = tarfile.SYMTYPE
+        symlink.linkname = "/etc/passwd"
+        tar.addfile(symlink)
+
+    dest = tmp_path / "dest"
+    with pytest.raises(tarfile.FilterError, match="HEUDICONV_TAR_FILTER"):
+        safe_extract_tar(str(tarball), str(dest))

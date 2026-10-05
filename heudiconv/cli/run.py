@@ -143,7 +143,23 @@ def get_parser() -> ArgumentParser:
         "--overwrite",
         action="store_true",
         default=False,
-        help="Overwrite existing converted files.",
+        help="Overwrite existing converted files. For "
+        "--command populate-scans-duration, also recompute 'duration' "
+        "values which are already filled in.",
+    )
+    parser.add_argument(
+        "--fix-acq-time",
+        action="store_true",
+        default=False,
+        help="For --command populate-scans-duration: also overwrite "
+        "'acq_time' with the earliest acquisition timestamp re-derived "
+        "from the source DICOMs, when it disagrees with the value "
+        "already stored (see https://github.com/nipy/heudiconv/issues/876), "
+        "and likewise the JSON sidecar's 'AcquisitionTime' as recorded by "
+        "dcm2niix, where unambiguously off the same way. "
+        "A disagreement is logged as a warning regardless of this flag, but "
+        "only for rows actually (re)examined -- combine with --overwrite to "
+        "also check/fix rows whose 'duration' is already populated.",
     )
     parser.add_argument(
         "--datalad",
@@ -171,9 +187,14 @@ def get_parser() -> ArgumentParser:
             "sanitize-jsons",
             "treat-jsons",
             "populate-intended-for",
+            "populate-scans-duration",
         ),
         help="Custom action to be performed on provided files instead of "
-        "regular operation.",
+        "regular operation. 'populate-scans-duration' retrospectively "
+        "fills in the 'duration' column of '*_scans.tsv' file(s) found "
+        "under the path(s) given via --files, using previously-generated "
+        "sourcedata DICOMs or the nifti/json sidecar; combine with "
+        "--overwrite to also recompute values which are already filled in.",
     )
     parser.add_argument(
         "-g",
