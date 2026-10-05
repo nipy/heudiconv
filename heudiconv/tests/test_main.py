@@ -280,22 +280,17 @@ def test_get_formatted_scans_key_row_mixed_timezone_awareness(tmp_path: Path) ->
 
 
 @pytest.mark.ai_generated
-def test_get_formatted_scans_key_row_tolerates_unexpected_failure(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    # the acq_time/duration estimate is best-effort and must never abort
-    # conversion over an unexpected failure (e.g. a pydicom/data edge case
-    # not otherwise anticipated) -- it degrades to 'n/a' with a warning
+def test_get_formatted_scans_key_row_propagates_unexpected_failure() -> None:
+    # an unexpected failure (e.g. a bug, not a known data-quality quirk
+    # already tolerated by get_acquisition_timestamps/_duration) should
+    # surface loudly rather than be swallowed into a silent 'n/a'
     dicom_list = sorted(glob("%s/b0dwiForFmap/*.dcm" % TESTS_DATA_PATH))
-    caplog.set_level(logging.WARNING, logger="heudiconv.bids")
     with patch(
         "heudiconv.dicoms.get_acquisition_timestamps",
         side_effect=RuntimeError("boom"),
     ):
-        row = get_formatted_scans_key_row(dicom_list)  # must not raise
-    assert row[0] == "n/a"
-    assert row[1] == "n/a"
-    assert "Failed to determine acq_time/duration" in caplog.text
+        with pytest.raises(RuntimeError, match="boom"):
+            get_formatted_scans_key_row(dicom_list)
 
 
 # TODO: finish this

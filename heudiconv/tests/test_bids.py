@@ -8,6 +8,7 @@ import csv
 from datetime import datetime, timedelta
 from glob import glob
 import itertools
+from json import JSONDecodeError
 import logging
 import os
 import os.path as op
@@ -1836,18 +1837,12 @@ def _read_scans_rows(
         return fieldnames, list(reader)
 
 
-def _make_bids_dataset_stub(bids_root: Path) -> Path:
-    """Create the minimal skeleton `populate_scans_duration` operates on.
-
-    Layout: ``sub-01/func/sub-01_task-rest_bold.{nii.gz,json}`` plus a
-    ``sub-01/sub-01_scans.tsv`` with only ``filename``/``acq_time`` columns
-    (as produced before `duration` support was added).
-
-    Returns
-    -------
-    Path
-        Path to the ``_scans.tsv`` file.
-    """
+@pytest.fixture
+def tmp_bids_with_scans(tmp_path: Path) -> tuple[Path, Path]:
+    """A minimal BIDS dataset at `tmp_path / "bids"`, paired with its
+    `_scans.tsv` path -- the setup shared by most
+    `populate_scans_duration`/`_duration_from_nifti_sidecar` tests."""
+    bids_root = tmp_path / "bids"
     func_dir = bids_root / "sub-01" / "func"
     func_dir.mkdir(parents=True)
     save_json(
@@ -1859,17 +1854,6 @@ def _make_bids_dataset_stub(bids_root: Path) -> Path:
         "filename\tacq_time\n"
         "func/sub-01_task-rest_bold.nii.gz\t2018-08-10T12:08:25.360000\n"
     )
-    return scans_tsv
-
-
-@pytest.fixture
-def tmp_bids_with_scans(tmp_path: Path) -> tuple[Path, Path]:
-    """A minimal BIDS dataset (see `_make_bids_dataset_stub`) at
-    `tmp_path / "bids"`, paired with its `_scans.tsv` path -- the setup
-    shared by most `populate_scans_duration`/`_duration_from_nifti_sidecar`
-    tests."""
-    bids_root = tmp_path / "bids"
-    scans_tsv = _make_bids_dataset_stub(bids_root)
     return bids_root, scans_tsv
 
 
@@ -1879,13 +1863,7 @@ def _make_multivol_func_scan(
     nvols: int = 10,
     meta_extra: Optional[dict[str, Any]] = None,
 ) -> None:
-    """Populate the func/ nifti+json created by `_make_bids_dataset_stub`.
-
-    Writes an `nvols`-volume image and a JSON sidecar with
-    ``RepetitionTime`` = `tr` (plus any `meta_extra` fields) -- the setup
-    shared by most `populate_scans_duration`/`_duration_from_nifti_sidecar`
-    nifti+json-fallback tests.
-    """
+    """Populate the func/ nifti+json created by `tmp_bids_with_scans`."""
     nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
     nibabel.Nifti1Image(np.zeros((2, 2, 2, nvols)), np.eye(4)).to_filename(
         str(nifti_fn)
@@ -2082,14 +2060,15 @@ def test_populate_scans_duration_naive_stored_vs_aware_dicoms(
 
 
 @pytest.mark.ai_generated
-def test_populate_scans_duration_ignores_large_anonymization_gap(
+def test_populate_scans_duration_does_not_fix_large_anonymization_gap(
     tmp_path: Path,
     tmp_bids_with_scans: tuple[Path, Path],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     # a gap of days (e.g. from date-shifting anonymization), unlike the
     # few-second interleaved-slice bias this check targets, must not be
-    # warned about or fixed -- fixing it would undo the anonymization
+    # auto-fixed -- that would undo the anonymization -- but is still
+    # warned about, visibly, rather than silently skipped
     bids_root, scans_tsv = tmp_bids_with_scans
     (bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz").write_bytes(b"")
     save_json(str(bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.json"), {})
@@ -2111,7 +2090,7 @@ def test_populate_scans_duration_ignores_large_anonymization_gap(
     caplog.set_level(logging.WARNING, logger="heudiconv.bids")
     populate_scans_duration(str(bids_root), fix_acq_time=True)
 
-    assert not caplog.records  # no warning for an anonymization-sized gap
+    assert "looks anonymized/date-shifted, not fixing" in caplog.text
     _, rows = _read_scans_rows(scans_tsv)
     assert rows[0]["acq_time"] == "1900-01-01T12:00:02"  # left untouched
 
@@ -3083,6 +3062,15 @@ def test_populate_bids_templates_syncs_existing_scans_json(tmp_path: Path) -> No
     assert "duration" in scans_json
     assert scans_json["acq_time"] == {"Description": "old"}  # untouched
     assert scans_json["MyCustomField"] == {"Description": "x"}  # untouched
+
+
+@pytest.mark.ai_generated
+def test_populate_bids_templates_errors_on_malformed_scans_json(tmp_path: Path) -> None:
+    # a malformed scans.json is for the user to fix, not something to
+    # silently leave out of date
+    (tmp_path / "scans.json").write_text("not json")
+    with pytest.raises(JSONDecodeError):
+        populate_bids_templates(str(tmp_path))
 
 
 @pytest.mark.ai_generated

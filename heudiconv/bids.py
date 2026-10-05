@@ -19,7 +19,7 @@ import re
 import stat
 import statistics
 import tempfile
-from typing import Any, Optional
+from typing import Any, NamedTuple, Optional
 import warnings
 
 from nibabel.filename_parser import splitext_addext
@@ -52,11 +52,8 @@ lgr = logging.getLogger(__name__)
 # when printing its AcquisitionTime, so allow for rounding
 ACQ_TIME_TOLERANCE = datetime.timedelta(milliseconds=1)
 
-# A gap between a stored acq_time and one re-derived from source DICOMs
-# beyond this is not the few-second interleaved-slice bias the retrospective
-# backfill's congruency check targets (see ACQ_TIME_TOLERANCE's use in
-# _populate_scans_duration_file) -- more likely the dataset's dates were
-# deliberately shifted for anonymization
+# beyond this, an acq_time/DICOM gap looks like deliberately shifted
+# (anonymized) dates rather than the interleaved-slice bias we target
 ACQ_TIME_DATE_SHIFT_THRESHOLD = datetime.timedelta(hours=12)
 
 # Fields to be populated in _scans files. Order matters
@@ -558,7 +555,7 @@ def save_scans_key(
             fix=True,
         )
     except Exception as exc:
-        # must never abort a conversion
+        # do not abort conversion, we should proceed with n/a though
         lgr.warning("Failed to check acq_time of %s: %s", item[0], exc)
     # where should we store it?
     output_dir = op.dirname(op.dirname(bids_file))
@@ -577,16 +574,9 @@ def _sync_scans_json_fields(scans_json: str) -> None:
     """
     if not op.lexists(scans_json):
         return
-    try:
-        meta = load_json(scans_json)
-        if not isinstance(meta, dict):
-            raise ValueError(f"{scans_json} does not contain a JSON object")
-    except Exception as exc:
-        # scans_json is arbitrary, possibly user-edited (or an unfetched
-        # git-annex placeholder) data, so a read/parse failure must not
-        # abort conversion -- just leave it as-is
-        lgr.warning("Failed to load %s to sync its fields: %s", scans_json, exc)
-        return
+    meta = load_json(scans_json)
+    if not isinstance(meta, dict):
+        raise ValueError(f"{scans_json} does not contain a JSON object")
     missing = {k: v for k, v in SCANS_FILE_FIELDS.items() if k not in meta}
     if missing:
         meta.update(missing)
@@ -616,11 +606,7 @@ def _merge_scans_header(existing_header: list[str], additions: list[str]) -> lis
 def _read_scans_tsv(
     scans_tsv: str,
 ) -> tuple[list[str], list[dict[str, Optional[str]]]]:
-    """Read a `_scans.tsv` file into (fieldnames, rows-as-dicts).
-
-    Tolerates a leading UTF-8 byte-order mark some Excel/Windows-authored
-    TSVs carry.
-    """
+    """Read a `_scans.tsv` file into (fieldnames, rows-as-dicts)."""
     with open(scans_tsv, newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f, delimiter="\t")
         return list(reader.fieldnames or []), list(reader)
@@ -663,12 +649,8 @@ def add_rows_to_scans_keys_file(fn: str, newrows: dict[str, list[str]]) -> None:
                     k: v for k, v in row.items() if k != "filename"
                 }
 
-        # newrows reflects a file just (re-)converted, so it is always
-        # authoritative for any filename it carries -- replacing a stale
-        # existing row for a file re-converted with --overwrite, not just
-        # adding rows for genuinely new files (otherwise e.g. a corrected
-        # sidecar AcquisitionTime and the _scans.tsv acq_time it was
-        # corrected against would disagree after re-conversion)
+        # newrows is authoritative for any filename it carries, replacing
+        # (not just adding to) an existing row
         for key_toadd in newrows:
             fnames2info[key_toadd] = dict(zip(canonical[1:], newrows[key_toadd]))
         # remove
@@ -724,12 +706,17 @@ def get_formatted_scans_key_row(
         [ISO acquisition time, duration in seconds (or 'n/a'), performing
         physician name, random string]
     """
-    return _get_scans_key_row_and_timestamps(dcm_fns)[0]
+    return _get_scans_key_row_and_timestamps(dcm_fns).row
+
+
+class ScansKeyRowAndTimestamps(NamedTuple):
+    row: list[str]
+    timestamps: list[datetime.datetime]
 
 
 def _get_scans_key_row_and_timestamps(
     dcm_fns: str | Path | Sequence[str | Path],
-) -> tuple[list[str], list[datetime.datetime]]:
+) -> ScansKeyRowAndTimestamps:
     """Return the `_scans.tsv` row, plus the run's DICOM timestamps.
 
     `acq_time` is the earliest of those timestamps.
@@ -743,18 +730,9 @@ def _get_scans_key_row_and_timestamps(
     # interleaved multiband Siemens acquisitions exported one DICOM per
     # slice, that one is not always the earliest-acquired
     # (https://github.com/nipy/heudiconv/issues/876)
-    try:
-        timestamps = dicoms.get_acquisition_timestamps(dcm_fn_strs)
-        acq_datetime = min(timestamps) if timestamps else None
-        acq_duration = dicoms.get_acquisition_duration(
-            dcm_fn_strs, timestamps=timestamps
-        )
-    except Exception as exc:
-        # must never abort a conversion over a best-effort estimate
-        lgr.warning(
-            "Failed to determine acq_time/duration for %s: %s", dcm_fn_strs[0], exc
-        )
-        timestamps, acq_datetime, acq_duration = [], None, None
+    timestamps = dicoms.get_acquisition_timestamps(dcm_fn_strs)
+    acq_datetime = min(timestamps) if timestamps else None
+    acq_duration = dicoms.get_acquisition_duration(dcm_fn_strs, timestamps=timestamps)
     # add random string
     # But let's make it reproducible by using all UIDs
     # (might change across versions?)
@@ -775,7 +753,7 @@ def _get_scans_key_row_and_timestamps(
     # empty entries should be 'n/a'
     # https://github.com/dartmouth-pbs/heudiconv/issues/32
     row = ["n/a" if not str(e) else e for e in row]
-    return row, timestamps
+    return ScansKeyRowAndTimestamps(row, timestamps)
 
 
 def _comparable_acq_times(
@@ -800,11 +778,7 @@ def _get_sidecar_acquisition_datetime(
     acq_time = load_json(json_file).get("AcquisitionTime")
     if not acq_time:
         return None
-    try:
-        time_ = strptime(str(acq_time), ["%H:%M:%S.%f", "%H:%M:%S"]).time()
-    except ValueError:
-        lgr.debug("Could not parse AcquisitionTime %r in %s", acq_time, json_file)
-        return None
+    time_ = strptime(str(acq_time), ["%H:%M:%S.%f", "%H:%M:%S"]).time()
     candidates = [
         # the sidecar carries the same local wall time as a timezone-aware
         # `near` (from DICOM TimezoneOffsetFromUTC), so take its tzinfo
@@ -1125,12 +1099,10 @@ def _duration_from_nifti_sidecar(
 def _find_sourcedata_tarball(nifti_fn: str, bids_root: str) -> Optional[str]:
     """Find the heudiconv-produced sourcedata DICOM tarball for `nifti_fn`.
 
-    Usually named after `nifti_fn`'s own stem, but dcm2niix can split one
-    converted item into several outputs (e.g. ``echo-``, ``magnitude1``/
-    ``2``, ``part-mag``/``phase``) that all share one tarball, named after
-    the item's own prefix rather than any single output's full stem -- the
-    longest-matching-prefix tarball in the same sourcedata directory covers
-    that case too. None if no tarball at all is found.
+    Usually named after `nifti_fn`'s own stem; falls back to the longest-
+    matching-prefix tarball in the same sourcedata directory, for a
+    multi-output item (e.g. ``echo-``, ``magnitude1``/``2``) sharing one
+    tarball named after the item's own prefix instead.
     """
     rel = op.relpath(nifti_fn, bids_root)
     sourcedata_dir = op.join(bids_root, "sourcedata", op.dirname(rel))
@@ -1331,22 +1303,11 @@ def _populate_scans_duration_file(
             # wall-clock time rather than raising TypeError
             earliest_cmp, stored_cmp = _comparable_acq_times(earliest, stored_dt)
             gap = earliest_cmp - stored_cmp
-            if abs(gap) > ACQ_TIME_DATE_SHIFT_THRESHOLD:
-                # a gap this large is not the few-second interleaved-slice
-                # bias this check targets -- more likely the dataset's
-                # dates were deliberately shifted for anonymization, which
-                # fixing (or warning about on every row) would undo
-                lgr.debug(
-                    "%s: stored acq_time %s differs from the re-derived "
-                    "one by %.1f hours, too large to be the bias "
-                    "https://github.com/nipy/heudiconv/issues/876 "
-                    "targets -- likely anonymized/date-shifted data; not "
-                    "warning or fixing",
-                    filename,
-                    stored_dt.isoformat(),
-                    gap.total_seconds() / 3600,
-                )
-            elif abs(gap) > ACQ_TIME_TOLERANCE:
+            # a gap beyond this is not the few-second interleaved-slice bias
+            # this check targets -- more likely deliberately shifted dates
+            # (anonymization), which auto-fixing would undo
+            looks_anonymized = abs(gap) > ACQ_TIME_DATE_SHIFT_THRESHOLD
+            if abs(gap) > ACQ_TIME_TOLERANCE:
                 lgr.warning(
                     "%s: stored acq_time %s differs from the earliest "
                     "acquisition timestamp re-derived from its source "
@@ -1356,12 +1317,16 @@ def _populate_scans_duration_file(
                     stored_dt.isoformat(),
                     gap.total_seconds(),
                     (
-                        "fixing"
-                        if fix_acq_time
-                        else "not fixed -- pass --fix-acq-time to"
+                        "looks anonymized/date-shifted, not fixing"
+                        if looks_anonymized
+                        else (
+                            "fixing"
+                            if fix_acq_time
+                            else "not fixed -- pass --fix-acq-time to"
+                        )
                     ),
                 )
-                if fix_acq_time:
+                if fix_acq_time and not looks_anonymized:
                     # keep the stored value's timezone style (naive/aware)
                     row["acq_time"] = earliest_cmp.isoformat()
                     changed = True

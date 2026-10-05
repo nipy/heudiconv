@@ -635,18 +635,8 @@ def _safe_tar_members(tar: tarfile.TarFile, dest: str) -> list[tarfile.TarInfo]:
             lgr.warning("Refusing to extract device/FIFO member %r", member.name)
             continue
         if member.issym() or member.islnk():
-            # a per-member check here (as for the other cases above) is not
-            # enough: resolving a link's target against dest only tells
-            # whether it looks safe assuming no other member has been
-            # extracted yet, but a chain of links (e.g. a -> ".", a/b ->
-            # "..", then a regular file "b/evil") can still resolve outside
-            # dest once members are actually extracted in order, even
-            # though each one looked safe in isolation. tarfile's own
-            # extraction-filter support (the normal path; see
-            # safe_extract_tar) checks incrementally against the real
-            # filesystem state and does not have this gap -- this manual
-            # fallback only runs on a Python old enough to lack it at all,
-            # so simply refusing every link member here closes it.
+            # a chain of links can resolve outside dest once actually
+            # extracted even when each looks safe checked on its own here
             lgr.warning(
                 "Refusing to extract link member %r: this Python's "
                 "tarfile lacks native extraction-filter support, under "

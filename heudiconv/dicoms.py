@@ -802,9 +802,7 @@ def get_acquisition_duration(
         span_and_median = _timestamp_span_and_median_interval(timestamps)
         if span_and_median is not None:
             span, median_interval = span_and_median
-            # the tag reflects the full planned protocol, not a truncated
-            # or aborted acquisition -- a generous margin (one more median
-            # interval beyond the normal span + 1 estimate) avoids
+            # a margin beyond the normal span + 1 estimate avoids
             # second-guessing a merely slightly-longer-than-expected tag
             if duration > span + 2 * median_interval:
                 lgr.warning(
