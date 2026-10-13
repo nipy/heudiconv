@@ -131,6 +131,7 @@ def prep_conversion(
     overwrite: bool,
     dcmconfig: Optional[str],
     grouping: str,
+    sanitize_dates: str,
 ) -> None:
     if dicoms:
         lgr.info("Processing %d dicoms", len(dicoms))
@@ -269,6 +270,7 @@ def prep_conversion(
             min_meta=min_meta,
             overwrite=overwrite,
             dcmconfig=dcmconfig,
+            sanitize_dates=sanitize_dates,
         )
 
     for item_dicoms in filegroup.values():
@@ -609,6 +611,7 @@ def convert(
     prov_file: Optional[str] = None,
     dcmconfig: Optional[str] = None,
     populate_intended_for_opts: Optional[PopulateIntendedForOpts] = None,
+    sanitize_dates: str = 'remove',
 ) -> None:
     """Perform actual conversion (calls to converter etc) given info from
     heuristic's `infotodict`
@@ -717,7 +720,7 @@ def convert(
                     if bids_options is not None:
                         save_scans_key(item, bids_outfiles)
                     # Fix up and unify BIDS files
-                    tuneup_bids_json_files(bids_outfiles)
+                    tuneup_bids_json_files(bids_outfiles, sanitize=sanitize_dates)
 
                     if prov_file:
                         prov_files.append(prov_file)
