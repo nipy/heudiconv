@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import atexit
 from collections import defaultdict
 from collections.abc import ItemsView, Iterable, Iterator
 from glob import glob
@@ -13,13 +12,11 @@ import sys
 from types import ModuleType
 from typing import Optional
 
+from .archives import tempdirs
 from .dicoms import group_dicoms_into_seqinfos
-from .utils import SeqInfo, StudySessionInfo, TempDirs, docstring_parameter
+from .utils import SeqInfo, StudySessionInfo, docstring_parameter
 
 lgr = logging.getLogger(__name__)
-tempdirs = TempDirs()
-# Ensure they are cleaned up upon exit
-atexit.register(tempdirs.cleanup)
 
 _VCS_REGEX = r"%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)" % (op.sep, op.sep)
 
@@ -135,7 +132,7 @@ def get_extracted_dicoms(fl: Iterable[str]) -> ItemsView[Optional[str], list[str
         # contained within each archive. So, files are temporarily
         # extracted into unique tempdirs
         # cannot use TempDirs since will trigger cleanup with __del__
-        tmpdir = tempdirs(prefix="heudiconvDCM")
+        tmpdir = tempdirs(prefix="heudiconvDCM", archive=t)
 
         # check content and sanitize permission bits before extraction
         os.chmod(tmpdir, mode=0o700)
@@ -148,7 +145,7 @@ def get_extracted_dicoms(fl: Iterable[str]) -> ItemsView[Optional[str], list[str
             kws["filter"] = os.environ.get("HEUDICONV_TAR_FILTER", "tar")
         shutil.unpack_archive(t, extract_dir=tmpdir, **kws)  # type: ignore[arg-type]
 
-        archive_content = list(find_files(regex=".*", topdir=tmpdir))
+        archive_content = sorted(find_files(regex=".*", topdir=tmpdir))
 
         # may be too cautious (tmpdir is already 700).
         for f in archive_content:

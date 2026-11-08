@@ -55,6 +55,29 @@ Run the following command::
 * `-b` indicates that we want to output in BIDS format
 * `--minmeta` guarantees that meta-information in the dcms does not get inserted into the JSON sidecar. This is good because the information is not needed but can overflow the JSON file causing some BIDS apps to crash.
 
+Archived DICOMs
+***************
+
+You can also pass a DICOM archive, such as ``dicom/219.tar.gz`` or
+``dicom/219.zip``, to ``--files`` or use it in a ``-d`` subject template.
+HeuDiConv extracts the files into a temporary directory for conversion.
+
+In the saved ``.heudiconv`` metadata, ``filegroup*.json`` identifies archive
+members using the absolute archive path followed by the path inside the
+archive, for example ``/data/219.tar.gz/series/image.dcm``. These are source
+references; they do not name files in the filesystem. When reusing a saved
+conversion table, HeuDiConv resolves them against the current extraction.
+Keep the archive at the same path when reusing that table.
+
+For a DICOM at the root of an archive, ``dcm_dir_name`` in ``dicominfo*.tsv``
+and in the heuristic's sequence information is the archive filename. For a
+member in a subdirectory, it is that subdirectory's name. These fields no
+longer depend on the randomly named extraction directory. Unarchived input
+paths retain their existing representation.
+
+Metadata saved by older versions can still contain temporary archive paths.
+Regenerate those conversion tables to obtain stable source references.
+
 Output
 ******
 
