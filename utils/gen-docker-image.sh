@@ -33,8 +33,8 @@ ${OCI_BINARY:-docker} run --rm $image generate docker \
         netbase \
     --copy . /src/heudiconv \
     --miniconda \
-        version="py39_4.12.0" \
-        conda_install="python=3.9 traits>=4.6.0 scipy numpy nomkl pandas gdcm" \
+        version="py312_24.5.0-0" \
+        conda_install="python=3.12 traits>=4.6.0 scipy numpy nomkl pandas gdcm" \
         pip_install="/src/heudiconv[all]" \
         pip_opts="--editable" \
     --entrypoint "heudiconv" \
