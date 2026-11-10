@@ -297,7 +297,9 @@ def test_known_nibabel_frame_filters() -> None:
         # was misspelled before nibabel 5.5.0
         getattr(dw, "DEFUALT_FRAME_FILTERS", None),
     )
-    assert default_filters is not None
+    assert (
+        default_filters is not None
+    ), "nibabel no longer exposes default frame filters under a known name"
     assert {type(f).__name__ for f in default_filters} <= {
         "FilterMultiStack",
         "FilterDwiIso",
