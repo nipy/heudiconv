@@ -28,33 +28,39 @@ classifiers = [
     "Typing :: Typed",
 ]
 requires-python = ">=3.10"
+# The lower bounds here and in optional-dependencies below are tested by
+# "tox -e py3-lowest" (also on CI), which installs the lowest versions
+# satisfying them on the oldest Python we support.  They are the oldest ones
+# we know to work there, and not necessarily the oldest which could work.
 dependencies = [
     # not usable in some use cases since might be just a downloader, not binary
     # "dcm2niix",
-    "dcmstack>=0.8",
-    "etelemetry",
+    # 0.8 does not work with nibabel 5
+    "dcmstack>=0.9.0",
+    "etelemetry>=0.3.1",
     "filelock>=3.0.12",
     # 5.5.0 added FilterMultiOrient to the default frame filters of the
     # multiframe DICOM wrapper: it warns, and changes the shape (hence seqinfo
     # dim3) reported for multi-orientation stacks such as scouts.
     # TODO: lift the ceiling once we decided how to handle that
     "nibabel>=5.3.1,<5.5",
-    "nipype >=1.2.3",
-    "pydicom >= 1.0.0",
+    # older ones do not work with the current traits and numpy
+    "nipype >=1.9.1",
+    "pydicom >= 2.3.0",
 ]
 dynamic = ["version", "readme"]
 
 [project.optional-dependencies]
 tests = [
-    "pytest",
-    "tinydb",
-    "inotify",
+    "pytest>=7.0",
+    "tinydb>=4.0.0",
+    "inotify>=0.2.9",
 ]
 extras = [
-    "duecredit",  # optional dependency
+    "duecredit>=0.10.0",  # optional dependency
 ]
 # Keep the version in sync with MIN_DATALAD_VERSION in heudiconv/info.py
-datalad = ["datalad >=0.13.0"]
+datalad = ["datalad >=0.19.0"]
 # What it takes to build docs/ -- used by .readthedocs.yaml and "tox -e docs"
 docs = [
     "sphinx",
