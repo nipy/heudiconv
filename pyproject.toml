@@ -28,15 +28,17 @@ classifiers = [
     "Typing :: Typed",
 ]
 requires-python = ">=3.10"
-# The lower bounds here and in optional-dependencies below are tested by
-# "tox -e py3-lowest" (also on CI), which installs the lowest versions
-# satisfying them on the oldest Python we support.  They are the oldest ones
-# we know to work there, and not necessarily the oldest which could work.
+# The lower bounds here and in the optional-dependencies below, besides "docs",
+# are tested by "tox -e py3-lowest" (also on CI), which installs the lowest
+# versions satisfying them on the oldest Python we support.  They are the
+# oldest ones we know to work there, and not necessarily the oldest which
+# could work.
 dependencies = [
     # not usable in some use cases since might be just a downloader, not binary
     # "dcm2niix",
     # 0.8 does not work with nibabel 5
     "dcmstack>=0.9.0",
+    # what nipype (see below) requires anyways
     "etelemetry>=0.3.1",
     "filelock>=3.0.12",
     # 5.5.0 added FilterMultiOrient to the default frame filters of the
@@ -44,9 +46,12 @@ dependencies = [
     # dim3) reported for multi-orientation stacks such as scouts.
     # TODO: lift the ceiling once we decided how to handle that
     "nibabel>=5.3.1,<5.5",
-    # older ones do not work with the current traits and numpy
+    # 1.9.0 does not work with traits 7, which it allows.  1.8.6 works (it
+    # requires older traits), but issues a warning on an invalid escape
+    # sequence, which our tests treat as an error.
     "nipype >=1.9.1",
-    "pydicom >= 2.3.0",
+    # we use pydicom.tag.TagType, which older ones do not have
+    "pydicom >= 2.2.0",
 ]
 dynamic = ["version", "readme"]
 
@@ -57,10 +62,14 @@ tests = [
     "inotify>=0.2.9",
 ]
 extras = [
-    "duecredit>=0.10.0",  # optional dependency
+    # optional dependency.  Older ones fail to import with the due.py stub
+    # of nipype
+    "duecredit>=0.10.0",
 ]
 # Keep the version in sync with MIN_DATALAD_VERSION in heudiconv/info.py
-datalad = ["datalad >=0.19.0"]
+# <0.18 need pkg_resources, and with 0.18.0 and 0.18.1 test_prepare_for_datalad
+# fails with the current git-annex
+datalad = ["datalad >=0.18.2"]
 # What it takes to build docs/ -- used by .readthedocs.yaml and "tox -e docs"
 docs = [
     "sphinx",

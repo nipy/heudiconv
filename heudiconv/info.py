@@ -10,4 +10,4 @@ __packagename__ = "heudiconv"
 __description__ = "Heuristic DICOM Converter"
 
 # Keep in sync with the "datalad" extra in pyproject.toml
-MIN_DATALAD_VERSION = "0.19.0"
+MIN_DATALAD_VERSION = "0.18.2"
