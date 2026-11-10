@@ -521,7 +521,7 @@ def get_datetime_from_dcm(dcm_data: dcm.Dataset) -> datetime.datetime | None:
 
     Returns
     -------
-    Optional[datetime.datetime]
+    datetime.datetime | None
         One of several datetimes that are related to when the scan occurred, or None if no datetime can be found
 
     Notes
@@ -562,7 +562,7 @@ def get_datetime_strings_from_dcm(
 
     Returns
     -------
-    tuple of two Optional[str]
+    tuple of two str | None
         (date, time), each None if no corresponding information was found.
     """
     date = dcm_data.get("AcquisitionDate")
@@ -650,10 +650,10 @@ def compress_dicoms(
 
 # Note: This function is passed to nipype by `embed_metadata_from_dicoms()`,
 # and nipype reparses the function source in a clean namespace that does not
-# have `from __future__ import annotations` enabled.  Thus, we need to use
-# Python 3.7-compatible annotations on this function, and any non-builtin types
-# used in the annotations need to be included by import statements passed to
-# the `nipype.Function` constructor.
+# have `from __future__ import annotations` enabled.  Thus, the annotations on
+# this function get evaluated, so they need to be valid at runtime with the
+# oldest Python we support, and any non-builtin types used in them need to be
+# included by import statements passed to the `nipype.Function` constructor.
 def embed_dicom_and_nifti_metadata(
     dcmfiles: list[str],
     niftifile: str,
@@ -764,7 +764,7 @@ def embed_metadata_from_dicoms(
             function=embed_dicom_and_nifti_metadata,
             imports=[
                 "from pathlib import Path",
-                "from typing import Any, Dict, List, Optional, Union",
+                "from typing import Any",
             ],
         ),
         name="embedder",

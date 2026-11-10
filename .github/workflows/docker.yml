@@ -4,6 +4,14 @@ on:
   push:
     branches:
       - master
+  # Only build (never push) for the PRs which change what the image is made of
+  # or how
+  pull_request:
+    paths:
+      - .github/workflows/docker.yml
+      - Dockerfile
+      - pyproject.toml
+      - utils/gen-docker-image.sh
 
 jobs:
   build-docker:
@@ -33,6 +41,7 @@ jobs:
                 .
 
       - name: Push Docker image
+        if: github.event_name == 'push'
         run: |
           git describe --match 'v[0-9]*' | grep -q -e - && (
               docker login -u "$DOCKER_LOGIN" --password-stdin <<<"$DOCKER_TOKEN"

@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Hashable
-from collections.abc import Mapping
-from collections.abc import Mapping as MappingABC
-from collections.abc import Sequence
+from collections.abc import Callable, Hashable, Mapping, Sequence
 import copy
 import datetime
 from glob import glob
@@ -599,7 +596,7 @@ def create_tree(path: str, tree: TreeSpec, archives_leading_dir: bool = True) ->
     if not op.exists(path):
         os.makedirs(path)
 
-    if isinstance(tree, MappingABC):
+    if isinstance(tree, Mapping):
         tree = list(tree.items())
 
     for file_, load in tree:

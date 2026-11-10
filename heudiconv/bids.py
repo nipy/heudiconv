@@ -344,7 +344,7 @@ def tuneup_bids_json_files(json_files: list[str]) -> None:
                     json_["EchoTime%d" % i] = load_json(
                         json_basename + "_magnitude%d.json" % i
                     )["EchoTime"]
-                except OSError as exc:
+                except IOError as exc:
                     lgr.error("Failed to open magnitude file: %s", exc)
             # might have been made R/O already, but if not -- it will be set
             # only later in the pipeline, so we must not make it read-only yet
