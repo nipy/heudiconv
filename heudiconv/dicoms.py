@@ -46,6 +46,7 @@ with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     # suppress warning
     import nibabel.nicom.dicomwrappers as dw
+from nibabel.openers import ImageOpener
 
 # TODO: remove the kludge whenever
 # https://github.com/moloney/dcmstack/pull/90 is merged and released
@@ -163,13 +164,42 @@ def create_seqinfo(
     )
 
 
+def wrapper_from_file(fl: str, **kwargs: Any) -> dw.Wrapper:
+    """Create nibabel DICOM wrapper for a file, the same way for any nibabel
+
+    This is nibabel's ``wrapper_from_file`` but with the frame filters for
+    multiframe (enhanced) DICOMs spelled out, so they do not depend on the
+    version of nibabel: we want only the filters which nibabel had by default
+    before 5.5.0.  nibabel 5.5.0 added ``FilterMultiOrient`` to the defaults,
+    which for a stack with multiple frame orientations (e.g. a scout) issues a
+    warning and retains only the frames of the first orientation, thus changing
+    ``image_shape`` (hence ``dim3`` of seqinfo) and other attributes which
+    heuristics might rely on.
+
+    Parameters
+    ----------
+    fl : str
+      Path to the DICOM file
+    **kwargs
+      Passed to ``pydicom.dcmread``
+    """
+    with ImageOpener(fl) as fobj:
+        dcm_data = dcm.dcmread(fobj, **kwargs)
+    mw: dw.Wrapper = dw.wrapper_from_data(
+        dcm_data,
+        # new instances each time since filters keep state of the last wrapper
+        frame_filters=(dw.FilterMultiStack(), dw.FilterDwiIso()),
+    )
+    return mw
+
+
 def validate_dicom(
     fl: str, dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]]
 ) -> Optional[tuple[dw.Wrapper, tuple[int, str], Optional[str]]]:
     """
     Parse DICOM attributes. Returns None if not valid.
     """
-    mw = dw.wrapper_from_file(fl, force=True, stop_before_pixels=True)
+    mw = wrapper_from_file(fl, force=True, stop_before_pixels=True)
     # Workaround for protocol name in private siemens csa header
     if not getattr(mw.dcm_data, "ProtocolName", "").strip():
         mw.dcm_data.ProtocolName = (

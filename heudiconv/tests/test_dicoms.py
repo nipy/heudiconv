@@ -20,6 +20,7 @@ from heudiconv.dicoms import (
     get_reproducible_int,
     group_dicoms_into_seqinfos,
     parse_private_csa_header,
+    wrapper_from_file,
 )
 
 from .utils import TEST_DICOM_PATHS, TESTS_DATA_PATH
@@ -185,7 +186,7 @@ def test_get_datetime_from_dcm_wo_dt() -> None:
 def test_create_seqinfo(
     dcmfile: str,
 ) -> None:
-    mw = dw.wrapper_from_file(dcmfile)
+    mw = wrapper_from_file(dcmfile)
     seqinfo = create_seqinfo(mw, [dcmfile], op.basename(dcmfile))
     assert seqinfo.sequence_name
 
@@ -278,11 +279,29 @@ def test_get_datetime_strings_from_dcm_partial() -> None:
 
 
 @pytest.mark.ai_generated
+def test_create_seqinfo_multi_orientation() -> None:
+    # An enhanced DICOM of a scout with 3 frames, each in its own orientation.
+    # nibabel >= 5.5.0 by default would warn (our pytest configuration turns
+    # warnings into errors) and retain only the frames of the first orientation.
+    # We want all the frames, and thus the same seqinfo, with any nibabel.
+    dcmfile = op.join(
+        TESTS_DATA_PATH,
+        "MRI_102TD_PHA_S.MR.Chen_Matthews_1.3.1.2022.11.16.15.50.20.357.31204541.dcm",
+    )
+    mw = wrapper_from_file(dcmfile, force=True, stop_before_pixels=True)
+    assert isinstance(mw, dw.MultiframeWrapper)
+    assert len(mw.frames) == 3
+    assert mw.image_shape == (162, 162, 3)
+    seqinfo = create_seqinfo(mw, [dcmfile], op.basename(dcmfile))
+    assert (seqinfo.dim1, seqinfo.dim2, seqinfo.dim3, seqinfo.dim4) == (162, 162, 3, 1)
+
+
+@pytest.mark.ai_generated
 @pytest.mark.parametrize("dcmfile", TEST_DICOM_PATHS)
 def test_create_seqinfo_date_time(dcmfile: str) -> None:
     # all our test DICOMs do carry some date/time information, and seqinfo
     # should expose it regardless of which tags it comes from
-    mw = dw.wrapper_from_file(dcmfile)
+    mw = wrapper_from_file(dcmfile)
     seqinfo = create_seqinfo(mw, [dcmfile], op.basename(dcmfile))
     assert seqinfo.date is not None
     assert seqinfo.time is not None
