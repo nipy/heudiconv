@@ -372,21 +372,22 @@ def group_dicoms_into_seqinfos(
 
         ingrp = False
         # check if same series was already converted
-        for idx in range(len(mwgroup)):
-            if mw.is_same_series(mwgroup[idx]):
+        for grp_idx in range(len(mwgroup)):
+            if mw.is_same_series(mwgroup[grp_idx]):
                 if grouping != "all":
                     assert (
-                        mwgroup[idx].dcm_data.get("StudyInstanceUID") == file_studyUID
+                        mwgroup[grp_idx].dcm_data.get("StudyInstanceUID")
+                        == file_studyUID
                     ), "Same series found for multiple different studies"
                 ingrp = True
                 series_id = SeriesID(
-                    mwgroup[idx].dcm_data.SeriesNumber,
-                    mwgroup[idx].dcm_data.ProtocolName,
+                    mwgroup[grp_idx].dcm_data.SeriesNumber,
+                    mwgroup[grp_idx].dcm_data.ProtocolName,
                 )
                 if per_studyUID:
                     series_id = series_id._replace(file_studyUID=file_studyUID)
                 group_keys.append(series_id)
-                group_values.append(idx)
+                group_values.append(grp_idx)
 
         if not ingrp:
             mwgroup.append(mw)
