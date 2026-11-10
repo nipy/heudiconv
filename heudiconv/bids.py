@@ -14,7 +14,7 @@ import os
 import os.path as op
 from pathlib import Path
 import re
-from typing import Any, Optional
+from typing import Any
 import warnings
 
 import numpy as np
@@ -124,9 +124,7 @@ def treat_age(age: str | float | None) -> str | None:
     return agestr
 
 
-def populate_bids_templates(
-    path: str, defaults: Optional[dict[str, Any]] = None
-) -> None:
+def populate_bids_templates(path: str, defaults: dict[str, Any] | None = None) -> None:
     """Premake BIDS text files with templates"""
 
     lgr.info("Populating template files under %s", path)
@@ -256,7 +254,7 @@ def populate_aggregated_jsons(path: str) -> None:
 
         # specify the name of the '_events.tsv' file:
         parsed_fpath = BIDSFile.parse(op.basename(fpath))
-        for events_invalid_entity in ['chunk', 'echo', 'part']:
+        for events_invalid_entity in ["chunk", "echo", "part"]:
             # events.tsv with these entities are not specified
             parsed_fpath.drop(events_invalid_entity, missing_ok=True)
         fpath = op.join(op.dirname(fpath), str(parsed_fpath))
@@ -346,7 +344,7 @@ def tuneup_bids_json_files(json_files: list[str]) -> None:
                     json_["EchoTime%d" % i] = load_json(
                         json_basename + "_magnitude%d.json" % i
                     )["EchoTime"]
-                except IOError as exc:
+                except OSError as exc:
                     lgr.error("Failed to open magnitude file: %s", exc)
             # might have been made R/O already, but if not -- it will be set
             # only later in the pipeline, so we must not make it read-only yet
@@ -445,7 +443,7 @@ def add_participant_record(
         )
 
 
-def find_subj_ses(f_name: str) -> tuple[Optional[str], Optional[str]]:
+def find_subj_ses(f_name: str) -> tuple[str | None, str | None]:
     """Given a path to the bids formatted filename parse out subject/session"""
     # we will allow the match at either directories or within filename
     # assuming that bids layout is "correct"
@@ -474,8 +472,8 @@ def save_scans_key(
     # and if there is a conflict, we would just blow since this function
     # should be invoked only on a result of a single item conversion as far
     # as I see it, so should have the same subject/session
-    subj: Optional[str] = None
-    ses: Optional[str] = None
+    subj: str | None = None
+    ses: str | None = None
     for bids_file in bids_files:
         # get filenames
         f_name = "/".join(bids_file.split("/")[-2:])
@@ -821,7 +819,7 @@ def find_compatible_fmaps_for_run(
 
 def find_compatible_fmaps_for_session(
     path_to_bids_session: str, matching_parameters: list[str]
-) -> Optional[dict[str, dict[str, list[str]]]]:
+) -> dict[str, dict[str, list[str]]] | None:
     """
     Finds compatible fmaps for all non-fmap runs in a session.
     (Note: It is the responsibility of the calling function to make sure
@@ -874,7 +872,7 @@ def find_compatible_fmaps_for_session(
 
 def select_fmap_from_compatible_groups(
     json_file: str, compatible_fmap_groups: dict[str, list[str]], criterion: str
-) -> Optional[str]:
+) -> str | None:
     """
     Selects the fmap that will be used to correct for distortions in json_file
     from the compatible fmap_groups list, based on the given criterion
@@ -1107,7 +1105,7 @@ class BIDSFile:
     ]
 
     def __init__(
-        self, entities: dict[str, str], suffix: str, extension: Optional[str]
+        self, entities: dict[str, str], suffix: str, extension: str | None
     ) -> None:
         self._entities = entities
         self._suffix = suffix
@@ -1188,7 +1186,7 @@ class BIDSFile:
             )
         return out
 
-    def __getitem__(self, entity: str) -> Optional[str]:
+    def __getitem__(self, entity: str) -> str | None:
         return self._entities[entity] if entity in self._entities else None
 
     def __setitem__(
@@ -1233,7 +1231,7 @@ class BIDSFile:
         return self._suffix
 
     @property
-    def extension(self) -> Optional[str]:
+    def extension(self) -> str | None:
         return self._extension
 
 

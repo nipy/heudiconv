@@ -11,7 +11,6 @@ import re
 import shutil
 import sys
 from types import ModuleType
-from typing import Optional
 
 from .dicoms import group_dicoms_into_seqinfos
 from .utils import SeqInfo, StudySessionInfo, TempDirs, docstring_parameter
@@ -41,7 +40,7 @@ _TAR_UNPACK_FORMATS = tuple(k for k, is_tar in _UNPACK_FORMATS.items() if is_tar
 def find_files(
     regex: str,
     topdir: list[str] | tuple[str, ...] | str = op.curdir,
-    exclude: Optional[str] = None,
+    exclude: str | None = None,
     exclude_vcs: bool = True,
     dirs: bool = False,
 ) -> Iterator[str]:
@@ -82,7 +81,7 @@ def find_files(
             yield path
 
 
-def get_extracted_dicoms(fl: Iterable[str]) -> ItemsView[Optional[str], list[str]]:
+def get_extracted_dicoms(fl: Iterable[str]) -> ItemsView[str | None, list[str]]:
     """Given a collection of files and/or directories, list out and possibly
     extract the contents from archives.
 
@@ -117,7 +116,7 @@ def get_extracted_dicoms(fl: Iterable[str]) -> ItemsView[Optional[str], list[str
     the unarchived file. If there are multiple archived files, they are grouped
     into separate sessions.
     """
-    sessions: dict[Optional[str], list[str]] = defaultdict(list)
+    sessions: dict[str | None, list[str]] = defaultdict(list)
 
     # keep track of session manually to ensure that the variable is bound
     # when it is used after the loop (e.g., consider situation with
@@ -168,12 +167,12 @@ def get_extracted_dicoms(fl: Iterable[str]) -> ItemsView[Optional[str], list[str
 
 
 def get_study_sessions(
-    dicom_dir_template: Optional[str],
-    files_opt: Optional[list[str]],
+    dicom_dir_template: str | None,
+    files_opt: list[str] | None,
     heuristic: ModuleType,
     outdir: str,
-    session: Optional[str],
-    sids: Optional[list[str]],
+    session: str | None,
+    sids: list[str] | None,
     grouping: str = "studyUID",
 ) -> dict[StudySessionInfo, list[str] | dict[SeqInfo, list[str]]]:
     """Sort files or dicom seqinfos into study_sessions.
@@ -275,7 +274,7 @@ def get_study_sessions(
 
             def infotoids(
                 seqinfos: Iterable[SeqInfo], outdir: str  # noqa: U100
-            ) -> dict[str, Optional[str]]:
+            ) -> dict[str, str | None]:
                 return {"locator": None, "session": None, "subject": None}
 
             heuristic.infotoids = infotoids  # type: ignore[attr-defined]

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Hashable
+from collections.abc import Mapping
 from collections.abc import Mapping as MappingABC
+from collections.abc import Sequence
 import copy
 import datetime
 from glob import glob
@@ -22,20 +24,7 @@ import sys
 import tempfile
 from time import sleep
 from types import ModuleType
-from typing import (
-    Any,
-    AnyStr,
-    Hashable,
-    Mapping,
-    NamedTuple,
-    Optional,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-    cast,
-    overload,
-)
+from typing import Any, AnyStr, NamedTuple, TypeVar, Union, cast, overload
 import warnings
 
 import pydicom as dcm
@@ -63,19 +52,19 @@ class SeqInfo(NamedTuple):
     protocol_name: str  # 12
     is_motion_corrected: bool  # 13
     is_derived: bool  # 14
-    patient_id: Optional[str]  # 15
+    patient_id: str | None  # 15
     study_description: str  # 16
     referring_physician_name: str  # 17
     series_description: str  # 18
     sequence_name: str  # 19
     image_type: tuple[str, ...]  # 20
     accession_number: str  # 21
-    patient_age: Optional[str]  # 22
-    patient_sex: Optional[str]  # 23
-    date: Optional[str]  # 24
-    series_uid: Optional[str]  # 25
-    time: Optional[str]  # 26
-    custom: Optional[Hashable]  # 27
+    patient_age: str | None  # 22
+    patient_sex: str | None  # 23
+    date: str | None  # 24
+    series_uid: str | None  # 25
+    time: str | None  # 26
+    custom: Hashable | None  # 27
 
 
 class StudySessionInfo(NamedTuple):
@@ -84,12 +73,12 @@ class StudySessionInfo(NamedTuple):
     # the same StudyInstanceUID which would collide, i.e point to the same
     # subject/session. So 'locator' is pretty much an assignment from
     # StudyInstanceUID into some place within hierarchy
-    locator: Optional[str]
+    locator: str | None
 
-    session: Optional[str]
+    session: str | None
 
     # should be some ID defined either in cmdline or deduced
-    subject: Optional[str]
+    subject: str | None
 
 
 class TempDirs:
@@ -99,7 +88,7 @@ class TempDirs:
         self.dirs: list[str] = []
         self.lgr: logging.Logger = logging.getLogger("tempdirs")
 
-    def __call__(self, prefix: Optional[str] = None) -> str:
+    def __call__(self, prefix: str | None = None) -> str:
         tmpdir = tempfile.mkdtemp(prefix=prefix)
         self.dirs.append(tmpdir)
         return tmpdir
@@ -284,7 +273,7 @@ def save_json(
 
     """
     assure_no_file_exists(filename)
-    j: Optional[str] = None
+    j: str | None = None
     if pretty:
         try:
             j = json_dumps_pretty(data, sort_keys=sort_keys, indent=indent)
@@ -592,7 +581,7 @@ class File:
 
 
 TreeSpec = Union[
-    Sequence[Tuple[Union[str, File], "Load"]],
+    Sequence[tuple[str | File, "Load"]],
     Mapping[str, "Load"],
 ]
 
@@ -649,7 +638,7 @@ def get_typed_attr(
 
 
 def get_typed_attr(
-    obj: Any, attr: str, _type: type[T], default: Optional[V] = None
+    obj: Any, attr: str, _type: type[T], default: V | None = None
 ) -> T | V | None:
     """
     Typecasts an object's named attribute. If the attribute cannot be
