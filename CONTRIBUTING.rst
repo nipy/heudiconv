@@ -137,10 +137,19 @@ Documentation
 To contribute to the documentation, we recommend building the docs
 locally prior to submitting a patch.
 
-To build the docs locally:
+To build the docs locally::
 
- 1. From the root of the heudiconv repository, `pip install -r docs/requirements.txt`
- 2. From the `docs/` directory, run `make html`
+    tox -e docs
+
+which installs HeuDiConv with its ``docs`` extra (see `pyproject.toml <./pyproject.toml>`_) and
+runs ``sphinx-build`` with warnings treated as errors -- the very same way
+`Read the Docs <https://heudiconv.readthedocs.io>`_ builds them according to
+`.readthedocs.yaml <./.readthedocs.yaml>`_, and the ``Docs`` GitHub Actions workflow checks them
+in every pull request.  Alternatively, ``pip install -e .[all,docs]`` and run ``make html`` from
+the ``docs/`` directory.
+
+Note that HeuDiConv derives its version from Git tags, so building from a shallow clone or from
+a clone without tags (``git fetch --unshallow --tags`` remedies both) would fail.
 
 
 Code style

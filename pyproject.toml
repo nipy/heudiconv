@@ -51,6 +51,11 @@ extras = [
 ]
 # Keep the version in sync with MIN_DATALAD_VERSION in heudiconv/info.py
 datalad = ["datalad >=0.13.0"]
+# What it takes to build docs/ -- used by .readthedocs.yaml and "tox -e docs"
+docs = [
+    "sphinx",
+    "sphinx-argparse",
+]
 all = ["heudiconv[tests,extras,datalad]"]
 
 [project.scripts]
