@@ -176,6 +176,10 @@ def wrapper_from_file(fl: str, **kwargs: Any) -> dw.Wrapper:
     ``image_shape`` (hence ``dim3`` of seqinfo) and other attributes which
     heuristics might rely on.
 
+    The goal is the stability of what we pass to heuristics, not the
+    correctness of geometry: e.g. ``affine`` of the wrapper for such a stack
+    of frames in different orientations is not meaningful, with any nibabel.
+
     Parameters
     ----------
     fl : str
@@ -187,7 +191,10 @@ def wrapper_from_file(fl: str, **kwargs: Any) -> dw.Wrapper:
         dcm_data = dcm.dcmread(fobj, **kwargs)
     mw: dw.Wrapper = dw.wrapper_from_data(
         dcm_data,
-        # new instances each time since filters keep state of the last wrapper
+        # The list is frozen on purpose (see docstring): revisit whenever
+        # nibabel adds more default filters, test_known_nibabel_frame_filters
+        # would tell.  New instances each time since filters keep the state of
+        # the last wrapper they were applied to.
         frame_filters=(dw.FilterMultiStack(), dw.FilterDwiIso()),
     )
     return mw
@@ -733,6 +740,11 @@ def embed_dicom_and_nifti_metadata(
 
     from heudiconv.utils import save_json
 
+    # Note: dcmstack creates nibabel DICOM wrappers on its own, with the default
+    # frame filters of nibabel (unlike our wrapper_from_file), and provides no
+    # way to specify them.  So for a multiframe DICOM with multiple frame
+    # orientations nibabel >= 5.5.0 would warn here, and the shape and affine
+    # in the metadata of the stack would be of the first orientation only.
     stack = ds.parse_and_stack(dcmfiles, force=True).values()
     if len(stack) > 1:
         raise ValueError("Found multiple series")
