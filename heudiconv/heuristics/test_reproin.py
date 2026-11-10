@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import re
-from typing import NamedTuple
+from typing import Any, NamedTuple
 from unittest.mock import patch
 
 import pytest
@@ -129,14 +129,18 @@ def test_fix_dbic_protocol() -> None:
         "": [("THESCOUT", "scout")],
     }
 
+    def fix_dbic_protocol_(seqinfos: list[FakeSeqInfo]) -> list[Any]:
+        # we feed it FakeSeqInfo, not the SeqInfo its signature promises
+        return fix_dbic_protocol(seqinfos)  # type: ignore[arg-type]
+
     with (
         patch.object(reproin, "protocols2fix", protocols2fix),
         patch.object(reproin, "series_spec_fields", ["field1"]),
     ):
-        seqinfos_ = fix_dbic_protocol(seqinfos)  # type: ignore[arg-type]
-    assert seqinfos[1] == seqinfos_[1]  # type: ignore[comparison-overlap]
+        seqinfos_ = fix_dbic_protocol_(seqinfos)
+    assert seqinfos[1] == seqinfos_[1]
     # field2 shouldn't have changed since I didn't pass it
-    assert seqinfos_[0] == FakeSeqInfo(  # type: ignore[comparison-overlap]
+    assert seqinfos_[0] == FakeSeqInfo(
         accession_number, "mystudy", "02-anat-scout_MPR_sag", seq1.field2
     )
 
@@ -145,10 +149,10 @@ def test_fix_dbic_protocol() -> None:
         patch.object(reproin, "protocols2fix", protocols2fix),
         patch.object(reproin, "series_spec_fields", ["field1", "field2"]),
     ):
-        seqinfos_ = fix_dbic_protocol(seqinfos)  # type: ignore[arg-type]
-    assert seqinfos[1] == seqinfos_[1]  # type: ignore[comparison-overlap]
+        seqinfos_ = fix_dbic_protocol_(seqinfos)
+    assert seqinfos[1] == seqinfos_[1]
     # now everything should have changed
-    assert seqinfos_[0] == FakeSeqInfo(  # type: ignore[comparison-overlap]
+    assert seqinfos_[0] == FakeSeqInfo(
         accession_number,
         "mystudy",
         "02-anat-scout_MPR_sag",
