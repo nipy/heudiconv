@@ -7,7 +7,6 @@ import os
 import os.path as op
 from pathlib import Path
 import re
-from typing import Optional
 
 import pydicom as dcm
 import pytest
@@ -35,7 +34,7 @@ def test_conversion(
     tmp_path: Path,
     subject: str,
     heuristic: str,
-    anon_cmd: Optional[str],
+    anon_cmd: str | None,
 ) -> None:
     monkeypatch.chdir(tmp_path)
     try:

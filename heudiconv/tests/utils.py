@@ -4,7 +4,6 @@ from glob import glob
 import logging
 import os.path as op
 from pathlib import Path
-from typing import Optional
 
 import heudiconv.heuristics
 
@@ -27,9 +26,9 @@ def gen_heudiconv_args(
     outdir: str,
     subject: str,
     heuristic_file: str,
-    anon_cmd: Optional[str] = None,
-    template: Optional[str] = None,
-    xargs: Optional[list[str]] = None,
+    anon_cmd: str | None = None,
+    template: str | None = None,
+    xargs: list[str] | None = None,
 ) -> list[str]:
     heuristic = op.realpath(op.join(HEURISTICS_PATH, heuristic_file))
 
@@ -61,7 +60,7 @@ def gen_heudiconv_args(
     return args
 
 
-def fetch_data(tmpdir: str | Path, dataset: str, getpath: Optional[str] = None) -> str:
+def fetch_data(tmpdir: str | Path, dataset: str, getpath: str | None = None) -> str:
     """
     Utility function to interface with datalad database.
     Performs datalad `install` and datalad `get` operations.

@@ -12,7 +12,7 @@ import re
 import shlex
 import subprocess
 import time
-from typing import Any, Optional
+from typing import Any
 
 import inotify.adapters
 from inotify.constants import IN_CREATE, IN_ISDIR, IN_MODIFY
@@ -55,7 +55,7 @@ def run_heudiconv(args: list[str]) -> tuple[str, dict[str, Any]]:
 
 def process(
     paths2process: dict[str, float],
-    db: Optional[TinyDB],
+    db: TinyDB | None,
     wait: int | float = WAIT_TIME,
     logdir: str = "log",
 ) -> None:
@@ -88,7 +88,7 @@ def process(
 def monitor(
     topdir: str = "/tmp/new_dir",
     check_ptrn: str = "/20../../..",
-    db: Optional[TinyDB] = None,
+    db: TinyDB | None = None,
     wait: int | float = WAIT_TIME,
     logdir: str = "log",
 ) -> None:

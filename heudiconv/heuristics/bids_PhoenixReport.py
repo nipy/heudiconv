@@ -6,13 +6,11 @@ series_description and outputs **only to sourcedata**.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from heudiconv.utils import SeqInfo
 
 
 def create_key(
-    template: Optional[str],
+    template: str | None,
     outtype: tuple[str, ...] = ("nii.gz",),
     annotation_classes: None = None,
 ) -> tuple[str, tuple[str, ...], None]:
