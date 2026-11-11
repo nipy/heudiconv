@@ -46,6 +46,7 @@ with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     # suppress warning
     import nibabel.nicom.dicomwrappers as dw
+from nibabel.openers import ImageOpener
 
 # TODO: remove the kludge whenever
 # https://github.com/moloney/dcmstack/pull/90 is merged and released
@@ -163,13 +164,49 @@ def create_seqinfo(
     )
 
 
+def wrapper_from_file(fl: str, **kwargs: Any) -> dw.Wrapper:
+    """Create nibabel DICOM wrapper for a file, the same way for any nibabel
+
+    This is nibabel's ``wrapper_from_file`` but with the frame filters for
+    multiframe (enhanced) DICOMs spelled out, so they do not depend on the
+    version of nibabel: we want only the filters which nibabel had by default
+    before 5.5.0.  nibabel 5.5.0 added ``FilterMultiOrient`` to the defaults,
+    which for a stack with multiple frame orientations (e.g. a scout) issues a
+    warning and retains only the frames of the first orientation, thus changing
+    ``image_shape`` (hence ``dim3`` of seqinfo) and other attributes which
+    heuristics might rely on.
+
+    The goal is the stability of what we pass to heuristics, not the
+    correctness of geometry: e.g. ``affine`` of the wrapper for such a stack
+    of frames in different orientations is not meaningful, with any nibabel.
+
+    Parameters
+    ----------
+    fl : str
+      Path to the DICOM file
+    **kwargs
+      Passed to ``pydicom.dcmread``
+    """
+    with ImageOpener(fl) as fobj:
+        dcm_data = dcm.dcmread(fobj, **kwargs)
+    mw: dw.Wrapper = dw.wrapper_from_data(
+        dcm_data,
+        # The list is frozen on purpose (see docstring): revisit whenever
+        # nibabel adds more default filters, test_known_nibabel_frame_filters
+        # would tell.  New instances each time since filters keep the state of
+        # the last wrapper they were applied to.
+        frame_filters=(dw.FilterMultiStack(), dw.FilterDwiIso()),
+    )
+    return mw
+
+
 def validate_dicom(
     fl: str, dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]]
 ) -> Optional[tuple[dw.Wrapper, tuple[int, str], Optional[str]]]:
     """
     Parse DICOM attributes. Returns None if not valid.
     """
-    mw = dw.wrapper_from_file(fl, force=True, stop_before_pixels=True)
+    mw = wrapper_from_file(fl, force=True, stop_before_pixels=True)
     # Workaround for protocol name in private siemens csa header
     if not getattr(mw.dcm_data, "ProtocolName", "").strip():
         mw.dcm_data.ProtocolName = (
@@ -372,21 +409,22 @@ def group_dicoms_into_seqinfos(
 
         ingrp = False
         # check if same series was already converted
-        for idx in range(len(mwgroup)):
-            if mw.is_same_series(mwgroup[idx]):
+        for grp_idx in range(len(mwgroup)):
+            if mw.is_same_series(mwgroup[grp_idx]):
                 if grouping != "all":
                     assert (
-                        mwgroup[idx].dcm_data.get("StudyInstanceUID") == file_studyUID
+                        mwgroup[grp_idx].dcm_data.get("StudyInstanceUID")
+                        == file_studyUID
                     ), "Same series found for multiple different studies"
                 ingrp = True
                 series_id = SeriesID(
-                    mwgroup[idx].dcm_data.SeriesNumber,
-                    mwgroup[idx].dcm_data.ProtocolName,
+                    mwgroup[grp_idx].dcm_data.SeriesNumber,
+                    mwgroup[grp_idx].dcm_data.ProtocolName,
                 )
                 if per_studyUID:
                     series_id = series_id._replace(file_studyUID=file_studyUID)
                 group_keys.append(series_id)
-                group_values.append(idx)
+                group_values.append(grp_idx)
 
         if not ingrp:
             mwgroup.append(mw)
@@ -702,6 +740,11 @@ def embed_dicom_and_nifti_metadata(
 
     from heudiconv.utils import save_json
 
+    # Note: dcmstack creates nibabel DICOM wrappers on its own, with the default
+    # frame filters of nibabel (unlike our wrapper_from_file), and provides no
+    # way to specify them.  So for a multiframe DICOM with multiple frame
+    # orientations nibabel >= 5.5.0 would warn here, and the shape and affine
+    # in the metadata of the stack would be of the first orientation only.
     stack = ds.parse_and_stack(dcmfiles, force=True).values()
     if len(stack) > 1:
         raise ValueError("Found multiple series")
