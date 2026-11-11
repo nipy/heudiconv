@@ -17,6 +17,7 @@ Quick reference
     tox                          # run linting, type checking, and tests as CI would
     tox -e lint                  # flake8 + codespell only
     tox -e typing                # mypy only
+    tox -e py3-lowest            # tests with the lowest supported versions of dependencies
 
 The sections below describe each of those in more detail.
 
