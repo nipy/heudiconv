@@ -20,9 +20,17 @@ from heudiconv.dicoms import (
     get_reproducible_int,
     group_dicoms_into_seqinfos,
     parse_private_csa_header,
+    wrapper_from_file,
 )
 
 from .utils import TEST_DICOM_PATHS, TESTS_DATA_PATH
+
+# An enhanced (multiframe) DICOM of a scout from Siemens XA30, with 3 frames,
+# each in its own orientation
+XA30_ENHANCED_DCM_PATH = op.join(
+    TESTS_DATA_PATH,
+    "MRI_102TD_PHA_S.MR.Chen_Matthews_1.3.1.2022.11.16.15.50.20.357.31204541.dcm",
+)
 
 # Public: Private DICOM tags
 DICOM_FIELDS_TO_TEST = {"ProtocolName": "tProtocolName"}
@@ -137,10 +145,7 @@ def test_get_datetime_from_dcm_from_acq_date_time() -> None:
 def test_get_datetime_from_dcm_from_acq_datetime() -> None:
     # if AcquisitionDate and AcquisitionTime not there, can we rely on AcquisitionDateTime?
     XA30_enhanced_dcm = dcm.dcmread(
-        op.join(
-            TESTS_DATA_PATH,
-            "MRI_102TD_PHA_S.MR.Chen_Matthews_1.3.1.2022.11.16.15.50.20.357.31204541.dcm",
-        ),
+        XA30_ENHANCED_DCM_PATH,
         stop_before_pixels=True,
     )
     dt = get_datetime_from_dcm(XA30_enhanced_dcm)
@@ -152,10 +157,7 @@ def test_get_datetime_from_dcm_from_acq_datetime() -> None:
 def test_get_datetime_from_dcm_from_only_series_date_time() -> None:
     # if acquisition date/time/datetime not available, can we rely on SeriesDate & SeriesTime?
     XA30_enhanced_dcm = dcm.dcmread(
-        op.join(
-            TESTS_DATA_PATH,
-            "MRI_102TD_PHA_S.MR.Chen_Matthews_1.3.1.2022.11.16.15.50.20.357.31204541.dcm",
-        ),
+        XA30_ENHANCED_DCM_PATH,
         stop_before_pixels=True,
     )
     del XA30_enhanced_dcm.AcquisitionDateTime
@@ -169,10 +171,7 @@ def test_get_datetime_from_dcm_from_only_series_date_time() -> None:
 def test_get_datetime_from_dcm_wo_dt() -> None:
     # if there's no known source (e.g., after anonymization), are we still able to proceed?
     XA30_enhanced_dcm = dcm.dcmread(
-        op.join(
-            TESTS_DATA_PATH,
-            "MRI_102TD_PHA_S.MR.Chen_Matthews_1.3.1.2022.11.16.15.50.20.357.31204541.dcm",
-        ),
+        XA30_ENHANCED_DCM_PATH,
         stop_before_pixels=True,
     )
     del XA30_enhanced_dcm.AcquisitionDateTime
@@ -185,7 +184,7 @@ def test_get_datetime_from_dcm_wo_dt() -> None:
 def test_create_seqinfo(
     dcmfile: str,
 ) -> None:
-    mw = dw.wrapper_from_file(dcmfile)
+    mw = wrapper_from_file(dcmfile)
     seqinfo = create_seqinfo(mw, [dcmfile], op.basename(dcmfile))
     assert seqinfo.sequence_name
 
@@ -208,10 +207,7 @@ def test_get_datetime_strings_from_dcm_acq_datetime() -> None:
     # enhanced ones) have only AcquisitionDateTime, and we should still be able
     # to provide date and time
     XA30_enhanced_dcm = dcm.dcmread(
-        op.join(
-            TESTS_DATA_PATH,
-            "MRI_102TD_PHA_S.MR.Chen_Matthews_1.3.1.2022.11.16.15.50.20.357.31204541.dcm",
-        ),
+        XA30_ENHANCED_DCM_PATH,
         stop_before_pixels=True,
     )
     assert "AcquisitionDate" not in XA30_enhanced_dcm
@@ -230,10 +226,7 @@ def test_get_datetime_strings_from_dcm_acq_datetime() -> None:
 def test_get_datetime_strings_from_dcm_series_date_time() -> None:
     # fall back to SeriesDate/SeriesTime if no acquisition date/time/datetime
     XA30_enhanced_dcm = dcm.dcmread(
-        op.join(
-            TESTS_DATA_PATH,
-            "MRI_102TD_PHA_S.MR.Chen_Matthews_1.3.1.2022.11.16.15.50.20.357.31204541.dcm",
-        ),
+        XA30_ENHANCED_DCM_PATH,
         stop_before_pixels=True,
     )
     del XA30_enhanced_dcm.AcquisitionDateTime
@@ -252,10 +245,7 @@ def test_get_datetime_strings_from_dcm_series_date_time() -> None:
 def test_get_datetime_strings_from_dcm_wo_dt() -> None:
     # no date/time information whatsoever (e.g. after anonymization) -- no error
     XA30_enhanced_dcm = dcm.dcmread(
-        op.join(
-            TESTS_DATA_PATH,
-            "MRI_102TD_PHA_S.MR.Chen_Matthews_1.3.1.2022.11.16.15.50.20.357.31204541.dcm",
-        ),
+        XA30_ENHANCED_DCM_PATH,
         stop_before_pixels=True,
     )
     del XA30_enhanced_dcm.AcquisitionDateTime
@@ -278,11 +268,52 @@ def test_get_datetime_strings_from_dcm_partial() -> None:
 
 
 @pytest.mark.ai_generated
+def test_multi_orientation_seqinfo() -> None:
+    # nibabel >= 5.5.0 by default would warn (our pytest configuration turns
+    # warnings into errors) and retain only the frames of the first orientation.
+    # We want all the frames, and thus the same seqinfo, with any nibabel.
+    mw = wrapper_from_file(XA30_ENHANCED_DCM_PATH, force=True, stop_before_pixels=True)
+    assert isinstance(mw, dw.MultiframeWrapper)
+    assert len(mw.frames) == 3
+    assert mw.image_shape == (162, 162, 3)
+
+    # and that is what we get through the code path used while converting
+    seqinfos = group_dicoms_into_seqinfos(
+        [XA30_ENHANCED_DCM_PATH], "studyUID", flatten=True
+    )
+    (seqinfo,) = seqinfos
+    assert (seqinfo.dim1, seqinfo.dim2, seqinfo.dim3, seqinfo.dim4) == (162, 162, 3, 1)
+
+
+@pytest.mark.ai_generated
+def test_known_nibabel_frame_filters() -> None:
+    # wrapper_from_file deliberately does not follow the default frame filters
+    # of nibabel.  Fail whenever nibabel gains a default filter we have not
+    # considered yet, so we make a conscious decision on either to adopt it in
+    # wrapper_from_file (it could change seqinfo) or to list it here.
+    default_filters = getattr(
+        dw,
+        "DEFAULT_FRAME_FILTERS",
+        # was misspelled before nibabel 5.5.0
+        getattr(dw, "DEFUALT_FRAME_FILTERS", None),
+    )
+    assert (
+        default_filters is not None
+    ), "nibabel no longer exposes default frame filters under a known name"
+    assert {type(f).__name__ for f in default_filters} <= {
+        "FilterMultiStack",
+        "FilterDwiIso",
+        # added in 5.5.0, intentionally not used by wrapper_from_file
+        "FilterMultiOrient",
+    }
+
+
+@pytest.mark.ai_generated
 @pytest.mark.parametrize("dcmfile", TEST_DICOM_PATHS)
 def test_create_seqinfo_date_time(dcmfile: str) -> None:
     # all our test DICOMs do carry some date/time information, and seqinfo
     # should expose it regardless of which tags it comes from
-    mw = dw.wrapper_from_file(dcmfile)
+    mw = wrapper_from_file(dcmfile)
     seqinfo = create_seqinfo(mw, [dcmfile], op.basename(dcmfile))
     assert seqinfo.date is not None
     assert seqinfo.time is not None
@@ -317,10 +348,7 @@ def test_get_reproducible_int_wo_dt(tmp_path: Path) -> None:
 def test_get_reproducible_int_raises_assertion_wo_dt(tmp_path: Path) -> None:
     # if there's no known source (e.g., after anonymization), is AssertionError Raised?
     XA30_enhanced_dcm = dcm.dcmread(
-        op.join(
-            TESTS_DATA_PATH,
-            "MRI_102TD_PHA_S.MR.Chen_Matthews_1.3.1.2022.11.16.15.50.20.357.31204541.dcm",
-        ),
+        XA30_ENHANCED_DCM_PATH,
         stop_before_pixels=True,
     )
     del XA30_enhanced_dcm.AcquisitionDateTime

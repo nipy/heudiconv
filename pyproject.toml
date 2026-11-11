@@ -41,11 +41,7 @@ dependencies = [
     # what nipype (see below) requires anyways
     "etelemetry>=0.3.1",
     "filelock>=3.0.12",
-    # 5.5.0 added FilterMultiOrient to the default frame filters of the
-    # multiframe DICOM wrapper: it warns, and changes the shape (hence seqinfo
-    # dim3) reported for multi-orientation stacks such as scouts.
-    # TODO: lift the ceiling once we decided how to handle that
-    "nibabel>=5.3.1,<5.5",
+    "nibabel>=5.3.1",
     # 1.9.0 does not work with traits 7, which it allows.  1.8.6 works (it
     # requires older traits), but issues a warning on an invalid escape
     # sequence, which our tests treat as an error.
