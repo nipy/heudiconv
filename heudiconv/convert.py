@@ -16,6 +16,7 @@ import filelock
 from nipype import Node
 from nipype.interfaces.base import TraitListObject
 
+from .archives import tempdirs as archive_tempdirs
 from .bids import (
     BIDS_VERSION,
     BIDSError,
@@ -199,12 +200,18 @@ def prep_conversion(
         lgr.info("Reloading existing filegroup.json " "because %s exists", edit_file)
         info = read_config(edit_file)
         filegroup = load_json(filegroup_file)
-        # XXX Yarik finally understood why basedir was dragged along!
-        # So we could reuse the same PATHs definitions possibly consistent
-        # across re-runs... BUT that wouldn't work anyways if e.g.
-        # DICOMs dumped with SOP UUIDs thus differing across runs etc
-        # So either it would need to be brought back or reconsidered altogether
-        # (since no sample data to test on etc)
+        # The saved archive references must point to this run's extraction.
+        input_dicoms = dicoms or [
+            filename for files in (seqinfo or {}).values() for filename in files
+        ]
+        current_files = {
+            archive_tempdirs.source_path(filename): filename
+            for filename in input_dicoms
+        }
+        filegroup = {
+            series: [current_files.get(filename, filename) for filename in files]
+            for series, files in filegroup.items()
+        }
     else:
         assure_no_file_exists(target_heuristic_filename)
         safe_copyfile(heuristic.filename, target_heuristic_filename)
@@ -239,7 +246,13 @@ def prep_conversion(
         write_config(info_file, info)
         assure_no_file_exists(edit_file)
         write_config(edit_file, info)
-        save_json(filegroup_file, filegroup)
+        save_json(
+            filegroup_file,
+            {
+                series: [archive_tempdirs.source_path(filename) for filename in files]
+                for series, files in filegroup.items()
+            },
+        )
 
     if bids_options is not None:
         # the other portion of the path would mimic BIDS layout
