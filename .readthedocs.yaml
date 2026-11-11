@@ -1,14 +1,25 @@
 version: 2
 formats: all
-python:
-  install:
-    - requirements: docs/requirements.txt
-    - method: pip
-      path: .
 build:
   os: ubuntu-24.04
   tools:
-    python: "3.9"
+    python: "3.13"
+  jobs:
+    post_checkout:
+      # RTD clones shallowly and without tags, whereas versioningit needs to
+      # reach the most recent release tag to come up with the version -- which
+      # is what the docs get labeled with, and without which heudiconv does not
+      # even install.
+      - git fetch --unshallow --tags || git fetch --tags
+python:
+  install:
+    # The docs requirements are the "docs" extra of pyproject.toml, so that
+    # RTD, tox (-e docs), and CI all build with the very same environment.
+    - method: pip
+      path: .
+      extra_requirements:
+        - all
+        - docs
 sphinx:
   configuration: docs/conf.py
   fail_on_warning: true

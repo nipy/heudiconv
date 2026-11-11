@@ -6,7 +6,6 @@ from glob import glob
 import json
 import os.path as op
 from pathlib import Path
-from typing import Optional
 
 import pytest
 
@@ -252,9 +251,9 @@ def test_populate_intended_for(
     monkeypatch: pytest.MonkeyPatch,
     capfd: pytest.CaptureFixture[str],
     subjects: list[str],
-    sesID: Optional[str],
+    sesID: str | None,
     _expected_session_folder: str,
-    heuristic: Optional[str],
+    heuristic: str | None,
 ) -> None:
     """
     Test convert

@@ -1,4 +1,0 @@
-# should be "installed" from top directory since that one refers to .[all]
-sphinx-argparse
-sphinxcontrib-napoleon
--r ../dev-requirements.txt

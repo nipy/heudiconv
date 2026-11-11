@@ -1,3 +1,25 @@
+# v1.6.0 (Tue Nov 10 2026)
+
+#### 🚀 Enhancement
+
+- feat: rename BIDS files for multi-orientation series (rebase of #788 + fixes) [#869](https://github.com/nipy/heudiconv/pull/869) ([@bpinsard](https://github.com/bpinsard) [@claude](https://github.com/claude) [@yarikoptic-gitmate](https://github.com/yarikoptic-gitmate))
+
+#### 🏠 Internal
+
+- Improve type safety and modernize CI Python version [#885](https://github.com/nipy/heudiconv/pull/885) ([@claude](https://github.com/claude) [@yarikoptic-gitmate](https://github.com/yarikoptic-gitmate))
+
+#### 📝 Documentation
+
+- Consolidate documentation build configuration [#884](https://github.com/nipy/heudiconv/pull/884) ([@claude](https://github.com/claude) [@yarikoptic-gitmate](https://github.com/yarikoptic-gitmate))
+
+#### Authors: 3
+
+- Basile ([@bpinsard](https://github.com/bpinsard))
+- Claude ([@claude](https://github.com/claude))
+- GitMate for @yarikoptic ([@yarikoptic-gitmate](https://github.com/yarikoptic-gitmate))
+
+---
+
 # v1.5.1 (Fri Sep 18 2026)
 
 #### 🐛 Bug Fix

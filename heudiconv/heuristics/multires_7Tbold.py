@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 import pydicom as dcm
 
 from heudiconv.utils import SeqInfo
@@ -10,7 +8,7 @@ scaninfo_suffix = ".json"
 
 
 def create_key(
-    template: Optional[str],
+    template: str | None,
     outtype: tuple[str, ...] = ("nii.gz",),
     annotation_classes: None = None,
 ) -> tuple[str, tuple[str, ...], None]:

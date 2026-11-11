@@ -5,7 +5,7 @@ import inspect
 import logging
 import os
 import os.path as op
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from ..info import MIN_DATALAD_VERSION as MIN_VERSION
 from ..utils import SeqInfo, create_file_if_missing
@@ -19,11 +19,11 @@ if TYPE_CHECKING:
 def prepare_datalad(
     studydir: str,
     outdir: str,
-    sid: Optional[str],
+    sid: str | None,
     session: str | int | None,
-    seqinfo: Optional[dict[SeqInfo, list[str]]],
-    dicoms: Optional[list[str]],
-    bids: Optional[str],
+    seqinfo: dict[SeqInfo, list[str]] | None,
+    dicoms: list[str] | None,
+    bids: str | None,
 ) -> str:
     """Prepare data for datalad"""
     from datalad.api import Dataset
@@ -46,7 +46,7 @@ def prepare_datalad(
 
 
 def add_to_datalad(
-    topdir: str, studydir: str, msg: Optional[str], bids: Optional[str]  # noqa: U100
+    topdir: str, studydir: str, msg: str | None, bids: str | None  # noqa: U100
 ) -> None:
     """Do all necessary preparations (if were not done before) and save"""
     import datalad.api as dl
