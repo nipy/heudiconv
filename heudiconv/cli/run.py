@@ -5,7 +5,6 @@ from argparse import ArgumentParser
 import logging
 import os
 import sys
-from typing import Optional
 
 from .. import __version__
 from ..main import workflow
@@ -13,7 +12,7 @@ from ..main import workflow
 lgr = logging.getLogger(__name__)
 
 
-def main(argv: Optional[list[str]] = None) -> None:
+def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(
         format="%(levelname)s: %(message)s",
         level=getattr(logging, os.environ.get("HEUDICONV_LOG_LEVEL", "INFO")),

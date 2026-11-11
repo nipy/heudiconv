@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from heudiconv.utils import SeqInfo
 
@@ -9,7 +8,7 @@ lgr = logging.getLogger("heudiconv")
 
 
 def create_key(
-    template: Optional[str],
+    template: str | None,
     outtype: tuple[str, ...] = ("nii.gz",),
     annotation_classes: None = None,
 ) -> tuple[str, tuple[str, ...], None]:

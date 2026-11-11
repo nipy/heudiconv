@@ -5,7 +5,7 @@ import logging
 import os.path as op
 import sys
 from types import TracebackType
-from typing import Any, Optional
+from typing import Any
 
 from . import __packagename__, __version__
 from .bids import populate_bids_templates, populate_intended_for, tuneup_bids_json_files
@@ -38,7 +38,7 @@ def setup_exceptionhook() -> None:
     def _pdb_excepthook(
         exc_type: type[BaseException],
         exc_value: BaseException,
-        tb: Optional[TracebackType],
+        tb: TracebackType | None,
     ) -> None:
         if is_interactive():
             import pdb
@@ -56,10 +56,10 @@ def setup_exceptionhook() -> None:
 def process_extra_commands(
     outdir: str,
     command: str,
-    files: Optional[list[str]],
-    heuristic: Optional[str],
-    session: Optional[str],
-    subjs: Optional[list[str]],
+    files: list[str] | None,
+    heuristic: str | None,
+    session: str | None,
+    subjs: list[str] | None,
     grouping: str,
 ) -> None:
     """
@@ -191,7 +191,7 @@ def process_extra_commands(
         raise ValueError("Unknown command %s" % command)
 
 
-def ensure_heuristic_arg(heuristic: Optional[str] = None) -> None:
+def ensure_heuristic_arg(heuristic: str | None = None) -> None:
     """
     Check that the heuristic argument was provided.
     """
@@ -213,28 +213,28 @@ def ensure_heuristic_arg(heuristic: Optional[str] = None) -> None:
 )
 def workflow(
     *,
-    dicom_dir_template: Optional[str] = None,
-    files: Optional[list[str]] = None,
-    subjs: Optional[list[str]] = None,
+    dicom_dir_template: str | None = None,
+    files: list[str] | None = None,
+    subjs: list[str] | None = None,
     converter: str = "dcm2niix",
     outdir: str = ".",
-    locator: Optional[str] = None,
-    conv_outdir: Optional[str] = None,
-    anon_cmd: Optional[str] = None,
-    heuristic: Optional[str] = None,
+    locator: str | None = None,
+    conv_outdir: str | None = None,
+    anon_cmd: str | None = None,
+    heuristic: str | None = None,
     with_prov: bool = False,
-    session: Optional[str] = None,
-    bids_options: Optional[str] = None,
+    session: str | None = None,
+    bids_options: str | None = None,
     overwrite: bool = False,
     datalad: bool = False,
     debug: bool = False,
-    command: Optional[str] = None,
+    command: str | None = None,
     grouping: str = "studyUID",
     minmeta: bool = False,
-    random_seed: Optional[int] = None,
-    dcmconfig: Optional[str] = None,
-    queue: Optional[str] = None,
-    queue_args: Optional[str] = None,
+    random_seed: int | None = None,
+    dcmconfig: str | None = None,
+    queue: str | None = None,
+    queue_args: str | None = None,
 ) -> None:
     """Run the HeuDiConv conversion workflow.
 

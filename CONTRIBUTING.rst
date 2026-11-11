@@ -100,7 +100,7 @@ The following pull request labels are respected:
 Development environment
 -----------------------
 
-We support Python 3 only (>= 3.9), and test against all Python versions from 3.9 through 3.13.
+We support Python 3 only (>= 3.10), and test against all Python versions from 3.10 through 3.14.
 
 Dependencies which you will need are listed in `pyproject.toml <./pyproject.toml>`_.
 Note that you will likely have these will already be available on your system if you used a
