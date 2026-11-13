@@ -7,6 +7,7 @@ import os.path as op
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
+import warnings
 
 import pydicom as dcm
 import pytest
@@ -532,34 +533,13 @@ def test_estimate_scan_duration_from_times_skips_malformed_timestamp(
 ) -> None:
     # a malformed date/time in one (non-first) file should be skipped with
     # a warning, not raise and abort the whole (best-effort) estimate
-    import warnings
-
-    import pydicom.config as dcm_config
-
-    offsets = [0, 1, 3]
-    dicom_list = []
-    for i, offset in enumerate(offsets):
-        dcm_data = dcm.dcmread(
-            op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
-        )
-        dcm_data.AcquisitionDate = "20200101"
-        if i == 1:
-            # bypass pydicom's own VR validation so a genuinely malformed
-            # value (as could come from a non-conformant scanner) can be
-            # written out for this test
-            old_mode = dcm_config.settings.writing_validation_mode
-            dcm_config.settings.writing_validation_mode = dcm_config.IGNORE
-            try:
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
-                    dcm_data.AcquisitionTime = "not-a-time"
-            finally:
-                dcm_config.settings.writing_validation_mode = old_mode
-        else:
-            dcm_data.AcquisitionTime = "%06d.000000" % (120000 + offset)
-        out = tmp_path / f"f{i}.dcm"
-        dcm.dcmwrite(str(out), dcm_data)
-        dicom_list.append(str(out))
+    dicom_list = make_timed_dicoms(tmp_path, [0, 1, 3])
+    dcm_data = dcm.dcmread(dicom_list[1], stop_before_pixels=True)
+    with warnings.catch_warnings():
+        # pydicom >= 2.3 warns about the invalid value
+        warnings.simplefilter("ignore")
+        dcm_data.AcquisitionTime = "not-a-time"
+    dcm.dcmwrite(dicom_list[1], dcm_data)
 
     # the malformed file (offset 1) is skipped; span (3s) + median interval
     # of the remaining single interval (3s) between the two good timestamps
@@ -650,11 +630,9 @@ def test_estimate_scan_duration_from_times_wo_dt(tmp_path: Path) -> None:
     # no usable date/time information (e.g. stripped by anonymization) --
     # use two distinct files, so this also rules out the "single unique
     # timestamp" case rather than just a single-file list
-    outs = []
-    for i in range(2):
-        dcm_data = dcm.dcmread(
-            op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
-        )
+    dicom_list = make_timed_dicoms(tmp_path, [0, 1])
+    for fn in dicom_list:
+        dcm_data = dcm.dcmread(fn, stop_before_pixels=True)
         for field in (
             "AcquisitionDate",
             "AcquisitionTime",
@@ -664,10 +642,8 @@ def test_estimate_scan_duration_from_times_wo_dt(tmp_path: Path) -> None:
         ):
             if field in dcm_data:
                 delattr(dcm_data, field)
-        out = tmp_path / f"no_dt_{i}.dcm"
-        dcm.dcmwrite(str(out), dcm_data)
-        outs.append(str(out))
-    assert estimate_scan_duration_from_times(outs) is None
+        dcm.dcmwrite(fn, dcm_data)
+    assert estimate_scan_duration_from_times(dicom_list) is None
 
 
 @pytest.mark.ai_generated
@@ -676,26 +652,30 @@ def test_get_acquisition_duration_empty() -> None:
 
 
 @pytest.mark.ai_generated
-def test_get_acquisition_duration_prefers_tag(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    "offsets,tag,expected",
+    [
+        ([0], 12.5, 12.5),  # nothing to cross-check the tag against
+        # timestamps span 7s, estimate 7s + 2s median interval = 9s
+        ([2, 0, 4, 7], 10.0, 10.0),  # the tag is plausible
+        ([2, 0, 4, 7], 602.0, 9.0),  # e.g. the full protocol of an aborted run
+        ([2, 0, 4, 7], 2.0, 9.0),  # shorter than what was acquired
+    ],
+)
+def test_get_acquisition_duration_cross_checks_tag(
+    tmp_path: Path, offsets: list[int], tag: float, expected: float
 ) -> None:
-    # when a tag is present, the (more expensive) per-file timestamp scan
-    # should not even be attempted
-    def _boom(_dicom_list: list[str]) -> float:
-        raise AssertionError("should not be called")
-
-    monkeypatch.setattr("heudiconv.dicoms.estimate_scan_duration_from_times", _boom)
-    dcm_data = dcm.dcmread(
-        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
-    )
-    dcm_data.add_new((0x0018, 0x9073), "FD", 12.5)
-    out = tmp_path / "with_tag.dcm"
-    dcm.dcmwrite(str(out), dcm_data)
-    assert get_acquisition_duration([str(out)]) == pytest.approx(12.5)
+    dicom_list = make_timed_dicoms(tmp_path, offsets)
+    for fn in dicom_list:
+        dcm_data = dcm.dcmread(fn, stop_before_pixels=True)
+        dcm_data.add_new((0x0018, 0x9073), "FD", tag)
+        dcm.dcmwrite(fn, dcm_data)
+    assert get_acquisition_duration(dicom_list) == pytest.approx(expected)
 
 
 @pytest.mark.ai_generated
 def test_get_acquisition_duration_falls_back_to_times() -> None:
+    # preferred over this fixture's CSA-declared 591s
     dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))
     assert get_acquisition_duration(dicom_list) == pytest.approx(12.45)
 
@@ -709,15 +689,6 @@ def test_get_acquisition_duration_falls_back_to_declared_duration() -> None:
     # source left
     dcm_fn = op.join(TESTS_DATA_PATH, "phantom.dcm")
     assert get_acquisition_duration([dcm_fn]) == pytest.approx(14.0)
-
-
-@pytest.mark.ai_generated
-def test_get_acquisition_duration_prefers_times_over_declared_duration() -> None:
-    # this fixture's own CSA header declares 591s (see test_dicoms data),
-    # wildly more than its real per-file timestamp span (12.45s) -- since a
-    # multi-file timestamp span IS available here, it must be preferred
-    dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))
-    assert get_acquisition_duration(dicom_list) == pytest.approx(12.45)
 
 
 @pytest.mark.ai_generated

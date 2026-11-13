@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Callable
-import csv
 from datetime import datetime, timedelta
 from glob import glob
 import itertools
@@ -34,8 +33,6 @@ from heudiconv.bids import (
     _duration_from_nifti_sidecar,
     _find_bids_dataset_root,
     _find_json_sidecar,
-    _get_retrospective_duration,
-    _is_within_directory,
     _merge_scans_header,
     _read_scans_tsv,
     _set_sidecar_acquisition_time,
@@ -58,10 +55,12 @@ from heudiconv.bids import (
     tuneup_bids_json_files,
 )
 from heudiconv.cli.run import main as runner
+from heudiconv.convert import add_taskname_to_infofile
 from heudiconv.dicoms import compress_dicoms
 from heudiconv.utils import (
     Load,
     TempDirs,
+    _is_within_directory,
     create_tree,
     is_readonly,
     load_json,
@@ -1827,14 +1826,13 @@ def test_sanitize_label() -> None:
         sanitize_label(" @ ")
 
 
-def _read_scans_rows(
-    scans_tsv: Path,
-) -> tuple[list[str] | None, list[dict[str, str]]]:
-    """Read a `_scans.tsv` file, returning its (fieldnames, rows)."""
-    with open(scans_tsv, newline="") as f:
-        reader = csv.DictReader(f, delimiter="\t")
-        fieldnames = list(reader.fieldnames) if reader.fieldnames else None
-        return fieldnames, list(reader)
+def _add_sourcedata(
+    bids_root: Path, dicom_list: list[str], stem: str = "sub-01_task-rest_bold"
+) -> None:
+    """Package `dicom_list` under sourcedata/ as heudiconv does for `stem`."""
+    sourcedata_dir = bids_root / "sourcedata" / "sub-01" / "func"
+    sourcedata_dir.mkdir(parents=True, exist_ok=True)
+    compress_dicoms(dicom_list, str(sourcedata_dir / stem), TempDirs(), overwrite=True)
 
 
 @pytest.fixture
@@ -1885,21 +1883,13 @@ def test_populate_scans_duration_from_sourcedata(
     # package the same source DICOMs heudiconv itself would have, under
     # sourcedata/, mirroring the converted file's relative path:
     dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))
-    sourcedata_dir = bids_root / "sourcedata" / "sub-01" / "func"
-    sourcedata_dir.mkdir(parents=True)
-    compress_dicoms(
-        dicom_list,
-        str(sourcedata_dir / "sub-01_task-rest_bold"),
-        TempDirs(),
-        overwrite=True,
-    )
-    assert (sourcedata_dir / "sub-01_task-rest_bold.dicom.tgz").exists()
+    _add_sourcedata(bids_root, dicom_list)
 
     populate_scans_duration(str(bids_root))
 
-    fieldnames, rows = _read_scans_rows(scans_tsv)
+    fieldnames, rows = _read_scans_tsv(str(scans_tsv))
     assert fieldnames == ["filename", "acq_time", "duration"]
-    assert float(rows[0]["duration"]) == pytest.approx(12.45)
+    assert rows[0]["duration"] == "12.450"
 
     # the dataset-level data dictionary should now document 'duration' too
     scans_json = load_json(str(bids_root / "scans.json"))
@@ -1907,45 +1897,68 @@ def test_populate_scans_duration_from_sourcedata(
 
 
 @pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "outputs,tarball",
+    [
+        # heudiconv inserts e.g. echo-N into each output's name...
+        (
+            ["sub-01_task-rest_echo-1_bold", "sub-01_task-rest_echo-2_bold"],
+            "sub-01_task-rest_bold",
+        ),
+        # ...or appends an index to its suffix
+        (["sub-01_magnitude1", "sub-01_magnitude2"], "sub-01_magnitude"),
+    ],
+)
 def test_populate_scans_duration_from_sourcedata_multi_output_item(
+    tmp_path: Path,
     tmp_bids_with_scans: tuple[Path, Path],
+    outputs: list[str],
+    tarball: str,
 ) -> None:
-    # Regression test for a real pre-merge review finding on PR #872:
-    # dcm2niix can split one converted item into several outputs (e.g.
-    # echo-1/echo-2) that all share one sourcedata tarball, named after the
-    # item's own prefix rather than any single output's full stem -- so an
-    # exact-stem tarball lookup misses it for every such output.
+    # all outputs of an item share one sourcedata tarball, named after the item
     bids_root, scans_tsv = tmp_bids_with_scans
     func_dir = bids_root / "sub-01" / "func"
-    for echo in (1, 2):
-        nifti_fn = func_dir / f"sub-01_task-rest_echo-{echo}_bold.nii.gz"
-        nifti_fn.write_bytes(b"")
-        save_json(str(func_dir / f"sub-01_task-rest_echo-{echo}_bold.json"), {})
+    # sidecar times of an item's outputs may legitimately differ (e.g.
+    # localizer planes)
+    sidecar_times = ["12:00:02.000000", "12:00:04.000000"]
+    for output, sidecar_time in zip(outputs, sidecar_times, strict=True):
+        (func_dir / f"{output}.nii.gz").write_bytes(b"")
+        save_json(str(func_dir / f"{output}.json"), {"AcquisitionTime": sidecar_time})
     scans_tsv.write_text(
         "filename\tacq_time\n"
-        "func/sub-01_task-rest_echo-1_bold.nii.gz\tn/a\n"
-        "func/sub-01_task-rest_echo-2_bold.nii.gz\tn/a\n"
+        + "".join(f"func/{output}.nii.gz\t2020-01-01T12:00:02\n" for output in outputs)
     )
+    _add_sourcedata(bids_root, make_timed_dicoms(tmp_path, [2, 0, 4, 7]), tarball)
 
-    # the tarball is named after the shared item prefix, with neither
-    # output's own echo-N suffix
-    dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))
-    sourcedata_dir = bids_root / "sourcedata" / "sub-01" / "func"
-    sourcedata_dir.mkdir(parents=True)
-    compress_dicoms(
-        dicom_list,
-        str(sourcedata_dir / "sub-01_task-rest"),
-        TempDirs(),
-        overwrite=True,
-    )
+    populate_scans_duration(str(bids_root), fix_acq_time=True)
 
-    populate_scans_duration(str(bids_root))
+    # duration and acq_time, the same for all outputs of an item, are fixed...
+    _, rows = _read_scans_tsv(str(scans_tsv))
+    assert [(row["acq_time"], row["duration"]) for row in rows] == [
+        ("2020-01-01T12:00:00", "9.000")
+    ] * 2
+    # ...but not the sidecars, which only conversion sees all together
+    assert [
+        load_json(func_dir / f"{output}.json")["AcquisitionTime"] for output in outputs
+    ] == sidecar_times
 
-    _, rows = _read_scans_rows(scans_tsv)
-    assert [float(row["duration"]) for row in rows] == [
-        pytest.approx(12.45),
-        pytest.approx(12.45),
-    ]
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize("filename", ["../../outside.nii.gz", "/outside.nii.gz"])
+def test_populate_scans_duration_refuses_paths_outside_dataset(
+    tmp_bids_with_scans: tuple[Path, Path],
+    caplog: pytest.LogCaptureFixture,
+    filename: str,
+) -> None:
+    bids_root, scans_tsv = tmp_bids_with_scans
+    scans_tsv.write_text(f"filename\tacq_time\n{filename}\tn/a\n")
+
+    caplog.set_level(logging.WARNING, logger="heudiconv.bids")
+    populate_scans_duration(str(bids_root), overwrite=True)
+
+    assert "resolves outside of the dataset" in caplog.text
+    _, rows = _read_scans_tsv(str(scans_tsv))
+    assert rows[0]["duration"] == "n/a"
 
 
 @pytest.mark.ai_generated
@@ -1981,22 +1994,15 @@ def test_populate_scans_duration_warns_and_optionally_fixes_acq_time(
     offsets = [2, 0, 4, 7]
     dicom_list = make_timed_dicoms(tmp_path, offsets)
 
-    sourcedata_dir = bids_root / "sourcedata" / "sub-01" / "func"
-    sourcedata_dir.mkdir(parents=True)
-    compress_dicoms(
-        dicom_list,
-        str(sourcedata_dir / "sub-01_task-rest_bold"),
-        TempDirs(),
-        overwrite=True,
-    )
+    _add_sourcedata(bids_root, dicom_list)
 
     caplog.set_level(logging.WARNING, logger="heudiconv.bids")
     populate_scans_duration(str(bids_root))
 
-    _, rows = _read_scans_rows(scans_tsv)
+    _, rows = _read_scans_tsv(str(scans_tsv))
     # duration is the true span (0 to 7 = 7s) + median interval (2s) = 9s,
     # not anchored on the stored (biased) acq_time
-    assert float(rows[0]["duration"]) == pytest.approx(9.0)
+    assert rows[0]["duration"] == "9.000"
     # acq_time itself is left untouched without fix_acq_time...
     assert rows[0]["acq_time"] == "2020-01-01T12:00:02"
     # ...but the disagreement (2s stored vs. 0s re-derived) was warned about
@@ -2008,9 +2014,9 @@ def test_populate_scans_duration_warns_and_optionally_fixes_acq_time(
 
     caplog.clear()
     populate_scans_duration(str(bids_root), overwrite=True, fix_acq_time=True)
-    _, rows = _read_scans_rows(scans_tsv)
+    _, rows = _read_scans_tsv(str(scans_tsv))
     assert rows[0]["acq_time"] == "2020-01-01T12:00:00"
-    assert float(rows[0]["duration"]) == pytest.approx(9.0)
+    assert rows[0]["duration"] == "9.000"
     # and, once acq_time is fixed, the sidecar's AcquisitionTime too
     assert load_json(sidecar)["AcquisitionTime"] == "12:00:00.000000"
     assert is_readonly(str(sidecar))
@@ -2036,25 +2042,18 @@ def test_populate_scans_duration_naive_stored_vs_aware_dicoms(
     )
 
     dicom_list = make_timed_dicoms(tmp_path, [2, 0, 4, 7], tz_offset="+0100")
-    sourcedata_dir = bids_root / "sourcedata" / "sub-01" / "func"
-    sourcedata_dir.mkdir(parents=True)
-    compress_dicoms(
-        dicom_list,
-        str(sourcedata_dir / "sub-01_task-rest_bold"),
-        TempDirs(),
-        overwrite=True,
-    )
+    _add_sourcedata(bids_root, dicom_list)
 
     caplog.set_level(logging.WARNING, logger="heudiconv.bids")
     populate_scans_duration(str(bids_root))  # must not raise
 
-    _, rows = _read_scans_rows(scans_tsv)
-    assert float(rows[0]["duration"]) == pytest.approx(9.0)
+    _, rows = _read_scans_tsv(str(scans_tsv))
+    assert rows[0]["duration"] == "9.000"
     assert "differs from the earliest acquisition" in caplog.text
 
     caplog.clear()
     populate_scans_duration(str(bids_root), overwrite=True, fix_acq_time=True)
-    _, rows = _read_scans_rows(scans_tsv)
+    _, rows = _read_scans_tsv(str(scans_tsv))
     # fixed value keeps the stored value's (naive) style, not the DICOMs'
     assert rows[0]["acq_time"] == "2020-01-01T12:00:00"
 
@@ -2078,40 +2077,14 @@ def test_populate_scans_duration_does_not_fix_large_anonymization_gap(
     )
 
     dicom_list = make_timed_dicoms(tmp_path, [2, 0, 4, 7])
-    sourcedata_dir = bids_root / "sourcedata" / "sub-01" / "func"
-    sourcedata_dir.mkdir(parents=True)
-    compress_dicoms(
-        dicom_list,
-        str(sourcedata_dir / "sub-01_task-rest_bold"),
-        TempDirs(),
-        overwrite=True,
-    )
+    _add_sourcedata(bids_root, dicom_list)
 
     caplog.set_level(logging.WARNING, logger="heudiconv.bids")
     populate_scans_duration(str(bids_root), fix_acq_time=True)
 
     assert "looks anonymized/date-shifted, not fixing" in caplog.text
-    _, rows = _read_scans_rows(scans_tsv)
+    _, rows = _read_scans_tsv(str(scans_tsv))
     assert rows[0]["acq_time"] == "1900-01-01T12:00:02"  # left untouched
-
-
-@pytest.mark.ai_generated
-def test_set_sidecar_acquisition_time_writes_pretty_json(tmp_path: Path) -> None:
-    # Regression test for a real pre-merge review finding on PR #872:
-    # _set_sidecar_acquisition_time() must not reintroduce the
-    # formatting-only diffs that 77e1a07 removed from tuneup_bids_json_files
-    json_fn = tmp_path / "sub-01_task-rest_bold.json"
-    save_json(
-        str(json_fn),
-        {"AcquisitionTime": "12:00:02.000000", "ShimSetting": [1, 2, 3, 4, 5, 6]},
-        pretty=True,
-    )
-
-    _set_sidecar_acquisition_time(str(json_fn), "12:00:00.000000")
-
-    lines = json_fn.read_text().splitlines()
-    assert sum("ShimSetting" in line for line in lines) == 1
-    assert load_json(str(json_fn))["AcquisitionTime"] == "12:00:00.000000"
 
 
 @pytest.mark.ai_generated
@@ -2151,7 +2124,7 @@ def test_add_rows_to_scans_keys_file_refreshes_existing_row(tmp_path: Path) -> N
         },
     )
 
-    _, rows = _read_scans_rows(scans_tsv)
+    _, rows = _read_scans_tsv(str(scans_tsv))
     by_filename = {row["filename"]: row for row in rows}
     assert by_filename["func/sub-01_task-rest_bold.nii.gz"]["acq_time"] == (
         "2020-01-01T12:00:00"
@@ -2388,14 +2361,7 @@ def test_populate_scans_duration_fix_acq_time_leaves_sidecar(
         "func/sub-01_task-rest_bold.nii.gz\t2020-01-01T12:00:02\n"
     )
     if case == "inherited":
-        sourcedata_dir = bids_root / "sourcedata" / "sub-01" / "func"
-        sourcedata_dir.mkdir(parents=True)
-        compress_dicoms(
-            make_timed_dicoms(tmp_path, [2, 0, 4, 7]),
-            str(sourcedata_dir / "sub-01_task-rest_bold"),
-            TempDirs(),
-            overwrite=True,
-        )
+        _add_sourcedata(bids_root, make_timed_dicoms(tmp_path, [2, 0, 4, 7]))
 
     caplog.set_level(logging.WARNING, logger="heudiconv.bids")
     populate_scans_duration(str(bids_root), overwrite=True, fix_acq_time=True)
@@ -2441,11 +2407,11 @@ def test_populate_scans_duration_from_nifti_sidecar(
 
     populate_scans_duration(str(bids_root))
 
-    _, rows = _read_scans_rows(scans_tsv)
+    _, rows = _read_scans_tsv(str(scans_tsv))
     if expected is None:
         assert rows[0]["duration"] == "n/a"
     else:
-        assert float(rows[0]["duration"]) == pytest.approx(expected)
+        assert rows[0]["duration"] == "%.3f" % expected
 
 
 @pytest.mark.ai_generated
@@ -2462,13 +2428,13 @@ def test_populate_scans_duration_overwrite(
 
     # by default, an existing value is left untouched:
     populate_scans_duration(str(bids_root))
-    _, rows = _read_scans_rows(scans_tsv)
+    _, rows = _read_scans_tsv(str(scans_tsv))
     assert rows[0]["duration"] == "1.0"
 
     # with overwrite=True, it gets recomputed:
     populate_scans_duration(str(bids_root), overwrite=True)
-    _, rows = _read_scans_rows(scans_tsv)
-    assert float(rows[0]["duration"]) == pytest.approx(20.0)
+    _, rows = _read_scans_tsv(str(scans_tsv))
+    assert rows[0]["duration"] == "20.000"
 
 
 @pytest.mark.ai_generated
@@ -2493,8 +2459,8 @@ def test_populate_scans_duration_direct_file_path(
 
     populate_scans_duration(str(scans_tsv))
 
-    _, rows = _read_scans_rows(scans_tsv)
-    assert float(rows[0]["duration"]) == pytest.approx(20.0)
+    _, rows = _read_scans_tsv(str(scans_tsv))
+    assert rows[0]["duration"] == "20.000"
 
 
 @pytest.mark.ai_generated
@@ -2519,19 +2485,12 @@ def test_populate_scans_duration_tarball_present_but_unusable_falls_back(
     single_dicom_fn = tmp_path / "stripped.dcm"
     pydicom.dcmwrite(str(single_dicom_fn), dcm_data)
 
-    sourcedata_dir = bids_root / "sourcedata" / "sub-01" / "func"
-    sourcedata_dir.mkdir(parents=True)
-    compress_dicoms(
-        [str(single_dicom_fn)],
-        str(sourcedata_dir / "sub-01_task-rest_bold"),
-        TempDirs(),
-        overwrite=True,
-    )
+    _add_sourcedata(bids_root, [str(single_dicom_fn)])
 
     populate_scans_duration(str(bids_root))
 
-    _, rows = _read_scans_rows(scans_tsv)
-    assert float(rows[0]["duration"]) == pytest.approx(20.0)
+    _, rows = _read_scans_tsv(str(scans_tsv))
+    assert rows[0]["duration"] == "20.000"
 
 
 @pytest.mark.ai_generated
@@ -2556,8 +2515,8 @@ def test_populate_scans_duration_via_cli(
         ]
     )
 
-    _, rows = _read_scans_rows(scans_tsv)
-    assert float(rows[0]["duration"]) == pytest.approx(20.0)
+    _, rows = _read_scans_tsv(str(scans_tsv))
+    assert rows[0]["duration"] == "20.000"
 
 
 @pytest.mark.ai_generated
@@ -2572,25 +2531,7 @@ def test_populate_scans_duration_fix_acq_time_via_cli(
         "func/sub-01_task-rest_bold.nii.gz\t2020-01-01T12:00:02\n"
     )
 
-    offsets = [2, 0, 4, 7]
-    dicom_list = []
-    for i, offset in enumerate(offsets):
-        dcm_data = pydicom.dcmread(
-            op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
-        )
-        dcm_data.AcquisitionDate = "20200101"
-        dcm_data.AcquisitionTime = "%06d.000000" % (120000 + offset)
-        out = tmp_path / f"f{i}.dcm"
-        pydicom.dcmwrite(str(out), dcm_data)
-        dicom_list.append(str(out))
-    sourcedata_dir = bids_root / "sourcedata" / "sub-01" / "func"
-    sourcedata_dir.mkdir(parents=True)
-    compress_dicoms(
-        dicom_list,
-        str(sourcedata_dir / "sub-01_task-rest_bold"),
-        TempDirs(),
-        overwrite=True,
-    )
+    _add_sourcedata(bids_root, make_timed_dicoms(tmp_path, [2, 0, 4, 7]))
 
     runner(
         [
@@ -2602,9 +2543,9 @@ def test_populate_scans_duration_fix_acq_time_via_cli(
         ]
     )
 
-    _, rows = _read_scans_rows(scans_tsv)
+    _, rows = _read_scans_tsv(str(scans_tsv))
     assert rows[0]["acq_time"] == "2020-01-01T12:00:00"
-    assert float(rows[0]["duration"]) == pytest.approx(9.0)
+    assert rows[0]["duration"] == "9.000"
 
 
 @pytest.mark.ai_generated
@@ -2634,25 +2575,8 @@ def test_populate_scans_duration_tarball_error_falls_back(
 
     populate_scans_duration(str(bids_root))
 
-    _, rows = _read_scans_rows(scans_tsv)
-    assert float(rows[0]["duration"]) == pytest.approx(20.0)
-
-
-@pytest.mark.ai_generated
-def test_get_retrospective_duration_tolerates_corrupt_tarball(
-    tmp_bids_with_scans: tuple[Path, Path],
-) -> None:
-    bids_root, _ = tmp_bids_with_scans
-    _make_multivol_func_scan(bids_root)
-    sourcedata_dir = bids_root / "sourcedata" / "sub-01" / "func"
-    sourcedata_dir.mkdir(parents=True)
-    (sourcedata_dir / "sub-01_task-rest_bold.dicom.tgz").write_bytes(b"garbage")
-
-    nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
-    # must not raise -- falls through to the sidecar estimate
-    duration, timestamps = _get_retrospective_duration(str(nifti_fn), str(bids_root))
-    assert duration == pytest.approx(20.0)
-    assert timestamps == []
+    _, rows = _read_scans_tsv(str(scans_tsv))
+    assert rows[0]["duration"] == "20.000"
 
 
 @pytest.mark.ai_generated
@@ -2674,7 +2598,7 @@ def test_populate_scans_duration_header_only_file_still_migrated(
 
     populate_scans_duration(str(bids_root))
 
-    fieldnames, rows = _read_scans_rows(scans_tsv)
+    fieldnames, rows = _read_scans_tsv(str(scans_tsv))
     assert fieldnames == ["filename", "acq_time", "duration"]
     assert rows == []
     scans_json = load_json(str(bids_root / "scans.json"))
@@ -2699,7 +2623,7 @@ def test_populate_scans_duration_tolerates_byte_order_mark(tmp_path: Path) -> No
 
     populate_scans_duration(str(bids_root))
 
-    fieldnames, rows = _read_scans_rows(scans_tsv)
+    fieldnames, rows = _read_scans_tsv(str(scans_tsv))
     assert fieldnames == ["filename", "acq_time", "duration"]
     assert rows == [
         {
@@ -3074,20 +2998,30 @@ def test_populate_bids_templates_errors_on_malformed_scans_json(tmp_path: Path) 
 
 
 @pytest.mark.ai_generated
-def test_tuneup_bids_json_files_writes_pretty_json(tmp_path: Path) -> None:
-    # tuneup_bids_json_files() rewrites every sidecar it touches (to strip
-    # date fields and stamp the heudiconv version), so without pretty=True
-    # a long numeric array (e.g. ShimSetting, bvecs/bvals-adjacent fields)
-    # gets reformatted one value per line -- a huge, pure-noise diff on
-    # datasets re-converted across heudiconv versions, unrelated to any
-    # actual change in the values themselves
+@pytest.mark.parametrize(
+    "rewrite",
+    [
+        lambda fn: tuneup_bids_json_files([fn]),
+        lambda fn: _set_sidecar_acquisition_time(fn, "12:00:00.000000"),
+        add_taskname_to_infofile,
+    ],
+    ids=["tuneup_bids_json_files", "set_sidecar_acquisition_time", "add_taskname"],
+)
+def test_sidecar_rewrites_keep_pretty_json(
+    tmp_path: Path, rewrite: Callable[[str], None]
+) -> None:
+    # sidecars rewritten during conversion must keep numeric arrays on one
+    # line, rather than reformat them one value per line -- a pure-noise diff
+    # on datasets re-converted across heudiconv versions
     json_fn = tmp_path / "sub-01_task-rest_bold.json"
-    save_json(str(json_fn), {"ShimSetting": [1, 2, 3, 4, 5, 6, 7, 8]}, pretty=True)
+    shim = [1, 2, 3, 4, 5, 6, 7, 8]
+    save_json(
+        str(json_fn),
+        {"AcquisitionTime": "12:00:02.000000", "ShimSetting": shim},
+        pretty=True,
+    )
 
-    tuneup_bids_json_files([str(json_fn)])
+    rewrite(str(json_fn))
 
-    # the array must stay collapsed on one line, not one value per line
-    lines = json_fn.read_text().splitlines()
-    assert sum("ShimSetting" in line for line in lines) == 1
-    assert [line for line in lines if "ShimSetting" in line][0].count(",") == 7
-    assert load_json(str(json_fn))["ShimSetting"] == [1, 2, 3, 4, 5, 6, 7, 8]
+    assert '"ShimSetting": [1, 2, 3, 4, 5, 6, 7, 8]' in json_fn.read_text()
+    assert load_json(str(json_fn))["ShimSetting"] == shim

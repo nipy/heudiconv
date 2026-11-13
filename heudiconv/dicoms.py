@@ -809,8 +809,8 @@ def get_acquisition_duration(
     aborted multi-volume acquisition (see the code below for the exact
     conditions). The DICOM tag itself is cross-checked against the
     timestamps when available, and ignored in favor of the timestamp
-    estimate if it is far larger than their span -- it otherwise reflects
-    the full planned protocol even for a truncated/aborted acquisition.
+    estimate if it is shorter, or far larger, than their span (e.g.
+    reflecting the full planned protocol of a truncated/aborted acquisition).
     `timestamps` is passed through to
     :func:`estimate_scan_duration_from_times`. Returns None if nothing
     succeeds.
@@ -826,14 +826,15 @@ def get_acquisition_duration(
         if span_and_median is not None:
             span, median_interval = span_and_median
             # a margin beyond the normal span + 1 estimate avoids
-            # second-guessing a merely slightly-longer-than-expected tag
-            if duration > span + 2 * median_interval:
+            # second-guessing a merely slightly-longer-than-expected tag,
+            # while no acquisition is shorter than its timestamps span
+            if not span <= duration <= span + 2 * median_interval:
                 lgr.warning(
-                    "%s: AcquisitionDuration tag declares %.3fs, far more "
-                    "than the %.3fs spanned by its %d distinct acquisition "
-                    "timestamps -- likely a truncated/aborted multi-volume "
+                    "%s: AcquisitionDuration tag declares %.3fs, which "
+                    "disagrees with the %.3fs spanned by its %d distinct "
+                    "acquisition timestamps (e.g. a truncated/aborted "
                     "acquisition reporting the full planned protocol "
-                    "duration; using the timestamp-based estimate instead",
+                    "duration); using the timestamp-based estimate instead",
                     dicom_list[0],
                     duration,
                     span,

@@ -301,6 +301,9 @@ def test_add_rows_to_scans_keys_file(tmp_path: Path) -> None:
         "another_file.nii.gz": ["2018xxxxx", "n/a", "", "fasadfasdf"],
     }
     add_rows_to_scans_keys_file(fn, rows)
+    umask = os.umask(0)
+    os.umask(umask)
+    assert stat.S_IMODE(os.stat(fn).st_mode) == 0o666 & ~umask
 
     def _check_rows(fn: str, rows: dict[str, list[str]]) -> None:
         with open(fn, "r") as csvfile:
@@ -372,15 +375,21 @@ def test_add_rows_to_scans_keys_file_upgrades_older_header(tmp_path: Path) -> No
 @pytest.mark.ai_generated
 def test_add_rows_to_scans_keys_file_preserves_custom_columns(tmp_path: Path) -> None:
     # BIDS allows additional _scans.tsv columns beyond the ones heudiconv
-    # itself defines; adding a new row must not drop a dataset-specific
-    # column (here "notes") that an existing file already carries.
+    # itself defines; adding a new row, or replacing an existing one (e.g.
+    # re-converted with --overwrite), must keep a dataset-specific column
+    # (here "notes") that an existing file already carries.
     fn = opj(tmp_path, "file.tsv")
     with open(fn, "w") as f:
         f.write("filename\tacq_time\toperator\trandstr\tnotes\n")
         f.write("old_file.nii.gz\t2016adsfasd\tDr. Old\toldrand01\thand-added\n")
+        f.write("redone.nii.gz\t2017xxxxx\tDr. Old\toldrand02\tkeep me\n")
 
     add_rows_to_scans_keys_file(
-        fn, {"new_file.nii.gz": ["2018xxxxx", "1.500", "", "newrand01"]}
+        fn,
+        {
+            "new_file.nii.gz": ["2018xxxxx", "1.500", "", "newrand01"],
+            "redone.nii.gz": ["2017yyyyy", "2.000", "Dr. New", "newrand02"],
+        },
     )
 
     with open(fn) as f:
@@ -401,6 +410,13 @@ def test_add_rows_to_scans_keys_file_preserves_custom_columns(tmp_path: Path) ->
         "Dr. Old",
         "oldrand01",
         "hand-added",
+    ]
+    assert by_filename["redone.nii.gz"] == [
+        "2017yyyyy",
+        "2.000",
+        "Dr. New",
+        "newrand02",
+        "keep me",
     ]
     # the new row has no value for the custom column -- filled with 'n/a'
     assert by_filename["new_file.nii.gz"] == [

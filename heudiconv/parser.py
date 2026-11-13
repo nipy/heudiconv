@@ -145,8 +145,7 @@ def get_extracted_dicoms(fl: Iterable[str]) -> ItemsView[str | None, list[str]]:
         os.chmod(tmpdir, mode=0o700)
         if t.endswith(_TAR_UNPACK_FORMATS):
             # route through our own tar extraction, which vets members
-            # itself on Python versions where tarfile has no filter=
-            # support at all (< 3.12) rather than extracting unrestricted
+            # itself where tarfile has no filter= support at all
             safe_extract_tar(t, tmpdir)
         else:
             shutil.unpack_archive(t, extract_dir=tmpdir)

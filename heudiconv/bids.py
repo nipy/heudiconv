@@ -29,6 +29,7 @@ import pydicom as dcm
 from . import __version__, dicoms
 from .parser import find_files
 from .utils import (
+    _is_within_directory,
     as_finite_positive_float,
     create_file_if_missing,
     is_readonly,
@@ -619,70 +620,30 @@ def add_rows_to_scans_keys_file(fn: str, newrows: dict[str, list[str]]) -> None:
       filename
     newrows: dict
       rows to add or, for a file already in `fn` (e.g. re-converted with
-      `--overwrite`), replace (acquisition time, duration, referring
+      `--overwrite`), update (acquisition time, duration, referring
       physician, random string), in the order of ``SCANS_FILE_FIELDS``
       (excluding "filename")
     """
     canonical = list(SCANS_FILE_FIELDS.keys())
-    header = canonical
-    if op.lexists(fn):
-        # Key each row's values by their *own* column name, not by
-        # position: a file written by an older heudiconv version may have
-        # fewer/differently-ordered columns (e.g. no "duration"), and
-        # zipping those positionally against the current, wider header
-        # would silently misassign values (e.g. "operator" ending up under
-        # "duration").
-        existing_header, existing_rows = _read_scans_tsv(fn)
-        # BIDS allows additional scan columns beyond the ones we define, so
-        # keep any that are already there (e.g. user-added), only adding
-        # whichever canonical ones (e.g. a newly introduced "duration")
-        # the existing file lacks -- rather than rebuilding the header from
-        # SCANS_FILE_FIELDS alone and silently dropping the rest.
-        header = _merge_scans_header(existing_header or canonical, canonical)
-        fnames2info: dict[str, dict[str, str | None]] = {}
-        for row in existing_rows:
-            existing_filename = row.get("filename")
-            if existing_filename is not None:
-                fnames2info[existing_filename] = {
-                    k: v for k, v in row.items() if k != "filename"
-                }
-
-        # newrows is authoritative for any filename it carries, replacing
-        # (not just adding to) an existing row
-        for key_toadd in newrows:
-            fnames2info[key_toadd] = dict(zip(canonical[1:], newrows[key_toadd]))
-        # remove
-        os.unlink(fn)
-    else:
-        fnames2info = {k: dict(zip(canonical[1:], v)) for k, v in newrows.items()}
-
-    # prepare all the data rows, filling any column missing from a given
-    # row (e.g. "duration" for a row carried over from an older file, or a
-    # custom column only some rows had) with 'n/a' rather than shifting
-    # the remaining columns into its place
-    def _value_or_na(value: str | None) -> str:
-        # unlike maybe_na(), an explicitly blank value (e.g. an empty
-        # PerformingPhysicianName) is preserved as-is -- only a column
-        # missing from this particular row becomes 'n/a'
-        return "n/a" if value is None else value
-
-    data_rows = [
-        [filename] + [_value_or_na(info.get(col)) for col in header[1:]]
-        for filename, info in fnames2info.items()
-    ]
-    # sort by the date/filename -- acq_time's position in a row matches its
-    # position in `header`, which may not be right after "filename" if an
-    # existing file had a custom column inserted before it
-    acq_time_idx = header.index("acq_time") if "acq_time" in header else 1
-    try:
-        data_rows_sorted = sorted(data_rows, key=lambda x: (x[acq_time_idx], x[0]))
-    except TypeError as exc:
-        lgr.warning("Sorting scans by date failed: %s", str(exc))
-        data_rows_sorted = sorted(data_rows)
-    # save
-    with open(fn, "a", encoding="utf-8") as csvfile:
-        writer = csv.writer(csvfile, delimiter="\t")
-        writer.writerows([header] + data_rows_sorted)
+    header, rows = _read_scans_tsv(fn) if op.lexists(fn) else ([], [])
+    # values are matched to columns by name, so that a file written by an
+    # older heudiconv (e.g. without "duration") or with extra (e.g.
+    # user-added) columns keeps every value under its own column
+    header = _merge_scans_header(header or canonical, canonical)
+    fnames2info = {row["filename"]: row for row in rows if row.get("filename")}
+    for filename, values in newrows.items():
+        fnames2info.setdefault(filename, {"filename": filename}).update(
+            zip(canonical[1:], values, strict=True)
+        )
+    # sort by the date/filename
+    _write_scans_tsv_atomically(
+        fn,
+        header,
+        sorted(
+            fnames2info.values(),
+            key=lambda row: (row.get("acq_time") or "n/a", row["filename"]),
+        ),
+    )
 
 
 def get_formatted_scans_key_row(
@@ -934,19 +895,6 @@ def _format_duration(duration: float | None) -> str:
     return "%.3f" % duration if duration is not None else "n/a"
 
 
-def _is_within_directory(path: str, directory: str) -> bool:
-    """Return True if `path` resolves to somewhere at or under `directory`.
-
-    Resolves symlinks (via `os.path.realpath`) on both sides, so a
-    dataset-internal symlink that points outside `directory` is correctly
-    treated as escaping it, rather than merely comparing lexical
-    (unresolved) absolute paths.
-    """
-    path = op.realpath(path)
-    directory = op.realpath(directory)
-    return path == directory or path.startswith(directory + os.sep)
-
-
 def _find_json_sidecar(nifti_fn: str, bids_root: str) -> str | None:
     """Find the JSON sidecar applicable to `nifti_fn`.
 
@@ -1094,40 +1042,43 @@ def _duration_from_nifti_sidecar(
     return tr * nvols
 
 
-def _find_sourcedata_tarball(nifti_fn: str, bids_root: str) -> str | None:
+def _find_sourcedata_tarball(nifti_fn: str, bids_root: str) -> tuple[str | None, bool]:
     """Find the heudiconv-produced sourcedata DICOM tarball for `nifti_fn`.
 
-    Usually named after `nifti_fn`'s own stem; falls back to the longest-
-    matching-prefix tarball in the same sourcedata directory, for a
-    multi-output item (e.g. ``echo-``, ``magnitude1``/``2``) sharing one
-    tarball named after the item's own prefix instead.
+    Returns it (None if not found), and whether it is shared by all outputs
+    of a multi-output item (e.g. ``echo-``, ``magnitude1``/``2``), i.e.
+    named after the item rather than after `nifti_fn` itself.
     """
     rel = op.relpath(nifti_fn, bids_root)
     sourcedata_dir = op.join(bids_root, "sourcedata", op.dirname(rel))
     stem = _nifti_stem(op.basename(rel))
     exact = op.join(sourcedata_dir, stem + ".dicom.tgz")
     if op.exists(exact):
-        return exact
+        return exact, False
+    # the longest prefix of `stem` without the entities heudiconv inserts to
+    # tell apart the outputs of an item
+    item_stem = re.sub(r"_(echo|part|ch|chunk)-[a-zA-Z0-9]+", "", stem)
     candidates = [
         p
         for p in glob(op.join(sourcedata_dir, "*.dicom.tgz"))
-        if stem.startswith(op.basename(p)[: -len(".dicom.tgz")])
+        if item_stem.startswith(op.basename(p)[: -len(".dicom.tgz")])
     ]
-    return max(candidates, key=len) if candidates else None
+    return (max(candidates, key=len), True) if candidates else (None, False)
 
 
 def _get_retrospective_duration(
     nifti_fn: str, bids_root: str
-) -> tuple[float | None, list[datetime.datetime]]:
+) -> tuple[float | None, list[datetime.datetime], bool]:
     """Best-effort acquisition duration for an already-converted BIDS scan,
     plus the acquisition timestamps of its source DICOMs.
 
     Tries the heudiconv-produced sourcedata DICOM tarball first (see
-    :func:`_find_sourcedata_tarball`), then falls back to the NIfTI + JSON
-    sidecar for `duration` alone -- the timestamps need the actual DICOMs,
-    so they are empty whenever no tarball is found or it yields nothing.
+    :func:`_find_sourcedata_tarball`, which also gives the returned "shared"
+    flag), then falls back to the NIfTI + JSON sidecar for `duration` alone
+    -- the timestamps need the actual DICOMs, so they are empty whenever no
+    tarball is found or it yields nothing.
     """
-    tarball = _find_sourcedata_tarball(nifti_fn, bids_root)
+    tarball, shared = _find_sourcedata_tarball(nifti_fn, bids_root)
     if tarball is not None:
         try:
             duration, timestamps = _duration_and_timestamps_from_dicom_tarball(tarball)
@@ -1144,13 +1095,13 @@ def _get_retrospective_duration(
             )
             duration, timestamps = None, []
         if duration is not None:
-            return duration, timestamps
+            return duration, timestamps, shared
         lgr.debug(
             "Could not establish duration from source DICOMs %s for %s",
             tarball,
             nifti_fn,
         )
-    return _duration_from_nifti_sidecar(nifti_fn, bids_root), []
+    return _duration_from_nifti_sidecar(nifti_fn, bids_root), [], False
 
 
 def populate_scans_duration(
@@ -1205,16 +1156,20 @@ def _write_scans_tsv_atomically(
 ) -> None:
     """Rewrite `scans_tsv` in place, atomically.
 
-    Writes to a temp file in the same directory, restores the original's
-    permission bits (``mkstemp`` otherwise creates it owner-only), then
-    ``os.replace``s it over `scans_tsv`. This works even when `scans_tsv`
+    Writes to a temp file in the same directory, gives it the original's
+    permission bits (or the umask default for a new file -- ``mkstemp``
+    otherwise creates it owner-only), then ``os.replace``s it over
+    `scans_tsv`. This works even when `scans_tsv`
     is read-only or a symlink into git-annex, since replacing a directory
     entry only needs write permission on the directory, and leaves the
     original intact on failure.
     """
-    original_mode: int | None = None
     if op.exists(scans_tsv):  # dereferences a symlink, e.g. into git-annex
-        original_mode = stat.S_IMODE(os.stat(scans_tsv).st_mode)
+        mode = stat.S_IMODE(os.stat(scans_tsv).st_mode)
+    else:  # what open() would have created
+        umask = os.umask(0)
+        os.umask(umask)
+        mode = 0o666 & ~umask
     directory = op.dirname(scans_tsv) or "."
     fd, tmp_path = tempfile.mkstemp(
         dir=directory, prefix=".heudiconv-scans-", suffix=".tsv"
@@ -1222,12 +1177,18 @@ def _write_scans_tsv_atomically(
     try:
         with os.fdopen(fd, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(
-                f, fieldnames=fieldnames, delimiter="\t", restval="n/a"
+                f,
+                fieldnames=fieldnames,
+                delimiter="\t",
+                restval="n/a",
+                extrasaction="ignore",
             )
             writer.writeheader()
-            writer.writerows(rows)
-        if original_mode is not None:
-            os.chmod(tmp_path, original_mode)
+            # None: a field missing from a short row of the file read
+            writer.writerows(
+                {k: "n/a" if v is None else v for k, v in row.items()} for row in rows
+            )
+        os.chmod(tmp_path, mode)
         os.replace(tmp_path, scans_tsv)
     except BaseException:
         os.unlink(tmp_path)
@@ -1288,7 +1249,9 @@ def _populate_scans_duration_file(
                 stored_dt = strptime_bids(acq_time)
             except ValueError:
                 pass
-        duration, timestamps = _get_retrospective_duration(nifti_fn, bids_root)
+        duration, timestamps, shared_tarball = _get_retrospective_duration(
+            nifti_fn, bids_root
+        )
         earliest = min(timestamps) if timestamps else None
         new_value = _format_duration(duration)
         if row.get("duration") != new_value:
@@ -1332,14 +1295,18 @@ def _populate_scans_duration_file(
         try:
             json_fn = _find_json_sidecar(nifti_fn, bids_root)
             # never touch (or suggest fixing) an inherited sidecar, which is
-            # shared with other scans
-            own_sidecar = json_fn == _nifti_stem(nifti_fn) + ".json"
+            # shared with other scans, nor one of an output of a multi-output
+            # item, whose sidecars may legitimately differ (e.g. localizer
+            # planes) -- only conversion sees all of them together
+            check_sidecar = (
+                json_fn == _nifti_stem(nifti_fn) + ".json" and not shared_tarball
+            )
             check_acq_time_congruency(
                 stored_dt,
                 [json_fn] if json_fn else [],
                 label=filename,
-                timestamps=timestamps if own_sidecar else (),
-                fix=fix_acq_time and own_sidecar,
+                timestamps=timestamps if check_sidecar else (),
+                fix=fix_acq_time and check_sidecar,
             )
         except Exception as exc:
             # must never abort the backfill

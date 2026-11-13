@@ -580,6 +580,13 @@ def as_finite_positive_float(value: Any) -> float | None:
     return parsed if math.isfinite(parsed) and parsed > 0 else None
 
 
+def _is_within_directory(path: str, directory: str) -> bool:
+    """Return True if `path`, with symlinks resolved, is at or under `directory`."""
+    path = op.realpath(path)
+    directory = op.realpath(directory)
+    return path == directory or path.startswith(directory + os.sep)
+
+
 def _safe_tar_members(tar: tarfile.TarFile, dest: str) -> list[tarfile.TarInfo]:
     """Filter `tar`'s members down to those safe to extract into `dest`.
 
@@ -604,16 +611,10 @@ def _safe_tar_members(tar: tarfile.TarFile, dest: str) -> list[tarfile.TarInfo]:
     list of tarfile.TarInfo
         The subset of `tar`'s members judged safe to extract.
     """
-    dest_real = op.realpath(dest)
-
-    def _resolves_within_dest(target: str) -> bool:
-        resolved = op.realpath(target)
-        return resolved == dest_real or resolved.startswith(dest_real + os.sep)
-
     safe = []
     for member in tar.getmembers():
-        if op.isabs(member.name) or not _resolves_within_dest(
-            op.join(dest, member.name)
+        if op.isabs(member.name) or not _is_within_directory(
+            op.join(dest, member.name), dest
         ):
             lgr.warning("Refusing to extract %r: escapes %s", member.name, dest)
             continue
