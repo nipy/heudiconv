@@ -4,7 +4,6 @@ import logging
 import os
 import subprocess
 import sys
-from typing import Optional
 
 from nipype.utils.filemanip import which
 
@@ -12,7 +11,7 @@ lgr = logging.getLogger(__name__)
 
 
 def queue_conversion(
-    queue: str, iterarg: str, iterables: int, queue_args: Optional[str] = None
+    queue: str, iterarg: str, iterables: int, queue_args: str | None = None
 ) -> None:
     """
     Write out conversion arguments to file and submit to a job scheduler.

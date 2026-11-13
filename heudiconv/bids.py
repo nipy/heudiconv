@@ -19,7 +19,7 @@ import re
 import stat
 import statistics
 import tempfile
-from typing import Any, NamedTuple, Optional
+from typing import Any, NamedTuple
 import warnings
 
 from nibabel.filename_parser import splitext_addext
@@ -161,9 +161,7 @@ def treat_age(age: str | float | None) -> str | None:
     return agestr
 
 
-def populate_bids_templates(
-    path: str, defaults: Optional[dict[str, Any]] = None
-) -> None:
+def populate_bids_templates(path: str, defaults: dict[str, Any] | None = None) -> None:
     """Premake BIDS text files with templates"""
 
     lgr.info("Populating template files under %s", path)
@@ -486,7 +484,7 @@ def add_participant_record(
         )
 
 
-def find_subj_ses(f_name: str) -> tuple[Optional[str], Optional[str]]:
+def find_subj_ses(f_name: str) -> tuple[str | None, str | None]:
     """Given a path to the bids formatted filename parse out subject/session"""
     # we will allow the match at either directories or within filename
     # assuming that bids layout is "correct"
@@ -515,8 +513,8 @@ def save_scans_key(
     # and if there is a conflict, we would just blow since this function
     # should be invoked only on a result of a single item conversion as far
     # as I see it, so should have the same subject/session
-    subj: Optional[str] = None
-    ses: Optional[str] = None
+    subj: str | None = None
+    ses: str | None = None
     # all bids_files of this item share the same source DICOMs, so the row
     # (including the possibly-expensive `duration` estimation) is the same
     # for every one of them -- compute it once rather than per file
@@ -605,7 +603,7 @@ def _merge_scans_header(existing_header: list[str], additions: list[str]) -> lis
 
 def _read_scans_tsv(
     scans_tsv: str,
-) -> tuple[list[str], list[dict[str, Optional[str]]]]:
+) -> tuple[list[str], list[dict[str, str | None]]]:
     """Read a `_scans.tsv` file into (fieldnames, rows-as-dicts)."""
     with open(scans_tsv, newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f, delimiter="\t")
@@ -641,7 +639,7 @@ def add_rows_to_scans_keys_file(fn: str, newrows: dict[str, list[str]]) -> None:
         # the existing file lacks -- rather than rebuilding the header from
         # SCANS_FILE_FIELDS alone and silently dropping the rest.
         header = _merge_scans_header(existing_header or canonical, canonical)
-        fnames2info: dict[str, dict[str, Optional[str]]] = {}
+        fnames2info: dict[str, dict[str, str | None]] = {}
         for row in existing_rows:
             existing_filename = row.get("filename")
             if existing_filename is not None:
@@ -662,7 +660,7 @@ def add_rows_to_scans_keys_file(fn: str, newrows: dict[str, list[str]]) -> None:
     # row (e.g. "duration" for a row carried over from an older file, or a
     # custom column only some rows had) with 'n/a' rather than shifting
     # the remaining columns into its place
-    def _value_or_na(value: Optional[str]) -> str:
+    def _value_or_na(value: str | None) -> str:
         # unlike maybe_na(), an explicitly blank value (e.g. an empty
         # PerformingPhysicianName) is preserved as-is -- only a column
         # missing from this particular row becomes 'n/a'
@@ -770,7 +768,7 @@ def _comparable_acq_times(
 
 def _get_sidecar_acquisition_datetime(
     json_file: str, near: datetime.datetime
-) -> Optional[datetime.datetime]:
+) -> datetime.datetime | None:
     """Return the time-of-day `AcquisitionTime` from a (dcm2niix produced)
     JSON sidecar as a datetime -- on whichever day puts it closest to `near`,
     so a run straddling midnight is handled -- or None if the sidecar has no
@@ -791,7 +789,7 @@ def _get_sidecar_acquisition_datetime(
 
 
 def check_acq_time_congruency(
-    acq_datetime: Optional[datetime.datetime],
+    acq_datetime: datetime.datetime | None,
     json_files: Sequence[str],
     label: str,
     timestamps: Sequence[datetime.datetime] = (),
@@ -909,7 +907,7 @@ def _find_bids_dataset_root(path: str) -> str:
 
 def _duration_and_timestamps_from_dicom_tarball(
     tarball: str,
-) -> tuple[Optional[float], list[datetime.datetime]]:
+) -> tuple[float | None, list[datetime.datetime]]:
     """Compute acquisition duration, and the acquisition timestamps,
     from a heudiconv-produced sourcedata DICOM tarball.
 
@@ -931,7 +929,7 @@ def _nifti_stem(nifti_fn: str) -> str:
     return splitext_addext(nifti_fn)[0]
 
 
-def _format_duration(duration: Optional[float]) -> str:
+def _format_duration(duration: float | None) -> str:
     """Format a duration in seconds as a `_scans.tsv` cell (``'n/a'`` if None)."""
     return "%.3f" % duration if duration is not None else "n/a"
 
@@ -949,7 +947,7 @@ def _is_within_directory(path: str, directory: str) -> bool:
     return path == directory or path.startswith(directory + os.sep)
 
 
-def _find_json_sidecar(nifti_fn: str, bids_root: str) -> Optional[str]:
+def _find_json_sidecar(nifti_fn: str, bids_root: str) -> str | None:
     """Find the JSON sidecar applicable to `nifti_fn`.
 
     A same-named one right next to it if present, else -- per the `BIDS
@@ -989,8 +987,8 @@ def _find_json_sidecar(nifti_fn: str, bids_root: str) -> Optional[str]:
 
 
 def _duration_from_nifti_sidecar(
-    nifti_fn: str, bids_root: Optional[str] = None
-) -> Optional[float]:
+    nifti_fn: str, bids_root: str | None = None
+) -> float | None:
     """Estimate a run's duration from its NIfTI + JSON sidecar.
 
     The sidecar is found per :func:`_find_json_sidecar`, so this also
@@ -1027,7 +1025,7 @@ def _duration_from_nifti_sidecar(
         except (TypeError, ValueError):
             return None
 
-        def median_onset_interval() -> Optional[float]:
+        def median_onset_interval() -> float | None:
             if len(onsets) < 2:
                 return None
             return statistics.median(t2 - t1 for t1, t2 in zip(onsets[:-1], onsets[1:]))
@@ -1096,7 +1094,7 @@ def _duration_from_nifti_sidecar(
     return tr * nvols
 
 
-def _find_sourcedata_tarball(nifti_fn: str, bids_root: str) -> Optional[str]:
+def _find_sourcedata_tarball(nifti_fn: str, bids_root: str) -> str | None:
     """Find the heudiconv-produced sourcedata DICOM tarball for `nifti_fn`.
 
     Usually named after `nifti_fn`'s own stem; falls back to the longest-
@@ -1120,7 +1118,7 @@ def _find_sourcedata_tarball(nifti_fn: str, bids_root: str) -> Optional[str]:
 
 def _get_retrospective_duration(
     nifti_fn: str, bids_root: str
-) -> tuple[Optional[float], list[datetime.datetime]]:
+) -> tuple[float | None, list[datetime.datetime]]:
     """Best-effort acquisition duration for an already-converted BIDS scan,
     plus the acquisition timestamps of its source DICOMs.
 
@@ -1203,7 +1201,7 @@ def populate_scans_duration(
 
 
 def _write_scans_tsv_atomically(
-    scans_tsv: str, fieldnames: list[str], rows: list[dict[str, Optional[str]]]
+    scans_tsv: str, fieldnames: list[str], rows: list[dict[str, str | None]]
 ) -> None:
     """Rewrite `scans_tsv` in place, atomically.
 
@@ -1214,7 +1212,7 @@ def _write_scans_tsv_atomically(
     entry only needs write permission on the directory, and leaves the
     original intact on failure.
     """
-    original_mode: Optional[int] = None
+    original_mode: int | None = None
     if op.exists(scans_tsv):  # dereferences a symlink, e.g. into git-annex
         original_mode = stat.S_IMODE(os.stat(scans_tsv).st_mode)
     directory = op.dirname(scans_tsv) or "."
@@ -1601,7 +1599,7 @@ def find_compatible_fmaps_for_run(
 
 def find_compatible_fmaps_for_session(
     path_to_bids_session: str, matching_parameters: list[str]
-) -> Optional[dict[str, dict[str, list[str]]]]:
+) -> dict[str, dict[str, list[str]]] | None:
     """
     Finds compatible fmaps for all non-fmap runs in a session.
     (Note: It is the responsibility of the calling function to make sure
@@ -1654,7 +1652,7 @@ def find_compatible_fmaps_for_session(
 
 def select_fmap_from_compatible_groups(
     json_file: str, compatible_fmap_groups: dict[str, list[str]], criterion: str
-) -> Optional[str]:
+) -> str | None:
     """
     Selects the fmap that will be used to correct for distortions in json_file
     from the compatible fmap_groups list, based on the given criterion
@@ -1885,7 +1883,7 @@ class BIDSFile:
     ]
 
     def __init__(
-        self, entities: dict[str, str], suffix: str, extension: Optional[str]
+        self, entities: dict[str, str], suffix: str, extension: str | None
     ) -> None:
         self._entities = entities
         self._suffix = suffix
@@ -1966,7 +1964,7 @@ class BIDSFile:
             )
         return out
 
-    def __getitem__(self, entity: str) -> Optional[str]:
+    def __getitem__(self, entity: str) -> str | None:
         return self._entities[entity] if entity in self._entities else None
 
     def __setitem__(
@@ -2011,7 +2009,7 @@ class BIDSFile:
         return self._suffix
 
     @property
-    def extension(self) -> Optional[str]:
+    def extension(self) -> str | None:
         return self._extension
 
     @property

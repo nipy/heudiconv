@@ -4,7 +4,7 @@ from collections.abc import Iterable, Iterator
 import os.path as op
 from pathlib import Path
 import sys
-from typing import TYPE_CHECKING, Any, Generic, NamedTuple, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, NamedTuple, TypeVar
 from unittest.mock import patch
 
 import pytest
@@ -94,7 +94,7 @@ def test_monitor(capsys: pytest.CaptureFixture[str]) -> None:
 def test_process(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
-    side_effect: Optional[BaseException],
+    side_effect: BaseException | None,
     success: int,
 ) -> None:
     db_fn = tmp_path / "database.json"

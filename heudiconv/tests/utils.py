@@ -6,7 +6,6 @@ from glob import glob
 import logging
 import os.path as op
 from pathlib import Path
-from typing import Optional
 
 import pydicom as dcm
 
@@ -31,9 +30,9 @@ def gen_heudiconv_args(
     outdir: str,
     subject: str,
     heuristic_file: str,
-    anon_cmd: Optional[str] = None,
-    template: Optional[str] = None,
-    xargs: Optional[list[str]] = None,
+    anon_cmd: str | None = None,
+    template: str | None = None,
+    xargs: list[str] | None = None,
 ) -> list[str]:
     heuristic = op.realpath(op.join(HEURISTICS_PATH, heuristic_file))
 
@@ -65,7 +64,7 @@ def gen_heudiconv_args(
     return args
 
 
-def fetch_data(tmpdir: str | Path, dataset: str, getpath: Optional[str] = None) -> str:
+def fetch_data(tmpdir: str | Path, dataset: str, getpath: str | None = None) -> str:
     """
     Utility function to interface with datalad database.
     Performs datalad `install` and datalad `get` operations.
@@ -100,7 +99,7 @@ def make_timed_dicoms(
     outdir: Path,
     offsets: Sequence[float],
     start: str = "2020-01-01T12:00:00",
-    tz_offset: Optional[str] = None,
+    tz_offset: str | None = None,
 ) -> list[str]:
     """Write copies of the phantom.dcm header (no pixel data) into `outdir`
     as f0.dcm, f1.dcm, ..., each acquired `offsets[i]` seconds after `start`

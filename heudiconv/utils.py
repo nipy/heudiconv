@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from collections.abc import Mapping as MappingABC
+from collections.abc import Callable, Hashable, Mapping, Sequence
 import copy
 import datetime
 from glob import glob
@@ -24,20 +23,7 @@ import tarfile
 import tempfile
 from time import sleep
 from types import ModuleType
-from typing import (
-    Any,
-    AnyStr,
-    Hashable,
-    Mapping,
-    NamedTuple,
-    Optional,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-    cast,
-    overload,
-)
+from typing import Any, AnyStr, NamedTuple, TypeVar, Union, cast, overload
 import warnings
 
 import pydicom as dcm
@@ -65,19 +51,19 @@ class SeqInfo(NamedTuple):
     protocol_name: str  # 12
     is_motion_corrected: bool  # 13
     is_derived: bool  # 14
-    patient_id: Optional[str]  # 15
+    patient_id: str | None  # 15
     study_description: str  # 16
     referring_physician_name: str  # 17
     series_description: str  # 18
     sequence_name: str  # 19
     image_type: tuple[str, ...]  # 20
     accession_number: str  # 21
-    patient_age: Optional[str]  # 22
-    patient_sex: Optional[str]  # 23
-    date: Optional[str]  # 24
-    series_uid: Optional[str]  # 25
-    time: Optional[str]  # 26
-    custom: Optional[Hashable]  # 27
+    patient_age: str | None  # 22
+    patient_sex: str | None  # 23
+    date: str | None  # 24
+    series_uid: str | None  # 25
+    time: str | None  # 26
+    custom: Hashable | None  # 27
 
 
 class StudySessionInfo(NamedTuple):
@@ -86,12 +72,12 @@ class StudySessionInfo(NamedTuple):
     # the same StudyInstanceUID which would collide, i.e point to the same
     # subject/session. So 'locator' is pretty much an assignment from
     # StudyInstanceUID into some place within hierarchy
-    locator: Optional[str]
+    locator: str | None
 
-    session: Optional[str]
+    session: str | None
 
     # should be some ID defined either in cmdline or deduced
-    subject: Optional[str]
+    subject: str | None
 
 
 class TempDirs:
@@ -101,7 +87,7 @@ class TempDirs:
         self.dirs: list[str] = []
         self.lgr: logging.Logger = logging.getLogger("tempdirs")
 
-    def __call__(self, prefix: Optional[str] = None) -> str:
+    def __call__(self, prefix: str | None = None) -> str:
         tmpdir = tempfile.mkdtemp(prefix=prefix)
         self.dirs.append(tmpdir)
         return tmpdir
@@ -286,7 +272,7 @@ def save_json(
 
     """
     assure_no_file_exists(filename)
-    j: Optional[str] = None
+    j: str | None = None
     if pretty:
         try:
             j = json_dumps_pretty(data, sort_keys=sort_keys, indent=indent)
@@ -568,7 +554,7 @@ def file_md5sum(filename: str) -> str:
         return hashlib.md5(f.read()).hexdigest()
 
 
-def as_finite_positive_float(value: Any) -> Optional[float]:
+def as_finite_positive_float(value: Any) -> float | None:
     """Parse `value` as a float, or None if not a finite, strictly positive one.
 
     Guards uniformly against values which are missing, non-numeric,
@@ -584,7 +570,7 @@ def as_finite_positive_float(value: Any) -> Optional[float]:
 
     Returns
     -------
-    Optional[float]
+    float or None
         The parsed value, or None if it does not qualify.
     """
     try:
@@ -656,10 +642,10 @@ def safe_extract_tar(tarball: str, dest: str) -> None:
     Always *attempts* to pass ``filter=`` to
     :func:`tarfile.TarFile.extractall`, which rejects unsafe members
     (absolute paths, ``..`` traversal, device files, ...); Python 3.14
-    will make this the default behavior. Rather than gating that attempt
+    made this the default behavior. Rather than gating that attempt
     on a ``sys.version_info`` check, this tries it unconditionally and
     only falls back on ``TypeError``: security fixes backporting ``filter``
-    support landed in 3.8.17, 3.9.17, 3.10.12, and 3.11.4 as well as
+    support landed in 3.10.12 and 3.11.4 as well as
     natively in 3.12+ (see
     https://docs.python.org/3/library/tarfile.html#tarfile-extraction-filter),
     so checking the running interpreter's actual capability is both
@@ -728,7 +714,7 @@ class File:
 
 
 TreeSpec = Union[
-    Sequence[Tuple[Union[str, File], "Load"]],
+    Sequence[tuple[str | File, "Load"]],
     Mapping[str, "Load"],
 ]
 
@@ -746,7 +732,7 @@ def create_tree(path: str, tree: TreeSpec, archives_leading_dir: bool = True) ->
     if not op.exists(path):
         os.makedirs(path)
 
-    if isinstance(tree, MappingABC):
+    if isinstance(tree, Mapping):
         tree = list(tree.items())
 
     for file_, load in tree:
@@ -785,7 +771,7 @@ def get_typed_attr(
 
 
 def get_typed_attr(
-    obj: Any, attr: str, _type: type[T], default: Optional[V] = None
+    obj: Any, attr: str, _type: type[T], default: V | None = None
 ) -> T | V | None:
     """
     Typecasts an object's named attribute. If the attribute cannot be

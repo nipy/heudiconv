@@ -9,9 +9,8 @@ import os.path as op
 import random
 import re
 import shutil
-import sys
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import filelock
 from nipype import Node
@@ -51,10 +50,7 @@ from .utils import (
 )
 
 if TYPE_CHECKING:
-    if sys.version_info >= (3, 8):
-        from typing import TypedDict
-    else:
-        from typing_extensions import TypedDict
+    from typing import TypedDict
 
     class PopulateIntendedForOpts(TypedDict, total=False):
         matching_parameters: str | list[str]
@@ -71,7 +67,7 @@ def conversion_info(
     outdir: str,
     info: dict[tuple[str, tuple[str, ...], None], list],
     filegroup: dict[str, list[str]],
-    ses: Optional[str],
+    ses: str | None,
 ) -> list[tuple[str, tuple[str, ...], list[str]]]:
     convert_info: list[tuple[str, tuple[str, ...], list[str]]] = []
     for key, items in info.items():
@@ -116,20 +112,20 @@ def conversion_info(
 
 
 def prep_conversion(
-    sid: Optional[str],
-    dicoms: Optional[list[str]],
+    sid: str | None,
+    dicoms: list[str] | None,
     outdir: str,
     heuristic: ModuleType,
     converter: str,
-    anon_sid: Optional[str],
-    anon_outdir: Optional[str],
+    anon_sid: str | None,
+    anon_outdir: str | None,
     with_prov: bool,
-    ses: Optional[str],
-    bids_options: Optional[str],
-    seqinfo: Optional[dict[SeqInfo, list[str]]],
+    ses: str | None,
+    bids_options: str | None,
+    seqinfo: dict[SeqInfo, list[str]] | None,
     min_meta: bool,
     overwrite: bool,
-    dcmconfig: Optional[str],
+    dcmconfig: str | None,
     grouping: str,
 ) -> None:
     if dicoms:
@@ -330,7 +326,7 @@ def update_complex_name(metadata: dict[str, Any], filename: str) -> str:
         return filename
 
     # Check to see if it is magnitude or phase part:
-    img_type = cast(List[str], metadata.get("ImageType", []))
+    img_type = cast(list[str], metadata.get("ImageType", []))
     if "M" in img_type:
         mag_or_phase = "mag"
     elif "P" in img_type:
@@ -599,16 +595,16 @@ def convert(
     items: list[tuple[str, tuple[str, ...], list[str]]],
     converter: str,
     scaninfo_suffix: str,
-    custom_callable: Optional[Callable[[str, tuple[str, ...], list[str]], Any]],
+    custom_callable: Callable[[str, tuple[str, ...], list[str]], Any] | None,
     with_prov: bool,
-    bids_options: Optional[str],
+    bids_options: str | None,
     outdir: str,
     min_meta: bool,
     overwrite: bool,
     symlink: bool = True,
-    prov_file: Optional[str] = None,
-    dcmconfig: Optional[str] = None,
-    populate_intended_for_opts: Optional[PopulateIntendedForOpts] = None,
+    prov_file: str | None = None,
+    dcmconfig: str | None = None,
+    populate_intended_for_opts: PopulateIntendedForOpts | None = None,
 ) -> None:
     """Perform actual conversion (calls to converter etc) given info from
     heuristic's `infotodict`
@@ -793,7 +789,7 @@ def convert(
 
 def convert_dicom(
     item_dicoms: list[str],
-    bids_options: Optional[str],
+    bids_options: str | None,
     prefix: str,
     outdir: str,
     tempdirs: TempDirs,
@@ -856,10 +852,10 @@ def nipype_convert(
     item_dicoms: list[str],
     prefix: str,
     with_prov: bool,
-    bids_options: Optional[str],
+    bids_options: str | None,
     tmpdir: str,
-    dcmconfig: Optional[str] = None,
-) -> tuple[Node, Optional[str]]:
+    dcmconfig: str | None = None,
+) -> tuple[Node, str | None]:
     """
     Converts DICOMs grouped from heuristic using Nipype's Dcm2niix interface.
 
@@ -927,7 +923,7 @@ def filter_partial_volumes(
     nii_files: list[str],
     bids_files: list[str],
     bids_metas: list[dict[str, Any]],
-) -> Tuple[list[str] | str, list[str] | str, list[Any] | Any]:
+) -> tuple[list[str] | str, list[str] | str, list[Any] | Any]:
     """filter interrupted 4D scans volumes with missing slices on XA: see dcm2niix #742
 
     Parameters
@@ -984,7 +980,7 @@ def filter_partial_volumes(
 def save_converted_files(
     res: Node,
     item_dicoms: list[str],
-    bids_options: Optional[str],
+    bids_options: str | None,
     outtype: str,
     prefix: str,
     outname_bids: str,
@@ -1147,7 +1143,7 @@ def save_converted_files(
         ### every file a distinct name, and we cannot tell until we have them
         ### all (dcm2niix splits a series on more criteria than we handle, so
         ### e.g. two of the images can well share an orientation).
-        renamed: list[tuple[str, str, Optional[str]]] = []
+        renamed: list[tuple[str, str, str | None]] = []
         for fl, suffix, bids_file, bids_meta in zip(
             res_files, suffixes, bids_files, bids_metas
         ):

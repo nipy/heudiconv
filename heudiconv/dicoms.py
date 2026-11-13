@@ -1,27 +1,15 @@
 # dicom operations
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Hashable
 import datetime
 import logging
 import os
 import os.path as op
 from pathlib import Path
 import statistics
-import sys
 import tarfile
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Dict,
-    Hashable,
-    List,
-    NamedTuple,
-    Optional,
-    Protocol,
-    Union,
-    overload,
-)
+from typing import TYPE_CHECKING, Any, NamedTuple, Protocol, overload
 from unittest.mock import patch
 import warnings
 
@@ -39,15 +27,13 @@ from .utils import (
 )
 
 if TYPE_CHECKING:
-    if sys.version_info >= (3, 8):
-        from typing import Literal
-    else:
-        from typing_extensions import Literal
+    from typing import Literal
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     # suppress warning
     import nibabel.nicom.dicomwrappers as dw
+from nibabel.openers import ImageOpener
 
 # TODO: remove the kludge whenever
 # https://github.com/moloney/dcmstack/pull/90 is merged and released
@@ -165,13 +151,49 @@ def create_seqinfo(
     )
 
 
+def wrapper_from_file(fl: str, **kwargs: Any) -> dw.Wrapper:
+    """Create nibabel DICOM wrapper for a file, the same way for any nibabel
+
+    This is nibabel's ``wrapper_from_file`` but with the frame filters for
+    multiframe (enhanced) DICOMs spelled out, so they do not depend on the
+    version of nibabel: we want only the filters which nibabel had by default
+    before 5.5.0.  nibabel 5.5.0 added ``FilterMultiOrient`` to the defaults,
+    which for a stack with multiple frame orientations (e.g. a scout) issues a
+    warning and retains only the frames of the first orientation, thus changing
+    ``image_shape`` (hence ``dim3`` of seqinfo) and other attributes which
+    heuristics might rely on.
+
+    The goal is the stability of what we pass to heuristics, not the
+    correctness of geometry: e.g. ``affine`` of the wrapper for such a stack
+    of frames in different orientations is not meaningful, with any nibabel.
+
+    Parameters
+    ----------
+    fl : str
+      Path to the DICOM file
+    **kwargs
+      Passed to ``pydicom.dcmread``
+    """
+    with ImageOpener(fl) as fobj:
+        dcm_data = dcm.dcmread(fobj, **kwargs)
+    mw: dw.Wrapper = dw.wrapper_from_data(
+        dcm_data,
+        # The list is frozen on purpose (see docstring): revisit whenever
+        # nibabel adds more default filters, test_known_nibabel_frame_filters
+        # would tell.  New instances each time since filters keep the state of
+        # the last wrapper they were applied to.
+        frame_filters=(dw.FilterMultiStack(), dw.FilterDwiIso()),
+    )
+    return mw
+
+
 def validate_dicom(
-    fl: str, dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]]
-) -> Optional[tuple[dw.Wrapper, tuple[int, str], Optional[str]]]:
+    fl: str, dcmfilter: Callable[[dcm.dataset.Dataset], Any] | None
+) -> tuple[dw.Wrapper, tuple[int, str], str | None] | None:
     """
     Parse DICOM attributes. Returns None if not valid.
     """
-    mw = dw.wrapper_from_file(fl, force=True, stop_before_pixels=True)
+    mw = wrapper_from_file(fl, force=True, stop_before_pixels=True)
     # Workaround for protocol name in private siemens csa header
     if not getattr(mw.dcm_data, "ProtocolName", "").strip():
         mw.dcm_data.ProtocolName = (
@@ -214,7 +236,7 @@ def validate_dicom(
 class SeriesID(NamedTuple):
     series_number: int
     protocol_name: str
-    file_studyUID: Optional[str] = None
+    file_studyUID: str | None = None
 
     def __str__(self) -> str:
         s = f"{self.series_number}-{self.protocol_name}"
@@ -227,33 +249,33 @@ class SeriesID(NamedTuple):
 def group_dicoms_into_seqinfos(
     files: list[str],
     grouping: str,
-    file_filter: Optional[Callable[[str], Any]] = None,
-    dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]] = None,
+    file_filter: Callable[[str], Any] | None = None,
+    dcmfilter: Callable[[dcm.dataset.Dataset], Any] | None = None,
     flatten: Literal[False] = False,
     custom_grouping: (
         str
         | Callable[
-            [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]],
+            [list[str], Callable[[dcm.dataset.Dataset], Any] | None, type[SeqInfo]],
             dict[SeqInfo, list[str]],
         ]
         | None
     ) = None,
     custom_seqinfo: CustomSeqinfoT | None = None,
-) -> dict[Optional[str], dict[SeqInfo, list[str]]]: ...
+) -> dict[str | None, dict[SeqInfo, list[str]]]: ...
 
 
 @overload
 def group_dicoms_into_seqinfos(
     files: list[str],
     grouping: str,
-    file_filter: Optional[Callable[[str], Any]] = None,
-    dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]] = None,
+    file_filter: Callable[[str], Any] | None = None,
+    dcmfilter: Callable[[dcm.dataset.Dataset], Any] | None = None,
     *,
     flatten: Literal[True],
     custom_grouping: (
         str
         | Callable[
-            [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]],
+            [list[str], Callable[[dcm.dataset.Dataset], Any] | None, type[SeqInfo]],
             dict[SeqInfo, list[str]],
         ]
         | None
@@ -265,19 +287,19 @@ def group_dicoms_into_seqinfos(
 def group_dicoms_into_seqinfos(
     files: list[str],
     grouping: str,
-    file_filter: Optional[Callable[[str], Any]] = None,
-    dcmfilter: Optional[Callable[[dcm.dataset.Dataset], Any]] = None,
+    file_filter: Callable[[str], Any] | None = None,
+    dcmfilter: Callable[[dcm.dataset.Dataset], Any] | None = None,
     flatten: Literal[False, True] = False,
     custom_grouping: (
         str
         | Callable[
-            [list[str], Optional[Callable[[dcm.dataset.Dataset], Any]], type[SeqInfo]],
+            [list[str], Callable[[dcm.dataset.Dataset], Any] | None, type[SeqInfo]],
             dict[SeqInfo, list[str]],
         ]
         | None
     ) = None,
     custom_seqinfo: CustomSeqinfoT | None = None,
-) -> dict[Optional[str], dict[SeqInfo, list[str]]] | dict[SeqInfo, list[str]]:
+) -> dict[str | None, dict[SeqInfo, list[str]]] | dict[SeqInfo, list[str]]:
     """Process list of dicoms and return seqinfo and file group
     `seqinfo` contains per-sequence extract of fields from DICOMs which
     will be later provided into heuristics to decide on filenames
@@ -322,7 +344,7 @@ def group_dicoms_into_seqinfos(
     group_keys: list[SeriesID] = []
     group_values: list[int] = []
     mwgroup: list[dw.Wrapper] = []
-    studyUID: Optional[str] = None
+    studyUID: str | None = None
 
     if file_filter:
         nfl_before = len(files)
@@ -374,35 +396,36 @@ def group_dicoms_into_seqinfos(
 
         ingrp = False
         # check if same series was already converted
-        for idx in range(len(mwgroup)):
-            if mw.is_same_series(mwgroup[idx]):
+        for grp_idx in range(len(mwgroup)):
+            if mw.is_same_series(mwgroup[grp_idx]):
                 if grouping != "all":
                     assert (
-                        mwgroup[idx].dcm_data.get("StudyInstanceUID") == file_studyUID
+                        mwgroup[grp_idx].dcm_data.get("StudyInstanceUID")
+                        == file_studyUID
                     ), "Same series found for multiple different studies"
                 ingrp = True
                 series_id = SeriesID(
-                    mwgroup[idx].dcm_data.SeriesNumber,
-                    mwgroup[idx].dcm_data.ProtocolName,
+                    mwgroup[grp_idx].dcm_data.SeriesNumber,
+                    mwgroup[grp_idx].dcm_data.ProtocolName,
                 )
                 if per_studyUID:
                     series_id = series_id._replace(file_studyUID=file_studyUID)
                 group_keys.append(series_id)
-                group_values.append(idx)
+                group_values.append(grp_idx)
 
         if not ingrp:
             mwgroup.append(mw)
             group_keys.append(series_id)
             group_values.append(len(mwgroup) - 1)
 
-    group_map = dict(zip(group_keys, group_values))
+    group_map = dict(zip(group_keys, group_values, strict=True))
 
     if removeidx:
         # remove non DICOMS from files
         for idx in sorted(removeidx, reverse=True):
             del files[idx]
 
-    seqinfos: dict[Optional[str], dict[SeqInfo, list[str]]] = {}
+    seqinfos: dict[str | None, dict[SeqInfo, list[str]]] = {}
     flat_seqinfos: dict[SeqInfo, list[str]] = {}
     # for the next line to make any sense the series_id needs to
     # be sortable in a way that preserves the series order
@@ -424,7 +447,7 @@ def group_dicoms_into_seqinfos(
                 continue
         seqinfo = create_seqinfo(mw, series_files, series_id_str, custom_seqinfo)
 
-        key: Optional[str]
+        key: str | None
         if per_studyUID:
             key = studyUID
         elif grouping == "accession_number":
@@ -526,7 +549,7 @@ def get_reproducible_int(dicom_list: list[str]) -> int:
     )
 
 
-def get_datetime_from_dcm(dcm_data: dcm.Dataset) -> Optional[datetime.datetime]:
+def get_datetime_from_dcm(dcm_data: dcm.Dataset) -> datetime.datetime | None:
     """Extract datetime from filedataset, or return None is no datetime information found.
 
     Parameters
@@ -537,7 +560,7 @@ def get_datetime_from_dcm(dcm_data: dcm.Dataset) -> Optional[datetime.datetime]:
 
     Returns
     -------
-    Optional[datetime.datetime]
+    datetime.datetime | None
         One of several datetimes that are related to when the scan occurred, or None if no datetime can be found
 
     Notes
@@ -571,7 +594,7 @@ def _has_value(dcm_data: dcm.Dataset, *tags: str) -> bool:
 
 def get_datetime_strings_from_dcm(
     dcm_data: dcm.Dataset,
-) -> tuple[Optional[str], Optional[str]]:
+) -> tuple[str | None, str | None]:
     """Get DICOM style date (YYYYMMDD) and time (HHMMSS.FFFFFF) strings
 
     Uses AcquisitionDate and AcquisitionTime whenever both are present, and
@@ -585,7 +608,7 @@ def get_datetime_strings_from_dcm(
 
     Returns
     -------
-    tuple of two Optional[str]
+    tuple of two str | None
         (date, time), each None if no corresponding information was found.
     """
     date = dcm_data.get("AcquisitionDate")
@@ -609,7 +632,7 @@ _GE_ACQUISITION_DURATION_OFFSET = 0x5A
 _GE_ACQUISITION_DURATION_CREATOR = "GEMS_ACQU_01"
 
 
-def get_dicom_acquisition_duration(dcm_data: dcm.Dataset) -> Optional[float]:
+def get_dicom_acquisition_duration(dcm_data: dcm.Dataset) -> float | None:
     """Extract the total scan duration directly from a DICOM tag, if present.
 
     Checks the standard ``AcquisitionDuration`` tag (0018,9073, mostly
@@ -633,7 +656,7 @@ def get_dicom_acquisition_duration(dcm_data: dcm.Dataset) -> Optional[float]:
     return duration * 1e-6 if duration is not None else None
 
 
-def get_dicom_declared_acquisition_duration(dcm_data: dcm.Dataset) -> Optional[float]:
+def get_dicom_declared_acquisition_duration(dcm_data: dcm.Dataset) -> float | None:
     """Extract Siemens' own declared (prescribed) total scan time.
 
     Parsed from the CSA/Phoenix protocol's ``lTotalScanTimeSec`` -- a
@@ -728,7 +751,7 @@ def get_acquisition_timestamps(dicom_list: list[str]) -> list[datetime.datetime]
 
 def _timestamp_span_and_median_interval(
     timestamps: list[datetime.datetime],
-) -> Optional[tuple[float, float]]:
+) -> tuple[float, float] | None:
     """Return (span, median inter-timestamp interval), in seconds, across
     the distinct `timestamps`. None if fewer than two are distinct."""
     unique_timestamps = sorted(set(timestamps))
@@ -748,8 +771,8 @@ def _timestamp_span_and_median_interval(
 
 def estimate_scan_duration_from_times(
     dicom_list: list[str],
-    timestamps: Optional[list[datetime.datetime]] = None,
-) -> Optional[float]:
+    timestamps: list[datetime.datetime] | None = None,
+) -> float | None:
     """Estimate a run's total duration from per-file acquisition timestamps.
 
     The span between the earliest and latest timestamp (see
@@ -773,8 +796,8 @@ def estimate_scan_duration_from_times(
 
 def get_acquisition_duration(
     dicom_list: list[str],
-    timestamps: Optional[list[datetime.datetime]] = None,
-) -> Optional[float]:
+    timestamps: list[datetime.datetime] | None = None,
+) -> float | None:
     """Determine the total wallclock duration, in seconds, of a run.
 
     `dicom_list` should ideally be every DICOM file belonging to the run (a
@@ -836,7 +859,7 @@ def get_acquisition_duration(
 
 def compress_dicoms(
     dicom_list: list[str], out_prefix: str, tempdirs: TempDirs, overwrite: bool
-) -> Optional[str]:
+) -> str | None:
     """Archives DICOMs into a tarball
 
     Also tries to do it reproducibly, so takes the date for files
@@ -906,15 +929,15 @@ def compress_dicoms(
 
 # Note: This function is passed to nipype by `embed_metadata_from_dicoms()`,
 # and nipype reparses the function source in a clean namespace that does not
-# have `from __future__ import annotations` enabled.  Thus, we need to use
-# Python 3.7-compatible annotations on this function, and any non-builtin types
-# used in the annotations need to be included by import statements passed to
-# the `nipype.Function` constructor.
+# have `from __future__ import annotations` enabled.  Thus, the annotations on
+# this function get evaluated, so they need to be valid at runtime with the
+# oldest Python we support, and any non-builtin types used in them need to be
+# included by import statements passed to the `nipype.Function` constructor.
 def embed_dicom_and_nifti_metadata(
-    dcmfiles: List[str],
+    dcmfiles: list[str],
     niftifile: str,
-    infofile: Union[str, Path],
-    bids_info: Optional[Dict[str, Any]],
+    infofile: str | Path,
+    bids_info: dict[str, Any] | None,
 ) -> None:
     """Embed metadata from nifti (affine etc) and dicoms into infofile (json)
 
@@ -944,6 +967,11 @@ def embed_dicom_and_nifti_metadata(
 
     from heudiconv.utils import save_json
 
+    # Note: dcmstack creates nibabel DICOM wrappers on its own, with the default
+    # frame filters of nibabel (unlike our wrapper_from_file), and provides no
+    # way to specify them.  So for a multiframe DICOM with multiple frame
+    # orientations nibabel >= 5.5.0 would warn here, and the shape and affine
+    # in the metadata of the stack would be of the first orientation only.
     stack = ds.parse_and_stack(dcmfiles, force=True).values()
     if len(stack) > 1:
         raise ValueError("Found multiple series")
@@ -974,11 +1002,11 @@ def embed_dicom_and_nifti_metadata(
 
 
 def embed_metadata_from_dicoms(
-    bids_options: Optional[str],
+    bids_options: str | None,
     item_dicoms: list[str],
     outname: str,
     outname_bids: str,
-    prov_file: Optional[str],
+    prov_file: str | None,
     scaninfo: str,
     tempdirs: TempDirs,
     with_prov: bool,
@@ -1020,7 +1048,7 @@ def embed_metadata_from_dicoms(
             function=embed_dicom_and_nifti_metadata,
             imports=[
                 "from pathlib import Path",
-                "from typing import Any, Dict, List, Optional, Union",
+                "from typing import Any",
             ],
         ),
         name="embedder",
@@ -1062,7 +1090,7 @@ def parse_private_csa_header(
     dcm_data: dcm.dataset.Dataset,
     _public_attr: str,
     private_attr: str,
-    default: Optional[str] = None,
+    default: str | None = None,
 ) -> str:
     """
     Parses CSA header in cases where value is not defined publicly

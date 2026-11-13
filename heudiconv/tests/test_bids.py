@@ -18,7 +18,7 @@ import re
 import shutil
 import stat
 import string
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import nibabel
 import numpy as np
@@ -266,11 +266,11 @@ def generate_scans_tsv(session_struct: dict[str, dict[str, Any]]) -> str:
     return "\n".join(scans_file_content)
 
 
-DummySession = Tuple[
-    Dict[str, Load],
-    Dict[str, Optional[List[str]]],
-    Dict[str, List[str]],
-    Dict[str, Dict[str, List[str]]],
+DummySession = tuple[
+    dict[str, Load],
+    dict[str, list[str] | None],
+    dict[str, list[str]],
+    dict[str, dict[str, list[str]]],
 ]
 
 
@@ -1037,7 +1037,7 @@ def create_dummy_magnitude_phase_bids_session(session_path: str) -> DummySession
     expected_prefix = session_path.split(sub_str)[-1].split(op.sep)[-1]
 
     # dict, with fmap names as keys and the expected "IntendedFor" as values.
-    expected_result: dict[str, Optional[list[str]]] = {
+    expected_result: dict[str, list[str] | None] = {
         "{p}_acq-case1_{s}.json".format(p=prefix, s="phasediff"): [
             op.join(
                 expected_prefix,
@@ -1829,7 +1829,7 @@ def test_sanitize_label() -> None:
 
 def _read_scans_rows(
     scans_tsv: Path,
-) -> tuple[Optional[list[str]], list[dict[str, str]]]:
+) -> tuple[list[str] | None, list[dict[str, str]]]:
     """Read a `_scans.tsv` file, returning its (fieldnames, rows)."""
     with open(scans_tsv, newline="") as f:
         reader = csv.DictReader(f, delimiter="\t")
@@ -1861,7 +1861,7 @@ def _make_multivol_func_scan(
     bids_root: Path,
     tr: float = 2.0,
     nvols: int = 10,
-    meta_extra: Optional[dict[str, Any]] = None,
+    meta_extra: dict[str, Any] | None = None,
 ) -> None:
     """Populate the func/ nifti+json created by `tmp_bids_with_scans`."""
     nifti_fn = bids_root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"
@@ -2242,7 +2242,7 @@ def test_check_acq_time_congruency(
     caplog: pytest.LogCaptureFixture,
     tz: str,
     acq_time: str,
-    sidecar_times: list[Optional[str]],
+    sidecar_times: list[str | None],
     expected: list[str],
 ) -> None:
     sidecars = []
@@ -2321,8 +2321,8 @@ def test_check_acq_time_congruency_fix(
     fix: bool,
     acq: float,
     timestamps: list[float],
-    sidecars: list[Optional[float]],
-    corrected: list[Optional[float]],
+    sidecars: list[float | None],
+    corrected: list[float | None],
     expected_log: list[str],
 ) -> None:
     start = datetime.fromisoformat("2020-01-01T12:00:00" + tz)
@@ -2330,7 +2330,7 @@ def test_check_acq_time_congruency_fix(
     def at(offset: float) -> datetime:
         return start + timedelta(seconds=offset)
 
-    def fmt(offset: Optional[float]) -> Optional[str]:
+    def fmt(offset: float | None) -> str | None:
         return at(offset).strftime("%H:%M:%S.%f") if offset is not None else None
 
     json_files = []
@@ -2433,7 +2433,7 @@ def test_save_scans_key_fixes_sidecar_acquisition_time(tmp_path: Path) -> None:
     ],
 )
 def test_populate_scans_duration_from_nifti_sidecar(
-    tmp_bids_with_scans: tuple[Path, Path], nvols: int, expected: Optional[float]
+    tmp_bids_with_scans: tuple[Path, Path], nvols: int, expected: float | None
 ) -> None:
     bids_root, scans_tsv = tmp_bids_with_scans
     _make_multivol_func_scan(bids_root, nvols=nvols)
@@ -2804,8 +2804,8 @@ def test_duration_from_nifti_sidecar_volume_timing_variants(
     caplog: pytest.LogCaptureFixture,
     tr: float,
     meta_extra: dict[str, Any],
-    env_var: Optional[str],
-    expected: Optional[float],
+    env_var: str | None,
+    expected: float | None,
     expect_warning: bool,
 ) -> None:
     if env_var is not None:

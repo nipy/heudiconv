@@ -139,7 +139,7 @@ import hashlib
 import logging
 import os.path
 import re
-from typing import Any, Optional, TypeVar
+from typing import Any, TypeVar
 
 import pydicom as dcm
 
@@ -243,7 +243,7 @@ def filter_files(_fn: str) -> bool:
 
 
 def create_key(
-    subdir: Optional[str],
+    subdir: str | None,
     file_suffix: str,
     outtype: tuple[str, ...] = ("nii.gz", "dicom"),
     annotation_classes: None = None,
@@ -261,7 +261,7 @@ def create_key(
     return template, outtype, annotation_classes
 
 
-def md5sum(string: Optional[str]) -> str:
+def md5sum(string: str | None) -> str:
     """Computes md5sum of a string"""
     if not string:
         return ""  # not None so None was not compared to strings
@@ -404,8 +404,8 @@ def infotodict(
     skipped: list[str] = []
     skipped_unknown: list[str] = []
     current_run = 0
-    run_label: Optional[str] = None  # run-
-    dcm_image_iod_spec: Optional[str] = None
+    run_label: str | None = None  # run-
+    dcm_image_iod_spec: str | None = None
     skip_derived = False
     for curr_seqinfo in seqinfo:
         # XXX: skip derived sequences, we don't store them to avoid polluting
@@ -596,7 +596,7 @@ def infotodict(
             # if there is no _run -- no run label added
             run_label = None
 
-        def from_series_info(name: str) -> Optional[str]:
+        def from_series_info(name: str) -> str | None:
             """A little helper to provide _name-value if series_info knows it
 
             Returns None otherwise
@@ -757,7 +757,7 @@ def get_unique(seqinfos: list[SeqInfo], attr: str) -> Any:
 # TODO: might need to do grouping per each session and return here multiple
 # hits, or may be we could just somehow demarkate that it will be multisession
 # one and so then later value parsed (again) in infotodict would be used???
-def infotoids(seqinfos: Iterable[SeqInfo], outdir: str) -> dict[str, Optional[str]]:
+def infotoids(seqinfos: Iterable[SeqInfo], outdir: str) -> dict[str, str | None]:
     seqinfo_lst = list(seqinfos)
     # decide on subjid and session based on patient_id
     lgr.info("Processing sequence infos to deduce study/session")
@@ -802,7 +802,7 @@ def infotoids(seqinfos: Iterable[SeqInfo], outdir: str) -> dict[str, Optional[st
             session_ = s.date
         if session_:
             ses_markers.append(session_)
-    session: Optional[str] = None
+    session: str | None = None
     if ses_markers:
         # we have a session or possibly more than one even
         # let's figure out which case we have
@@ -909,7 +909,7 @@ def parse_series_spec(series_spec: str) -> dict[str, str]:
         bids = True  # for sure
         split = split[1:]
 
-    def split2(s: str) -> tuple[str, Optional[str]]:
+    def split2(s: str) -> tuple[str, str | None]:
         # split on - if present, if not -- 2nd one returned None
         if "-" in s:
             a, _, b = s.partition("-")

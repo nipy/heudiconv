@@ -17,6 +17,7 @@ Quick reference
     tox                          # run linting, type checking, and tests as CI would
     tox -e lint                  # flake8 + codespell only
     tox -e typing                # mypy only
+    tox -e py3-lowest            # tests with the lowest supported versions of dependencies
 
 The sections below describe each of those in more detail.
 
@@ -100,7 +101,7 @@ The following pull request labels are respected:
 Development environment
 -----------------------
 
-We support Python 3 only (>= 3.9), and test against all Python versions from 3.9 through 3.13.
+We support Python 3 only (>= 3.10), and test against all Python versions from 3.10 through 3.14.
 
 Dependencies which you will need are listed in `pyproject.toml <./pyproject.toml>`_.
 Note that you will likely have these will already be available on your system if you used a
@@ -137,10 +138,19 @@ Documentation
 To contribute to the documentation, we recommend building the docs
 locally prior to submitting a patch.
 
-To build the docs locally:
+To build the docs locally::
 
- 1. From the root of the heudiconv repository, `pip install -r docs/requirements.txt`
- 2. From the `docs/` directory, run `make html`
+    tox -e docs
+
+which installs HeuDiConv with its ``docs`` extra (see `pyproject.toml <./pyproject.toml>`_) and
+runs ``sphinx-build`` with warnings treated as errors -- the very same way
+`Read the Docs <https://heudiconv.readthedocs.io>`_ builds them according to
+`.readthedocs.yaml <./.readthedocs.yaml>`_, and the ``Docs`` GitHub Actions workflow checks them
+in every pull request.  Alternatively, ``pip install -e .[all,docs]`` and run ``make html`` from
+the ``docs/`` directory.
+
+Note that HeuDiConv derives its version from Git tags, so building from a shallow clone or from
+a clone without tags (``git fetch --unshallow --tags`` remedies both) would fail.
 
 
 Code style
