@@ -1253,7 +1253,7 @@ def add_taskname_to_infofile(infofiles: str | list[str]) -> None:
             continue
 
         # write to outfile
-        save_json(infofile, meta_info)
+        save_json(infofile, meta_info, pretty=True)
 
 
 def bvals_are_zero(bval_file: str | list) -> bool:
