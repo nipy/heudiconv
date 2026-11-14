@@ -7,7 +7,6 @@ import logging
 import os
 import os.path as op
 from pathlib import Path
-import statistics
 import tarfile
 from typing import TYPE_CHECKING, Any, NamedTuple, Protocol, overload
 from unittest.mock import patch
@@ -21,6 +20,8 @@ from .utils import (
     as_finite_positive_float,
     get_typed_attr,
     load_json,
+    median_step,
+    naive_if_mixed_tz,
     set_readonly,
     strptime_dcm_da_tm,
     strptime_dcm_dt,
@@ -573,13 +574,23 @@ def get_datetime_from_dcm(dcm_data: dcm.Dataset) -> datetime.datetime | None:
 
     """
 
+    return _get_datetime_and_is_series_level(dcm_data)[0]
+
+
+def _get_datetime_and_is_series_level(
+    dcm_data: dcm.Dataset,
+) -> tuple[datetime.datetime | None, bool]:
+    """:func:`get_datetime_from_dcm` and whether it had to resort to the series' time."""
     if _has_value(dcm_data, "AcquisitionDate", "AcquisitionTime"):
-        return strptime_dcm_da_tm(dcm_data, "AcquisitionDate", "AcquisitionTime")
+        return (
+            strptime_dcm_da_tm(dcm_data, "AcquisitionDate", "AcquisitionTime"),
+            False,
+        )
     if _has_value(dcm_data, "AcquisitionDateTime"):
-        return strptime_dcm_dt(dcm_data, "AcquisitionDateTime")
+        return strptime_dcm_dt(dcm_data, "AcquisitionDateTime"), False
     if _has_value(dcm_data, "SeriesDate", "SeriesTime"):
-        return strptime_dcm_da_tm(dcm_data, "SeriesDate", "SeriesTime")
-    return None
+        return strptime_dcm_da_tm(dcm_data, "SeriesDate", "SeriesTime"), True
+    return None, False
 
 
 def _has_value(dcm_data: dcm.Dataset, *tags: str) -> bool:
@@ -639,10 +650,9 @@ def get_dicom_acquisition_duration(dcm_data: dcm.Dataset) -> float | None:
     Enhanced MR/CT), else the private GE tag (0019,105A, classic per-slice
     GE DICOMs). Returns None if neither is present/parseable.
     """
-    if (0x0018, 0x9073) in dcm_data:
-        duration = as_finite_positive_float(dcm_data[(0x0018, 0x9073)].value)
-        if duration is not None:
-            return duration
+    duration = as_finite_positive_float(dcm_data.get("AcquisitionDuration"))
+    if duration is not None:
+        return duration
 
     try:
         elem = dcm_data.get_private_item(
@@ -705,27 +715,19 @@ def get_acquisition_timestamps(dicom_list: list[str]) -> list[datetime.datetime]
     the series' (start) date/time are skipped too, unless no file has an
     acquisition date/time.
     """
-    timestamps = []
-    series_timestamps = []
+    timestamps: list[datetime.datetime] = []
+    series_timestamps: list[datetime.datetime] = []
     for fn in dicom_list:
         dcm_data = dcm.dcmread(
             fn, stop_before_pixels=True, force=True, specific_tags=_DATETIME_TAGS
         )
         try:
-            dt = get_datetime_from_dcm(dcm_data)
+            dt, is_series_level = _get_datetime_and_is_series_level(dcm_data)
         except ValueError as exc:
-            # a malformed date/time string in this file should not abort
-            # the whole (best-effort) collection -- just skip it
             lgr.warning("Failed to parse acquisition datetime from %s: %s", fn, exc)
             continue
-        if dt is None:
-            continue
-        if _has_value(dcm_data, "AcquisitionDate", "AcquisitionTime") or _has_value(
-            dcm_data, "AcquisitionDateTime"
-        ):
-            timestamps.append(dt)
-        else:
-            series_timestamps.append(dt)
+        if dt is not None:
+            (series_timestamps if is_series_level else timestamps).append(dt)
     if timestamps and series_timestamps:
         lgr.debug(
             "Ignoring %d file(s) with only the series' date/time among %d "
@@ -734,64 +736,42 @@ def get_acquisition_timestamps(dicom_list: list[str]) -> list[datetime.datetime]
             len(timestamps),
         )
     result = timestamps or series_timestamps
-    # DICOMs of one run should agree on carrying TimezoneOffsetFromUTC or
-    # not, but when they don't, comparing the resulting mix of aware and
-    # naive datetimes raises TypeError -- fall back to comparing all of
-    # them as local wall-clock time rather than letting that happen
-    if len({dt.tzinfo is None for dt in result}) > 1:
+    comparable = naive_if_mixed_tz(result)
+    if comparable is not result:
         lgr.warning(
             "Only some of %d files have a timezone-aware acquisition "
             "timestamp (DICOM TimezoneOffsetFromUTC present on some but "
             "not others) -- comparing all of them as timezone-naive",
             len(result),
         )
-        result = [dt.replace(tzinfo=None) for dt in result]
-    return result
+    return comparable
 
 
-def _timestamp_span_and_median_interval(
+def _span_and_median_interval(
     timestamps: list[datetime.datetime],
 ) -> tuple[float, float] | None:
-    """Return (span, median inter-timestamp interval), in seconds, across
-    the distinct `timestamps`. None if fewer than two are distinct."""
-    unique_timestamps = sorted(set(timestamps))
-    if len(unique_timestamps) < 2:
+    """(span, median interval) in seconds of the distinct `timestamps`, if >= 2."""
+    unique = sorted(set(timestamps))
+    if len(unique) < 2:
         return None
-    intervals = [
-        (t2 - t1).total_seconds()
-        for t1, t2 in zip(unique_timestamps[:-1], unique_timestamps[1:])
-    ]
-    # statistics.median() (not a hand-rolled "middle of the sorted list")
-    # to get the *true* median -- averaging the two middle values -- when
-    # there is an even number of intervals
-    median_interval = statistics.median(intervals)
-    span = (unique_timestamps[-1] - unique_timestamps[0]).total_seconds()
-    return span, median_interval
+    return (
+        (unique[-1] - unique[0]).total_seconds(),
+        median_step(unique).total_seconds(),
+    )
 
 
 def estimate_scan_duration_from_times(
-    dicom_list: list[str],
-    timestamps: list[datetime.datetime] | None = None,
+    timestamps: list[datetime.datetime],
 ) -> float | None:
-    """Estimate a run's total duration from per-file acquisition timestamps.
+    """Estimate a run's total duration from its acquisition `timestamps`.
 
-    The span between the earliest and latest timestamp (see
-    :func:`get_acquisition_timestamps`) across `dicom_list`, plus one median
-    inter-timestamp interval to account for the last timestamp marking the
-    *onset*, not the end, of the final volume/slice. Returns None if fewer
-    than two distinct timestamps could be established.
-
-    `timestamps`, if given, must be what :func:`get_acquisition_timestamps`
-    returns for `dicom_list`; it saves re-reading the files when the caller
-    already has them.
+    The span between the earliest and latest of them (see
+    :func:`get_acquisition_timestamps`), plus one median interval to account
+    for the last one marking the *onset*, not the end, of the final
+    volume/slice.  None if fewer than two are distinct.
     """
-    if timestamps is None:
-        timestamps = get_acquisition_timestamps(dicom_list)
-    span_and_median = _timestamp_span_and_median_interval(timestamps)
-    if span_and_median is None:
-        return None
-    span, median_interval = span_and_median
-    return span + median_interval
+    span_and_median = _span_and_median_interval(timestamps)
+    return sum(span_and_median) if span_and_median else None
 
 
 def get_acquisition_duration(
@@ -800,35 +780,30 @@ def get_acquisition_duration(
 ) -> float | None:
     """Determine the total wallclock duration, in seconds, of a run.
 
-    `dicom_list` should ideally be every DICOM file belonging to the run (a
-    single representative file also works, but then only
-    :func:`get_dicom_acquisition_duration` has a chance of succeeding).
-    Tries, in order: the standard/GE DICOM tag, per-file timestamps, then
-    Siemens' own declared duration as a last resort -- but only for a
-    genuinely single-volume protocol, to avoid overstating a truncated or
-    aborted multi-volume acquisition (see the code below for the exact
-    conditions). The DICOM tag itself is cross-checked against the
-    timestamps when available, and ignored in favor of the timestamp
-    estimate if it is shorter, or far larger, than their span (e.g.
-    reflecting the full planned protocol of a truncated/aborted acquisition).
-    `timestamps` is passed through to
-    :func:`estimate_scan_duration_from_times`. Returns None if nothing
-    succeeds.
+    `dicom_list` should be every DICOM file of the run, and `timestamps` (if
+    already at hand) what :func:`get_acquisition_timestamps` returns for it.
+    Sources, in order:
+
+    1. the DICOM tag (:func:`get_dicom_acquisition_duration`), unless the
+       timestamps show it to be implausible, e.g. a truncated acquisition
+       reporting its full planned duration;
+    2. :func:`estimate_scan_duration_from_times`;
+    3. Siemens' declared scan time, only for a single-volume protocol, so a
+       truncated multi-volume run gets None rather than its planned duration.
     """
     if not dicom_list:
         return None
+    if timestamps is None:
+        timestamps = get_acquisition_timestamps(dicom_list)
+    span_and_median = _span_and_median_interval(timestamps)
     dcm_data = dcm.dcmread(dicom_list[0], stop_before_pixels=True, force=True)
     duration = get_dicom_acquisition_duration(dcm_data)
-    if duration is not None:
-        if timestamps is None:
-            timestamps = get_acquisition_timestamps(dicom_list)
-        span_and_median = _timestamp_span_and_median_interval(timestamps)
-        if span_and_median is not None:
-            span, median_interval = span_and_median
-            # a margin beyond the normal span + 1 estimate avoids
-            # second-guessing a merely slightly-longer-than-expected tag,
-            # while no acquisition is shorter than its timestamps span
-            if not span <= duration <= span + 2 * median_interval:
+    if span_and_median is not None:
+        span, median_interval = span_and_median
+        # no acquisition is shorter than its timestamps span, while the margin
+        # of an extra interval avoids second-guessing a slightly longer tag
+        if duration is None or not span <= duration <= span + 2 * median_interval:
+            if duration is not None:
                 lgr.warning(
                     "%s: AcquisitionDuration tag declares %.3fs, which "
                     "disagrees with the %.3fs spanned by its %d distinct "
@@ -840,9 +815,7 @@ def get_acquisition_duration(
                     span,
                     len(set(timestamps)),
                 )
-                return span + median_interval
-        return duration
-    duration = estimate_scan_duration_from_times(dicom_list, timestamps=timestamps)
+            return span + median_interval
     if duration is not None:
         return duration
     if get_dicom_declared_repetitions(dcm_data) > 0:

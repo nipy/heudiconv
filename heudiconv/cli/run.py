@@ -190,7 +190,7 @@ def get_parser() -> ArgumentParser:
         ),
         help="Custom action to be performed on provided files instead of "
         "regular operation. 'populate-scans-duration' retrospectively "
-        "fills in the 'duration' column of '*_scans.tsv' file(s) found "
+        "fills in the 'duration' column of '_scans.tsv' file(s) found "
         "under the path(s) given via --files, using previously-generated "
         "sourcedata DICOMs or the nifti/json sidecar; combine with "
         "--overwrite to also recompute values which are already filled in.",

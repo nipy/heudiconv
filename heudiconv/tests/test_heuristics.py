@@ -155,9 +155,7 @@ def test_scans_keys_reproin(tmp_path: Path, invocation: list[str]) -> None:
                 assert re.match(
                     r"^[\d]{4}-[\d]{2}-[\d]{2}T[\d]{2}:[\d]{2}:[\d]{2}.[\d]{6}$", row[1]
                 )
-                # duration is either 'n/a' or a positive number of seconds
-                if row[2] != "n/a":
-                    assert float(row[2]) > 0
+                assert row[2] == "3.000"
 
 
 @patch("sys.stdout", new_callable=StringIO)

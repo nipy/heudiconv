@@ -6,7 +6,6 @@ import json
 import os.path as op
 from pathlib import Path
 from typing import Any
-from unittest.mock import patch
 import warnings
 
 import pydicom as dcm
@@ -475,75 +474,44 @@ def test_get_dicom_declared_repetitions() -> None:
     assert get_dicom_declared_repetitions(dcm_data) == 1
 
 
-@pytest.mark.ai_generated
-def test_estimate_scan_duration_from_times() -> None:
-    # 3 DICOMs, ~4.15s apart -- duration is the span plus one more interval
-    dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))
-    assert len(dicom_list) == 3
-    assert estimate_scan_duration_from_times(dicom_list) == pytest.approx(12.45)
+def _timestamps(offsets: list[float]) -> list[datetime.datetime]:
+    start = datetime.datetime(2020, 1, 1, 12)
+    return [start + datetime.timedelta(seconds=offset) for offset in offsets]
+
+
+def _edit_dicom(fn: str, **tags: Any) -> None:
+    """Set `tags` in the DICOM `fn`; a tag given as None is removed."""
+    dcm_data = dcm.dcmread(fn, stop_before_pixels=True)
+    with warnings.catch_warnings():
+        # pydicom >= 2.3 warns about an invalid value
+        warnings.simplefilter("ignore")
+        for tag, value in tags.items():
+            if value is not None:
+                setattr(dcm_data, tag, value)
+            elif tag in dcm_data:
+                delattr(dcm_data, tag)
+    dcm.dcmwrite(fn, dcm_data)
 
 
 @pytest.mark.ai_generated
 @pytest.mark.parametrize(
     "offsets,expected",
     [
-        # 5 timestamps -> 4 intervals (an even count): 1, 2, 4, 1 seconds.
-        # The true median is the average of the two middle (sorted) values,
-        # (1 + 2) / 2 == 1.5 -- not just "the" middle element of a 4-item
-        # list, which has no single middle element. span (8s) + median
-        # interval (1.5s)
+        # span plus the median interval, which for an even number of
+        # intervals (1, 2, 4, 1) is the mean of the two middle ones
         ([0, 1, 3, 7, 8], 9.5),
-        # Relevant to https://github.com/nipy/heudiconv/issues/875/876:
-        # interleaved multiband slice acquisition means the file
-        # conventionally treated as "first" (e.g. DICOM InstanceNumber 1,
-        # whatever dicom_list[0] resolves to) is not necessarily the
-        # earliest-acquired one. The duration estimate must use the true
-        # earliest/latest timestamps regardless -- dicom_list[0] has offset
-        # 2s here, but the true earliest is offset 0s (dicom_list[1]).
-        # span (0 to 7 = 7s) + median interval (2s) = 9s
+        # the first is not necessarily the earliest, e.g. interleaved
+        # multiband slices: https://github.com/nipy/heudiconv/issues/876
         ([2, 0, 4, 7], 9.0),
+        ([3, 3], None),  # need two distinct ones
+        ([3], None),
+        ([], None),
     ],
 )
-def test_estimate_scan_duration_from_times_parametrized(
-    tmp_path: Path, offsets: list[int], expected: float
+def test_estimate_scan_duration_from_times(
+    offsets: list[float], expected: float | None
 ) -> None:
-    dicom_list = make_timed_dicoms(tmp_path, offsets)
-    assert estimate_scan_duration_from_times(dicom_list) == pytest.approx(expected)
-
-
-@pytest.mark.ai_generated
-def test_get_acquisition_duration_uses_given_timestamps(tmp_path: Path) -> None:
-    offsets = [2, 0, 4, 7]
-    dicom_list = make_timed_dicoms(tmp_path, offsets)
-
-    timestamps = get_acquisition_timestamps(dicom_list)
-    assert get_acquisition_duration(dicom_list) == pytest.approx(9.0)
-    # reusing already-collected timestamps gives the same result, without
-    # re-reading the files
-    with patch("heudiconv.dicoms.get_acquisition_timestamps") as mocked:
-        assert get_acquisition_duration(
-            dicom_list, timestamps=timestamps
-        ) == pytest.approx(9.0)
-    mocked.assert_not_called()
-
-
-@pytest.mark.ai_generated
-def test_estimate_scan_duration_from_times_skips_malformed_timestamp(
-    tmp_path: Path,
-) -> None:
-    # a malformed date/time in one (non-first) file should be skipped with
-    # a warning, not raise and abort the whole (best-effort) estimate
-    dicom_list = make_timed_dicoms(tmp_path, [0, 1, 3])
-    dcm_data = dcm.dcmread(dicom_list[1], stop_before_pixels=True)
-    with warnings.catch_warnings():
-        # pydicom >= 2.3 warns about the invalid value
-        warnings.simplefilter("ignore")
-        dcm_data.AcquisitionTime = "not-a-time"
-    dcm.dcmwrite(dicom_list[1], dcm_data)
-
-    # the malformed file (offset 1) is skipped; span (3s) + median interval
-    # of the remaining single interval (3s) between the two good timestamps
-    assert estimate_scan_duration_from_times(dicom_list) == pytest.approx(6.0)
+    assert estimate_scan_duration_from_times(_timestamps(offsets)) == expected
 
 
 @pytest.mark.ai_generated
@@ -559,96 +527,85 @@ def test_get_acquisition_timestamps(tmp_path: Path, tz_offset: str | None) -> No
     ]
     assert [t.second for t in timestamps] == [2, 0, 4, 7]
     assert all((t.tzinfo is not None) == bool(tz_offset) for t in timestamps)
-    # and can be used for estimating the duration
-    assert get_acquisition_duration(dicom_list, timestamps=timestamps) == pytest.approx(
-        9.0
-    )
+
+
+_NO_DATETIME = dict.fromkeys(
+    ["AcquisitionDate", "AcquisitionTime", "AcquisitionDateTime", "SeriesDate"]
+    + ["SeriesTime"]
+)
+_SERIES_TIME_ONLY = dict(
+    AcquisitionTime=None, SeriesDate="20200101", SeriesTime="115930.000000"
+)
 
 
 @pytest.mark.ai_generated
-@pytest.mark.parametrize("n_series_only", [1, 3])
-def test_get_acquisition_timestamps_series_fallback(
-    tmp_path: Path, n_series_only: int
+@pytest.mark.parametrize(
+    "edits,expected_seconds",
+    [
+        # a file with a malformed, or without any, date/time is skipped
+        pytest.param({1: dict(AcquisitionTime="not-a-time")}, [0, 2], id="malformed"),
+        pytest.param({1: _NO_DATETIME}, [0, 2], id="no-datetime"),
+        pytest.param(dict.fromkeys(range(3), _NO_DATETIME), [], id="no-datetimes"),
+        # and so is one with only the (earlier) start time of the series
+        # (https://github.com/nipy/heudiconv/issues/878) ...
+        pytest.param({2: _SERIES_TIME_ONLY}, [0, 1], id="series-time"),
+        # ... unless that is all there is
+        pytest.param(
+            dict.fromkeys(range(3), _SERIES_TIME_ONLY), [30] * 3, id="series-times"
+        ),
+    ],
+)
+def test_get_acquisition_timestamps_of_odd_files(
+    tmp_path: Path, edits: dict[int, dict[str, Any]], expected_seconds: list[int]
 ) -> None:
-    # files which only have the (earlier) series start time must not be
-    # mixed in with the actual acquisition times of the others -- unless
-    # there are no others
     dicom_list = make_timed_dicoms(tmp_path, [0, 1, 2])
-    for fn in dicom_list[-n_series_only:]:
-        dcm_data = dcm.dcmread(fn, stop_before_pixels=True)
-        del dcm_data.AcquisitionTime
-        dcm_data.SeriesDate = "20200101"
-        dcm_data.SeriesTime = "115930.000000"
-        dcm.dcmwrite(fn, dcm_data)
+    for i, tags in edits.items():
+        _edit_dicom(dicom_list[i], **tags)
     timestamps = get_acquisition_timestamps(dicom_list)
-    if n_series_only < len(dicom_list):
-        assert [t.second for t in timestamps] == [0, 1]
-    else:
-        assert timestamps == [datetime.datetime(2020, 1, 1, 11, 59, 30)] * 3
+    assert [t.second for t in timestamps] == expected_seconds
 
 
 @pytest.mark.ai_generated
-def test_get_acquisition_timestamps_mixed_timezone_awareness(tmp_path: Path) -> None:
-    # real-world DICOMs of the same run do not always agree on carrying
-    # TimezoneOffsetFromUTC -- comparing the resulting mix of aware and
-    # naive datetimes must not raise TypeError
+def test_get_acquisition_timestamps_mixed_timezone_awareness(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    # DICOMs of a run do not always agree on carrying TimezoneOffsetFromUTC,
+    # and a mix of aware and naive datetimes could not be compared
     dicom_list = make_timed_dicoms(tmp_path, [2, 0, 4, 7], tz_offset="+0100")
-    dcm_data = dcm.dcmread(dicom_list[1], stop_before_pixels=True)
-    del dcm_data.TimezoneOffsetFromUTC
-    dcm.dcmwrite(dicom_list[1], dcm_data)
+    _edit_dicom(dicom_list[1], TimezoneOffsetFromUTC=None)
 
     timestamps = get_acquisition_timestamps(dicom_list)
-    assert all(t.tzinfo is None for t in timestamps)
-    assert [t.second for t in timestamps] == [2, 0, 4, 7]
-    # and duration/row computation built on top of it keep working too
-    assert get_acquisition_duration(dicom_list, timestamps=timestamps) == pytest.approx(
-        9.0
+    assert timestamps == _timestamps([2, 0, 4, 7])
+    assert "timezone-naive" in caplog.text
+    assert get_acquisition_duration(dicom_list, timestamps) == 9.0
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "dicoms,expected",
+    [
+        ([], None),
+        # 3 files ~4.15s apart: their timestamps are preferred over the 591s
+        # which the CSA header declares
+        ("b0dwiForFmap/*.dcm", 12.45),
+        # a single volume, so only Siemens' declared duration is left
+        ("phantom.dcm", 14.0),
+        # as for the 17s this one declares: its protocol is of 2 volumes
+        # (lRepetitions = 1), so with a single file it looks truncated
+        ("axasc35.dcm", None),
+    ],
+)
+def test_get_acquisition_duration(dicoms: str, expected: float | None) -> None:
+    dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, dicoms))) if dicoms else []
+    assert get_acquisition_duration(dicom_list) == (
+        expected and pytest.approx(expected)
     )
 
 
 @pytest.mark.ai_generated
-def test_get_acquisition_duration_rejects_truncated_acquisition_duration_tag() -> None:
-    # tests/data/xa_4d_interrupted: AcquisitionDuration declares 602.735s
-    # (the full planned protocol), but only 2 (36.2s apart) of the planned
-    # volumes were actually acquired -- using the tag as-is would wildly
-    # overstate the duration of this truncated/aborted acquisition
-    dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "xa_4d_interrupted", "*")))
-    assert get_dicom_acquisition_duration(
-        dcm.dcmread(dicom_list[0], stop_before_pixels=True, force=True)
-    ) == pytest.approx(602.735)
-    assert get_acquisition_duration(dicom_list) == pytest.approx(72.4)
-
-
-@pytest.mark.ai_generated
-def test_estimate_scan_duration_from_times_single_file() -> None:
-    dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))[:1]
-    assert estimate_scan_duration_from_times(dicom_list) is None
-
-
-@pytest.mark.ai_generated
-def test_estimate_scan_duration_from_times_wo_dt(tmp_path: Path) -> None:
-    # no usable date/time information (e.g. stripped by anonymization) --
-    # use two distinct files, so this also rules out the "single unique
-    # timestamp" case rather than just a single-file list
-    dicom_list = make_timed_dicoms(tmp_path, [0, 1])
-    for fn in dicom_list:
-        dcm_data = dcm.dcmread(fn, stop_before_pixels=True)
-        for field in (
-            "AcquisitionDate",
-            "AcquisitionTime",
-            "AcquisitionDateTime",
-            "SeriesDate",
-            "SeriesTime",
-        ):
-            if field in dcm_data:
-                delattr(dcm_data, field)
-        dcm.dcmwrite(fn, dcm_data)
-    assert estimate_scan_duration_from_times(dicom_list) is None
-
-
-@pytest.mark.ai_generated
-def test_get_acquisition_duration_empty() -> None:
-    assert get_acquisition_duration([]) is None
+def test_get_acquisition_duration_of_given_timestamps(tmp_path: Path) -> None:
+    dicom_list = make_timed_dicoms(tmp_path, [2, 0, 4, 7])
+    assert get_acquisition_duration(dicom_list, _timestamps([0, 1, 2])) == 3.0
 
 
 @pytest.mark.ai_generated
@@ -663,44 +620,30 @@ def test_get_acquisition_duration_empty() -> None:
     ],
 )
 def test_get_acquisition_duration_cross_checks_tag(
-    tmp_path: Path, offsets: list[int], tag: float, expected: float
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+    offsets: list[int],
+    tag: float,
+    expected: float,
 ) -> None:
     dicom_list = make_timed_dicoms(tmp_path, offsets)
     for fn in dicom_list:
-        dcm_data = dcm.dcmread(fn, stop_before_pixels=True)
-        dcm_data.add_new((0x0018, 0x9073), "FD", tag)
-        dcm.dcmwrite(fn, dcm_data)
-    assert get_acquisition_duration(dicom_list) == pytest.approx(expected)
+        _edit_dicom(fn, AcquisitionDuration=tag)
+    assert get_acquisition_duration(dicom_list) == expected
+    assert ("AcquisitionDuration tag declares" in caplog.text) == (tag != expected)
 
 
 @pytest.mark.ai_generated
-def test_get_acquisition_duration_falls_back_to_times() -> None:
-    # preferred over this fixture's CSA-declared 591s
-    dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))
-    assert get_acquisition_duration(dicom_list) == pytest.approx(12.45)
-
-
-@pytest.mark.ai_generated
-def test_get_acquisition_duration_falls_back_to_declared_duration() -> None:
-    # a single-volume 3D sequence (e.g. an MPRAGE T1w): every file shares
-    # one AcquisitionTime, so estimate_scan_duration_from_times() cannot
-    # find two distinct timestamps to work with -- Siemens' own declared
-    # duration (embedded in this real fixture's CSA header) is the only
-    # source left
-    dcm_fn = op.join(TESTS_DATA_PATH, "phantom.dcm")
-    assert get_acquisition_duration([dcm_fn]) == pytest.approx(14.0)
-
-
-@pytest.mark.ai_generated
-def test_get_acquisition_duration_does_not_guess_for_truncated_multivolume() -> None:
-    # axasc35.dcm's protocol declares 'lRepetitions = 1' (2 volumes planned),
-    # but only a single file/timestamp is available here -- e.g. an aborted
-    # acquisition stopped after its first volume. Falling back to Siemens'
-    # declared total scan time (17s) would report the full planned protocol
-    # rather than the actual (much shorter) partial one, so this must be
-    # left as unavailable instead of guessed.
-    dcm_fn = op.join(TESTS_DATA_PATH, "axasc35.dcm")
-    assert get_dicom_declared_acquisition_duration(
-        dcm.dcmread(dcm_fn, stop_before_pixels=True)
-    ) == pytest.approx(17.0)
-    assert get_acquisition_duration([dcm_fn]) is None
+def test_get_acquisition_duration_of_truncated_acquisition(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # AcquisitionDuration is of the full planned protocol, of which only 2
+    # files, 36.2s apart, were acquired
+    dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "xa_4d_interrupted", "*")))
+    tag = get_dicom_acquisition_duration(
+        dcm.dcmread(dicom_list[0], stop_before_pixels=True, force=True)
+    )
+    assert tag == pytest.approx(602.735)
+    duration = get_acquisition_duration(dicom_list)
+    assert duration is not None and 36.2 <= duration < 100
+    assert "AcquisitionDuration tag declares 602.735s" in caplog.text

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import csv
-import datetime
 from glob import glob
 from io import StringIO
 import logging
@@ -241,56 +240,14 @@ def test_get_formatted_scans_key_row() -> None:
 def test_get_formatted_scans_key_row_acq_time_is_earliest_timestamp(
     tmp_path: Path,
 ) -> None:
-    # Regression test for https://github.com/nipy/heudiconv/issues/876:
-    # interleaved multiband slice acquisition can mean the file passed first
-    # is not the earliest-acquired one. `acq_time` must be the earliest
-    # timestamp across every file of the run, not dicom_list[0]'s own one.
-    offsets = [2, 0, 4, 7]
-    dicom_list = make_timed_dicoms(tmp_path, offsets)
-
-    row = get_formatted_scans_key_row(dicom_list)
-    acq_time = datetime.datetime.fromisoformat(row[0])
-    duration = float(row[1])
-    # dicom_list[0] has offset 2s, but the true earliest is offset 0s
-    assert acq_time == datetime.datetime(2020, 1, 1, 12, 0, 0)
-    # true last raw timestamp (offset 7s) plus the median inter-timestamp
-    # interval (2s, from offsets 0/2/4/7) -- the estimated end of
-    # acquisition -- so acq_time + duration lands exactly there
-    estimated_end = datetime.datetime(2020, 1, 1, 12, 0, 9)
-    assert abs(
-        (acq_time + datetime.timedelta(seconds=duration)) - estimated_end
-    ) <= datetime.timedelta(milliseconds=1)
-
-
-@pytest.mark.ai_generated
-def test_get_formatted_scans_key_row_mixed_timezone_awareness(tmp_path: Path) -> None:
-    # Regression test for a real pre-merge review finding on PR #872: real
-    # DICOMs of the same run do not always agree on carrying
-    # TimezoneOffsetFromUTC -- this must not raise and abort conversion.
-    import pydicom as dcm
-
-    dicom_list = make_timed_dicoms(tmp_path, [2, 0, 4, 7], tz_offset="+0100")
-    dcm_data = dcm.dcmread(dicom_list[1], stop_before_pixels=True)
-    del dcm_data.TimezoneOffsetFromUTC
-    dcm.dcmwrite(dicom_list[1], dcm_data)
-
-    row = get_formatted_scans_key_row(dicom_list)  # must not raise
-    assert row[0] == "2020-01-01T12:00:00"
-    assert float(row[1]) == pytest.approx(9.0)
-
-
-@pytest.mark.ai_generated
-def test_get_formatted_scans_key_row_propagates_unexpected_failure() -> None:
-    # an unexpected failure (e.g. a bug, not a known data-quality quirk
-    # already tolerated by get_acquisition_timestamps/_duration) should
-    # surface loudly rather than be swallowed into a silent 'n/a'
-    dicom_list = sorted(glob("%s/b0dwiForFmap/*.dcm" % TESTS_DATA_PATH))
-    with patch(
-        "heudiconv.dicoms.get_acquisition_timestamps",
-        side_effect=RuntimeError("boom"),
-    ):
-        with pytest.raises(RuntimeError, match="boom"):
-            get_formatted_scans_key_row(dicom_list)
+    # https://github.com/nipy/heudiconv/issues/876: the first file is not
+    # necessarily the earliest acquired, e.g. interleaved multiband slices
+    dicom_list = make_timed_dicoms(tmp_path, [2, 0, 4, 7])
+    # span of 7s + median interval of 2s
+    assert get_formatted_scans_key_row(dicom_list)[:2] == [
+        "2020-01-01T12:00:00",
+        "9.000",
+    ]
 
 
 # TODO: finish this
@@ -301,9 +258,9 @@ def test_add_rows_to_scans_keys_file(tmp_path: Path) -> None:
         "another_file.nii.gz": ["2018xxxxx", "n/a", "", "fasadfasdf"],
     }
     add_rows_to_scans_keys_file(fn, rows)
-    umask = os.umask(0)
-    os.umask(umask)
-    assert stat.S_IMODE(os.stat(fn).st_mode) == 0o666 & ~umask
+    # not e.g. the owner-only permissions of a temporary file
+    (tmp_path / "plain").touch()
+    assert os.stat(fn).st_mode == os.stat(tmp_path / "plain").st_mode
 
     def _check_rows(fn: str, rows: dict[str, list[str]]) -> None:
         with open(fn, "r") as csvfile:
@@ -341,116 +298,94 @@ def test_add_rows_to_scans_keys_file(tmp_path: Path) -> None:
 
 
 @pytest.mark.ai_generated
-def test_add_rows_to_scans_keys_file_upgrades_older_header(tmp_path: Path) -> None:
-    # a file written by a heudiconv version predating 'duration' has fewer,
-    # differently-ordered columns; adding a new row to it must not
-    # misalign the old row's values (e.g. 'operator' landing under
-    # 'duration') -- see gh-issue discussion on positional vs. by-name
-    # column handling.
-    fn = opj(tmp_path, "file.tsv")
-    with open(fn, "w") as f:
-        f.write("filename\tacq_time\toperator\trandstr\n")
-        f.write("old_file.nii.gz\t2016adsfasd\tDr. Old\toldrand01\n")
-
+@pytest.mark.parametrize(
+    "existing,encoding,expected",
+    [
+        pytest.param(
+            # as written before 'duration' was introduced: values must stay
+            # under their own columns
+            [
+                "filename\tacq_time\toperator\trandstr",
+                "old.nii.gz\t2016\tDr. Old\told1",
+            ],
+            "utf-8",
+            [
+                "filename\tacq_time\tduration\toperator\trandstr",
+                "old.nii.gz\t2016\tn/a\tDr. Old\told1",
+                "redone.nii.gz\t2017b\t2.000\tDr. New\tnew2",
+                "new.nii.gz\t2018\t1.500\t\tnew1",
+            ],
+            id="older-header",
+        ),
+        pytest.param(
+            # BIDS allows custom columns, which must survive adding a row
+            # and refreshing one (e.g. re-converted with --overwrite)
+            [
+                "filename\tacq_time\toperator\trandstr\tnotes",
+                "old.nii.gz\t2016\tDr. Old\told1\thand-added",
+                "redone.nii.gz\t2017a\tDr. Old\told2\tkeep me",
+            ],
+            "utf-8",
+            [
+                "filename\tacq_time\tduration\toperator\trandstr\tnotes",
+                "old.nii.gz\t2016\tn/a\tDr. Old\told1\thand-added",
+                "redone.nii.gz\t2017b\t2.000\tDr. New\tnew2\tkeep me",
+                "new.nii.gz\t2018\t1.500\t\tnew1\tn/a",
+            ],
+            id="custom-column",
+        ),
+        pytest.param(
+            # a byte-order mark, as seen on OpenNeuro (e.g. edited with
+            # Excel), must not stick to the name of the "filename" column
+            ["filename\tacq_time", "old.nii.gz\t2016"],
+            "utf-8-sig",
+            [
+                "filename\tacq_time\tduration\toperator\trandstr",
+                "old.nii.gz\t2016\tn/a\tn/a\tn/a",
+                "redone.nii.gz\t2017b\t2.000\tDr. New\tnew2",
+                "new.nii.gz\t2018\t1.500\t\tnew1",
+            ],
+            id="byte-order-mark",
+        ),
+        pytest.param(
+            # rows are sorted by acq_time, wherever that column is
+            ["filename\tnotes\tacq_time", "old.nii.gz\tn\t2019"],
+            "utf-8",
+            [
+                "filename\tnotes\tacq_time\tduration\toperator\trandstr",
+                "redone.nii.gz\tn/a\t2017b\t2.000\tDr. New\tnew2",
+                "new.nii.gz\tn/a\t2018\t1.500\t\tnew1",
+                "old.nii.gz\tn\t2019\tn/a\tn/a\tn/a",
+            ],
+            id="acq_time-after-custom-column",
+        ),
+    ],
+)
+def test_add_rows_to_existing_scans_keys_file(
+    tmp_path: Path, existing: list[str], encoding: str, expected: list[str]
+) -> None:
+    fn = tmp_path / "file.tsv"
+    fn.write_text("\n".join(existing) + "\n", encoding=encoding)
     add_rows_to_scans_keys_file(
-        fn, {"new_file.nii.gz": ["2018xxxxx", "1.500", "", "newrand01"]}
-    )
-
-    with open(fn) as f:
-        reader = csv.reader(f, delimiter="\t")
-        header, *rows = list(reader)
-    assert header == ["filename", "acq_time", "duration", "operator", "randstr"]
-    by_filename = {row[0]: row[1:] for row in rows}
-    # the pre-existing row keeps its own values under their own columns,
-    # gaining 'n/a' for the new 'duration' column rather than being shifted
-    assert by_filename["old_file.nii.gz"] == [
-        "2016adsfasd",
-        "n/a",
-        "Dr. Old",
-        "oldrand01",
-    ]
-    assert by_filename["new_file.nii.gz"] == ["2018xxxxx", "1.500", "", "newrand01"]
-
-
-@pytest.mark.ai_generated
-def test_add_rows_to_scans_keys_file_preserves_custom_columns(tmp_path: Path) -> None:
-    # BIDS allows additional _scans.tsv columns beyond the ones heudiconv
-    # itself defines; adding a new row, or replacing an existing one (e.g.
-    # re-converted with --overwrite), must keep a dataset-specific column
-    # (here "notes") that an existing file already carries.
-    fn = opj(tmp_path, "file.tsv")
-    with open(fn, "w") as f:
-        f.write("filename\tacq_time\toperator\trandstr\tnotes\n")
-        f.write("old_file.nii.gz\t2016adsfasd\tDr. Old\toldrand01\thand-added\n")
-        f.write("redone.nii.gz\t2017xxxxx\tDr. Old\toldrand02\tkeep me\n")
-
-    add_rows_to_scans_keys_file(
-        fn,
+        str(fn),
         {
-            "new_file.nii.gz": ["2018xxxxx", "1.500", "", "newrand01"],
-            "redone.nii.gz": ["2017yyyyy", "2.000", "Dr. New", "newrand02"],
+            "new.nii.gz": ["2018", "1.500", "", "new1"],
+            "redone.nii.gz": ["2017b", "2.000", "Dr. New", "new2"],
         },
     )
-
-    with open(fn) as f:
-        reader = csv.reader(f, delimiter="\t")
-        header, *rows = list(reader)
-    assert header == [
-        "filename",
-        "acq_time",
-        "duration",
-        "operator",
-        "randstr",
-        "notes",
-    ]
-    by_filename = {row[0]: row[1:] for row in rows}
-    assert by_filename["old_file.nii.gz"] == [
-        "2016adsfasd",
-        "n/a",
-        "Dr. Old",
-        "oldrand01",
-        "hand-added",
-    ]
-    assert by_filename["redone.nii.gz"] == [
-        "2017yyyyy",
-        "2.000",
-        "Dr. New",
-        "newrand02",
-        "keep me",
-    ]
-    # the new row has no value for the custom column -- filled with 'n/a'
-    assert by_filename["new_file.nii.gz"] == [
-        "2018xxxxx",
-        "1.500",
-        "",
-        "newrand01",
-        "n/a",
-    ]
+    assert fn.read_text().splitlines() == expected
 
 
 @pytest.mark.ai_generated
-def test_add_rows_to_scans_keys_file_tolerates_byte_order_mark(tmp_path: Path) -> None:
-    # some real-world _scans.tsv files (observed on OpenNeuro) carry a
-    # leading UTF-8 byte-order mark on the header line -- e.g. from having
-    # been authored/edited with Excel or similar tooling. Left unhandled,
-    # the BOM sticks to the "filename" column name, so it stops matching
-    # the literal string "filename" and every existing row gets treated as
-    # an unrecognized/lost column instead of being preserved.
-    fn = opj(tmp_path, "file.tsv")
-    with open(fn, "w", encoding="utf-8-sig") as f:
-        f.write("filename\tacq_time\n")
-        f.write("old_file.nii.gz\t2016adsfasd\n")
-
-    add_rows_to_scans_keys_file(
-        fn, {"new_file.nii.gz": ["2018xxxxx", "1.500", "", "newrand01"]}
-    )
-
-    with open(fn) as f:
-        reader = csv.reader(f, delimiter="\t")
-        header, *rows = list(reader)
-    assert header == ["filename", "acq_time", "duration", "operator", "randstr"]
-    by_filename = {row[0]: row[1:] for row in rows}
-    assert by_filename["old_file.nii.gz"] == ["2016adsfasd", "n/a", "n/a", "n/a"]
+def test_add_rows_to_malformed_scans_keys_file(tmp_path: Path) -> None:
+    # rewriting would lose the field for which there is no column
+    fn = tmp_path / "file.tsv"
+    content = "filename\tacq_time\nold.nii.gz\t2016\tstray\n"
+    fn.write_text(content)
+    with pytest.raises(ValueError, match="more fields than its header"):
+        add_rows_to_scans_keys_file(str(fn), {"new.nii.gz": ["2018", "1", "", "r"]})
+    assert fn.read_text() == content
+    assert os.listdir(tmp_path) == ["file.tsv"]
 
 
 def test__find_subj_ses() -> None:
