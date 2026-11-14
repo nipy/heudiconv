@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import json
 from json.decoder import JSONDecodeError
 import logging
@@ -22,6 +22,8 @@ from heudiconv.utils import (
     json_dumps_pretty,
     load_heuristic,
     load_json,
+    median_step,
+    naive_if_mixed_tz,
     remove_prefix,
     remove_suffix,
     sanitize_path,
@@ -345,3 +347,38 @@ def test_sanitize_path_invalid(
 )
 def test_as_finite_positive_float(value: Any, expected: float | None) -> None:
     assert as_finite_positive_float(value) == expected
+
+
+_NAIVE = datetime(2020, 1, 1, 12)
+_AWARE = _NAIVE.replace(tzinfo=timezone.utc)
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "values,expected",
+    [
+        ([0.0, 1.0, 3.0], 1.5),
+        # of an even number of steps: the mean of the two middle ones
+        ([0, 1, 3, 7, 8], 1.5),
+        ([_NAIVE, _NAIVE + timedelta(seconds=2)], timedelta(seconds=2)),
+    ],
+)
+def test_median_step(values: list[Any], expected: Any) -> None:
+    assert median_step(values) == expected
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "datetimes,mixed",
+    [
+        ([], False),
+        ([_NAIVE], False),
+        ([_AWARE, _AWARE], False),
+        ([_NAIVE, _AWARE], True),
+    ],
+)
+def test_naive_if_mixed_tz(datetimes: list[datetime], mixed: bool) -> None:
+    result = naive_if_mixed_tz(datetimes)
+    # callers tell by identity whether anything had to be done
+    assert (result is not datetimes) == mixed
+    assert result == ([_NAIVE, _NAIVE] if mixed else datetimes)

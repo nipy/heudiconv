@@ -384,7 +384,7 @@ def tuneup_bids_json_files(json_files: list[str]) -> None:
                     lgr.error("Failed to open magnitude file: %s", exc)
             # might have been made R/O already, but if not -- it will be set
             # only later in the pipeline, so we must not make it read-only yet
-            _save_json_keeping_readonly(json_phasediffname, json_)
+            _save_json_keeping_readonly(json_phasediffname, json_, pretty=True)
 
 
 def add_participant_record(
@@ -553,10 +553,10 @@ def save_scans_key(
     )
 
 
-def _save_json_keeping_readonly(json_file: str, data: Any) -> None:
-    """Replace `json_file` with (prettified) `data`, keeping it read-only if it was."""
-    was_readonly = is_readonly(json_file)
-    save_json(json_file, data, pretty=True)
+def _save_json_keeping_readonly(json_file: str, data: Any, **kwargs: Any) -> None:
+    """:func:`save_json`, which replaces `json_file`, keeping it read-only if it was."""
+    was_readonly = op.exists(json_file) and is_readonly(json_file)
+    save_json(json_file, data, **kwargs)
     if was_readonly:
         set_readonly(json_file)
 
@@ -564,12 +564,17 @@ def _save_json_keeping_readonly(json_file: str, data: Any) -> None:
 def _ensure_scans_json(scans_json: str) -> None:
     """Create `scans_json`, or add the ``SCANS_FILE_FIELDS`` keys it is missing.
 
-    Anything else in an existing one, e.g. user-defined keys, is left untouched.
+    Anything else in an existing one, e.g. user-defined keys, is left
+    untouched, and so is one without content (e.g. annexed and not present).
     """
-    meta = load_json(scans_json) if op.lexists(scans_json) else {}
+    if op.islink(scans_json) and not op.exists(scans_json):
+        return
+    meta = load_json(scans_json) if op.exists(scans_json) else {}
+    if not isinstance(meta, dict):
+        raise ValueError(f"{scans_json} does not contain a JSON object")
     missing = {k: v for k, v in SCANS_FILE_FIELDS.items() if k not in meta}
     if missing:
-        save_json(scans_json, {**meta, **missing}, sort_keys=False)
+        _save_json_keeping_readonly(scans_json, {**meta, **missing}, sort_keys=False)
 
 
 def _merge_scans_header(existing_header: list[str], additions: list[str]) -> list[str]:
@@ -590,38 +595,37 @@ def _merge_scans_header(existing_header: list[str], additions: list[str]) -> lis
     return merged
 
 
-def _read_scans_tsv(
-    scans_tsv: str,
-) -> tuple[list[str], list[dict[str, str | None]]]:
-    """Read a `_scans.tsv` file into (fieldnames, rows-as-dicts).
+# a row of a `_scans.tsv`: its fields by column name, a missing one being
+# None, and any beyond the header listed under the key None
+_ScansRow = dict[Any, Any]
 
-    Raises ValueError for a row with more fields than the header, since
-    rewriting such a file would lose them.
-    """
+
+def _read_scans_tsv(scans_tsv: str) -> tuple[list[str], list[_ScansRow]]:
+    """Read a `_scans.tsv` file into (fieldnames, rows)."""
     with open(scans_tsv, newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f, delimiter="\t")
-        fieldnames, rows = list(reader.fieldnames or []), list(reader)
-    if any(None in row for row in rows):
-        raise ValueError(f"{scans_tsv} has row(s) with more fields than its header")
-    return fieldnames, rows
+        return list(reader.fieldnames or []), list(reader)
 
 
 def _write_scans_tsv(
-    scans_tsv: str, fieldnames: list[str], rows: list[dict[str, str | None]]
+    scans_tsv: str, fieldnames: list[str], rows: list[_ScansRow]
 ) -> None:
     """(Re)write `scans_tsv` atomically, keeping the permissions of an existing one.
 
     Replacing the directory entry also works for a read-only file or a
     symlink into git-annex, and leaves the original intact on failure.
     """
-    tmp = scans_tsv + ".heudiconv-tmp"
+    tmp = f"{scans_tsv}.{os.getpid()}.tmp"
+    # not mkstemp(), which would not give a new file its umask-default mode
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o666)
     try:
-        with open(tmp, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames, delimiter="\t", restval="n/a")
-            writer.writeheader()
-            # None: a field missing from a short row of the file read
+        with os.fdopen(fd, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f, delimiter="\t")
+            writer.writerow(fieldnames)
             writer.writerows(
-                {k: "n/a" if v is None else v for k, v in row.items()} for row in rows
+                ["n/a" if row.get(k) is None else row[k] for k in fieldnames]
+                + row.get(None, [])
+                for row in rows
             )
         if op.exists(scans_tsv):
             shutil.copymode(scans_tsv, tmp)
@@ -809,7 +813,7 @@ def check_acq_time_congruency(
         acq_time_str = acq_datetime.strftime("%H:%M:%S.%f")
         for f in sidecar_times:
             _save_json_keeping_readonly(
-                f, {**load_json(f), "AcquisitionTime": acq_time_str}
+                f, {**load_json(f), "AcquisitionTime": acq_time_str}, pretty=True
             )
         lgr.info(
             "%s: corrected AcquisitionTime recorded by dcm2niix from %s to "
@@ -913,6 +917,8 @@ def _find_json_sidecar(nifti_fn: str, bids_root: str) -> str | None:
     root = Path(op.realpath(bids_root))
     directory = Path(op.realpath(op.dirname(nifti_fn)))
     for current in [directory, *directory.parents]:
+        if not current.is_relative_to(root):
+            break
         candidates = [
             (len(candidate.entities), json_fn)
             for json_fn in sorted(glob(str(current / "*.json")))
@@ -922,15 +928,16 @@ def _find_json_sidecar(nifti_fn: str, bids_root: str) -> str | None:
         if candidates:
             # most specific (most shared entities) match wins
             return max(candidates, key=lambda c: c[0])[1]
-        if current == root:
-            break
     return None
 
 
 def _duration_from_volume_timing(meta: dict[str, Any], json_fn: str) -> float | None:
     """Duration per a sidecar's ``VolumeTiming``: its last onset plus one frame."""
+    volume_timing = meta["VolumeTiming"]
+    if not isinstance(volume_timing, list):
+        return None
     try:
-        onsets = sorted(float(t) for t in meta["VolumeTiming"])
+        onsets = sorted(float(t) for t in volume_timing)
     except (TypeError, ValueError):
         return None
     if not onsets:
@@ -957,10 +964,10 @@ def _duration_from_nifti_sidecar(nifti_fn: str, bids_root: str) -> float | None:
     """Estimate a run's duration from its NIfTI + JSON sidecar.
 
     The sidecar (see :func:`_find_json_sidecar`) gives it via
-    ``VolumeTiming``, or else ``AcquisitionDuration``.  For a multi-volume
-    run the latter is cross-checked against TR x volumes, like
-    :func:`heudiconv.dicoms.get_acquisition_duration` does against the
-    timestamps; a truncated single-volume output cannot be told apart.
+    ``VolumeTiming`` or ``AcquisitionDuration``, or else it is TR x volumes.
+    Unlike with DICOMs (:func:`heudiconv.dicoms.get_acquisition_duration`)
+    there are no timestamps to tell by whether ``AcquisitionDuration`` is of
+    a truncated run, TR x volumes being no measure for many a sequence.
     """
     json_fn = _find_json_sidecar(nifti_fn, bids_root)
     if json_fn is None:
@@ -977,21 +984,16 @@ def _duration_from_nifti_sidecar(nifti_fn: str, bids_root: str) -> float | None:
 
     duration = as_finite_positive_float(meta.get("AcquisitionDuration"))
     tr = as_finite_positive_float(meta.get("RepetitionTime"))
-    if tr is None:
+    if duration is not None or tr is None:
         return duration
     try:
         shape = nb.load(nifti_fn).shape  # type: ignore[attr-defined]
     except Exception as exc:
         # arbitrary, possibly corrupted or truncated, user data
         lgr.warning("Failed to load %s to get the number of volumes: %s", nifti_fn, exc)
-        return duration
-    nvols = shape[3] if len(shape) > 3 else 1
-    if nvols <= 1:
-        # TR x 1 vastly underestimates e.g. an anatomical, so we do not guess
-        return duration
-    if duration is None or not tr * (nvols - 1) <= duration <= tr * (nvols + 1):
-        return tr * nvols
-    return duration
+        return None
+    # TR x 1 vastly underestimates e.g. an anatomical, so we do not guess
+    return tr * shape[3] if len(shape) > 3 and shape[3] > 1 else None
 
 
 def _find_sourcedata_tarball(nifti_fn: str, bids_root: str) -> tuple[str | None, bool]:
@@ -1104,7 +1106,10 @@ def _populate_scans_duration_file(
     # a legacy file gains the column (and scans.json its description below)
     # even if there is nothing to compute, e.g. no rows
     changed = "duration" not in fieldnames
-    fieldnames = _merge_scans_header(fieldnames, ["filename", "acq_time", "duration"])
+    if changed:
+        fieldnames = _merge_scans_header(
+            fieldnames, ["filename", "acq_time", "duration"]
+        )
     tarballs: _TarballCache = {}
     for row in rows:
         filename = row["filename"]
@@ -1121,9 +1126,18 @@ def _populate_scans_duration_file(
             )
         else:
             before = dict(row)
-            _populate_scans_duration_row(
-                row, op.join(session_dir, filename), bids_root, fix_acq_time, tarballs
-            )
+            try:
+                _populate_scans_duration_row(
+                    row,
+                    op.join(session_dir, filename),
+                    bids_root,
+                    fix_acq_time,
+                    tarballs,
+                )
+            except Exception as exc:
+                # e.g. a malformed sidecar must not get in the way of the
+                # other rows, nor of recording what was done to this one
+                lgr.warning("Failed to process %s: %s", filename, exc)
             changed |= row != before
 
     if changed:
@@ -1135,7 +1149,7 @@ def _populate_scans_duration_file(
 
 
 def _populate_scans_duration_row(
-    row: dict[str, str | None],
+    row: _ScansRow,
     nifti_fn: str,
     bids_root: str,
     fix_acq_time: bool,
@@ -1170,7 +1184,7 @@ def _populate_scans_duration_row(
 
 
 def _reconcile_acq_time(
-    row: dict[str, str | None], earliest: datetime.datetime | None, fix: bool
+    row: _ScansRow, earliest: datetime.datetime | None, fix: bool
 ) -> datetime.datetime | None:
     """Warn if `acq_time` of `row` is not `earliest`, replacing it if `fix`.
 
@@ -1543,7 +1557,7 @@ def select_fmap_from_compatible_groups(
     except IndexError:
         raise FileNotFoundError("No '*_scans' file found for session %s" % sess_folder)
     _, scans_rows = _read_scans_tsv(scans_tsv)
-    acq_times = {row["filename"]: row.get("acq_time") or "" for row in scans_rows}
+    acq_times = {row.get("filename"): row.get("acq_time") or "" for row in scans_rows}
     # acq_times for the compatible fmaps:
     acq_times_fmaps = {
         k: acq_times[

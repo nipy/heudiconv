@@ -549,6 +549,14 @@ _SERIES_TIME_ONLY = dict(
         # and so is one with only the (earlier) start time of the series
         # (https://github.com/nipy/heudiconv/issues/878) ...
         pytest.param({2: _SERIES_TIME_ONLY}, [0, 1], id="series-time"),
+        pytest.param(
+            {
+                0: _SERIES_TIME_ONLY,
+                1: dict(_NO_DATETIME, AcquisitionDateTime="20200101120005.000000"),
+            },
+            [5, 2],
+            id="series-time-vs-AcquisitionDateTime",
+        ),
         # ... unless that is all there is
         pytest.param(
             dict.fromkeys(range(3), _SERIES_TIME_ONLY), [30] * 3, id="series-times"

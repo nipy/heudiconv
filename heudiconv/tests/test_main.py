@@ -359,6 +359,18 @@ def test_add_rows_to_scans_keys_file(tmp_path: Path) -> None:
             ],
             id="acq_time-after-custom-column",
         ),
+        pytest.param(
+            # fields beyond the header (e.g. a trailing tab) are not lost
+            ["filename\tacq_time", "old.nii.gz\t2016\tstray\t"],
+            "utf-8",
+            [
+                "filename\tacq_time\tduration\toperator\trandstr",
+                "old.nii.gz\t2016\tn/a\tn/a\tn/a\tstray\t",
+                "redone.nii.gz\t2017b\t2.000\tDr. New\tnew2",
+                "new.nii.gz\t2018\t1.500\t\tnew1",
+            ],
+            id="fields-beyond-header",
+        ),
     ],
 )
 def test_add_rows_to_existing_scans_keys_file(
@@ -374,18 +386,7 @@ def test_add_rows_to_existing_scans_keys_file(
         },
     )
     assert fn.read_text().splitlines() == expected
-
-
-@pytest.mark.ai_generated
-def test_add_rows_to_malformed_scans_keys_file(tmp_path: Path) -> None:
-    # rewriting would lose the field for which there is no column
-    fn = tmp_path / "file.tsv"
-    content = "filename\tacq_time\nold.nii.gz\t2016\tstray\n"
-    fn.write_text(content)
-    with pytest.raises(ValueError, match="more fields than its header"):
-        add_rows_to_scans_keys_file(str(fn), {"new.nii.gz": ["2018", "1", "", "r"]})
-    assert fn.read_text() == content
-    assert os.listdir(tmp_path) == ["file.tsv"]
+    assert os.listdir(tmp_path) == ["file.tsv"]  # no temporary file left
 
 
 def test__find_subj_ses() -> None:

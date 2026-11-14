@@ -38,7 +38,6 @@ from heudiconv.bids import (
     _find_json_sidecar,
     _merge_scans_header,
     _read_scans_tsv,
-    _save_json_keeping_readonly,
     check_acq_time_congruency,
     find_compatible_fmaps_for_run,
     find_compatible_fmaps_for_session,
@@ -2137,21 +2136,21 @@ _VOLUME_TIMING = {"VolumeTiming": [0.0, 2.0, 4.0]}
             "",
             id="AcquisitionDuration",
         ),
-        # e.g. of the full protocol of a truncated run, as dcm2niix records it
+        # for which TR x volumes is no measure, e.g. for the 2 volumes of a
+        # fieldmap's magnitude, or with dummy scans
         pytest.param(
-            {"RepetitionTime": 2.0, "AcquisitionDuration": 602.735},
-            10,
-            20.0,
+            {"RepetitionTime": 0.488, "AcquisitionDuration": 54.0},
+            2,
+            54.0,
             "",
-            id="implausible-AcquisitionDuration",
+            id="AcquisitionDuration-of-fmap",
         ),
-        # nothing to check it against
         pytest.param(
             {"RepetitionTime": 2.3, "AcquisitionDuration": 312.0},
-            1,
+            None,
             312.0,
             "",
-            id="single-volume-AcquisitionDuration",
+            id="AcquisitionDuration-of-unreadable-nifti",
         ),
         pytest.param(
             {"AcquisitionDuration": 17.5}, 10, 17.5, "", id="AcquisitionDuration-only"
@@ -2183,7 +2182,7 @@ _VOLUME_TIMING = {"VolumeTiming": [0.0, 2.0, 4.0]}
         ),
         *(
             pytest.param({"VolumeTiming": onsets}, 1, None, "", id=f"onsets-{onsets}")
-            for onsets in ([0.0], [], ["junk"], 5)
+            for onsets in ([0.0], [], ["junk"], 5, "123", {"1": 0, "3": 0})
         ),
         # seen on OpenNeuro, although the two are mutually exclusive per
         # BIDS: TR could be of a much longer silent gap of a sparse design
@@ -2464,11 +2463,6 @@ def test_find_bids_dataset_root(tmp_path: Path) -> None:
     [
         ("", True, "it has no 'filename' column"),
         ("acq_time\n2020-01-01T12:00:00\n", True, "it has no 'filename' column"),
-        (
-            "filename\tacq_time\nfunc/x.nii.gz\tn/a\tstray\n",
-            True,
-            "has row(s) with more fields than its header",
-        ),
         ("filename\tacq_time\n", False, "it is not within a BIDS dataset"),
     ],
 )
@@ -2503,28 +2497,48 @@ def test_populate_scans_duration_skips_malformed_file(
     assert (scans_ds.root / "scans.json").exists() == in_dataset
 
 
+_OTHER = "func/sub-01_task-other_bold.nii.gz"
+
+
 @pytest.mark.ai_generated
 @pytest.mark.parametrize(
-    "cells,with_dicoms,expected,expected_log",
+    "cells,sidecar,with_dicoms,expected,expected_log",
     [
-        (["", "2020-01-01T12:00:00"], False, "n/a", "WARNING: "),
+        (["", "2020-01-01T12:00:00"], None, False, "n/a", "WARNING: "),
         # not a BIDS name to look the sidecar up for
-        (["func/x_bold.nii.gz", "2020-01-01T12:00:00"], False, "n/a", ""),
-        # a short row
-        (["func/sub-01_task-other_bold.nii.gz"], False, "n/a", ""),
+        (["func/x_bold.nii.gz", "2020-01-01T12:00:00"], None, False, "n/a", ""),
+        # a short row, and one with fields beyond the header, which are kept
+        ([_OTHER], None, False, "n/a", ""),
+        ([_OTHER, "2020-01-01T12:00:00", "stray", ""], None, False, "n/a", ""),
         # no acq_time to check, which is no reason not to get the duration
-        (["func/sub-01_task-other_bold.nii.gz", "junk"], True, "3.000", ""),
+        ([_OTHER, "junk"], None, True, "3.000", ""),
+        # nor is a sidecar which cannot be checked
+        *(
+            (
+                [_OTHER, "2020-01-01T12:00:00"],
+                sidecar,
+                True,
+                "3.000",
+                "WARNING: Failed to process",
+            )
+            for sidecar in ('{"AcquisitionTime": "garbage"}', "[1]", "")
+        ),
     ],
 )
 def test_populate_scans_duration_of_odd_row(
     scans_ds: ScansDataset,
     caplog: pytest.LogCaptureFixture,
     cells: list[str],
+    sidecar: str | None,
     with_dicoms: bool,
     expected: str,
     expected_log: str,
 ) -> None:
     scans_ds.add_row(*cells)
+    if sidecar is not None:
+        (scans_ds.root / "sub-01" / _OTHER).with_suffix("").with_suffix(
+            ".json"
+        ).write_text(sidecar)
     if with_dicoms:
         scans_ds.add_sourcedata(
             scans_ds.make_dicoms([0, 1, 2]), cells[0].removesuffix(".nii.gz")
@@ -2538,7 +2552,7 @@ def test_populate_scans_duration_of_odd_row(
         "filename": cells[0],
         "acq_time": cells[1] if len(cells) > 1 else "n/a",
         "duration": expected,
-    }
+    } | ({None: cells[2:]} if cells[2:] else {})
     assert regular["duration"] == "9.000"
     log = _bids_log(caplog)
     assert log.startswith(expected_log) and bool(log) == bool(expected_log)
@@ -2656,8 +2670,11 @@ def test_populate_bids_templates_syncs_existing_scans_json(tmp_path: Path) -> No
         str(tmp_path / "scans.json"),
         {"acq_time": {"Description": "old"}, "MyCustomField": {"Description": "x"}},
     )
+    set_readonly(str(tmp_path / "scans.json"))
 
     populate_bids_templates(str(tmp_path))
+
+    assert is_readonly(str(tmp_path / "scans.json"))
 
     scans_json = load_json(str(tmp_path / "scans.json"))
     assert "duration" in scans_json
@@ -2666,12 +2683,27 @@ def test_populate_bids_templates_syncs_existing_scans_json(tmp_path: Path) -> No
 
 
 @pytest.mark.ai_generated
-def test_populate_bids_templates_errors_on_malformed_scans_json(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "content,error", [("not json", JSONDecodeError), ("[1]", ValueError)]
+)
+def test_populate_bids_templates_errors_on_malformed_scans_json(
+    tmp_path: Path, content: str, error: type[Exception]
+) -> None:
     # a malformed scans.json is for the user to fix, not something to
     # silently leave out of date
-    (tmp_path / "scans.json").write_text("not json")
-    with pytest.raises(JSONDecodeError):
+    (tmp_path / "scans.json").write_text(content)
+    with pytest.raises(error):
         populate_bids_templates(str(tmp_path))
+
+
+@pytest.mark.ai_generated
+def test_populate_bids_templates_leaves_scans_json_without_content(
+    tmp_path: Path,
+) -> None:
+    # e.g. annexed, and not present
+    (tmp_path / "scans.json").symlink_to("nowhere")
+    populate_bids_templates(str(tmp_path))
+    assert os.readlink(tmp_path / "scans.json") == "nowhere"
 
 
 @pytest.mark.ai_generated
@@ -2679,10 +2711,16 @@ def test_populate_bids_templates_errors_on_malformed_scans_json(tmp_path: Path) 
     "rewrite",
     [
         lambda fn: tuneup_bids_json_files([fn]),
-        lambda fn: _save_json_keeping_readonly(fn, load_json(fn)),
+        lambda fn: check_acq_time_congruency(
+            datetime(2020, 1, 1, 12),
+            [fn],
+            label="run",
+            timestamps=[datetime(2020, 1, 1, 12, 0, s) for s in (2, 0)],
+            fix=True,
+        ),
         add_taskname_to_infofile,
     ],
-    ids=["tuneup_bids_json_files", "save_json_keeping_readonly", "add_taskname"],
+    ids=["tuneup_bids_json_files", "check_acq_time_congruency", "add_taskname"],
 )
 def test_sidecar_rewrites_keep_pretty_json(
     tmp_path: Path, rewrite: Callable[[str], None]
