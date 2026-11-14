@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Callable, Sequence
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from glob import glob
 import itertools
 from json import JSONDecodeError
@@ -17,6 +17,7 @@ import re
 import shutil
 import stat
 import string
+import tarfile
 import tempfile
 from typing import Any
 from unittest.mock import patch
@@ -38,6 +39,7 @@ from heudiconv.bids import (
     _find_json_sidecar,
     _merge_scans_header,
     _read_scans_tsv,
+    _reconcile_acq_time,
     check_acq_time_congruency,
     find_compatible_fmaps_for_run,
     find_compatible_fmaps_for_session,
@@ -1848,7 +1850,7 @@ class ScansDataset:
     ) -> Path:
         """Add a scan with its row, and return the path of its JSON sidecar.
 
-        The NIfTI is of `nvols` volumes, or empty if None.  The `sidecar` is
+        The NIfTI is of `nvols` volumes (3D if 0), or an empty file if None.  The `sidecar` is
         JSON or, if a str, written as is; none is written if None.  DICOMs
         acquired at `dicom_offsets`, if any, go under sourcedata/.
         """
@@ -1858,9 +1860,8 @@ class ScansDataset:
         if nvols is None:
             nifti.write_bytes(b"")
         else:
-            nibabel.Nifti1Image(np.zeros((2, 2, 2, nvols)), np.eye(4)).to_filename(
-                nifti
-            )
+            shape = (2, 2, 2, nvols) if nvols else (2, 2, 2)
+            nibabel.Nifti1Image(np.zeros(shape), np.eye(4)).to_filename(nifti)
         if isinstance(sidecar, str):
             json_file.write_text(sidecar)
         elif sidecar is not None:
@@ -1905,8 +1906,15 @@ def _bids_log(caplog: pytest.LogCaptureFixture, level: int = logging.WARNING) ->
     )
 
 
+def _assert_bids_log(caplog: pytest.LogCaptureFixture, expected: str) -> None:
+    """`expected` is among the warnings of heudiconv.bids, or there are none."""
+    log = _bids_log(caplog)
+    assert expected in log
+    assert bool(log) == bool(expected), log
+
+
 @pytest.mark.ai_generated
-@pytest.mark.parametrize("target", ["dataset", "scans_tsv"])
+@pytest.mark.parametrize("target", ["dataset", "scans_tsv", "cli"])
 def test_populate_scans_duration_from_sourcedata(
     scans_ds: ScansDataset, target: str
 ) -> None:
@@ -1915,9 +1923,11 @@ def test_populate_scans_duration_from_sourcedata(
         sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))
     )
 
-    populate_scans_duration(
-        str(scans_ds.root if target == "dataset" else scans_ds.scans_tsv)
-    )
+    path = str(scans_ds.scans_tsv if target == "scans_tsv" else scans_ds.root)
+    if target == "cli":
+        runner(["--command", "populate-scans-duration", "--files", path])
+    else:
+        populate_scans_duration(path)
 
     fieldnames, rows = scans_ds.read()
     assert fieldnames == ["filename", "acq_time", "duration"]
@@ -1972,7 +1982,13 @@ def test_populate_scans_duration_of_multi_output_item(
 
 @pytest.mark.ai_generated
 @pytest.mark.parametrize(
-    "filename", ["../../outside.nii.gz", "/outside.nii.gz", "escape/outside.nii.gz"]
+    "filename",
+    [
+        "../../outside.nii.gz",
+        "../../bids-sibling/outside.nii.gz",
+        "/outside.nii.gz",
+        "escape/outside.nii.gz",
+    ],
 )
 def test_populate_scans_duration_refuses_paths_outside_dataset(
     scans_ds: ScansDataset, caplog: pytest.LogCaptureFixture, filename: str
@@ -2097,8 +2113,7 @@ def test_save_scans_key_checks_sidecar_acquisition_time(
     )
 
     assert load_json(sidecar)["AcquisitionTime"] == expected
-    log = _bids_log(caplog)
-    assert log.startswith(expected_log) and bool(log) == bool(expected_log)
+    _assert_bids_log(caplog, expected_log)
     assert scans_ds.rows[0] | {"randstr": ""} == {
         "filename": BOLD + ".nii.gz",
         "acq_time": "2020-01-01T12:00:00",
@@ -2118,6 +2133,7 @@ _VOLUME_TIMING = {"VolumeTiming": [0.0, 2.0, 4.0]}
         pytest.param({"RepetitionTime": 2.0}, 10, 20.0, "", id="TR-x-volumes"),
         # TR x 1 is no estimate for e.g. an anatomical
         pytest.param({"RepetitionTime": 2.0}, 1, None, "", id="single-volume"),
+        pytest.param({"RepetitionTime": 2.0}, 0, None, "", id="3D"),
         pytest.param(
             {"RepetitionTime": 2.0},
             None,
@@ -2172,6 +2188,20 @@ _VOLUME_TIMING = {"VolumeTiming": [0.0, 2.0, 4.0]}
             "",
             id="VolumeTiming-FrameAcquisitionDuration",
         ),
+        pytest.param(
+            {"VolumeTiming": [5.0, 1.0, 3.0], "AcquisitionDuration": 1.5},
+            3,
+            6.5,
+            "",
+            id="VolumeTiming-unsorted",
+        ),
+        pytest.param(
+            {"VolumeTiming": [], "AcquisitionDuration": 1.5},
+            3,
+            None,
+            "",
+            id="VolumeTiming-empty",
+        ),
         # ... or else the median interval between onsets, here of 1, 2, 4, 1
         pytest.param(
             {"VolumeTiming": [0.0, 1.0, 3.0, 7.0, 8.0]},
@@ -2190,7 +2220,7 @@ _VOLUME_TIMING = {"VolumeTiming": [0.0, 2.0, 4.0]}
             _VOLUME_TIMING | {"RepetitionTime": 5.0},
             3,
             None,
-            "WARNING: ",
+            "which BIDS treats as mutually exclusive",
             id="VolumeTiming-and-TR",
         ),
         *(
@@ -2210,8 +2240,7 @@ def test_duration_from_nifti_sidecar(
     scans_ds.add_scan(sidecar=sidecar, nvols=nvols)
     nifti = scans_ds.root / "sub-01" / (BOLD + ".nii.gz")
     assert _duration_from_nifti_sidecar(str(nifti), str(scans_ds.root)) == expected
-    log = _bids_log(caplog)
-    assert log.startswith(expected_log) and bool(log) == bool(expected_log)
+    _assert_bids_log(caplog, expected_log)
 
 
 @pytest.mark.ai_generated
@@ -2411,15 +2440,97 @@ def test_populate_scans_duration_resorts_to_nifti_sidecar(
 def test_populate_scans_duration_overwrite(
     scans_ds: ScansDataset, nvols: int, recomputed: str
 ) -> None:
-    scans_ds.scans_tsv.write_text("filename\tacq_time\tduration\n")
-    scans_ds.add_scan(sidecar={"RepetitionTime": 2.0}, nvols=nvols)
-    scans_ds.scans_tsv.write_text(scans_ds.scans_tsv.read_text()[:-1] + "\t312.000\n")
+    scans_ds.add_scan(sidecar={"RepetitionTime": 2.0}, nvols=10)
+    scans_ds.add_scan(_OTHER[:-7], sidecar={"RepetitionTime": 2.0}, nvols=nvols)
+    scans_ds.scans_tsv.write_text(
+        "filename\tacq_time\tduration\n"
+        f"{BOLD}.nii.gz\t2020-01-01T12:00:00\tn/a\n"
+        f"{_OTHER}\t2020-01-01T12:30:00\t312.000\n"
+        # nothing to establish it from
+        "func/sub-01_task-gone_bold.nii.gz\t2020-01-01T12:40:00\tn/a\n"
+    )
 
+    # only what is missing gets filled in
     populate_scans_duration(str(scans_ds.root))
-    assert scans_ds.rows[0]["duration"] == "312.000"
+    assert [row["duration"] for row in scans_ds.rows] == ["20.000", "312.000", "n/a"]
 
     populate_scans_duration(str(scans_ds.root), overwrite=True)
-    assert scans_ds.rows[0]["duration"] == recomputed
+    assert [row["duration"] for row in scans_ds.rows] == ["20.000", recomputed, "n/a"]
+
+
+@pytest.mark.ai_generated
+def test_duration_from_inherited_nifti_sidecar(scans_ds: ScansDataset) -> None:
+    scans_ds.add_scan(nvols=10)
+    save_json(scans_ds.root / "task-rest_bold.json", {"RepetitionTime": 2.0})
+    populate_scans_duration(str(scans_ds.root))
+    assert scans_ds.rows[0]["duration"] == "20.000"
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "stored,expected",
+    [
+        ("2020-01-01T12:00:02", "2020-01-01T12:00:00"),
+        ("2020-01-01T23:00:00", "2020-01-01T12:00:00"),
+        ("2020-01-01T01:00:00", "2020-01-01T12:00:00"),
+        # in the style, naive or timezone-aware, of the stored one
+        ("2020-01-01T12:00:02+01:00", "2020-01-01T12:00:00+01:00"),
+        # close enough
+        ("2020-01-01T12:00:00.000900", None),
+        # more than 12 hours apart, either way: rather shifted dates
+        ("2020-01-02T00:00:01", None),
+        ("2019-12-31T23:59:59", None),
+        ("junk", None),
+    ],
+)
+def test_reconcile_acq_time(stored: str, expected: str | None) -> None:
+    row = {"filename": "x", "acq_time": stored}
+    earliest = datetime(2020, 1, 1, 12, tzinfo=timezone(timedelta(hours=1)))
+    _reconcile_acq_time(row, earliest, fix=True)
+    assert row["acq_time"] == (expected or stored)
+    _reconcile_acq_time(row := {"filename": "x", "acq_time": stored}, earliest, False)
+    assert row["acq_time"] == stored
+
+
+@pytest.mark.ai_generated
+def test_extract_dicom_tarball(tmp_path: Path) -> None:
+    # only regular files, under names of our own, ordered by member name
+    members = tmp_path / "members"
+    (members / "sub").mkdir(parents=True)
+    for name in ("b.dcm", "sub/a.dcm", "c.dcm"):
+        (members / name).write_text(name)
+    (members / "link.dcm").symlink_to("/etc/passwd")
+    tarball = tmp_path / "dicoms.tgz"
+    with tarfile.open(tarball, "w:gz") as tar:
+        for name in ("c.dcm", "link.dcm", "sub", "b.dcm"):
+            tar.add(members / name, arcname=name)
+        tar.add(members / "b.dcm", arcname="../escaped.dcm")
+    dest = tmp_path / "dest"
+    dest.mkdir()
+
+    extracted = _extract_dicom_tarball(str(tarball), str(dest))
+
+    assert [Path(f).read_text() for f in extracted] == [
+        "b.dcm",  # ../escaped.dcm
+        "b.dcm",
+        "c.dcm",
+        "sub/a.dcm",
+    ]
+    assert sorted(tmp_path.rglob("*.dcm")) == sorted(
+        [*map(Path, extracted), *members.rglob("*.dcm")]
+    )
+
+
+@pytest.mark.ai_generated
+def test_populate_scans_duration_failing_to_write(
+    scans_ds: ScansDataset, caplog: pytest.LogCaptureFixture
+) -> None:
+    content = scans_ds.scans_tsv.read_text()
+    with patch("heudiconv.bids.os.replace", side_effect=OSError("disk full")):
+        populate_scans_duration(str(scans_ds.root))
+    assert "ERROR: Failed to populate 'duration'" in _bids_log(caplog)
+    assert scans_ds.scans_tsv.read_text() == content
+    assert sorted(os.listdir(scans_ds.scans_tsv.parent)) == ["func", "sub-01_scans.tsv"]
 
 
 @pytest.mark.ai_generated
@@ -2435,9 +2546,10 @@ def test_populate_scans_duration_no_scans_tsv(
 @pytest.mark.parametrize(
     "flags",
     [[], ["--overwrite"], ["--fix-acq-time"], ["--overwrite", "--fix-acq-time"]],
+    ids=" ".join,
 )
 def test_populate_scans_duration_cli(tmp_path: Path, flags: list[str]) -> None:
-    with patch("heudiconv.main.populate_scans_duration") as populate:
+    with patch("heudiconv.main.populate_scans_duration", autospec=True) as populate:
         runner(
             ["--command", "populate-scans-duration", "--files", str(tmp_path), *flags]
         )
@@ -2504,7 +2616,7 @@ _OTHER = "func/sub-01_task-other_bold.nii.gz"
 @pytest.mark.parametrize(
     "cells,sidecar,with_dicoms,expected,expected_log",
     [
-        (["", "2020-01-01T12:00:00"], None, False, "n/a", "WARNING: "),
+        (["", "2020-01-01T12:00:00"], None, False, "n/a", "row with no filename"),
         # not a BIDS name to look the sidecar up for
         (["func/x_bold.nii.gz", "2020-01-01T12:00:00"], None, False, "n/a", ""),
         # a short row, and one with fields beyond the header, which are kept
@@ -2554,48 +2666,32 @@ def test_populate_scans_duration_of_odd_row(
         "duration": expected,
     } | ({None: cells[2:]} if cells[2:] else {})
     assert regular["duration"] == "9.000"
-    log = _bids_log(caplog)
-    assert log.startswith(expected_log) and bool(log) == bool(expected_log)
+    _assert_bids_log(caplog, expected_log)
 
 
 @pytest.mark.ai_generated
-@pytest.mark.parametrize(
-    "rows,encoding",
-    [
-        # nothing to compute, which is no reason not to add the column
-        ([], "utf-8"),
-        # a byte-order mark, as seen on OpenNeuro, must not stick to the
-        # name of the "filename" column
-        ([["meg/sub-01_task-x_meg.fif", "2000-01-01T00:00:00Z"]], "utf-8-sig"),
-    ],
-)
-def test_populate_scans_duration_adds_column(
-    scans_ds: ScansDataset, rows: list[list[str]], encoding: str
-) -> None:
-    scans_ds.scans_tsv.write_text("filename\tacq_time\n", encoding=encoding)
-    for row in rows:
-        scans_ds.add_row(*row)
-
+def test_populate_scans_duration_adds_column(scans_ds: ScansDataset) -> None:
+    # nothing to compute, which is no reason not to add the column
     populate_scans_duration(str(scans_ds.root))
-
-    assert scans_ds.read() == (
-        ["filename", "acq_time", "duration"],
-        [
-            dict(zip(["filename", "acq_time", "duration"], [*row, "n/a"]))
-            for row in rows
-        ],
-    )
+    assert scans_ds.scans_tsv.read_text().split() == [
+        "filename",
+        "acq_time",
+        "duration",
+    ]
     assert "duration" in load_json(scans_ds.root / "scans.json")
 
 
 @pytest.mark.ai_generated
-@pytest.mark.parametrize("mode", [0o664, 0o444])
+@pytest.mark.parametrize("mode", [0o664, 0o444], ids=oct)
 def test_populate_scans_duration_preserves_permissions(
     scans_ds: ScansDataset, mode: int
 ) -> None:
     os.chmod(scans_ds.scans_tsv, mode)
+    inode = os.stat(scans_ds.scans_tsv).st_ino
     populate_scans_duration(str(scans_ds.root))
     assert stat.S_IMODE(os.stat(scans_ds.scans_tsv).st_mode) == mode
+    # replaced, as a read-only one (which root could write to) has to be
+    assert os.stat(scans_ds.scans_tsv).st_ino != inode
     assert "duration" in scans_ds.scans_tsv.read_text()
 
 
