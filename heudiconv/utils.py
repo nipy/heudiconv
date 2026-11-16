@@ -10,6 +10,7 @@ import hashlib
 import json
 from json.decoder import JSONDecodeError
 import logging
+import math
 import os
 import os.path as op
 from pathlib import Path
@@ -18,6 +19,7 @@ import shutil
 import stat
 from subprocess import check_output
 import sys
+import tarfile
 import tempfile
 from time import sleep
 from types import ModuleType
@@ -550,6 +552,141 @@ def clear_temp_dicoms(item_dicoms: list[str]) -> None:
 def file_md5sum(filename: str) -> str:
     with open(filename, "rb") as f:
         return hashlib.md5(f.read()).hexdigest()
+
+
+def as_finite_positive_float(value: Any) -> float | None:
+    """Parse `value` as a float, or None if not a finite, strictly positive one.
+
+    Guards uniformly against values which are missing, non-numeric,
+    negative, zero, ``NaN``, or infinite -- e.g. a malformed or
+    placeholder metadata field -- so that callers can treat all of those
+    cases the same way ("value unusable, try something else") without
+    each having to special-case ``math.isfinite``/sign checks themselves.
+
+    Parameters
+    ----------
+    value : Any
+        Value to parse (e.g. read from a DICOM tag or a JSON sidecar).
+
+    Returns
+    -------
+    float or None
+        The parsed value, or None if it does not qualify.
+    """
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return parsed if math.isfinite(parsed) and parsed > 0 else None
+
+
+def _is_within_directory(path: str, directory: str) -> bool:
+    """Return True if `path`, with symlinks resolved, is at or under `directory`."""
+    path = op.realpath(path)
+    directory = op.realpath(directory)
+    return path == directory or path.startswith(directory + os.sep)
+
+
+def _safe_tar_members(tar: tarfile.TarFile, dest: str) -> list[tarfile.TarInfo]:
+    """Filter `tar`'s members down to those safe to extract into `dest`.
+
+    Used as a manual stand-in for the member vetting that
+    :func:`tarfile.TarFile.extractall`'s ``filter=`` performs natively,
+    for the rare case that support is unavailable at all (see
+    :func:`safe_extract_tar`). This is not a byte-for-byte reimplementation
+    of the builtin filter, but closes the same attack surface for our
+    purposes: it rejects members whose path (or, for symlinks/hardlinks,
+    link target) would resolve outside `dest` -- via an absolute path or
+    ``..`` traversal -- and rejects device/FIFO/character-special members.
+
+    Parameters
+    ----------
+    tar : tarfile.TarFile
+        Open archive to filter members from.
+    dest : str
+        Destination directory extraction is intended for.
+
+    Returns
+    -------
+    list of tarfile.TarInfo
+        The subset of `tar`'s members judged safe to extract.
+    """
+    safe = []
+    for member in tar.getmembers():
+        if op.isabs(member.name) or not _is_within_directory(
+            op.join(dest, member.name), dest
+        ):
+            lgr.warning("Refusing to extract %r: escapes %s", member.name, dest)
+            continue
+        if member.isdev():
+            lgr.warning("Refusing to extract device/FIFO member %r", member.name)
+            continue
+        if member.issym() or member.islnk():
+            # a chain of links can resolve outside dest once actually
+            # extracted even when each looks safe checked on its own here
+            lgr.warning(
+                "Refusing to extract link member %r: this Python's "
+                "tarfile lacks native extraction-filter support, under "
+                "which a chain of links could resolve outside %s even if "
+                "each looks safe on its own",
+                member.name,
+                dest,
+            )
+            continue
+        safe.append(member)
+    return safe
+
+
+def safe_extract_tar(tarball: str, dest: str) -> None:
+    """Extract a tar-based archive (``.tar``, ``.tar.gz``, ...) into `dest`.
+
+    Always *attempts* to pass ``filter=`` to
+    :func:`tarfile.TarFile.extractall`, which rejects unsafe members
+    (absolute paths, ``..`` traversal, device files, ...); Python 3.14
+    made this the default behavior. Rather than gating that attempt
+    on a ``sys.version_info`` check, this tries it unconditionally and
+    only falls back on ``TypeError``: security fixes backporting ``filter``
+    support landed in 3.10.12 and 3.11.4 as well as
+    natively in 3.12+ (see
+    https://docs.python.org/3/library/tarfile.html#tarfile-extraction-filter),
+    so checking the running interpreter's actual capability is both
+    simpler and more accurate than trying to track every patch release
+    that matters.
+
+    On the rare Python predating all of those (a genuine ``TypeError``),
+    members are vetted manually first, via :func:`_safe_tar_members`, so
+    this is safe to use on every Python version heudiconv supports.
+
+    Parameters
+    ----------
+    tarball : str
+        Path to the tar archive.
+    dest : str
+        Destination directory (created by ``tarfile`` as needed).
+    """
+    # "data" (not the more permissive "tar") is the default so that, on
+    # interpreters where the native filter is used, special files
+    # (devices/FIFOs) and unsafe link targets are rejected the same way
+    # our own _safe_tar_members() manual fallback rejects them; a weaker
+    # filter can still be opted into explicitly via this variable
+    tar_filter = os.environ.get("HEUDICONV_TAR_FILTER", "data")
+    with tarfile.open(tarball) as tar:
+        try:
+            tar.extractall(dest, filter=tar_filter)  # type: ignore[arg-type]
+        except TypeError:
+            lgr.debug(
+                "%s's tarfile does not support extraction filters; "
+                "vetting members of %s manually instead",
+                sys.version.split()[0],
+                tarball,
+            )
+            tar.extractall(dest, members=_safe_tar_members(tar, dest))
+        except tarfile.FilterError as exc:
+            raise tarfile.FilterError(
+                f"{exc} -- set the HEUDICONV_TAR_FILTER environment "
+                f"variable to a less restrictive filter (e.g. 'tar') if "
+                f"you trust {tarball!r} and need this member kept"
+            ) from exc
 
 
 # Borrowed from DataLad (MIT license), with "archives" functionality commented
