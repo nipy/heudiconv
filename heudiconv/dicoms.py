@@ -14,6 +14,7 @@ import warnings
 
 import pydicom as dcm
 
+from .archives import tempdirs as archive_tempdirs
 from .utils import (
     SeqInfo,
     TempDirs,
@@ -120,7 +121,9 @@ def create_seqinfo(
         total_files_till_now=total_files,
         example_dcm_file=op.basename(series_files[0]),
         series_id=series_id,
-        dcm_dir_name=op.basename(op.dirname(series_files[0])),
+        dcm_dir_name=op.basename(
+            op.dirname(archive_tempdirs.source_path(series_files[0]))
+        ),
         series_files=len(series_files),
         unspecified="",
         dim1=size[0],
