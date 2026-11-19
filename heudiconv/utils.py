@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ast import literal_eval
 from collections.abc import Callable, Hashable, Mapping, Sequence
 import copy
 import datetime
@@ -194,7 +195,7 @@ def create_file_if_missing(
 
 def read_config(infile: str) -> dict:
     with open(infile, "r") as fp:
-        info = cast(dict, eval(fp.read()))
+        info = cast(dict, literal_eval(fp.read()))
     return info
 
 

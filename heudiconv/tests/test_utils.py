@@ -21,6 +21,7 @@ from heudiconv.utils import (
     json_dumps_pretty,
     load_heuristic,
     load_json,
+    read_config,
     remove_prefix,
     remove_suffix,
     sanitize_path,
@@ -30,9 +31,28 @@ from heudiconv.utils import (
     strptime_dcm_dt,
     strptime_micr,
     update_json,
+    write_config,
 )
 
 from .utils import HEURISTICS_PATH
+
+
+@pytest.mark.ai_generated
+def test_read_config_round_trip(tmp_path: Path) -> None:
+    path = tmp_path / "conversion.edit.txt"
+    mapping = {("sub-{subject}/anat", ("nii.gz",), None): ["1", "2"]}
+    write_config(str(path), mapping)
+    assert read_config(str(path)) == mapping
+
+
+@pytest.mark.ai_generated
+def test_read_config_rejects_expressions(tmp_path: Path) -> None:
+    path = tmp_path / "conversion.edit.txt"
+    path.write_text("_config_test_sentinel()")
+    with patch("heudiconv.utils._config_test_sentinel", create=True) as sentinel:
+        with pytest.raises(ValueError):
+            read_config(str(path))
+        sentinel.assert_not_called()
 
 
 def test_get_known_heuristics_with_descriptions() -> None:
