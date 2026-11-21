@@ -22,7 +22,7 @@
 from heudiconv import __version__
 
 project = "heudiconv"
-copyright = "2014-2022, Heudiconv team"  # noqa: A001
+copyright = "2014-2026, Heudiconv team"  # noqa: A001
 author = "Heudiconv team"
 
 # The short X.Y version
