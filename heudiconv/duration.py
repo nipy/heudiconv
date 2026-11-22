@@ -25,7 +25,7 @@ import nibabel as nb
 from nibabel.filename_parser import splitext_addext
 import pydicom as dcm
 
-from .dicoms import FileTiming, parse_private_csa_header
+from .dicoms import FileTiming, parse_private_csa_protocol
 
 __all__ = ["Duration", "SCANS_FIELD", "from_dicoms", "from_sidecar"]
 
@@ -71,18 +71,18 @@ def from_dicoms(dicom_list: list[str], timings: list[FileTiming]) -> Duration | 
     if not dicom_list:
         return None
     dcm_data = dcm.dcmread(dicom_list[0], stop_before_pixels=True, force=True)
-    duration = estimate(SeriesHeader.from_dicom(dcm_data), len(dicom_list), timings)
-    lgr.info("Duration of %s: %s", dicom_list[0], duration or "unknown")
-    return duration
+    return estimate(SeriesHeader.from_dicom(dcm_data), len(dicom_list), timings)
 
 
 def from_sidecar(nifti_fn: str, meta: dict[str, Any]) -> Duration | None:
     """Duration of the run in `nifti_fn`, per it and its sidecar `meta`.
 
     For when there are no DICOMs to tell by.  Of volumes it is their number
-    times ``RepetitionTime``, unless they are not that far apart (ASL,
-    spectroscopy, ``VolumeTiming``); of a single volume it is the
-    ``AcquisitionDuration`` which the converter recorded.  None if unknown.
+    times ``RepetitionTime``, unless they are not that far apart: with
+    ``VolumeTiming``, or for ASL and spectroscopy, which are told by the
+    BIDS suffix of `nifti_fn` (or ``ArterialSpinLabelingType``).  Of a single
+    volume it is the ``AcquisitionDuration`` which the converter recorded.
+    None if unknown, as when `nifti_fn` cannot be read for how many it has.
     """
     try:
         shape = nb.load(nifti_fn).shape  # type: ignore[attr-defined]
@@ -92,11 +92,9 @@ def from_sidecar(nifti_fn: str, meta: dict[str, Any]) -> Duration | None:
         return None
     if len(shape) < 4 or shape[3] == 1:
         duration = _positive(meta.get("AcquisitionDuration"))
-        return (
-            Duration(duration, "AcquisitionDuration of the sidecar")
-            if duration
-            else None
-        )
+        if duration is None or duration > _LONGEST:
+            return None
+        return Duration(duration, "AcquisitionDuration of the sidecar")
     suffix = splitext_addext(op.basename(nifti_fn))[0].rpartition("_")[2]
     repetition_time = _positive(meta.get("RepetitionTime"))
     if (
@@ -140,15 +138,7 @@ class SeriesHeader:
             ge_duration=ge_duration and ge_duration * 1e-6,
             planned_volumes=_whole(dcm_data.get("NumberOfTemporalPositions")),
             ge_locations=_whole(_get_private(dcm_data, 0x0021, 0x4F, "GEMS_RELA_01")),
-            # for more volumes (lRepetitions) it could be of an aborted run,
-            # with just a part of what was planned
-            siemens_duration=(
-                None
-                if parse_private_csa_header(dcm_data, "", "lRepetitions")
-                else _positive(
-                    parse_private_csa_header(dcm_data, "", "lTotalScanTimeSec")
-                )
-            ),
+            siemens_duration=_get_siemens_duration(dcm_data),
         )
 
 
@@ -256,6 +246,18 @@ def _get_repetition_time(dcm_data: dcm.Dataset) -> Any:
         except (KeyError, IndexError, AttributeError):
             pass
     return dcm_data.get("RepetitionTime")
+
+
+def _get_siemens_duration(dcm_data: dcm.Dataset) -> float | None:
+    """lTotalScanTimeSec of a Siemens (CSA) protocol, if it is of a single volume.
+
+    For more of them (lRepetitions) it could be of an aborted run, with just
+    a part of what was planned.
+    """
+    protocol = parse_private_csa_protocol(dcm_data)
+    if protocol.get("lRepetitions"):
+        return None
+    return _positive(protocol.get("lTotalScanTimeSec"))
 
 
 def _get_private(dcm_data: dcm.Dataset, group: int, offset: int, creator: str) -> Any:

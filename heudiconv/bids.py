@@ -681,6 +681,7 @@ def get_formatted_scans_key_row(
     dcm_data = dcm.dcmread(dcm_fn_strs[0], stop_before_pixels=True, force=True)
     acq_datetime = min((timing.time for timing in timings), default=None)
     acq_duration = duration.from_dicoms(dcm_fn_strs, timings)
+    lgr.info("Duration of %s: %s", dcm_fn_strs[0], acq_duration or "unknown")
     # add random string
     # But let's make it reproducible by using all UIDs
     # (might change across versions?)
@@ -953,31 +954,34 @@ def _find_sourcedata_tarball(nifti_fn: str, bids_root: str) -> tuple[str | None,
     return (max(candidates, key=len), True) if candidates else (None, False)
 
 
-_TarballCache = dict[str, tuple[duration.Duration | None, list[datetime.datetime]]]
+_TarballCache = dict[
+    str, tuple[duration.Duration | None, list[datetime.datetime]] | None
+]
 
 
 def _read_sourcedata(
     nifti_fn: str, bids_root: str, tarballs: _TarballCache
-) -> tuple[duration.Duration | None, list[datetime.datetime], bool]:
+) -> tuple[duration.Duration | None, list[datetime.datetime], bool] | None:
     """What the sourcedata DICOMs of an already-converted scan tell.
 
-    Its duration and acquisition timestamps per :func:`_read_sourcedata_tarball`
-    (None and none if there is no tarball, or it cannot be read), and whether
-    the tarball is shared with other scans (see :func:`_find_sourcedata_tarball`).
-    `tarballs` caches what was read from each, which the outputs of a
-    multi-output item share.
+    Its duration and acquisition timestamps per :func:`_read_sourcedata_tarball`,
+    and whether the tarball is shared with other scans (see
+    :func:`_find_sourcedata_tarball`); None if there is no tarball, or it
+    cannot be read.  `tarballs` caches what was read from each, which the
+    outputs of a multi-output item share.
     """
     tarball, shared = _find_sourcedata_tarball(nifti_fn, bids_root)
     if tarball is None:
-        return None, [], False
+        return None
     if tarball not in tarballs:
         try:
             tarballs[tarball] = _read_sourcedata_tarball(tarball)
         except Exception as exc:
             # a corrupt archive or DICOM within
             lgr.warning("Failed to read source DICOMs from %s: %s", tarball, exc)
-            tarballs[tarball] = None, []
-    return *tarballs[tarball], shared
+            tarballs[tarball] = None
+    read = tarballs[tarball]
+    return read and (*read, shared)
 
 
 def populate_scans_duration(
@@ -1076,9 +1080,9 @@ def _populate_scans_duration_file(
 
     if changed:
         _write_scans_tsv(scans_tsv, fieldnames, rows)
-        lgr.info("Updated 'duration' column in %s", scans_tsv)
+        lgr.info("Updated %s", scans_tsv)
     else:
-        lgr.info("No new 'duration' values could be established for %s", scans_tsv)
+        lgr.info("Nothing to update in %s", scans_tsv)
     _ensure_scans_json(op.join(bids_root, "scans.json"))
 
 
@@ -1091,9 +1095,12 @@ def _populate_scans_row(
     tarballs: _TarballCache,
 ) -> None:
     """Establish `duration` of `row` if wanted, and check (or fix) its `acq_time`."""
-    found, timestamps, shared_tarball = _read_sourcedata(nifti_fn, bids_root, tarballs)
+    sourcedata = _read_sourcedata(nifti_fn, bids_root, tarballs)
+    found, timestamps, shared_tarball = sourcedata or (None, [], False)
     if want_duration:
-        found = found or _duration_from_sidecar(nifti_fn, bids_root)
+        if sourcedata is None:
+            # not if the DICOMs are there to tell, and do not
+            found = _duration_from_sidecar(nifti_fn, bids_root)
         lgr.info("Duration of %s: %s", row["filename"], found or "unknown")
         # keep a value which we could not re-establish
         row["duration"] = (

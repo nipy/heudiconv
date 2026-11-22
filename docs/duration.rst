@@ -48,11 +48,16 @@ two ``RepetitionTime`` if they are one apart, and ``n/a`` otherwise.
 From a NIfTI and its sidecar
 ============================
 
-Without DICOMs, ``--command populate-scans-duration`` goes by the converted
-files: for more than one volume it is their number times ``RepetitionTime``,
-and for a single one the ``AcquisitionDuration`` of the sidecar.  Volumes
-which are not a ``RepetitionTime`` apart get ``n/a``: ASL, spectroscopy, and
-anything with ``VolumeTiming``.
+Only if a scan has no (readable) DICOMs under ``sourcedata/``,
+``--command populate-scans-duration`` goes by the converted files: for more
+than one volume it is their number times ``RepetitionTime``, and for a
+single one the ``AcquisitionDuration`` of the sidecar, if not over 4 hours.
+Volumes which are not a ``RepetitionTime`` apart get ``n/a``: anything with
+``VolumeTiming``, and ASL and spectroscopy, which are told by their BIDS
+suffix (``asl``, ``m0scan``, ``svs``, ``mrsi``, ``unloc``, ``mrsref``) or, for
+ASL, ``ArterialSpinLabelingType`` in the sidecar -- which ``dcm2niix`` records
+for Siemens only.  A NIfTI which cannot be read, e.g. annexed and not
+present, gets ``n/a`` and a warning, the number of its volumes being unknown.
 
 What the rules are based on
 ===========================
@@ -64,6 +69,9 @@ al., 2025 <https://doi.org/10.1038/s41597-025-05503-w>`_).  What
 gives, is recorded in ``heudiconv/tests/data/dcm_qa_durations.json``, which
 the tests go through; with ``HEUDICONV_TEST_DCM_QA`` pointing to clones of
 the collections, they also check that record against the DICOMs themselves.
+The durations in it are what the code gave; what is independent of the code
+is the number of volumes and the ``RepetitionTime`` which ``dcm2niix`` made
+of a series, recorded along where it made a single 4D image of it.
 269 series get a duration: 103 from the onsets of their volumes, 77 from
 GE's tag (27 of them scaled), 42 from ``AcquisitionDuration``, and 47 from a
 Siemens protocol.
@@ -91,25 +99,31 @@ E.g. for the 20 volumes of ``func-bold_task-fa_run-1`` of ``dcm_qa_xa30``,
 protocol (602.7 s), whereas the 2 stored volumes, numbered 1 and 21, are
 36.2 s apart: 38.0 s.
 
-**The tag may be of a single volume**, as for 3D EPI and ASL of Siemens XA60
-(``dcm_qa_ep3d``, ``dcm_qa_asl``): about a second for runs of tens of them.
+**The tag may be of a single volume**, as for 3D EPI and ASL of Siemens XA60:
+about 1 s for runs of 12 to 24 s (``dcm_qa_ep3d``), and 12.8 s for one of
+395 s (``dcm_qa_asl``).
 
 **Acquisition times alone do not tell volumes.**  Files of two echoes of a
 field map may be a ``RepetitionTime`` apart (``dcm_qa_xa30``: 0.6025 s, for
 a scan of 76.2 s), files of the echoes of a volume milliseconds apart
 (``dcm_qa_me``, ``dcm_qa_physio``), and files of slices anywhere within a
-``RepetitionTime``.  ``AcquisitionNumber`` is the same for all of those.  On
-the 103 Siemens series with more than one ``AcquisitionNumber`` the duration
-by their onsets matches the number of volumes which ``dcm2niix`` makes of
-them times their ``RepetitionTime``, where that is a measure.
+``RepetitionTime``.  ``AcquisitionNumber`` is the same for all of those.  Of
+the 103 series which get their duration from the onsets of their volumes (99
+of Siemens, 4 of Philips), ``dcm2niix`` makes a single 4D image of 95.  For
+the 84 of them which are not ASL, the duration is within 2% of the number
+of its volumes times its ``RepetitionTime``; for ASL that is no measure,
+volumes taking several ``RepetitionTime`` each.
 
-**GE's times are not of volumes.**  They change within a series just as a
-second passes, also in the 32 series whose files do carry a
-``TemporalPositionIdentifier``; hence the requirement for volumes to follow
-in time as they do in number, which all 103 Siemens and 4 Philips series
-meet and none of those does.  GE's tag is right where ``RepetitionTime``
-is not: for the runs with a delay between volumes (``dcm_qa_trt``), going by
-their trigger times.
+**GE's times are, as a rule, not of volumes.**  In 76 of the 77 GE series
+they are the same for all files, or change just as a second passes, also
+where the files do carry a ``TemporalPositionIdentifier``; hence the
+requirement for volumes to follow in time as they do in number, which the
+Siemens and Philips series above meet, and of GE's only the one with a
+variable delay between volumes (``dcm_qa_ge``).  GE's tag is right where
+``RepetitionTime`` times volumes is not, going by the trigger times: for
+the runs with a delay between volumes (``dcm_qa_ge``: 13.15 s and 19 s for
+10 volumes with a ``RepetitionTime`` of 1 s), and those of ``dcm_qa_trt``
+(40 s for 10 volumes, 4 s apart, with a ``RepetitionTime`` of 2 s).
 
 Known limitations
 =================
@@ -127,10 +141,15 @@ Known limitations
   get ``n/a`` even where their distance is how long each took (ASL,
   ``pasl_3d_m0`` of ``dcm_qa_asl``).
 - From a NIfTI and its sidecar, the number of volumes times
-  ``RepetitionTime`` leaves out any delay between volumes.
+  ``RepetitionTime`` leaves out any delay between volumes, and
+  ``AcquisitionDuration`` is as ``dcm2niix`` passed it on.  A dataset with
+  DICOMs kept for some scans only thus has durations of two kinds.
+- Where conversion goes by a tag, converting and filling in later without
+  DICOMs give different durations: 150 s against 130 s for Canon's diffusion,
+  40 s against 20 s for ``dcm_qa_trt``.
 - Not represented in those collections, hence not checked: runs aborted on
-  the scanner other than ``xa_4d_interrupted``; long runs (3 series have 50
-  or more volumes); sparse, clustered or triggered acquisitions; PET; Bruker
+  the scanner other than ``xa_4d_interrupted``; long runs (4 series have 50
+  or more numbered volumes, none over 102); sparse, clustered or triggered acquisitions; PET; Bruker
   and other vendors.  The 26 CT series, Canon's and UIH's classic files get
   ``n/a``.
 

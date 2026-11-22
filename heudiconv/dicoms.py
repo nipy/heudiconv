@@ -679,7 +679,7 @@ def get_file_timings(dicom_list: list[str]) -> list[FileTiming]:
         try:
             dt, is_series_level = _get_datetime_and_is_series_level(dcm_data)
         except ValueError as exc:
-            unparsable.append(str(exc))
+            unparsable.append(f"{fn}: {exc}")
             continue
         if dt is not None:
             (series_timings if is_series_level else timings).append(
@@ -692,10 +692,9 @@ def get_file_timings(dicom_list: list[str]) -> list[FileTiming]:
     if unparsable:
         lgr.warning(
             "Failed to parse the acquisition datetime of %d of %d files, "
-            "starting with %s: %s",
+            "the first being %s",
             len(unparsable),
             len(dicom_list),
-            dicom_list[0],
             unparsable[0],
         )
     if timings and series_timings:
@@ -717,14 +716,6 @@ def get_file_timings(dicom_list: list[str]) -> list[FileTiming]:
         )
         result = [t._replace(time=time) for t, time in zip(result, comparable)]
     return result
-
-
-def get_acquisition_timestamps(dicom_list: list[str]) -> list[datetime.datetime]:
-    """Return the acquisition timestamps of the files in `dicom_list`.
-
-    Those of :func:`get_file_timings`.
-    """
-    return [timing.time for timing in get_file_timings(dicom_list)]
 
 
 def compress_dicoms(
@@ -956,6 +947,26 @@ def embed_metadata_from_dicoms(
         os.chdir(cwd)
 
 
+def parse_private_csa_protocol(dcm_data: dcm.dataset.Dataset) -> dict[str, Any]:
+    """Protocol (MrPhoenixProtocol) of the CSA header of a Siemens DICOM.
+
+    Empty if there is none, or it cannot be parsed.
+    """
+    import dcmstack.extract as dsextract
+    from nibabel.nicom import csareader
+
+    try:
+        # TODO: test with attr besides ProtocolName
+        csastr = csareader.get_csa_header(dcm_data, "series")["tags"][
+            "MrPhoenixProtocol"
+        ]["items"][0]
+        csastr = csastr.replace("### ASCCONV BEGIN", "### ASCCONV BEGIN ### ")
+        return dict(dsextract.parse_phoenix_prot("MrPhoenixProtocol", csastr))
+    except Exception as e:
+        lgr.debug("Failed to parse CSA header: %s", str(e))
+        return {}
+
+
 def parse_private_csa_header(
     dcm_data: dcm.dataset.Dataset,
     _public_attr: str,
@@ -982,19 +993,9 @@ def parse_private_csa_header(
         private attribute value or default
     """
     # TODO: provide mapping to private_attr from public_attr
-    import dcmstack.extract as dsextract
-    from nibabel.nicom import csareader
-
     try:
-        # TODO: test with attr besides ProtocolName
-        csastr = csareader.get_csa_header(dcm_data, "series")["tags"][
-            "MrPhoenixProtocol"
-        ]["items"][0]
-        csastr = csastr.replace("### ASCCONV BEGIN", "### ASCCONV BEGIN ### ")
-        parsedhdr = dsextract.parse_phoenix_prot("MrPhoenixProtocol", csastr)
-        val = str(parsedhdr[private_attr]).replace(" ", "")
-    except Exception as e:
-        lgr.debug("Failed to parse CSA header: %s", str(e))
+        val = str(parse_private_csa_protocol(dcm_data)[private_attr]).replace(" ", "")
+    except KeyError:
         val = default or ""
     assert isinstance(val, str)
     return val

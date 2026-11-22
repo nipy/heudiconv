@@ -17,7 +17,6 @@ from heudiconv.dicoms import (
     create_seqinfo,
     dw,
     embed_dicom_and_nifti_metadata,
-    get_acquisition_timestamps,
     get_datetime_from_dcm,
     get_datetime_strings_from_dcm,
     get_file_timings,
@@ -384,9 +383,9 @@ def _edit_dicom(fn: str, **tags: Any) -> None:
 
 @pytest.mark.ai_generated
 @pytest.mark.parametrize("tz_offset", [None, "+0100"])
-def test_get_acquisition_timestamps(tmp_path: Path, tz_offset: str | None) -> None:
+def test_get_file_timings_times(tmp_path: Path, tz_offset: str | None) -> None:
     dicom_list = make_timed_dicoms(tmp_path, [2, 0, 4, 7], tz_offset=tz_offset)
-    timestamps = get_acquisition_timestamps(dicom_list)
+    timestamps = [timing.time for timing in get_file_timings(dicom_list)]
     # in dicom_list order, and exactly what a full header read gives -- in
     # particular equally timezone-aware, so the two can be compared
     assert timestamps == [
@@ -431,13 +430,13 @@ _SERIES_TIME_ONLY = dict(
         ),
     ],
 )
-def test_get_acquisition_timestamps_of_odd_files(
+def test_get_file_timings_times_of_odd_files(
     tmp_path: Path, edits: dict[int, dict[str, Any]], expected_seconds: list[int]
 ) -> None:
     dicom_list = make_timed_dicoms(tmp_path, [0, 1, 2])
     for i, tags in edits.items():
         _edit_dicom(dicom_list[i], **tags)
-    timestamps = get_acquisition_timestamps(dicom_list)
+    timestamps = [timing.time for timing in get_file_timings(dicom_list)]
     assert [t.second for t in timestamps] == expected_seconds
 
 
@@ -452,11 +451,14 @@ def test_get_file_timings(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> N
         (_timestamps([2])[0], 2, 5),
         (_timestamps([0])[0], 1, None),
     ]
-    assert caplog.text.count("Failed to parse the acquisition datetime of 2 of 4") == 1
+    assert [r.getMessage() for r in caplog.records if r.name == "heudiconv.dicoms"] == [
+        "Failed to parse the acquisition datetime of 2 of 4 files, the first "
+        f"being {dicom_list[2]}: Unable to parse datetime string: not-a-time"
+    ]
 
 
 @pytest.mark.ai_generated
-def test_get_acquisition_timestamps_mixed_timezone_awareness(
+def test_get_file_timings_times_mixed_timezone_awareness(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     # DICOMs of a run do not always agree on carrying TimezoneOffsetFromUTC,
@@ -464,6 +466,6 @@ def test_get_acquisition_timestamps_mixed_timezone_awareness(
     dicom_list = make_timed_dicoms(tmp_path, [2, 0, 4, 7], tz_offset="+0100")
     _edit_dicom(dicom_list[1], TimezoneOffsetFromUTC=None)
 
-    timestamps = get_acquisition_timestamps(dicom_list)
+    timestamps = [timing.time for timing in get_file_timings(dicom_list)]
     assert timestamps == _timestamps([2, 0, 4, 7])
     assert "timezone-naive" in caplog.text

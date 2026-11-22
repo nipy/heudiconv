@@ -9,6 +9,7 @@ import os
 import os.path as op
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 import nibabel as nb
 import numpy as np
@@ -28,9 +29,14 @@ from heudiconv.duration import (
 from .utils import TESTS_DATA_PATH, make_timed_dicoms
 
 # What estimate() goes by, and what it gives, for each series of the
-# dcm_qa* collections of DICOMs of https://github.com/neurolabusc.
-# To check it against, or regenerate it from, clones of those collections,
-# set these variables to the directory with them, resp. to anything.
+# dcm_qa* collections of DICOMs of https://github.com/neurolabusc.  Those
+# durations are a record of what the code gave, to notice them change, and
+# not a truth of their own.  What is independent of the code is "dcm2niix":
+# the number of volumes and their RepetitionTime which dcm2niix made of a
+# series, where it made a single 4D image of it.
+# To check the record against, or regenerate it from, clones of those
+# collections, set these variables to the directory with them, resp. to
+# anything; a regenerated record is to be reviewed as any other change.
 DCM_QA_TABLE = Path(TESTS_DATA_PATH) / "dcm_qa_durations.json"
 DCM_QA_PATH = os.environ.get("HEUDICONV_TEST_DCM_QA")
 DCM_QA_REGENERATE = os.environ.get("HEUDICONV_TEST_DCM_QA_REGENERATE")
@@ -72,10 +78,21 @@ def _estimate_row(row: dict[str, Any]) -> Duration | None:
 def test_estimate_of_dcm_qa(row: dict[str, Any]) -> None:
     found = _estimate_row(row)
     assert (found and [round(found.seconds, 4), found.source]) == row["duration"]
+    # from the onsets of volumes it is that of as many RepetitionTime, unless
+    # that is not how long a volume takes, as for ASL
+    if (
+        found
+        and found.source.startswith("volumes numbered")
+        and "dcm2niix" in row
+        and "asl" not in row["description"].lower()
+    ):
+        volumes, repetition_time = row["dcm2niix"]
+        assert found.seconds == pytest.approx(volumes * repetition_time, rel=0.02)
 
 
-def _read_dcm_qa(path: str) -> list[dict[str, Any]]:
+def _read_dcm_qa(path: str) -> list[dict[str, Any]]:  # pragma: no cover
     """Table rows for the series of the collections under `path`."""
+    dcm2niix = {row["first"]: row.get("dcm2niix") for row in _load_table()}
     series = defaultdict(list)
     for dirpath, dirnames, filenames in os.walk(path):
         dirnames[:] = sorted(d for d in dirnames if d != ".git")
@@ -114,12 +131,14 @@ def _read_dcm_qa(path: str) -> list[dict[str, Any]]:
                 "duration": found and [round(found.seconds, 4), found.source],
             }
         )
+        if dcm2niix.get(rows[-1]["first"]):
+            rows[-1]["dcm2niix"] = dcm2niix[rows[-1]["first"]]
     return sorted(rows, key=lambda row: row["first"])
 
 
 @pytest.mark.ai_generated
 @pytest.mark.skipif(not DCM_QA_PATH, reason="needs HEUDICONV_TEST_DCM_QA")
-def test_dcm_qa_table_is_current() -> None:
+def test_dcm_qa_table_is_current() -> None:  # pragma: no cover
     assert DCM_QA_PATH
     rows = _read_dcm_qa(DCM_QA_PATH)
     if DCM_QA_REGENERATE:
@@ -200,12 +219,22 @@ def test_dcm_qa_table_is_current() -> None:
             None,
             id="dcm_qa fMRI_MB: two volumes with reference scans in between",
         ),
+        *(
+            pytest.param(
+                dict(repetition_time=3.0),
+                2,
+                _numbered(0, 3.0 * apart),
+                expected and (6.0, "volumes numbered by AcquisitionNumber"),
+                id=f"two volumes {apart} TR apart",
+            )
+            for apart, expected in [(0.94, None), (0.96, 1), (1.04, 1), (1.06, None)]
+        ),
         pytest.param(
-            dict(repetition_time=3.0),
-            2,
-            _numbered(0, 3.16),
-            None,
-            id="two volumes over the tolerance of a TR apart",
+            {},
+            4,
+            _timings((0, 1, None), (9, None, None), (2, 2, None), (4, 3, None)),
+            (6.0, "volumes numbered by AcquisitionNumber"),
+            id="a file without a number among numbered volumes",
         ),
         pytest.param(
             dict(acquisition_duration=40.0),
@@ -264,6 +293,13 @@ def test_dcm_qa_table_is_current() -> None:
             id="UIH: tag which could be taken for seconds",
         ),
         pytest.param(
+            dict(manufacturer="UIH Healthcare", acquisition_duration=5000.0),
+            1,
+            [],
+            None,
+            id="UIH, however spelled out",
+        ),
+        pytest.param(
             dict(acquisition_duration=14400.0),
             1,
             [],
@@ -293,6 +329,13 @@ def test_dcm_qa_table_is_current() -> None:
             _timings((0, 1, 1), (1, 1, 2)),
             (3.0, "GE's private tag, scaled to the stored volumes"),
             id="dcm_qa_ge: 3 of 60 volumes, and a part of one",
+        ),
+        pytest.param(
+            dict(ge_duration=60.0, planned_volumes=60, ge_locations=77),
+            4620,
+            _timings((0, 1, 1)),
+            (60.0, "GE's private tag"),
+            id="GE: all the files, whichever have a time",
         ),
         pytest.param(
             dict(ge_duration=60.0, planned_volumes=60, ge_locations=1),
@@ -344,6 +387,12 @@ def _in_groups(groups: str, **tags: Any) -> Dataset:
     return dcm_data
 
 
+def _with_top_level(dcm_data: Dataset, **tags: Any) -> Dataset:
+    for tag, value in tags.items():
+        setattr(dcm_data, tag, value)
+    return dcm_data
+
+
 def _dataset(**tags: Any) -> Dataset:
     dcm_data = Dataset()
     for tag, value in tags.items():
@@ -381,6 +430,14 @@ def _with_private(tag: int, creator: str, vr: str, value: Any) -> Dataset:
             dict(repetition_time=1.81),
         ),
         (_in_groups("SharedFunctionalGroupsSequence"), {}),
+        # rather than one beside them
+        (
+            _with_top_level(
+                _in_groups("SharedFunctionalGroupsSequence", RepetitionTime=1810),
+                RepetitionTime=5,
+            ),
+            dict(repetition_time=1.81),
+        ),
         (
             _dataset(SharedFunctionalGroupsSequence=[], RepetitionTime=1810),
             dict(repetition_time=1.81),
@@ -433,14 +490,10 @@ def test_series_header_siemens_duration(name: str, expected: float | None) -> No
         ("xa_4d_interrupted/*", (38.01, "volumes numbered by AcquisitionNumber")),
     ],
 )
-def test_from_dicoms(
-    dicoms: str, expected: tuple[float, str] | None, caplog: pytest.LogCaptureFixture
-) -> None:
-    caplog.set_level("INFO", logger="heudiconv.duration")
+def test_from_dicoms(dicoms: str, expected: tuple[float, str] | None) -> None:
     dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, dicoms))) if dicoms else []
     found: Any = from_dicoms(dicom_list, get_file_timings(dicom_list))
     assert found == (expected and (pytest.approx(expected[0]), expected[1]))
-    assert (expected[1] if expected else "unknown") in caplog.text or not dicoms
 
 
 @pytest.mark.ai_generated
@@ -455,6 +508,10 @@ def test_from_dicoms_goes_by_the_files_and_timings_given(tmp_path: Path) -> None
     dcm_data.AcquisitionDuration = 99.0
     dcm.dcmwrite(dicom_list[-1], dcm_data)
     assert from_dicoms(dicom_list, []) == (30.0, "AcquisitionDuration tag")
+    # and their number, whichever of them have timings
+    with patch("heudiconv.duration.estimate") as estimate_:
+        from_dicoms(dicom_list, [])
+    assert estimate_.call_args.args[1:] == (4, [])
 
 
 def _nifti(tmp_path: Path, name: str, shape: tuple[int, ...] | None) -> str:
@@ -489,8 +546,20 @@ def _nifti(tmp_path: Path, name: str, shape: tuple[int, ...] | None) -> str:
         ),
         # volumes which are not a RepetitionTime apart
         *(
-            (f"sub-1_{suffix}.nii.gz", (2, 2, 2, 10), {"RepetitionTime": 4.0}, None)
-            for suffix in ("asl", "m0scan", "svs", "mrsi")
+            (
+                f"sub-1_acq-x_{suffix}.nii.gz",
+                (2, 2, 2, 10),
+                {"RepetitionTime": 4.0},
+                None,
+            )
+            for suffix in ("asl", "m0scan", "svs", "mrsi", "unloc", "mrsref")
+        ),
+        # two volumes are no single one
+        (
+            "sub-1_task-rest_bold.nii.gz",
+            (2, 2, 2, 2),
+            {"RepetitionTime": 2.0, "AcquisitionDuration": 27.89},
+            (4.0, "RepetitionTime x volumes"),
         ),
         (
             "sub-1_task-rest_bold.nii.gz",
@@ -519,6 +588,8 @@ def _nifti(tmp_path: Path, name: str, shape: tuple[int, ...] | None) -> str:
         ),
         ("sub-1_T1w.nii.gz", (2, 2, 2), {"RepetitionTime": 2.3}, None),
         ("sub-1_T1w.nii.gz", (2, 2, 2), {"AcquisitionDuration": "junk"}, None),
+        # not in seconds
+        ("sub-1_T1w.nii.gz", (2, 2, 2), {"AcquisitionDuration": 190713.0}, None),
         # cannot tell how many volumes
         ("sub-1_T1w.nii.gz", None, {"AcquisitionDuration": 312.0}, None),
     ],

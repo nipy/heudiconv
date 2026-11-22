@@ -1951,7 +1951,7 @@ def test_populate_scans_duration_from_sourcedata(
     assert fieldnames == ["filename", "acq_time", "duration"]
     assert rows[0]["duration"] == "3.000"
     # and the data dictionary of the dataset documents it
-    assert "duration" in load_json(scans_ds.root / "scans.json")
+    assert load_json(scans_ds.root / "scans.json")["duration"] == duration.SCANS_FIELD
 
 
 @pytest.mark.ai_generated
@@ -2342,26 +2342,56 @@ def test_check_acq_time_congruency_fix(
 
 
 @pytest.mark.ai_generated
-@pytest.mark.parametrize("tarball", ["corrupt", "of-no-duration"])
-def test_populate_scans_duration_resorts_to_sidecar(
+@pytest.mark.parametrize(
+    "tarball,expected",
+    [
+        (None, "20.000"),
+        ("corrupt", "20.000"),
+        # which is preferred to the sidecar ...
+        ("of-duration", "1.000"),
+        # ... also where it tells that the duration cannot be told
+        ("of-no-duration", "n/a"),
+    ],
+)
+def test_populate_scans_duration_from_sidecar_without_dicoms(
     scans_ds: ScansDataset,
     caplog: pytest.LogCaptureFixture,
     monkeypatch: pytest.MonkeyPatch,
-    tarball: str,
+    tarball: str | None,
+    expected: str,
 ) -> None:
     scans_ds.add_scan(sidecar={"Duration": 20.0})
     if tarball == "corrupt":
         tarball_file = scans_ds.root / "sourcedata" / "sub-01" / (BOLD + ".dicom.tgz")
         tarball_file.parent.mkdir(parents=True)
         tarball_file.write_bytes(b"not a tarball")
-    else:
-        monkeypatch.setattr(duration, "from_dicoms", Mock(return_value=None))
+    elif tarball:
         scans_ds.add_sourcedata(scans_ds.make_dicoms([0]))
+    if tarball == "of-no-duration":
+        monkeypatch.setattr(duration, "from_dicoms", Mock(return_value=None))
 
     populate_scans_duration(str(scans_ds.root))
 
-    assert scans_ds.rows[0]["duration"] == "20.000"
+    assert scans_ds.rows[0]["duration"] == expected
     assert ("Failed to read source DICOMs" in caplog.text) == (tarball == "corrupt")
+
+
+@pytest.mark.ai_generated
+def test_populate_scans_duration_reads_only_what_it_needs(
+    scans_ds: ScansDataset,
+) -> None:
+    # not the DICOMs of a scan which has its duration, unless to fix its acq_time
+    scans_ds.add_scan(dicom_offsets=[2, 0, 4, 7])
+    scans_ds.scans_tsv.write_text(
+        f"filename\tacq_time\tduration\n{BOLD}.nii.gz\t2020-01-01T12:00:00\t312.000\n"
+    )
+    with patch(
+        "heudiconv.bids._extract_dicom_tarball", wraps=_extract_dicom_tarball
+    ) as extract:
+        populate_scans_duration(str(scans_ds.root))
+        assert not extract.called
+        populate_scans_duration(str(scans_ds.root), fix_acq_time=True)
+        assert extract.called
 
 
 @pytest.mark.ai_generated
@@ -2615,7 +2645,7 @@ def test_populate_scans_duration_adds_column(scans_ds: ScansDataset) -> None:
         "acq_time",
         "duration",
     ]
-    assert "duration" in load_json(scans_ds.root / "scans.json")
+    assert load_json(scans_ds.root / "scans.json")["duration"] == duration.SCANS_FIELD
 
 
 @pytest.mark.ai_generated
