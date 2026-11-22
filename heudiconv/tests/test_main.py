@@ -23,6 +23,7 @@ from heudiconv.bids import (
     populate_bids_templates,
 )
 from heudiconv.cli.run import main as runner
+from heudiconv.duration import Duration
 from heudiconv.external.dlad import MIN_VERSION, add_to_datalad
 from heudiconv.main import process_extra_commands, workflow
 from heudiconv.utils import create_file_if_missing, is_readonly, load_json, set_readonly
@@ -198,6 +199,10 @@ def test_prepare_for_datalad(tmp_path: Path) -> None:
     assert ".heudiconv/dummy.nii.gz" not in ds.repo.get_files()
 
 
+@patch(
+    "heudiconv.duration.from_dicoms",
+    lambda *args: Duration(float(len(args[0])), "number of DICOMs"),
+)
 def test_get_formatted_scans_key_row() -> None:
     dcm_fn = (
         "%s/01-fmap_acq-3mm/1.3.12.2.1107.5.2.43.66112.2016101409263663466202201.dcm"
@@ -207,10 +212,8 @@ def test_get_formatted_scans_key_row() -> None:
     row1 = get_formatted_scans_key_row(dcm_fn)
     assert len(row1) == 4
     assert row1[0] == "2016-10-14T09:26:34.692500"
-    # a single DICOM has no AcquisitionDuration-like standard/GE tag and no
-    # second timestamp to estimate from, but this real Siemens file's CSA
-    # header declares its total scan time as a last resort
-    assert row1[1] == "3.000"
+    # as heudiconv.duration establishes it, here per the patch above
+    assert row1[1] == "1.000"
     assert row1[2] == "n/a"
     prandstr1 = row1[3]
 
@@ -229,11 +232,9 @@ def test_get_formatted_scans_key_row() -> None:
     assert prandstr1 != prandstr3
     assert prandstr3 == "fae3befb"
 
-    # providing the full list of DICOMs for a run allows duration to be
-    # estimated from per-file acquisition timestamps
+    # it goes by all the DICOMs given
     dicom_list = sorted(glob("%s/b0dwiForFmap/*.dcm" % TESTS_DATA_PATH))
-    row4 = get_formatted_scans_key_row(dicom_list)
-    assert float(row4[1]) == pytest.approx(12.45)
+    assert get_formatted_scans_key_row(dicom_list)[1] == "3.000"
 
 
 @pytest.mark.ai_generated
@@ -243,11 +244,7 @@ def test_get_formatted_scans_key_row_acq_time_is_earliest_timestamp(
     # https://github.com/nipy/heudiconv/issues/876: the first file is not
     # necessarily the earliest acquired, e.g. interleaved multiband slices
     dicom_list = make_timed_dicoms(tmp_path, [2, 0, 4, 7])
-    # span of 7s + median interval of 2s
-    assert get_formatted_scans_key_row(dicom_list)[:2] == [
-        "2020-01-01T12:00:00",
-        "9.000",
-    ]
+    assert get_formatted_scans_key_row(dicom_list)[0] == "2020-01-01T12:00:00"
 
 
 # TODO: finish this

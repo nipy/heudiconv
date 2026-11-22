@@ -155,6 +155,8 @@ def test_scans_keys_reproin(tmp_path: Path, invocation: list[str]) -> None:
                 assert re.match(
                     r"^[\d]{4}-[\d]{2}-[\d]{2}T[\d]{2}:[\d]{2}:[\d]{2}.[\d]{6}$", row[1]
                 )
+                # the one conversion whose duration is checked for real:
+                # as its Siemens protocol declares, see heudiconv.duration
                 assert row[2] == "3.000"
 
 

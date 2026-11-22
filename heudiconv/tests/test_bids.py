@@ -20,20 +20,20 @@ import string
 import tarfile
 import tempfile
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import nibabel
 import numpy as np
 from numpy import testing as np_testing
-import pydicom
 import pytest
 
+from heudiconv import duration
 from heudiconv.bids import (
     SHIM_KEY,
     AllowedCriteriaForFmapAssignment,
     BIDSFile,
     KeyInfoForForce,
-    _duration_from_nifti_sidecar,
+    _duration_from_sidecar,
     _extract_dicom_tarball,
     _find_bids_dataset_root,
     _find_json_sidecar,
@@ -60,6 +60,7 @@ from heudiconv.bids import (
 from heudiconv.cli.run import main as runner
 from heudiconv.convert import add_taskname_to_infofile
 from heudiconv.dicoms import compress_dicoms
+from heudiconv.duration import Duration
 from heudiconv.utils import (
     Load,
     TempDirs,
@@ -1892,8 +1893,25 @@ class ScansDataset:
 
 
 @pytest.fixture
-def scans_ds(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> ScansDataset:
+def scans_ds(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> ScansDataset:
+    """A :class:`ScansDataset`, with durations which are not for these tests.
+
+    That of DICOMs is their number in seconds, and that per a sidecar its
+    "Duration", so that the two could be told apart.
+    """
     caplog.set_level(logging.INFO, logger="heudiconv.bids")
+    monkeypatch.setattr(
+        duration, "from_dicoms", lambda *args: Duration(float(len(args[0])), "DICOMs")
+    )
+    monkeypatch.setattr(
+        duration,
+        "from_sidecar",
+        lambda *args: (
+            Duration(args[1]["Duration"], "sidecar") if "Duration" in args[1] else None
+        ),
+    )
     return ScansDataset(tmp_path)
 
 
@@ -1931,7 +1949,7 @@ def test_populate_scans_duration_from_sourcedata(
 
     fieldnames, rows = scans_ds.read()
     assert fieldnames == ["filename", "acq_time", "duration"]
-    assert rows[0]["duration"] == "12.450"
+    assert rows[0]["duration"] == "3.000"
     # and the data dictionary of the dataset documents it
     assert "duration" in load_json(scans_ds.root / "scans.json")
 
@@ -1974,7 +1992,7 @@ def test_populate_scans_duration_of_multi_output_item(
     assert extract.call_count == 1
     # duration and acq_time, the same for all outputs of an item, are fixed ...
     assert [(row["acq_time"], row["duration"]) for row in scans_ds.rows] == [
-        ("2020-01-01T12:00:00", "9.000")
+        ("2020-01-01T12:00:00", "4.000")
     ] * 2
     # ... but not the sidecars, which only conversion sees all together
     assert [load_json(f)["AcquisitionTime"] for f in sidecars] == sidecar_times
@@ -2037,10 +2055,10 @@ def test_populate_scans_duration_acq_time(
 
     populate_scans_duration(str(scans_ds.root))
 
-    # the span of 7s + the median interval of 2s, whatever the acq_time,
-    # which is only warned about
+    # the duration is established whatever the acq_time, which is only
+    # warned about
     assert scans_ds.rows == [
-        {"filename": BOLD + ".nii.gz", "acq_time": stored, "duration": "9.000"}
+        {"filename": BOLD + ".nii.gz", "acq_time": stored, "duration": "4.000"}
     ]
     assert "differs from the earliest acquisition" in caplog.text
     assert ("pass --fix-acq-time" in caplog.text) == bool(fixed)
@@ -2055,6 +2073,25 @@ def test_populate_scans_duration_acq_time(
         "12:00:00.000000" if fixed else "12:00:02.000000"
     )
     assert is_readonly(str(sidecar))
+
+
+@pytest.mark.ai_generated
+def test_populate_scans_duration_fix_acq_time_alone(scans_ds: ScansDataset) -> None:
+    # of a scan which has its duration, which then stays as it is
+    scans_ds.add_scan(dicom_offsets=[2, 0, 4, 7])
+    scans_ds.scans_tsv.write_text(
+        f"filename\tacq_time\tduration\n{BOLD}.nii.gz\t2020-01-01T12:00:02\t312.000\n"
+    )
+    populate_scans_duration(str(scans_ds.root))
+    assert scans_ds.rows[0]["acq_time"] == "2020-01-01T12:00:02"
+    populate_scans_duration(str(scans_ds.root), fix_acq_time=True)
+    assert scans_ds.rows == [
+        {
+            "filename": BOLD + ".nii.gz",
+            "acq_time": "2020-01-01T12:00:00",
+            "duration": "312.000",
+        }
+    ]
 
 
 @pytest.mark.ai_generated
@@ -2123,123 +2160,27 @@ def test_save_scans_key_checks_sidecar_acquisition_time(
     }
 
 
-_VOLUME_TIMING = {"VolumeTiming": [0.0, 2.0, 4.0]}
-
-
 @pytest.mark.ai_generated
 @pytest.mark.parametrize(
-    "sidecar,nvols,expected,expected_log",
+    "sidecar,expected,expected_log",
     [
-        pytest.param({"RepetitionTime": 2.0}, 10, 20.0, "", id="TR-x-volumes"),
-        # TR x 1 is no estimate for e.g. an anatomical
-        pytest.param({"RepetitionTime": 2.0}, 1, None, "", id="single-volume"),
-        pytest.param({"RepetitionTime": 2.0}, 0, None, "", id="3D"),
-        pytest.param(
-            {"RepetitionTime": 2.0},
-            None,
-            None,
-            "WARNING: Failed to load",
-            id="unreadable-nifti",
-        ),
-        *(
-            pytest.param({"RepetitionTime": tr}, 10, None, "", id=f"TR-{tr}")
-            for tr in (-1.0, 0, float("nan"), float("inf"), "abc")
-        ),
-        pytest.param(
-            {"RepetitionTime": 2.0, "AcquisitionDuration": 20.5},
-            10,
-            20.5,
-            "",
-            id="AcquisitionDuration",
-        ),
-        # for which TR x volumes is no measure, e.g. for the 2 volumes of a
-        # fieldmap's magnitude, or with dummy scans
-        pytest.param(
-            {"RepetitionTime": 0.488, "AcquisitionDuration": 54.0},
-            2,
-            54.0,
-            "",
-            id="AcquisitionDuration-of-fmap",
-        ),
-        pytest.param(
-            {"RepetitionTime": 2.3, "AcquisitionDuration": 312.0},
-            None,
-            312.0,
-            "",
-            id="AcquisitionDuration-of-unreadable-nifti",
-        ),
-        pytest.param(
-            {"AcquisitionDuration": 17.5}, 10, 17.5, "", id="AcquisitionDuration-only"
-        ),
-        # with VolumeTiming: the last onset + the duration of a volume, for
-        # which AcquisitionDuration is the deprecated name ...
-        pytest.param(
-            _VOLUME_TIMING | {"AcquisitionDuration": 1.5},
-            3,
-            5.5,
-            "",
-            id="VolumeTiming",
-        ),
-        pytest.param(
-            _VOLUME_TIMING
-            | {"AcquisitionDuration": 1.5, "FrameAcquisitionDuration": 0.5},
-            3,
-            4.5,
-            "",
-            id="VolumeTiming-FrameAcquisitionDuration",
-        ),
-        pytest.param(
-            {"VolumeTiming": [5.0, 1.0, 3.0], "AcquisitionDuration": 1.5},
-            3,
-            6.5,
-            "",
-            id="VolumeTiming-unsorted",
-        ),
-        pytest.param(
-            {"VolumeTiming": [], "AcquisitionDuration": 1.5},
-            3,
-            None,
-            "",
-            id="VolumeTiming-empty",
-        ),
-        # ... or else the median interval between onsets, here of 1, 2, 4, 1
-        pytest.param(
-            {"VolumeTiming": [0.0, 1.0, 3.0, 7.0, 8.0]},
-            5,
-            9.5,
-            "",
-            id="VolumeTiming-only",
-        ),
-        *(
-            pytest.param({"VolumeTiming": onsets}, 1, None, "", id=f"onsets-{onsets}")
-            for onsets in ([0.0], [], ["junk"], 5, "123", {"1": 0, "3": 0})
-        ),
-        # seen on OpenNeuro, although the two are mutually exclusive per
-        # BIDS: TR could be of a much longer silent gap of a sparse design
-        pytest.param(
-            _VOLUME_TIMING | {"RepetitionTime": 5.0},
-            3,
-            None,
-            "which BIDS treats as mutually exclusive",
-            id="VolumeTiming-and-TR",
-        ),
-        *(
-            pytest.param(text, 10, None, "WARNING: Failed to load", id=text)
-            for text in ("{not valid json", "[1, 2, 3]", '"a string"')
-        ),
+        ({"Duration": 20.0}, 20.0, ""),
+        ("{not valid json", None, "WARNING: Failed to load"),
+        ("[1, 2, 3]", None, "WARNING: Failed to load"),
+        (None, None, ""),
     ],
 )
-def test_duration_from_nifti_sidecar(
+def test_duration_from_sidecar(
     scans_ds: ScansDataset,
     caplog: pytest.LogCaptureFixture,
-    sidecar: dict[str, Any] | str,
-    nvols: int | None,
+    sidecar: dict[str, Any] | str | None,
     expected: float | None,
     expected_log: str,
 ) -> None:
-    scans_ds.add_scan(sidecar=sidecar, nvols=nvols)
+    scans_ds.add_scan(sidecar=sidecar)
     nifti = scans_ds.root / "sub-01" / (BOLD + ".nii.gz")
-    assert _duration_from_nifti_sidecar(str(nifti), str(scans_ds.root)) == expected
+    found = _duration_from_sidecar(str(nifti), str(scans_ds.root))
+    assert (found and found.seconds) == expected
     _assert_bids_log(caplog, expected_log)
 
 
@@ -2402,24 +2343,20 @@ def test_check_acq_time_congruency_fix(
 
 @pytest.mark.ai_generated
 @pytest.mark.parametrize("tarball", ["corrupt", "of-no-duration"])
-def test_populate_scans_duration_resorts_to_nifti_sidecar(
-    scans_ds: ScansDataset, caplog: pytest.LogCaptureFixture, tarball: str
+def test_populate_scans_duration_resorts_to_sidecar(
+    scans_ds: ScansDataset,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    tarball: str,
 ) -> None:
-    scans_ds.add_scan(sidecar={"RepetitionTime": 2.0}, nvols=10)
+    scans_ds.add_scan(sidecar={"Duration": 20.0})
     if tarball == "corrupt":
         tarball_file = scans_ds.root / "sourcedata" / "sub-01" / (BOLD + ".dicom.tgz")
         tarball_file.parent.mkdir(parents=True)
         tarball_file.write_bytes(b"not a tarball")
     else:
-        # a single DICOM, stripped of the CSA header with the duration which
-        # Siemens declares, so there is neither a tag nor timestamps to go by
-        dcm_data = pydicom.dcmread(
-            op.join(TESTS_DATA_PATH, "01-anat-scout", "0001.dcm"),
-            stop_before_pixels=True,
-        )
-        del dcm_data[(0x0029, 0x1020)]
-        pydicom.dcmwrite(scans_ds.tmp_path / "stripped.dcm", dcm_data)
-        scans_ds.add_sourcedata([str(scans_ds.tmp_path / "stripped.dcm")])
+        monkeypatch.setattr(duration, "from_dicoms", Mock(return_value=None))
+        scans_ds.add_sourcedata(scans_ds.make_dicoms([0]))
 
     populate_scans_duration(str(scans_ds.root))
 
@@ -2429,19 +2366,19 @@ def test_populate_scans_duration_resorts_to_nifti_sidecar(
 
 @pytest.mark.ai_generated
 @pytest.mark.parametrize(
-    "nvols,recomputed",
+    "sidecar,recomputed",
     [
-        (10, "20.000"),
+        ({"Duration": 20.0}, "20.000"),
         # a value which cannot be re-established, e.g. the one Siemens
         # declared for an anatomical whose DICOMs were not kept, is kept
-        (1, "312.000"),
+        ({}, "312.000"),
     ],
 )
 def test_populate_scans_duration_overwrite(
-    scans_ds: ScansDataset, nvols: int, recomputed: str
+    scans_ds: ScansDataset, sidecar: dict[str, Any], recomputed: str
 ) -> None:
-    scans_ds.add_scan(sidecar={"RepetitionTime": 2.0}, nvols=10)
-    scans_ds.add_scan(_OTHER[:-7], sidecar={"RepetitionTime": 2.0}, nvols=nvols)
+    scans_ds.add_scan(sidecar={"Duration": 20.0})
+    scans_ds.add_scan(_OTHER[:-7], sidecar=sidecar)
     scans_ds.scans_tsv.write_text(
         "filename\tacq_time\tduration\n"
         f"{BOLD}.nii.gz\t2020-01-01T12:00:00\tn/a\n"
@@ -2460,8 +2397,8 @@ def test_populate_scans_duration_overwrite(
 
 @pytest.mark.ai_generated
 def test_duration_from_inherited_nifti_sidecar(scans_ds: ScansDataset) -> None:
-    scans_ds.add_scan(nvols=10)
-    save_json(scans_ds.root / "task-rest_bold.json", {"RepetitionTime": 2.0})
+    scans_ds.add_scan()
+    save_json(scans_ds.root / "task-rest_bold.json", {"Duration": 20.0})
     populate_scans_duration(str(scans_ds.root))
     assert scans_ds.rows[0]["duration"] == "20.000"
 
@@ -2665,7 +2602,7 @@ def test_populate_scans_duration_of_odd_row(
         "acq_time": cells[1] if len(cells) > 1 else "n/a",
         "duration": expected,
     } | ({None: cells[2:]} if cells[2:] else {})
-    assert regular["duration"] == "9.000"
+    assert regular["duration"] == "4.000"
     _assert_bids_log(caplog, expected_log)
 
 

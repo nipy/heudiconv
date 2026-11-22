@@ -636,10 +636,19 @@ def get_datetime_strings_from_dcm(
     return datetime_.strftime("%Y%m%d"), datetime_.strftime("%H%M%S.%f")
 
 
-# the tags get_datetime_from_dcm() looks at -- parsing only these is
-# meaningfully faster than a full header parse when scanning every file of
-# a (possibly large) run
-_DATETIME_TAGS = [
+class FileTiming(NamedTuple):
+    """When, and as which volume, the data of a DICOM file got acquired."""
+
+    time: datetime.datetime
+    #: AcquisitionNumber, which numbers the volumes of a Siemens series
+    acquisition_number: int | None
+    #: TemporalPositionIdentifier, which does so e.g. for Philips
+    temporal_position: int | None
+
+
+# what get_file_timings() needs -- parsing only these is meaningfully faster
+# than a full header parse when scanning every file of a (possibly large) run
+_TIMING_TAGS = [
     "AcquisitionDate",
     "AcquisitionTime",
     "AcquisitionDateTime",
@@ -647,47 +656,75 @@ _DATETIME_TAGS = [
     "SeriesTime",
     # makes the datetimes timezone-aware, so they must be read consistently
     "TimezoneOffsetFromUTC",
+    "AcquisitionNumber",
+    "TemporalPositionIdentifier",
 ]
 
 
-def get_acquisition_timestamps(dicom_list: list[str]) -> list[datetime.datetime]:
-    """Return the acquisition timestamps of the files in `dicom_list`.
+def get_file_timings(dicom_list: list[str]) -> list[FileTiming]:
+    """Return the timings of the files in `dicom_list`, in a single pass.
 
-    As established by :func:`get_datetime_from_dcm`, in `dicom_list` order,
-    skipping files without a (parseable) date/time.  Files which only have
-    the series' (start) date/time are skipped too, unless no file has an
-    acquisition date/time.
+    In `dicom_list` order, with times as established by
+    :func:`get_datetime_from_dcm`, skipping files without a (parseable)
+    date/time.  Files which only have the series' (start) date/time are
+    skipped too, unless no file has an acquisition date/time.
     """
-    timestamps: list[datetime.datetime] = []
-    series_timestamps: list[datetime.datetime] = []
+    timings: list[FileTiming] = []
+    series_timings: list[FileTiming] = []
+    unparsable = []
     for fn in dicom_list:
         dcm_data = dcm.dcmread(
-            fn, stop_before_pixels=True, force=True, specific_tags=_DATETIME_TAGS
+            fn, stop_before_pixels=True, force=True, specific_tags=_TIMING_TAGS
         )
         try:
             dt, is_series_level = _get_datetime_and_is_series_level(dcm_data)
         except ValueError as exc:
-            lgr.warning("Failed to parse acquisition datetime from %s: %s", fn, exc)
+            unparsable.append(str(exc))
             continue
         if dt is not None:
-            (series_timestamps if is_series_level else timestamps).append(dt)
-    if timestamps and series_timestamps:
+            (series_timings if is_series_level else timings).append(
+                FileTiming(
+                    dt,
+                    get_typed_attr(dcm_data, "AcquisitionNumber", int),
+                    get_typed_attr(dcm_data, "TemporalPositionIdentifier", int),
+                )
+            )
+    if unparsable:
+        lgr.warning(
+            "Failed to parse the acquisition datetime of %d of %d files, "
+            "starting with %s: %s",
+            len(unparsable),
+            len(dicom_list),
+            dicom_list[0],
+            unparsable[0],
+        )
+    if timings and series_timings:
         lgr.debug(
             "Ignoring %d file(s) with only the series' date/time among %d "
             "with an acquisition date/time",
-            len(series_timestamps),
-            len(timestamps),
+            len(series_timings),
+            len(timings),
         )
-    result = timestamps or series_timestamps
-    comparable = naive_if_mixed_tz(result)
-    if comparable is not result:
+    result = timings or series_timings
+    times = [timing.time for timing in result]
+    comparable = naive_if_mixed_tz(times)
+    if comparable is not times:
         lgr.warning(
             "Only some of %d files have a timezone-aware acquisition "
             "timestamp (DICOM TimezoneOffsetFromUTC present on some but "
             "not others) -- comparing all of them as timezone-naive",
             len(result),
         )
-    return comparable
+        result = [t._replace(time=time) for t, time in zip(result, comparable)]
+    return result
+
+
+def get_acquisition_timestamps(dicom_list: list[str]) -> list[datetime.datetime]:
+    """Return the acquisition timestamps of the files in `dicom_list`.
+
+    Those of :func:`get_file_timings`.
+    """
+    return [timing.time for timing in get_file_timings(dicom_list)]
 
 
 def compress_dicoms(

@@ -22,20 +22,16 @@ import tempfile
 from typing import Any
 import warnings
 
-import nibabel as nb
 from nibabel.filename_parser import splitext_addext
 import numpy as np
 import pydicom as dcm
 
-from . import __version__, dicoms
-from .duration import get_acquisition_duration
+from . import __version__, dicoms, duration
 from .parser import find_files
 from .utils import (
-    as_finite_positive_float,
     create_file_if_missing,
     is_readonly,
     load_json,
-    median_step,
     naive_if_mixed_tz,
     remove_prefix,
     remove_suffix,
@@ -71,24 +67,7 @@ SCANS_FILE_FIELDS = OrderedDict(
                 ]
             ),
         ),
-        (
-            "duration",
-            OrderedDict(
-                [
-                    ("LongName", "Scan duration"),
-                    (
-                        "Description",
-                        "Wallclock duration of the scan, in seconds, from the "
-                        "onset of the first to the end of the last stored "
-                        "volume or sample. Estimated from the DICOM headers "
-                        "(see heudiconv.duration.get_acquisition_duration) or, "
-                        "retrospectively, from the NIfTI/JSON sidecar. See also "
-                        "https://github.com/bids-standard/bids-specification/pull/2508",
-                    ),
-                    ("Units", "s"),
-                ]
-            ),
-        ),
+        ("duration", duration.SCANS_FIELD),
         ("operator", OrderedDict([("Description", "Name of the operator")])),
         (
             "randstr",
@@ -507,8 +486,9 @@ def save_scans_key(
     subj: str | None = None
     ses: str | None = None
     # all bids_files of this item share the same source DICOMs, hence the row
-    timestamps = dicoms.get_acquisition_timestamps(item[-1])
-    scan_key_row = get_formatted_scans_key_row(item[-1], timestamps)
+    timings = dicoms.get_file_timings(item[-1])
+    timestamps = [timing.time for timing in timings]
+    scan_key_row = get_formatted_scans_key_row(item[-1], timings)
     for bids_file in bids_files:
         # get filenames
         f_name = "/".join(bids_file.split("/")[-2:])
@@ -672,7 +652,7 @@ def add_rows_to_scans_keys_file(fn: str, newrows: dict[str, list[str]]) -> None:
 
 def get_formatted_scans_key_row(
     dcm_fns: str | Path | Sequence[str | Path],
-    timestamps: list[datetime.datetime] | None = None,
+    timings: list[dicoms.FileTiming] | None = None,
 ) -> list[str]:
     """Build a `_scans.tsv` data row for one converted item.
 
@@ -680,12 +660,11 @@ def get_formatted_scans_key_row(
     ----------
     dcm_fns: str or Path, or sequence of str or Path
         A single representative DICOM, or -- preferably -- every DICOM of
-        the run, letting `duration` be estimated from timestamps when no
-        `AcquisitionDuration` tag is available, and `acq_time` be the
-        earliest of them rather than whichever sorts first
-        (https://github.com/nipy/heudiconv/issues/876).
-    timestamps: list of datetime, optional
-        What :func:`heudiconv.dicoms.get_acquisition_timestamps` returns for
+        the run: `acq_time` is the earliest acquisition time among them
+        (https://github.com/nipy/heudiconv/issues/876), and `duration` is
+        as :mod:`heudiconv.duration` establishes it from them.
+    timings: list of FileTiming, optional
+        What :func:`heudiconv.dicoms.get_file_timings` returns for
         `dcm_fns`, if already at hand.
 
     Returns
@@ -697,11 +676,11 @@ def get_formatted_scans_key_row(
     if isinstance(dcm_fns, (str, Path)):
         dcm_fns = [dcm_fns]
     dcm_fn_strs: list[str] = [str(f) for f in dcm_fns]
-    if timestamps is None:
-        timestamps = dicoms.get_acquisition_timestamps(dcm_fn_strs)
+    if timings is None:
+        timings = dicoms.get_file_timings(dcm_fn_strs)
     dcm_data = dcm.dcmread(dcm_fn_strs[0], stop_before_pixels=True, force=True)
-    acq_datetime = min(timestamps, default=None)
-    acq_duration = get_acquisition_duration(dcm_fn_strs, timestamps)
+    acq_datetime = min((timing.time for timing in timings), default=None)
+    acq_duration = duration.from_dicoms(dcm_fn_strs, timings)
     # add random string
     # But let's make it reproducible by using all UIDs
     # (might change across versions?)
@@ -835,7 +814,7 @@ def check_acq_time_congruency(
         (sidecar_datetime - acq_datetime).total_seconds(),
         op.basename(json_file),
         (
-            " -- `heudiconv --command populate-scans-duration --overwrite "
+            " -- `heudiconv --command populate-scans-duration "
             "--fix-acq-time` would fix it"
             if fixable
             else ""
@@ -874,22 +853,25 @@ def _extract_dicom_tarball(tarball: str, dest: str) -> list[str]:
     return [fn for _, fn in sorted(extracted)]
 
 
-def _duration_and_timestamps_from_dicom_tarball(
+def _read_sourcedata_tarball(
     tarball: str,
-) -> tuple[float | None, list[datetime.datetime]]:
-    """Acquisition duration and timestamps from a sourcedata DICOM tarball.
+) -> tuple[duration.Duration | None, list[datetime.datetime]]:
+    """Duration, and acquisition timestamps, per a sourcedata DICOM tarball.
 
     See :func:`heudiconv.dicoms.compress_dicoms` for how it's produced.
     """
     with tempfile.TemporaryDirectory() as tmpdir:
         dicom_files = _extract_dicom_tarball(tarball, tmpdir)
-        timestamps = dicoms.get_acquisition_timestamps(dicom_files)
-        return get_acquisition_duration(dicom_files, timestamps), timestamps
+        timings = dicoms.get_file_timings(dicom_files)
+        return (
+            duration.from_dicoms(dicom_files, timings),
+            [timing.time for timing in timings],
+        )
 
 
-def _format_duration(duration: float | None) -> str:
-    """Format a duration in seconds as a `_scans.tsv` cell (``'n/a'`` if None)."""
-    return "%.3f" % duration if duration is not None else "n/a"
+def _format_duration(found: duration.Duration | None) -> str:
+    """Format a duration as a `_scans.tsv` cell (``'n/a'`` if None)."""
+    return "%.3f" % found.seconds if found else "n/a"
 
 
 def _parse_bids_name(path: str) -> BIDSFile:
@@ -932,44 +914,8 @@ def _find_json_sidecar(nifti_fn: str, bids_root: str) -> str | None:
     return None
 
 
-def _duration_from_volume_timing(meta: dict[str, Any], json_fn: str) -> float | None:
-    """Duration per a sidecar's ``VolumeTiming``: its last onset plus one frame."""
-    volume_timing = meta["VolumeTiming"]
-    if not isinstance(volume_timing, list):
-        return None
-    try:
-        onsets = sorted(float(t) for t in volume_timing)
-    except (TypeError, ValueError):
-        return None
-    if not onsets:
-        return None
-    frame_duration = as_finite_positive_float(
-        meta.get("FrameAcquisitionDuration")
-    ) or as_finite_positive_float(meta.get("AcquisitionDuration"))
-    if frame_duration is None:
-        if as_finite_positive_float(meta.get("RepetitionTime")) is not None:
-            lgr.warning(
-                "%s has both RepetitionTime and VolumeTiming, which BIDS "
-                "treats as mutually exclusive; not guessing a duration from "
-                "this inconsistent metadata",
-                json_fn,
-            )
-            return None
-        if len(onsets) < 2:
-            return None
-        frame_duration = median_step(onsets)
-    return onsets[-1] + frame_duration
-
-
-def _duration_from_nifti_sidecar(nifti_fn: str, bids_root: str) -> float | None:
-    """Estimate a run's duration from its NIfTI + JSON sidecar.
-
-    The sidecar (see :func:`_find_json_sidecar`) gives it via
-    ``VolumeTiming`` or ``AcquisitionDuration``, or else it is TR x volumes.
-    Unlike with DICOMs (:func:`heudiconv.duration.get_acquisition_duration`)
-    there are no timestamps to tell by whether ``AcquisitionDuration`` is of
-    a truncated run, TR x volumes being no measure for many a sequence.
-    """
+def _duration_from_sidecar(nifti_fn: str, bids_root: str) -> duration.Duration | None:
+    """Duration per `nifti_fn` and its JSON sidecar (see :func:`_find_json_sidecar`)."""
     json_fn = _find_json_sidecar(nifti_fn, bids_root)
     if json_fn is None:
         return None
@@ -980,21 +926,7 @@ def _duration_from_nifti_sidecar(nifti_fn: str, bids_root: str) -> float | None:
     except (OSError, ValueError) as exc:
         lgr.warning("Failed to load %s to get acquisition duration: %s", json_fn, exc)
         return None
-    if "VolumeTiming" in meta:
-        return _duration_from_volume_timing(meta, json_fn)
-
-    duration = as_finite_positive_float(meta.get("AcquisitionDuration"))
-    tr = as_finite_positive_float(meta.get("RepetitionTime"))
-    if duration is not None or tr is None:
-        return duration
-    try:
-        shape = nb.load(nifti_fn).shape  # type: ignore[attr-defined]
-    except Exception as exc:
-        # arbitrary, possibly corrupted or truncated, user data
-        lgr.warning("Failed to load %s to get the number of volumes: %s", nifti_fn, exc)
-        return None
-    # TR x 1 vastly underestimates e.g. an anatomical, so we do not guess
-    return tr * shape[3] if len(shape) > 3 and shape[3] > 1 else None
+    return duration.from_sidecar(nifti_fn, meta)
 
 
 def _find_sourcedata_tarball(nifti_fn: str, bids_root: str) -> tuple[str | None, bool]:
@@ -1021,33 +953,31 @@ def _find_sourcedata_tarball(nifti_fn: str, bids_root: str) -> tuple[str | None,
     return (max(candidates, key=len), True) if candidates else (None, False)
 
 
-_TarballCache = dict[str, tuple[float | None, list[datetime.datetime]]]
+_TarballCache = dict[str, tuple[duration.Duration | None, list[datetime.datetime]]]
 
 
-def _get_retrospective_duration(
+def _read_sourcedata(
     nifti_fn: str, bids_root: str, tarballs: _TarballCache
-) -> tuple[float | None, list[datetime.datetime], bool]:
-    """Best-effort duration of an already-converted scan, and its DICOM timestamps.
+) -> tuple[duration.Duration | None, list[datetime.datetime], bool]:
+    """What the sourcedata DICOMs of an already-converted scan tell.
 
-    From the sourcedata DICOM tarball (see :func:`_find_sourcedata_tarball`,
-    which also gives the returned "shared" flag) or, without timestamps
-    then, from the NIfTI + JSON sidecar.  `tarballs` caches what was read
-    from each tarball, which the outputs of a multi-output item share.
+    Its duration and acquisition timestamps per :func:`_read_sourcedata_tarball`
+    (None and none if there is no tarball, or it cannot be read), and whether
+    the tarball is shared with other scans (see :func:`_find_sourcedata_tarball`).
+    `tarballs` caches what was read from each, which the outputs of a
+    multi-output item share.
     """
     tarball, shared = _find_sourcedata_tarball(nifti_fn, bids_root)
-    if tarball is not None:
-        if tarball not in tarballs:
-            try:
-                tarballs[tarball] = _duration_and_timestamps_from_dicom_tarball(tarball)
-            except Exception as exc:
-                # a corrupt archive or DICOM within -- resort to the sidecar
-                lgr.warning("Failed to read source DICOMs from %s: %s", tarball, exc)
-                tarballs[tarball] = None, []
-        duration, timestamps = tarballs[tarball]
-        if duration is not None:
-            return duration, timestamps, shared
-        lgr.debug("No duration from source DICOMs %s for %s", tarball, nifti_fn)
-    return _duration_from_nifti_sidecar(nifti_fn, bids_root), [], False
+    if tarball is None:
+        return None, [], False
+    if tarball not in tarballs:
+        try:
+            tarballs[tarball] = _read_sourcedata_tarball(tarball)
+        except Exception as exc:
+            # a corrupt archive or DICOM within
+            lgr.warning("Failed to read source DICOMs from %s: %s", tarball, exc)
+            tarballs[tarball] = None, []
+    return *tarballs[tarball], shared
 
 
 def populate_scans_duration(
@@ -1066,12 +996,13 @@ def populate_scans_duration(
         Also recompute `duration` of rows which already have one.  A value
         which cannot be re-established is kept.
     fix_acq_time: bool, optional
-        Whether to replace `acq_time` of the rows (re)computed with the
-        earliest acquisition timestamp of the source DICOMs where they
-        disagree (https://github.com/nipy/heudiconv/issues/876), and
-        likewise `AcquisitionTime` of the scan's own JSON sidecar where
-        unambiguous (see :func:`check_acq_time_congruency`).  A disagreement
-        is warned about regardless.
+        Whether to replace `acq_time` with the earliest acquisition timestamp
+        of the source DICOMs where they disagree
+        (https://github.com/nipy/heudiconv/issues/876), and likewise
+        `AcquisitionTime` of the scan's own JSON sidecar where unambiguous
+        (see :func:`check_acq_time_congruency`).  Then the source DICOMs of
+        every scan get read.  Otherwise a disagreement is warned about for
+        the scans whose `duration` gets established from them.
     """
     if op.isfile(path):
         scans_tsvs = [path] if path.endswith("_scans.tsv") else []
@@ -1114,9 +1045,10 @@ def _populate_scans_duration_file(
     tarballs: _TarballCache = {}
     for row in rows:
         filename = row["filename"]
+        want_duration = overwrite or maybe_na(row.get("duration")) == "n/a"
         if not filename:
             lgr.warning("%s has a row with no filename, skipping it", scans_tsv)
-        elif maybe_na(row.get("duration")) != "n/a" and not overwrite:
+        elif not (want_duration or fix_acq_time):
             pass
         elif not _is_within(op.join(session_dir, filename), bids_root):
             lgr.warning(
@@ -1128,10 +1060,11 @@ def _populate_scans_duration_file(
         else:
             before = dict(row)
             try:
-                _populate_scans_duration_row(
+                _populate_scans_row(
                     row,
                     op.join(session_dir, filename),
                     bids_root,
+                    want_duration,
                     fix_acq_time,
                     tarballs,
                 )
@@ -1149,24 +1082,40 @@ def _populate_scans_duration_file(
     _ensure_scans_json(op.join(bids_root, "scans.json"))
 
 
-def _populate_scans_duration_row(
+def _populate_scans_row(
     row: _ScansRow,
     nifti_fn: str,
     bids_root: str,
+    want_duration: bool,
     fix_acq_time: bool,
     tarballs: _TarballCache,
 ) -> None:
-    """Update `duration` of `row`, and check (or fix) the acquisition times."""
-    duration, timestamps, shared_tarball = _get_retrospective_duration(
-        nifti_fn, bids_root, tarballs
-    )
-    # keep a value which we could not re-establish
-    row["duration"] = (
-        maybe_na(row.get("duration"))
-        if duration is None
-        else _format_duration(duration)
-    )
-    acq_datetime = _reconcile_acq_time(row, min(timestamps, default=None), fix_acq_time)
+    """Establish `duration` of `row` if wanted, and check (or fix) its `acq_time`."""
+    found, timestamps, shared_tarball = _read_sourcedata(nifti_fn, bids_root, tarballs)
+    if want_duration:
+        found = found or _duration_from_sidecar(nifti_fn, bids_root)
+        lgr.info("Duration of %s: %s", row["filename"], found or "unknown")
+        # keep a value which we could not re-establish
+        row["duration"] = (
+            _format_duration(found) if found else maybe_na(row.get("duration"))
+        )
+    _check_acq_time(row, nifti_fn, bids_root, timestamps, shared_tarball, fix_acq_time)
+
+
+def _check_acq_time(
+    row: _ScansRow,
+    nifti_fn: str,
+    bids_root: str,
+    timestamps: list[datetime.datetime],
+    shared_tarball: bool,
+    fix: bool,
+) -> None:
+    """Check `acq_time` of `row`, and of its sidecar, against `timestamps`.
+
+    Those of its source DICOMs, of a tarball which is or is not shared with
+    other scans; both get fixed if `fix`, where unambiguous.
+    """
+    acq_datetime = _reconcile_acq_time(row, min(timestamps, default=None), fix)
     json_fn = _find_json_sidecar(nifti_fn, bids_root)
     # never touch (or suggest fixing) an inherited sidecar, which is shared
     # with other scans, nor one of an output of a multi-output item, whose
@@ -1180,7 +1129,7 @@ def _populate_scans_duration_row(
         [json_fn] if json_fn else [],
         label=str(row["filename"]),
         timestamps=timestamps if own_sidecar else (),
-        fix=fix_acq_time and own_sidecar,
+        fix=fix and own_sidecar,
     )
 
 

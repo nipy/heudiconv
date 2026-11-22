@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import json
 from json.decoder import JSONDecodeError
 import logging
@@ -14,7 +14,6 @@ import pydicom as dcm
 import pytest
 
 from heudiconv.utils import (
-    as_finite_positive_float,
     create_tree,
     get_datetime,
     get_heuristic_description,
@@ -22,7 +21,6 @@ from heudiconv.utils import (
     json_dumps_pretty,
     load_heuristic,
     load_json,
-    median_step,
     naive_if_mixed_tz,
     remove_prefix,
     remove_suffix,
@@ -328,43 +326,8 @@ def test_sanitize_path_invalid(
     assert "contained problematic character(s)" in msg
 
 
-@pytest.mark.ai_generated
-@pytest.mark.parametrize(
-    "value,expected",
-    [
-        (12.5, 12.5),
-        ("3.0", 3.0),
-        (0, None),
-        (-1.0, None),
-        (float("nan"), None),
-        (float("inf"), None),
-        (float("-inf"), None),
-        (None, None),
-        ("not-a-number", None),
-        ([1, 2], None),
-        (10**400, None),  # OverflowError from float() on a huge int
-    ],
-)
-def test_as_finite_positive_float(value: Any, expected: float | None) -> None:
-    assert as_finite_positive_float(value) == expected
-
-
 _NAIVE = datetime(2020, 1, 1, 12)
 _AWARE = _NAIVE.replace(tzinfo=timezone.utc)
-
-
-@pytest.mark.ai_generated
-@pytest.mark.parametrize(
-    "values,expected",
-    [
-        ([0.0, 1.0, 3.0], 1.5),
-        # of an even number of steps: the mean of the two middle ones
-        ([0, 1, 3, 7, 8], 1.5),
-        ([_NAIVE, _NAIVE + timedelta(seconds=2)], timedelta(seconds=2)),
-    ],
-)
-def test_median_step(values: list[Any], expected: Any) -> None:
-    assert median_step(values) == expected
 
 
 @pytest.mark.ai_generated

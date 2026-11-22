@@ -20,6 +20,7 @@ from heudiconv.dicoms import (
     get_acquisition_timestamps,
     get_datetime_from_dcm,
     get_datetime_strings_from_dcm,
+    get_file_timings,
     get_reproducible_int,
     group_dicoms_into_seqinfos,
     parse_private_csa_header,
@@ -438,6 +439,20 @@ def test_get_acquisition_timestamps_of_odd_files(
         _edit_dicom(dicom_list[i], **tags)
     timestamps = get_acquisition_timestamps(dicom_list)
     assert [t.second for t in timestamps] == expected_seconds
+
+
+@pytest.mark.ai_generated
+def test_get_file_timings(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    dicom_list = make_timed_dicoms(tmp_path, [2, 0, 4, 7], numbers=[2, 1, 3, 4])
+    _edit_dicom(dicom_list[0], TemporalPositionIdentifier=5)
+    # those without a time are left out, with a single warning for them all
+    for fn in dicom_list[2:]:
+        _edit_dicom(fn, AcquisitionTime="not-a-time")
+    assert get_file_timings(dicom_list) == [
+        (_timestamps([2])[0], 2, 5),
+        (_timestamps([0])[0], 1, None),
+    ]
+    assert caplog.text.count("Failed to parse the acquisition datetime of 2 of 4") == 1
 
 
 @pytest.mark.ai_generated

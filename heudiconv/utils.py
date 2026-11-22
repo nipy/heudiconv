@@ -7,18 +7,15 @@ import copy
 import datetime
 from glob import glob
 import hashlib
-import itertools
 import json
 from json.decoder import JSONDecodeError
 import logging
-import math
 import os
 import os.path as op
 from pathlib import Path
 import re
 import shutil
 import stat
-import statistics
 from subprocess import check_output
 import sys
 import tempfile
@@ -553,30 +550,6 @@ def clear_temp_dicoms(item_dicoms: list[str]) -> None:
 def file_md5sum(filename: str) -> str:
     with open(filename, "rb") as f:
         return hashlib.md5(f.read()).hexdigest()
-
-
-def as_finite_positive_float(value: Any) -> float | None:
-    """Parse `value` as a float, or None if not a finite, strictly positive one.
-
-    >>> as_finite_positive_float("2.5")
-    2.5
-    >>> [as_finite_positive_float(v) for v in (None, "junk", 0, -1, "nan", "inf")]
-    [None, None, None, None, None, None]
-    """
-    try:
-        parsed = float(value)
-    except (TypeError, ValueError, OverflowError):
-        return None
-    return parsed if math.isfinite(parsed) and parsed > 0 else None
-
-
-def median_step(sorted_values: Sequence[Any]) -> Any:
-    """Median difference between consecutive `sorted_values` (at least two).
-
-    >>> median_step([0, 2, 4, 7])
-    2
-    """
-    return statistics.median(b - a for a, b in itertools.pairwise(sorted_values))
 
 
 def naive_if_mixed_tz(
