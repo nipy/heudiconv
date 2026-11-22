@@ -17,14 +17,9 @@ from heudiconv.dicoms import (
     create_seqinfo,
     dw,
     embed_dicom_and_nifti_metadata,
-    estimate_scan_duration_from_times,
-    get_acquisition_duration,
     get_acquisition_timestamps,
     get_datetime_from_dcm,
     get_datetime_strings_from_dcm,
-    get_dicom_acquisition_duration,
-    get_dicom_declared_acquisition_duration,
-    get_dicom_declared_repetitions,
     get_reproducible_int,
     group_dicoms_into_seqinfos,
     parse_private_csa_header,
@@ -367,113 +362,6 @@ def test_get_reproducible_int_raises_assertion_wo_dt(tmp_path: Path) -> None:
         get_reproducible_int([str(tmp_path)])
 
 
-@pytest.mark.ai_generated
-@pytest.mark.parametrize("dcmfile", TEST_DICOM_PATHS)
-def test_get_dicom_acquisition_duration_absent(dcmfile: str) -> None:
-    # none of our test DICOMs carry AcquisitionDuration-like tags
-    dcm_data = dcm.dcmread(dcmfile, stop_before_pixels=True, force=True)
-    assert get_dicom_acquisition_duration(dcm_data) is None
-
-
-# GE private tag block is only recognized under its own private creator, so
-# every case which sets (0019,105A) also sets (0019,0010) accordingly.
-_GE_CREATOR_TAG = (0x0019, 0x0010)
-_GE_DURATION_TAG = (0x0019, 0x105A)
-_GE_CREATOR = "GEMS_ACQU_01"
-
-
-@pytest.mark.ai_generated
-@pytest.mark.parametrize(
-    "tags,expected",
-    [
-        # standard tag alone
-        pytest.param({(0x0018, 0x9073): ("FD", 12.5)}, 12.5, id="standard"),
-        # GE private tag alone, under its recognized private creator
-        pytest.param(
-            {
-                _GE_CREATOR_TAG: ("LO", _GE_CREATOR),
-                _GE_DURATION_TAG: ("FL", 3.0118515e08),
-            },
-            pytest.approx(301.185, rel=1e-3),
-            id="ge_private",
-        ),
-        # both present -- the standard tag takes precedence
-        pytest.param(
-            {
-                (0x0018, 0x9073): ("FD", 12.5),
-                _GE_CREATOR_TAG: ("LO", _GE_CREATOR),
-                _GE_DURATION_TAG: ("FL", 999e6),
-            },
-            12.5,
-            id="prefers_standard",
-        ),
-        # private group 0019 is used differently by different vendors -- an
-        # element at the GE offset under an unrelated creator block must not
-        # be mistaken for GE's Acquisition Duration
-        pytest.param(
-            {
-                _GE_CREATOR_TAG: ("LO", "SOME_OTHER_VENDOR_01"),
-                _GE_DURATION_TAG: ("FL", 3.0118515e08),
-            },
-            None,
-            id="ge_wrong_creator",
-        ),
-        # e.g. some scanners write AcquisitionDuration = 0 when unpopulated;
-        # that is not a usable duration
-        pytest.param({(0x0018, 0x9073): ("FD", 0.0)}, None, id="zero"),
-        pytest.param({(0x0018, 0x9073): ("FD", -5.0)}, None, id="negative"),
-    ],
-)
-def test_get_dicom_acquisition_duration(
-    tags: dict[tuple[int, int], tuple[str, Any]], expected: float | None
-) -> None:
-    dcm_data = dcm.dcmread(
-        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
-    )
-    for tag, (vr, value) in tags.items():
-        dcm_data.add_new(tag, vr, value)
-    assert get_dicom_acquisition_duration(dcm_data) == expected
-
-
-@pytest.mark.ai_generated
-@pytest.mark.parametrize(
-    "strip_csa_header,expected",
-    [
-        # phantom.dcm is real Siemens data whose embedded CSA series header
-        # protocol dump carries "lTotalScanTimeSec = 14"
-        pytest.param(False, pytest.approx(14.0), id="present"),
-        # remove the CSA series header info to test the genuinely-absent
-        # case (e.g. non-Siemens data, or anonymization having stripped it)
-        pytest.param(True, None, id="absent"),
-    ],
-)
-def test_get_dicom_declared_acquisition_duration(
-    strip_csa_header: bool, expected: float | None
-) -> None:
-    dcm_data = dcm.dcmread(
-        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
-    )
-    if strip_csa_header:
-        del dcm_data[(0x0029, 0x1020)]
-    assert get_dicom_declared_acquisition_duration(dcm_data) == expected
-
-
-@pytest.mark.ai_generated
-def test_get_dicom_declared_repetitions() -> None:
-    # phantom.dcm's protocol dump omits 'lRepetitions' entirely, as Siemens
-    # does for a single-volume (single-measurement) sequence
-    dcm_data = dcm.dcmread(
-        op.join(TESTS_DATA_PATH, "phantom.dcm"), stop_before_pixels=True
-    )
-    assert get_dicom_declared_repetitions(dcm_data) == 0
-
-    # axasc35.dcm's protocol dump declares 'lRepetitions = 1' (2 volumes)
-    dcm_data = dcm.dcmread(
-        op.join(TESTS_DATA_PATH, "axasc35.dcm"), stop_before_pixels=True
-    )
-    assert get_dicom_declared_repetitions(dcm_data) == 1
-
-
 def _timestamps(offsets: list[float]) -> list[datetime.datetime]:
     start = datetime.datetime(2020, 1, 1, 12)
     return [start + datetime.timedelta(seconds=offset) for offset in offsets]
@@ -491,27 +379,6 @@ def _edit_dicom(fn: str, **tags: Any) -> None:
             elif tag in dcm_data:
                 delattr(dcm_data, tag)
     dcm.dcmwrite(fn, dcm_data)
-
-
-@pytest.mark.ai_generated
-@pytest.mark.parametrize(
-    "offsets,expected",
-    [
-        # span plus the median interval, which for an even number of
-        # intervals (1, 2, 4, 1) is the mean of the two middle ones
-        ([0, 1, 3, 7, 8], 9.5),
-        # the first is not necessarily the earliest, e.g. interleaved
-        # multiband slices: https://github.com/nipy/heudiconv/issues/876
-        ([2, 0, 4, 7], 9.0),
-        ([3, 3], None),  # need two distinct ones
-        ([3], None),
-        ([], None),
-    ],
-)
-def test_estimate_scan_duration_from_times(
-    offsets: list[float], expected: float | None
-) -> None:
-    assert estimate_scan_duration_from_times(_timestamps(offsets)) == expected
 
 
 @pytest.mark.ai_generated
@@ -585,73 +452,3 @@ def test_get_acquisition_timestamps_mixed_timezone_awareness(
     timestamps = get_acquisition_timestamps(dicom_list)
     assert timestamps == _timestamps([2, 0, 4, 7])
     assert "timezone-naive" in caplog.text
-    assert get_acquisition_duration(dicom_list, timestamps) == 9.0
-
-
-@pytest.mark.ai_generated
-@pytest.mark.parametrize(
-    "dicoms,expected",
-    [
-        ([], None),
-        # 3 files ~4.15s apart: their timestamps are preferred over the 591s
-        # which the CSA header declares
-        ("b0dwiForFmap/*.dcm", 12.45),
-        # a single volume, so only Siemens' declared duration is left
-        ("phantom.dcm", 14.0),
-        # as for the 17s this one declares: its protocol is of 2 volumes
-        # (lRepetitions = 1), so with a single file it looks truncated
-        ("axasc35.dcm", None),
-    ],
-)
-def test_get_acquisition_duration(dicoms: str, expected: float | None) -> None:
-    dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, dicoms))) if dicoms else []
-    assert get_acquisition_duration(dicom_list) == (
-        expected and pytest.approx(expected)
-    )
-
-
-@pytest.mark.ai_generated
-def test_get_acquisition_duration_of_given_timestamps(tmp_path: Path) -> None:
-    dicom_list = make_timed_dicoms(tmp_path, [2, 0, 4, 7])
-    assert get_acquisition_duration(dicom_list, _timestamps([0, 1, 2])) == 3.0
-
-
-@pytest.mark.ai_generated
-@pytest.mark.parametrize(
-    "offsets,tag,expected",
-    [
-        ([0], 12.5, 12.5),  # nothing to cross-check the tag against
-        # timestamps span 7s, estimate 7s + 2s median interval = 9s
-        ([2, 0, 4, 7], 10.0, 10.0),  # the tag is plausible
-        ([2, 0, 4, 7], 602.0, 9.0),  # e.g. the full protocol of an aborted run
-        ([2, 0, 4, 7], 2.0, 9.0),  # shorter than what was acquired
-    ],
-)
-def test_get_acquisition_duration_cross_checks_tag(
-    tmp_path: Path,
-    caplog: pytest.LogCaptureFixture,
-    offsets: list[int],
-    tag: float,
-    expected: float,
-) -> None:
-    dicom_list = make_timed_dicoms(tmp_path, offsets)
-    for fn in dicom_list:
-        _edit_dicom(fn, AcquisitionDuration=tag)
-    assert get_acquisition_duration(dicom_list) == expected
-    assert ("AcquisitionDuration tag declares" in caplog.text) == (tag != expected)
-
-
-@pytest.mark.ai_generated
-def test_get_acquisition_duration_of_truncated_acquisition(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    # AcquisitionDuration is of the full planned protocol, of which only 2
-    # files, 36.2s apart, were acquired
-    dicom_list = sorted(glob(op.join(TESTS_DATA_PATH, "xa_4d_interrupted", "*")))
-    tag = get_dicom_acquisition_duration(
-        dcm.dcmread(dicom_list[0], stop_before_pixels=True, force=True)
-    )
-    assert tag == pytest.approx(602.735)
-    duration = get_acquisition_duration(dicom_list)
-    assert duration is not None and 36.2 <= duration < 100
-    assert "AcquisitionDuration tag declares 602.735s" in caplog.text

@@ -18,10 +18,8 @@ from .archives import tempdirs as archive_tempdirs
 from .utils import (
     SeqInfo,
     TempDirs,
-    as_finite_positive_float,
     get_typed_attr,
     load_json,
-    median_step,
     naive_if_mixed_tz,
     set_readonly,
     strptime_dcm_da_tm,
@@ -638,64 +636,6 @@ def get_datetime_strings_from_dcm(
     return datetime_.strftime("%Y%m%d"), datetime_.strftime("%H%M%S.%f")
 
 
-# Private GE tag reporting the "Acquisition Duration" (in microseconds) for
-# classic (per-slice) GE DICOMs; see
-# https://github.com/rordenlab/dcm2niix/issues/808
-_GE_ACQUISITION_DURATION_GROUP = 0x0019
-_GE_ACQUISITION_DURATION_OFFSET = 0x5A
-_GE_ACQUISITION_DURATION_CREATOR = "GEMS_ACQU_01"
-
-
-def get_dicom_acquisition_duration(dcm_data: dcm.Dataset) -> float | None:
-    """Extract the total scan duration directly from a DICOM tag, if present.
-
-    Checks the standard ``AcquisitionDuration`` tag (0018,9073, mostly
-    Enhanced MR/CT), else the private GE tag (0019,105A, classic per-slice
-    GE DICOMs). Returns None if neither is present/parseable.
-    """
-    duration = as_finite_positive_float(dcm_data.get("AcquisitionDuration"))
-    if duration is not None:
-        return duration
-
-    try:
-        elem = dcm_data.get_private_item(
-            _GE_ACQUISITION_DURATION_GROUP,
-            _GE_ACQUISITION_DURATION_OFFSET,
-            _GE_ACQUISITION_DURATION_CREATOR,
-        )
-    except KeyError:
-        return None
-    duration = as_finite_positive_float(elem.value)
-    return duration * 1e-6 if duration is not None else None
-
-
-def get_dicom_declared_acquisition_duration(dcm_data: dcm.Dataset) -> float | None:
-    """Extract Siemens' own declared (prescribed) total scan time.
-
-    Parsed from the CSA/Phoenix protocol's ``lTotalScanTimeSec`` -- a
-    last-resort source (see :func:`get_acquisition_duration`) for e.g. a
-    single-volume 3D sequence, where nothing else is available at all.
-    Returns None if unavailable (e.g. non-Siemens data).
-    """
-    value = parse_private_csa_header(
-        dcm_data, "AcquisitionDuration", "lTotalScanTimeSec"
-    )
-    return as_finite_positive_float(value) if value else None
-
-
-def get_dicom_declared_repetitions(dcm_data: dcm.Dataset) -> int:
-    """Number of extra volumes Siemens' Phoenix protocol declares for this series.
-
-    0 for a single-volume acquisition -- Siemens omits ``lRepetitions``
-    entirely from the protocol dump when it is 0, so an absent field is
-    treated the same as an explicit 0.
-    """
-    value = parse_private_csa_header(
-        dcm_data, "NumberOfTemporalPositions", "lRepetitions"
-    )
-    return int(value) if value else 0
-
-
 # the tags get_datetime_from_dcm() looks at -- parsing only these is
 # meaningfully faster than a full header parse when scanning every file of
 # a (possibly large) run
@@ -748,90 +688,6 @@ def get_acquisition_timestamps(dicom_list: list[str]) -> list[datetime.datetime]
             len(result),
         )
     return comparable
-
-
-def _span_and_median_interval(
-    timestamps: list[datetime.datetime],
-) -> tuple[float, float] | None:
-    """(span, median interval) in seconds of the distinct `timestamps`, if >= 2."""
-    unique = sorted(set(timestamps))
-    if len(unique) < 2:
-        return None
-    return (
-        (unique[-1] - unique[0]).total_seconds(),
-        median_step(unique).total_seconds(),
-    )
-
-
-def estimate_scan_duration_from_times(
-    timestamps: list[datetime.datetime],
-) -> float | None:
-    """Estimate a run's total duration from its acquisition `timestamps`.
-
-    The span between the earliest and latest of them (see
-    :func:`get_acquisition_timestamps`), plus one median interval to account
-    for the last one marking the *onset*, not the end, of the final
-    volume/slice.  None if fewer than two are distinct.
-    """
-    span_and_median = _span_and_median_interval(timestamps)
-    return sum(span_and_median) if span_and_median else None
-
-
-def get_acquisition_duration(
-    dicom_list: list[str],
-    timestamps: list[datetime.datetime] | None = None,
-) -> float | None:
-    """Determine the total wallclock duration, in seconds, of a run.
-
-    `dicom_list` should be every DICOM file of the run, and `timestamps` (if
-    already at hand) what :func:`get_acquisition_timestamps` returns for it.
-    Sources, in order:
-
-    1. the DICOM tag (:func:`get_dicom_acquisition_duration`), unless the
-       timestamps show it to be implausible, e.g. a truncated acquisition
-       reporting its full planned duration;
-    2. :func:`estimate_scan_duration_from_times`;
-    3. Siemens' declared scan time, only for a single-volume protocol, so a
-       truncated multi-volume run gets None rather than its planned duration.
-    """
-    if not dicom_list:
-        return None
-    if timestamps is None:
-        timestamps = get_acquisition_timestamps(dicom_list)
-    span_and_median = _span_and_median_interval(timestamps)
-    dcm_data = dcm.dcmread(dicom_list[0], stop_before_pixels=True, force=True)
-    duration = get_dicom_acquisition_duration(dcm_data)
-    if span_and_median is not None:
-        span, median_interval = span_and_median
-        # no acquisition is shorter than its timestamps span, while the margin
-        # of an extra interval avoids second-guessing a slightly longer tag
-        if duration is None or not span <= duration <= span + 2 * median_interval:
-            if duration is not None:
-                lgr.warning(
-                    "%s: AcquisitionDuration tag declares %.3fs, which "
-                    "disagrees with the %.3fs spanned by its %d distinct "
-                    "acquisition timestamps (e.g. a truncated/aborted "
-                    "acquisition reporting the full planned protocol "
-                    "duration); using the timestamp-based estimate instead",
-                    dicom_list[0],
-                    duration,
-                    span,
-                    len(set(timestamps)),
-                )
-            return span + median_interval
-    if duration is not None:
-        return duration
-    if get_dicom_declared_repetitions(dcm_data) > 0:
-        lgr.warning(
-            "Could not establish a duration for %s from timestamps, and its "
-            "protocol declares more than one volume -- this looks like a "
-            "truncated/aborted acquisition, so not using Siemens' declared "
-            "total scan time, which would reflect the full planned protocol "
-            "rather than the actual partial acquisition",
-            dicom_list[0],
-        )
-        return None
-    return get_dicom_declared_acquisition_duration(dcm_data)
 
 
 def compress_dicoms(

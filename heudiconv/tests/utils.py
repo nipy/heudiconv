@@ -6,6 +6,7 @@ from glob import glob
 import logging
 import os.path as op
 from pathlib import Path
+from typing import Any
 
 import pydicom as dcm
 
@@ -100,12 +101,14 @@ def make_timed_dicoms(
     offsets: Sequence[float],
     start: str = "2020-01-01T12:00:00",
     tz_offset: str | None = None,
+    **tags: Any,
 ) -> list[str]:
     """Write copies of the phantom.dcm header (no pixel data) into `outdir`
     as f0.dcm, f1.dcm, ..., each acquired `offsets[i]` seconds after `start`
     (AcquisitionDate/AcquisitionTime) -- in timezone `tz_offset` (DICOM
     TimezoneOffsetFromUTC, e.g. "+0100") if given -- and return their paths
-    in that order."""
+    in that order.  RepetitionTime is 1000 (ms), for whole `offsets` to be
+    those of volumes, and any `tags` are set as given."""
     start_dt = datetime.datetime.fromisoformat(start)
     dicom_list = []
     for i, offset in enumerate(offsets):
@@ -117,6 +120,8 @@ def make_timed_dicoms(
         dcm_data.AcquisitionTime = acq_dt.strftime("%H%M%S.%f")
         if tz_offset:
             dcm_data.TimezoneOffsetFromUTC = tz_offset
+        for tag, value in ({"RepetitionTime": 1000} | tags).items():
+            setattr(dcm_data, tag, value)
         out = outdir / f"f{i}.dcm"
         dcm.dcmwrite(str(out), dcm_data)
         dicom_list.append(str(out))

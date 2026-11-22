@@ -28,6 +28,7 @@ import numpy as np
 import pydicom as dcm
 
 from . import __version__, dicoms
+from .duration import get_acquisition_duration
 from .parser import find_files
 from .utils import (
     as_finite_positive_float,
@@ -78,9 +79,9 @@ SCANS_FILE_FIELDS = OrderedDict(
                     (
                         "Description",
                         "Wallclock duration of the scan, in seconds, from the "
-                        "onset of the first to the end of the last acquired "
+                        "onset of the first to the end of the last stored "
                         "volume or sample. Estimated from the DICOM headers "
-                        "(see heudiconv.dicoms.get_acquisition_duration) or, "
+                        "(see heudiconv.duration.get_acquisition_duration) or, "
                         "retrospectively, from the NIfTI/JSON sidecar. See also "
                         "https://github.com/bids-standard/bids-specification/pull/2508",
                     ),
@@ -700,7 +701,7 @@ def get_formatted_scans_key_row(
         timestamps = dicoms.get_acquisition_timestamps(dcm_fn_strs)
     dcm_data = dcm.dcmread(dcm_fn_strs[0], stop_before_pixels=True, force=True)
     acq_datetime = min(timestamps, default=None)
-    acq_duration = dicoms.get_acquisition_duration(dcm_fn_strs, timestamps)
+    acq_duration = get_acquisition_duration(dcm_fn_strs, timestamps)
     # add random string
     # But let's make it reproducible by using all UIDs
     # (might change across versions?)
@@ -883,7 +884,7 @@ def _duration_and_timestamps_from_dicom_tarball(
     with tempfile.TemporaryDirectory() as tmpdir:
         dicom_files = _extract_dicom_tarball(tarball, tmpdir)
         timestamps = dicoms.get_acquisition_timestamps(dicom_files)
-        return dicoms.get_acquisition_duration(dicom_files, timestamps), timestamps
+        return get_acquisition_duration(dicom_files, timestamps), timestamps
 
 
 def _format_duration(duration: float | None) -> str:
@@ -965,7 +966,7 @@ def _duration_from_nifti_sidecar(nifti_fn: str, bids_root: str) -> float | None:
 
     The sidecar (see :func:`_find_json_sidecar`) gives it via
     ``VolumeTiming`` or ``AcquisitionDuration``, or else it is TR x volumes.
-    Unlike with DICOMs (:func:`heudiconv.dicoms.get_acquisition_duration`)
+    Unlike with DICOMs (:func:`heudiconv.duration.get_acquisition_duration`)
     there are no timestamps to tell by whether ``AcquisitionDuration`` is of
     a truncated run, TR x volumes being no measure for many a sequence.
     """

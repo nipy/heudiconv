@@ -1,0 +1,5 @@
+========
+Duration
+========
+
+.. automodule:: heudiconv.duration

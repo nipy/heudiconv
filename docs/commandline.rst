@@ -15,8 +15,9 @@ Scan durations in ``_scans.tsv``
 ================================
 
 Upon conversion to BIDS, the ``duration`` column of each ``_scans.tsv`` gets
-the wallclock duration of the scan in seconds, and ``acq_time`` the time of its
-earliest DICOM.  To add ``duration`` to a dataset converted before that, run::
+the :doc:`duration of the stored data <duration>` in seconds, and ``acq_time``
+the time of its earliest DICOM.  To add ``duration`` to a dataset converted
+before that, run::
 
     heudiconv --command populate-scans-duration --files /path/to/bids
 
