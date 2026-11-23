@@ -476,8 +476,10 @@ def save_scans_key(
     ses: str | None = None
     for bids_file in bids_files:
         # get filenames
-        f_name = "/".join(bids_file.split("/")[-2:])
-        f_name = f_name.replace("json", "nii.gz")
+        nifti_file = remove_suffix(bids_file, ".json") + ".nii"
+        if not op.exists(nifti_file):
+            nifti_file += ".gz"
+        f_name = "/".join(Path(nifti_file).parts[-2:])
         rows[f_name] = get_formatted_scans_key_row(item[-1][0])
         subj_, ses_ = find_subj_ses(f_name)
         if not subj_:

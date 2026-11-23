@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Callable
+import csv
 from datetime import datetime, timedelta
 from glob import glob
 import itertools
@@ -35,6 +36,7 @@ from heudiconv.bids import (
     populate_aggregated_jsons,
     populate_intended_for,
     sanitize_label,
+    save_scans_key,
     select_fmap_from_compatible_groups,
     treat_age,
 )
@@ -65,6 +67,38 @@ def test_maybe_na() -> None:
         assert maybe_na(na) == "n/a"
     for notna in 0, 1, False, True, "value":
         assert maybe_na(notna) == str(notna)
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize("extension", ["nii", "nii.gz"])
+@pytest.mark.parametrize("session", [None, "01"])
+@pytest.mark.parametrize("subject", ["01", "json01"])
+def test_scans_key_uses_existing_nifti_extension(
+    tmp_path: Path, extension: str, session: str | None, subject: str
+) -> None:
+    subject_dir = tmp_path / f"sub-{subject}"
+    output_dir = subject_dir / f"ses-{session}" if session else subject_dir
+    anat_dir = output_dir / "anat"
+    anat_dir.mkdir(parents=True)
+    prefix = f"sub-{subject}" + (f"_ses-{session}" if session else "")
+    nifti = anat_dir / f"{prefix}_T1w.{extension}"
+    nifti.touch()
+    sidecar = anat_dir / f"{prefix}_T1w.json"
+    save_json(str(sidecar), {})
+    save_scans_key(
+        (
+            str(anat_dir / prefix),
+            (extension,),
+            [op.join(TESTS_DATA_PATH, "axasc35.dcm")],
+        ),
+        [sidecar.as_posix()],
+    )
+
+    with (output_dir / f"{prefix}_scans.tsv").open() as fp:
+        rows = list(csv.DictReader(fp, delimiter="\t"))
+    assert len(rows) == 1
+    assert rows[0]["filename"] == f"anat/{nifti.name}"
+    assert (output_dir / rows[0]["filename"]).is_file()
 
 
 def test_treat_age() -> None:
