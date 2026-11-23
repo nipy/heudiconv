@@ -874,16 +874,16 @@ def sanitize_str(value: str) -> str:
 
 def parse_series_spec(series_spec: str) -> dict[str, str]:
     """Parse protocol name according to our convention with minimal set of fixups"""
+    # leading or trailing spaces do not matter
+    series_spec = series_spec.strip(" ")
+
     # Since Yarik didn't know better place to put it in, but could migrate outside
     # at some point. TODO
     series_spec = series_spec.replace("anat_T1w", "anat-T1w")
     series_spec = series_spec.replace("hardi_64", "dwi_acq-hardi64")
-    series_spec = series_spec.replace("AAHead_Scout", "anat-scout")
+    series_spec = re.sub(r"AAHead_Scout(?:_+$)?", "anat-scout", series_spec)
 
     # Parse the name according to our convention/specification
-
-    # leading or trailing spaces do not matter
-    series_spec = series_spec.strip(" ")
 
     # Strip off leading CAPITALS: prefix to accommodate some reported usecases:
     # https://github.com/ReproNim/reproin/issues/14

@@ -177,6 +177,27 @@ def test_fixupsubjectid() -> None:
     assert fixup_subjectid("SID30") == "sid000030"
 
 
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "series_spec,extra",
+    [
+        ("AAHead_Scout", {}),
+        ("AAHead_Scout_", {}),
+        ("AAHead_Scout___", {}),
+        (" PREFIX:AAHead_Scout_  ", {}),
+        ("AAHead_Scout_acq-test", {"acq": "test"}),
+    ],
+)
+def test_parse_scout_trailing_underscores(
+    series_spec: str, extra: dict[str, str]
+) -> None:
+    assert parse_series_spec(series_spec) == {
+        "datatype": "anat",
+        "datatype_suffix": "scout",
+        **extra,
+    }
+
+
 def test_parse_series_spec() -> None:
     pdpn = parse_series_spec
 
