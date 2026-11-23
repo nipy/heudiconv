@@ -39,7 +39,7 @@ from heudiconv.bids import (
     treat_age,
 )
 from heudiconv.cli.run import main as runner
-from heudiconv.utils import Load, create_tree, load_json, remove_suffix, save_json
+from heudiconv.utils import Load, create_tree, load_json, save_json
 
 from .utils import TESTS_DATA_PATH, fetch_data, gen_heudiconv_args
 
@@ -114,19 +114,21 @@ def test_get_key_info_for_fmap_assignment(
     the seed for the random label creation.
     """
 
-    nifti_file = op.join(TESTS_DATA_PATH, "sample_nifti.nii.gz")
+    shutil.copyfile(
+        op.join(TESTS_DATA_PATH, "sample_nifti.nii.gz"),
+        tmp_path / "sample_nifti.nii.gz",
+    )
     # Get the expected parameters from the NIfTI header:
     MY_HEADER = nibabel.ni1.np.loadtxt(
-        op.join(TESTS_DATA_PATH, remove_suffix(nifti_file, ".nii.gz") + "_params.txt")
+        op.join(TESTS_DATA_PATH, "sample_nifti_params.txt")
     )
-    json_name = op.join(TESTS_DATA_PATH, remove_suffix(nifti_file, ".nii.gz") + ".json")
+    json_name = str(tmp_path / "sample_nifti.json")
 
     # 1) Call for a non-existing file should give an error:
     with pytest.raises(FileNotFoundError):
         assert get_key_info_for_fmap_assignment("foo.json", "ImagingVolume")
 
     # 2) matching_parameters = 'Shims'
-    json_name = op.join(TESTS_DATA_PATH, remove_suffix(nifti_file, ".nii.gz") + ".json")
     save_json(
         json_name, {SHIM_KEY: A_SHIM}
     )  # otherwise get_key_info_for_fmap_assignment will give an error
