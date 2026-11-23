@@ -1111,6 +1111,13 @@ class BIDSFile:
         self._suffix = suffix
         self._extension = extension
 
+    def __repr__(self) -> str:
+        """Return a constructor expression, including incomplete BIDS filenames."""
+        return (
+            f"{type(self).__name__}(entities={dict(self._entities)!r}, "
+            f"suffix={self.suffix!r}, extension={self.extension!r})"
+        )
+
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, self.__class__):
             return False
