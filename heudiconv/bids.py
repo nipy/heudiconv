@@ -316,9 +316,7 @@ def tuneup_bids_json_files(json_files: list[str]) -> None:
             # Let's hope no word 'Date' comes within a study name or smth like
             # that
             raise ValueError("There must be no dates in .json sidecar")
-        # Those files should not have our version field already - should have been
-        # freshly produced
-        assert HEUDICONV_VERSION_JSON_KEY not in json_
+        # A sidecar may be processed again, for example with --overwrite.
         json_[HEUDICONV_VERSION_JSON_KEY] = str(__version__)
         save_json(jsonfile, json_)
 
