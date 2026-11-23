@@ -110,6 +110,68 @@ def test_group_dicoms_into_seqinfos() -> None:
     ]
 
 
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "sop_class",
+    [dcm.uid.GrayscaleSoftcopyPresentationStateStorage, dcm.uid.RawDataStorage],
+)
+@pytest.mark.parametrize("non_image_first", [False, True])
+def test_non_image_dicom_does_not_hide_mr_series(
+    tmp_path: Path, sop_class: dcm.uid.UID, non_image_first: bool
+) -> None:
+    study_uid, series_uid = dcm.uid.generate_uid(), dcm.uid.generate_uid()
+
+    def write_dicom(
+        name: str, uid: dcm.uid.UID, slice_number: int | None = None
+    ) -> str:
+        path = tmp_path / name
+        meta = dcm.dataset.FileMetaDataset()
+        meta.MediaStorageSOPClassUID = uid
+        meta.MediaStorageSOPInstanceUID = dcm.uid.generate_uid()
+        meta.TransferSyntaxUID = dcm.uid.ExplicitVRLittleEndian
+        dataset = dcm.dataset.FileDataset(
+            str(path),
+            {},
+            file_meta=meta,
+            preamble=b"\0" * 128,
+            is_implicit_VR=False,
+            is_little_endian=True,
+        )
+        dataset.SOPClassUID = uid
+        dataset.SOPInstanceUID = meta.MediaStorageSOPInstanceUID
+        dataset.StudyInstanceUID = study_uid
+        dataset.SeriesInstanceUID = series_uid
+        dataset.SeriesNumber = 1401
+        dataset.ProtocolName = "DTI"
+        dataset.Modality = "MR"
+        if slice_number is not None:
+            dataset.InstanceNumber = slice_number + 1
+            dataset.Rows = dataset.Columns = 4
+            dataset.PixelSpacing = [1, 1]
+            dataset.SliceThickness = 1
+            dataset.ImageOrientationPatient = [1, 0, 0, 0, 1, 0]
+            dataset.ImagePositionPatient = [0, 0, float(slice_number)]
+            dataset.SamplesPerPixel = 1
+            dataset.PhotometricInterpretation = "MONOCHROME2"
+            dataset.BitsAllocated = dataset.BitsStored = 16
+            dataset.HighBit = 15
+            dataset.PixelRepresentation = 0
+            dataset.PixelData = b"\0\0" * 16
+        dataset.save_as(path)
+        return str(path)
+
+    images = [write_dicom(f"IM_{i}", dcm.uid.MRImageStorage, i) for i in range(3)]
+    non_image = write_dicom("NON_IMAGE", sop_class)
+    files = [non_image, *images] if non_image_first else [*images, non_image]
+    seqinfos = group_dicoms_into_seqinfos(files, "studyUID", flatten=True)
+
+    assert len(seqinfos) == 1
+    seqinfo, grouped_files = next(iter(seqinfos.items()))
+    assert seqinfo.series_id == "1401-DTI"
+    assert seqinfo.series_files == 3
+    assert grouped_files == images
+
+
 def test_custom_seqinfo() -> None:
     """Tests for custom seqinfo extraction"""
 
