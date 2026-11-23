@@ -113,7 +113,10 @@ def test_group_dicoms_into_seqinfos() -> None:
 @pytest.mark.ai_generated
 @pytest.mark.parametrize(
     "sop_class",
-    [dcm.uid.GrayscaleSoftcopyPresentationStateStorage, dcm.uid.RawDataStorage],
+    [
+        pytest.param(dcm.uid.UID("1.2.840.10008.5.1.4.1.1.11.1"), id="gsps"),
+        pytest.param(dcm.uid.UID("1.2.840.10008.5.1.4.1.1.66"), id="raw-data"),
+    ],
 )
 @pytest.mark.parametrize("non_image_first", [False, True])
 def test_non_image_dicom_does_not_hide_mr_series(
@@ -160,7 +163,8 @@ def test_non_image_dicom_does_not_hide_mr_series(
         dataset.save_as(path)
         return str(path)
 
-    images = [write_dicom(f"IM_{i}", dcm.uid.MRImageStorage, i) for i in range(3)]
+    mr_image_storage = dcm.uid.UID("1.2.840.10008.5.1.4.1.1.4")
+    images = [write_dicom(f"IM_{i}", mr_image_storage, i) for i in range(3)]
     non_image = write_dicom("NON_IMAGE", sop_class)
     files = [non_image, *images] if non_image_first else [*images, non_image]
     seqinfos = group_dicoms_into_seqinfos(files, "studyUID", flatten=True)

@@ -213,8 +213,8 @@ def validate_dicom(
         lgr.warning("Ignoring %s because of DICOM filter", fl)
         return None
     if mw.dcm_data[0x0008, 0x0016].value in (
-        dcm.uid.RawDataStorage,
-        dcm.uid.GrayscaleSoftcopyPresentationStateStorage,
+        "1.2.840.10008.5.1.4.1.1.66",  # Raw Data Storage
+        "1.2.840.10008.5.1.4.1.1.11.1",  # Grayscale Softcopy Presentation State Storage
     ):
         return None
     try:
