@@ -69,7 +69,7 @@ What the rules are based on
 ===========================
 
 They were arrived at, and are checked, on the 404 series (36,768 DICOMs) of
-the 51 ``dcm_qa*`` collections at https://github.com/neurolabusc (see `Li et
+39 of the ``dcm_qa*`` collections at https://github.com/neurolabusc (see `Li et
 al., 2025 <https://doi.org/10.1038/s41597-025-05503-w>`_).  What
 :mod:`heudiconv.duration` goes by for each of those series, and what it
 gives, is recorded in ``heudiconv/tests/data/dcm_qa_durations.json``, which
