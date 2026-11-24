@@ -23,6 +23,7 @@ from .bids import (
     BIDSFile,
     add_participant_record,
     populate_bids_templates,
+    populate_events_template,
     populate_intended_for,
     sanitize_label,
     save_scans_key,
@@ -727,6 +728,9 @@ def convert(
                         save_scans_key(item, bids_outfiles)
                     # Fix up and unify BIDS files
                     tuneup_bids_json_files(bids_outfiles)
+                    if bids_options is not None:
+                        for jsonfile in bids_outfiles:
+                            populate_events_template(jsonfile, outdir)
 
                     if prov_file:
                         prov_files.append(prov_file)

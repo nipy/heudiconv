@@ -32,7 +32,7 @@ from heudiconv.bids import (
     get_key_info_for_fmap_assignment,
     get_shim_setting,
     maybe_na,
-    populate_aggregated_jsons,
+    populate_events_template,
     populate_intended_for,
     sanitize_label,
     select_fmap_from_compatible_groups,
@@ -1589,7 +1589,7 @@ def test_BIDSFile() -> None:
 
 
 @pytest.mark.ai_generated
-def test_populate_aggregated_jsons_events(tmp_path: Path) -> None:
+def test_populate_events_template_shared_entities(tmp_path: Path) -> None:
     """A single _events.tsv is generated for files differing only in
     entities the events are independent of ('chunk', 'echo', and 'part')"""
     func_path = tmp_path / "sub-01" / "func"
@@ -1609,7 +1609,8 @@ def test_populate_aggregated_jsons_events(tmp_path: Path) -> None:
         },
     )
 
-    populate_aggregated_jsons(str(tmp_path))
+    for jsonfile in func_path.glob("*_bold.json"):
+        populate_events_template(str(jsonfile), str(tmp_path))
 
     events_files = sorted(func_path.glob("*_events.tsv"))
     assert events_files == [func_path / "sub-01_task-rest_events.tsv"]
