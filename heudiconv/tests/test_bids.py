@@ -1508,6 +1508,26 @@ def test_populate_intended_for(
                 assert "IntendedFor" not in data.keys()
 
 
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "entities,suffix,extension",
+    [
+        ({"sub": "01", "ses": "02", "run": "03"}, "func", "nii.gz"),
+        ({"dir": "reversed"}, "", "json"),
+        ({"sub": "it's\\a-label"}, "T1w", None),
+        ({}, "", None),
+    ],
+)
+def test_BIDSFile_repr(
+    entities: dict[str, str], suffix: str, extension: str | None
+) -> None:
+    bids_file = BIDSFile(entities, suffix, extension)
+    representation = repr(bids_file)
+    assert representation.startswith("BIDSFile(entities=")
+    restored = eval(representation, {"BIDSFile": BIDSFile})
+    assert restored == bids_file
+
+
 def test_BIDSFile() -> None:
     """Tests for the BIDSFile class"""
 
