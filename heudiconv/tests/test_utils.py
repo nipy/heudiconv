@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 from json.decoder import JSONDecodeError
 import logging
@@ -21,6 +21,7 @@ from heudiconv.utils import (
     json_dumps_pretty,
     load_heuristic,
     load_json,
+    naive_if_mixed_tz,
     remove_prefix,
     remove_suffix,
     sanitize_path,
@@ -323,3 +324,24 @@ def test_sanitize_path_invalid(
     assert value in msg
     assert target in msg
     assert "contained problematic character(s)" in msg
+
+
+_NAIVE = datetime(2020, 1, 1, 12)
+_AWARE = _NAIVE.replace(tzinfo=timezone.utc)
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "datetimes,mixed",
+    [
+        ([], False),
+        ([_NAIVE], False),
+        ([_AWARE, _AWARE], False),
+        ([_NAIVE, _AWARE], True),
+    ],
+)
+def test_naive_if_mixed_tz(datetimes: list[datetime], mixed: bool) -> None:
+    result = naive_if_mixed_tz(datetimes)
+    # callers tell by identity whether anything had to be done
+    assert (result is not datetimes) == mixed
+    assert result == ([_NAIVE, _NAIVE] if mixed else datetimes)

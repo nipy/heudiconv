@@ -20,6 +20,7 @@ from .utils import (
     TempDirs,
     get_typed_attr,
     load_json,
+    naive_if_mixed_tz,
     set_readonly,
     strptime_dcm_da_tm,
     strptime_dcm_dt,
@@ -574,16 +575,33 @@ def get_datetime_from_dcm(dcm_data: dcm.Dataset) -> datetime.datetime | None:
 
     """
 
-    def check_tag(x: str) -> bool:
-        return x in dcm_data and dcm_data[x].value.strip()
+    return _get_datetime_and_is_series_level(dcm_data)[0]
 
-    if check_tag("AcquisitionDate") and check_tag("AcquisitionTime"):
-        return strptime_dcm_da_tm(dcm_data, "AcquisitionDate", "AcquisitionTime")
-    if check_tag("AcquisitionDateTime"):
-        return strptime_dcm_dt(dcm_data, "AcquisitionDateTime")
-    if check_tag("SeriesDate") and check_tag("SeriesTime"):
-        return strptime_dcm_da_tm(dcm_data, "SeriesDate", "SeriesTime")
-    return None
+
+def _get_datetime_and_is_series_level(
+    dcm_data: dcm.Dataset,
+) -> tuple[datetime.datetime | None, bool]:
+    """:func:`get_datetime_from_dcm` and whether it had to resort to the series' time."""
+    if _has_value(dcm_data, "AcquisitionDate", "AcquisitionTime"):
+        return (
+            strptime_dcm_da_tm(dcm_data, "AcquisitionDate", "AcquisitionTime"),
+            False,
+        )
+    if _has_value(dcm_data, "AcquisitionDateTime"):
+        return strptime_dcm_dt(dcm_data, "AcquisitionDateTime"), False
+    if _has_value(dcm_data, "SeriesDate", "SeriesTime"):
+        return strptime_dcm_da_tm(dcm_data, "SeriesDate", "SeriesTime"), True
+    return None, False
+
+
+def _has_value(dcm_data: dcm.Dataset, *tags: str) -> bool:
+    """Return True if all `tags` are present in `dcm_data` with non-blank values."""
+    return all(
+        tag in dcm_data
+        and dcm_data[tag].value is not None
+        and str(dcm_data[tag].value).strip()
+        for tag in tags
+    )
 
 
 def get_datetime_strings_from_dcm(
@@ -616,6 +634,88 @@ def get_datetime_strings_from_dcm(
         # nothing better to offer -- return whatever (if anything) we had
         return (str(date) if date else None, str(time) if time else None)
     return datetime_.strftime("%Y%m%d"), datetime_.strftime("%H%M%S.%f")
+
+
+class FileTiming(NamedTuple):
+    """When, and as which volume, the data of a DICOM file got acquired."""
+
+    time: datetime.datetime
+    #: AcquisitionNumber, which numbers the volumes of a Siemens series
+    acquisition_number: int | None
+    #: TemporalPositionIdentifier, which does so e.g. for Philips
+    temporal_position: int | None
+
+
+# what get_file_timings() needs -- parsing only these is meaningfully faster
+# than a full header parse when scanning every file of a (possibly large) run
+_TIMING_TAGS = [
+    "AcquisitionDate",
+    "AcquisitionTime",
+    "AcquisitionDateTime",
+    "SeriesDate",
+    "SeriesTime",
+    # makes the datetimes timezone-aware, so they must be read consistently
+    "TimezoneOffsetFromUTC",
+    "AcquisitionNumber",
+    "TemporalPositionIdentifier",
+]
+
+
+def get_file_timings(dicom_list: list[str]) -> list[FileTiming]:
+    """Return the timings of the files in `dicom_list`, in a single pass.
+
+    In `dicom_list` order, with times as established by
+    :func:`get_datetime_from_dcm`, skipping files without a (parseable)
+    date/time.  Files which only have the series' (start) date/time are
+    skipped too, unless no file has an acquisition date/time.
+    """
+    timings: list[FileTiming] = []
+    series_timings: list[FileTiming] = []
+    unparsable = []
+    for fn in dicom_list:
+        dcm_data = dcm.dcmread(
+            fn, stop_before_pixels=True, force=True, specific_tags=_TIMING_TAGS
+        )
+        try:
+            dt, is_series_level = _get_datetime_and_is_series_level(dcm_data)
+        except ValueError as exc:
+            unparsable.append(f"{fn}: {exc}")
+            continue
+        if dt is not None:
+            (series_timings if is_series_level else timings).append(
+                FileTiming(
+                    dt,
+                    get_typed_attr(dcm_data, "AcquisitionNumber", int),
+                    get_typed_attr(dcm_data, "TemporalPositionIdentifier", int),
+                )
+            )
+    if unparsable:
+        lgr.warning(
+            "Failed to parse the acquisition datetime of %d of %d files, "
+            "the first being %s",
+            len(unparsable),
+            len(dicom_list),
+            unparsable[0],
+        )
+    if timings and series_timings:
+        lgr.debug(
+            "Ignoring %d file(s) with only the series' date/time among %d "
+            "with an acquisition date/time",
+            len(series_timings),
+            len(timings),
+        )
+    result = timings or series_timings
+    times = [timing.time for timing in result]
+    comparable = naive_if_mixed_tz(times)
+    if comparable is not times:
+        lgr.warning(
+            "Only some of %d files have a timezone-aware acquisition "
+            "timestamp (DICOM TimezoneOffsetFromUTC present on some but "
+            "not others) -- comparing all of them as timezone-naive",
+            len(result),
+        )
+        result = [t._replace(time=time) for t, time in zip(result, comparable)]
+    return result
 
 
 def compress_dicoms(
@@ -847,6 +947,26 @@ def embed_metadata_from_dicoms(
         os.chdir(cwd)
 
 
+def parse_private_csa_protocol(dcm_data: dcm.dataset.Dataset) -> dict[str, Any]:
+    """Protocol (MrPhoenixProtocol) of the CSA header of a Siemens DICOM.
+
+    Empty if there is none, or it cannot be parsed.
+    """
+    import dcmstack.extract as dsextract
+    from nibabel.nicom import csareader
+
+    try:
+        # TODO: test with attr besides ProtocolName
+        csastr = csareader.get_csa_header(dcm_data, "series")["tags"][
+            "MrPhoenixProtocol"
+        ]["items"][0]
+        csastr = csastr.replace("### ASCCONV BEGIN", "### ASCCONV BEGIN ### ")
+        return dict(dsextract.parse_phoenix_prot("MrPhoenixProtocol", csastr))
+    except Exception as e:
+        lgr.debug("Failed to parse CSA header: %s", str(e))
+        return {}
+
+
 def parse_private_csa_header(
     dcm_data: dcm.dataset.Dataset,
     _public_attr: str,
@@ -873,19 +993,9 @@ def parse_private_csa_header(
         private attribute value or default
     """
     # TODO: provide mapping to private_attr from public_attr
-    import dcmstack.extract as dsextract
-    from nibabel.nicom import csareader
-
     try:
-        # TODO: test with attr besides ProtocolName
-        csastr = csareader.get_csa_header(dcm_data, "series")["tags"][
-            "MrPhoenixProtocol"
-        ]["items"][0]
-        csastr = csastr.replace("### ASCCONV BEGIN", "### ASCCONV BEGIN ### ")
-        parsedhdr = dsextract.parse_phoenix_prot("MrPhoenixProtocol", csastr)
-        val = parsedhdr[private_attr].replace(" ", "")
-    except Exception as e:
-        lgr.debug("Failed to parse CSA header: %s", str(e))
+        val = str(parse_private_csa_protocol(dcm_data)[private_attr]).replace(" ", "")
+    except KeyError:
         val = default or ""
     assert isinstance(val, str)
     return val

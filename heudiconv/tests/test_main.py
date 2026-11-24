@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+from glob import glob
 from io import StringIO
 import logging
 import os
@@ -22,11 +23,12 @@ from heudiconv.bids import (
     populate_bids_templates,
 )
 from heudiconv.cli.run import main as runner
+from heudiconv.duration import Duration
 from heudiconv.external.dlad import MIN_VERSION, add_to_datalad
 from heudiconv.main import process_extra_commands, workflow
 from heudiconv.utils import create_file_if_missing, is_readonly, load_json, set_readonly
 
-from .utils import TESTS_DATA_PATH
+from .utils import TESTS_DATA_PATH, make_timed_dicoms
 
 
 @patch("sys.stdout", new_callable=StringIO)
@@ -197,6 +199,10 @@ def test_prepare_for_datalad(tmp_path: Path) -> None:
     assert ".heudiconv/dummy.nii.gz" not in ds.repo.get_files()
 
 
+@patch(
+    "heudiconv.duration.from_dicoms",
+    lambda *args: Duration(float(len(args[0])), "number of DICOMs"),
+)
 def test_get_formatted_scans_key_row() -> None:
     dcm_fn = (
         "%s/01-fmap_acq-3mm/1.3.12.2.1107.5.2.43.66112.2016101409263663466202201.dcm"
@@ -204,14 +210,16 @@ def test_get_formatted_scans_key_row() -> None:
     )
 
     row1 = get_formatted_scans_key_row(dcm_fn)
-    assert len(row1) == 3
+    assert len(row1) == 5
     assert row1[0] == "2016-10-14T09:26:34.692500"
-    assert row1[1] == "n/a"
-    prandstr1 = row1[2]
+    # as heudiconv.duration establishes it, here per the patch above
+    assert row1[1:3] == ["1.000", "number of DICOMs"]
+    assert row1[3] == "n/a"
+    prandstr1 = row1[4]
 
     # if we rerun - should be identical!
     row2 = get_formatted_scans_key_row(dcm_fn)
-    prandstr2 = row2[2]
+    prandstr2 = row2[4]
     assert prandstr1 == prandstr2
     assert row1 == row2
     # So it is consistent across pythons etc, we use explicit value here
@@ -220,19 +228,36 @@ def test_get_formatted_scans_key_row() -> None:
     # but the prandstr should change when we consider another DICOM file
     row3 = get_formatted_scans_key_row("%s/01-anat-scout/0001.dcm" % TESTS_DATA_PATH)
     assert row3 != row1
-    prandstr3 = row3[2]
+    prandstr3 = row3[4]
     assert prandstr1 != prandstr3
     assert prandstr3 == "fae3befb"
+
+    # it goes by all the DICOMs given
+    dicom_list = sorted(glob("%s/b0dwiForFmap/*.dcm" % TESTS_DATA_PATH))
+    assert get_formatted_scans_key_row(dicom_list)[1] == "3.000"
+
+
+@pytest.mark.ai_generated
+def test_get_formatted_scans_key_row_acq_time_is_earliest_timestamp(
+    tmp_path: Path,
+) -> None:
+    # https://github.com/nipy/heudiconv/issues/876: the first file is not
+    # necessarily the earliest acquired, e.g. interleaved multiband slices
+    dicom_list = make_timed_dicoms(tmp_path, [2, 0, 4, 7])
+    assert get_formatted_scans_key_row(dicom_list)[0] == "2020-01-01T12:00:00"
 
 
 # TODO: finish this
 def test_add_rows_to_scans_keys_file(tmp_path: Path) -> None:
     fn = opj(tmp_path, "file.tsv")
     rows = {
-        "my_file.nii.gz": ["2016adsfasd", "", "fasadfasdf"],
-        "another_file.nii.gz": ["2018xxxxx", "", "fasadfasdf"],
+        "my_file.nii.gz": ["2016adsfasd", "1.500", "dicom-tag", "", "fasadfasdf"],
+        "another_file.nii.gz": ["2018xxxxx", "n/a", "n/a", "", "fasadfasdf"],
     }
     add_rows_to_scans_keys_file(fn, rows)
+    # not e.g. the owner-only permissions of a temporary file
+    (tmp_path / "plain").touch()
+    assert os.stat(fn).st_mode == os.stat(tmp_path / "plain").st_mode
 
     def _check_rows(fn: str, rows: dict[str, list[str]]) -> None:
         with open(fn, "r") as csvfile:
@@ -242,7 +267,14 @@ def test_add_rows_to_scans_keys_file(tmp_path: Path) -> None:
                 rows_loaded.append(row)
         for i, row_ in enumerate(rows_loaded):
             if i == 0:
-                assert row_ == ["filename", "acq_time", "operator", "randstr"]
+                assert row_ == [
+                    "filename",
+                    "acq_time",
+                    "duration",
+                    "duration_source",
+                    "operator",
+                    "randstr",
+                ]
             else:
                 assert rows[row_[0]] == row_[1:]
         # dates, filename should be sorted (date "first", filename "second")
@@ -255,12 +287,104 @@ def test_add_rows_to_scans_keys_file(tmp_path: Path) -> None:
     assert not op.exists(opj(tmp_path, "file.json"))
     # add a new one
     extra_rows = {
-        "a_new_file.nii.gz": ["2016adsfasd23", "", "fasadfasdf"],
-        "my_file.nii.gz": ["2016adsfasd", "", "fasadfasdf"],
-        "another_file.nii.gz": ["2018xxxxx", "", "fasadfasdf"],
+        "a_new_file.nii.gz": ["2016adsfasd23", "n/a", "n/a", "", "fasadfasdf"],
+        "my_file.nii.gz": ["2016adsfasd", "1.500", "dicom-tag", "", "fasadfasdf"],
+        "another_file.nii.gz": ["2018xxxxx", "n/a", "n/a", "", "fasadfasdf"],
     }
     add_rows_to_scans_keys_file(fn, extra_rows)
     _check_rows(fn, extra_rows)
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "existing,encoding,expected",
+    [
+        pytest.param(
+            # as written before 'duration' was introduced: values must stay
+            # under their own columns
+            [
+                "filename\tacq_time\toperator\trandstr",
+                "old.nii.gz\t2016\tDr. Old\told1",
+            ],
+            "utf-8",
+            [
+                "filename\tacq_time\tduration\tduration_source\toperator\trandstr",
+                "old.nii.gz\t2016\tn/a\tn/a\tDr. Old\told1",
+                "redone.nii.gz\t2017b\t2.000\tdicom-tag\tDr. New\tnew2",
+                "new.nii.gz\t2018\t1.500\tvolume-onsets\t\tnew1",
+            ],
+            id="older-header",
+        ),
+        pytest.param(
+            # BIDS allows custom columns, which must survive adding a row
+            # and refreshing one (e.g. re-converted with --overwrite)
+            [
+                "filename\tacq_time\toperator\trandstr\tnotes",
+                "old.nii.gz\t2016\tDr. Old\told1\thand-added",
+                "redone.nii.gz\t2017a\tDr. Old\told2\tkeep me",
+            ],
+            "utf-8",
+            [
+                "filename\tacq_time\tduration\tduration_source\toperator\trandstr\tnotes",
+                "old.nii.gz\t2016\tn/a\tn/a\tDr. Old\told1\thand-added",
+                "redone.nii.gz\t2017b\t2.000\tdicom-tag\tDr. New\tnew2\tkeep me",
+                "new.nii.gz\t2018\t1.500\tvolume-onsets\t\tnew1\tn/a",
+            ],
+            id="custom-column",
+        ),
+        pytest.param(
+            # a byte-order mark, as seen on OpenNeuro (e.g. edited with
+            # Excel), must not stick to the name of the "filename" column
+            ["filename\tacq_time", "old.nii.gz\t2016"],
+            "utf-8-sig",
+            [
+                "filename\tacq_time\tduration\tduration_source\toperator\trandstr",
+                "old.nii.gz\t2016\tn/a\tn/a\tn/a\tn/a",
+                "redone.nii.gz\t2017b\t2.000\tdicom-tag\tDr. New\tnew2",
+                "new.nii.gz\t2018\t1.500\tvolume-onsets\t\tnew1",
+            ],
+            id="byte-order-mark",
+        ),
+        pytest.param(
+            # rows are sorted by acq_time, wherever that column is
+            ["filename\tnotes\tacq_time", "old.nii.gz\tn\t2019"],
+            "utf-8",
+            [
+                "filename\tnotes\tacq_time\tduration\tduration_source\toperator\trandstr",
+                "redone.nii.gz\tn/a\t2017b\t2.000\tdicom-tag\tDr. New\tnew2",
+                "new.nii.gz\tn/a\t2018\t1.500\tvolume-onsets\t\tnew1",
+                "old.nii.gz\tn\t2019\tn/a\tn/a\tn/a\tn/a",
+            ],
+            id="acq_time-after-custom-column",
+        ),
+        pytest.param(
+            # fields beyond the header (e.g. a trailing tab) are not lost
+            ["filename\tacq_time", "old.nii.gz\t2016\tstray\t"],
+            "utf-8",
+            [
+                "filename\tacq_time\tduration\tduration_source\toperator\trandstr",
+                "old.nii.gz\t2016\tn/a\tn/a\tn/a\tn/a\tstray\t",
+                "redone.nii.gz\t2017b\t2.000\tdicom-tag\tDr. New\tnew2",
+                "new.nii.gz\t2018\t1.500\tvolume-onsets\t\tnew1",
+            ],
+            id="fields-beyond-header",
+        ),
+    ],
+)
+def test_add_rows_to_existing_scans_keys_file(
+    tmp_path: Path, existing: list[str], encoding: str, expected: list[str]
+) -> None:
+    fn = tmp_path / "file.tsv"
+    fn.write_text("\n".join(existing) + "\n", encoding=encoding)
+    add_rows_to_scans_keys_file(
+        str(fn),
+        {
+            "new.nii.gz": ["2018", "1.500", "volume-onsets", "", "new1"],
+            "redone.nii.gz": ["2017b", "2.000", "dicom-tag", "Dr. New", "new2"],
+        },
+    )
+    assert fn.read_text().splitlines() == expected
+    assert os.listdir(tmp_path) == ["file.tsv"]  # no temporary file left
 
 
 def test__find_subj_ses() -> None:

@@ -5,7 +5,9 @@ from __future__ import annotations
 __docformat__ = "numpy"
 
 from collections import OrderedDict
+from collections.abc import Sequence
 import csv
+import datetime
 import errno
 from glob import glob
 import hashlib
@@ -14,28 +16,43 @@ import os
 import os.path as op
 from pathlib import Path
 import re
+import shutil
+import tarfile
+import tempfile
 from typing import Any
 import warnings
 
+from nibabel.filename_parser import splitext_addext
 import numpy as np
 import pydicom as dcm
 
-from . import __version__, dicoms
+from . import __version__, dicoms, duration
 from .parser import find_files
 from .utils import (
     create_file_if_missing,
     is_readonly,
-    json_dumps,
     load_json,
+    naive_if_mixed_tz,
     remove_prefix,
     remove_suffix,
     save_json,
     set_readonly,
+    strptime,
     strptime_bids,
     update_json,
 )
 
 lgr = logging.getLogger(__name__)
+
+# How far apart two acquisition times of the same run (e.g. `acq_time` and
+# dcm2niix's sidecar AcquisitionTime) may be and still be considered the
+# same: DICOM TM carries microseconds, but dcm2niix goes through a double
+# when printing its AcquisitionTime, so allow for rounding
+ACQ_TIME_TOLERANCE = datetime.timedelta(milliseconds=1)
+
+# beyond this, an acq_time/DICOM gap looks like deliberately shifted
+# (anonymized) dates rather than the interleaved-slice bias we target
+ACQ_TIME_DATE_SHIFT_THRESHOLD = datetime.timedelta(hours=12)
 
 # Fields to be populated in _scans files. Order matters
 SCANS_FILE_FIELDS = OrderedDict(
@@ -50,6 +67,7 @@ SCANS_FILE_FIELDS = OrderedDict(
                 ]
             ),
         ),
+        *duration.SCANS_FIELDS.items(),
         ("operator", OrderedDict([("Description", "Name of the operator")])),
         (
             "randstr",
@@ -197,9 +215,7 @@ def populate_bids_templates(path: str, defaults: dict[str, Any] | None = None) -
         # TODO: get from schema
         glob_suffixes=[".md", ".txt", ".rst", ""],
     )
-    create_file_if_missing(
-        op.join(path, "scans.json"), json_dumps(SCANS_FILE_FIELDS, sort_keys=False)
-    )
+    _ensure_scans_json(op.join(path, "scans.json"))
     create_file_if_missing(op.join(path, ".bidsignore"), ".duecredit.p")
     if op.lexists(op.join(path, ".git")):
         create_file_if_missing(op.join(path, ".gitignore"), ".duecredit.p")
@@ -320,7 +336,7 @@ def tuneup_bids_json_files(json_files: list[str]) -> None:
         # freshly produced
         assert HEUDICONV_VERSION_JSON_KEY not in json_
         json_[HEUDICONV_VERSION_JSON_KEY] = str(__version__)
-        save_json(jsonfile, json_)
+        save_json(jsonfile, json_, pretty=True)
 
     # Load the beast
     seqtype = op.basename(op.dirname(jsonfile))
@@ -348,12 +364,7 @@ def tuneup_bids_json_files(json_files: list[str]) -> None:
                     lgr.error("Failed to open magnitude file: %s", exc)
             # might have been made R/O already, but if not -- it will be set
             # only later in the pipeline, so we must not make it read-only yet
-            was_readonly = is_readonly(json_phasediffname)
-            if was_readonly:
-                set_readonly(json_phasediffname, False)
-            save_json(json_phasediffname, json_)
-            if was_readonly:
-                set_readonly(json_phasediffname)
+            _save_json_keeping_readonly(json_phasediffname, json_, pretty=True)
 
 
 def add_participant_record(
@@ -474,11 +485,15 @@ def save_scans_key(
     # as I see it, so should have the same subject/session
     subj: str | None = None
     ses: str | None = None
+    # all bids_files of this item share the same source DICOMs, hence the row
+    timings = dicoms.get_file_timings(item[-1])
+    timestamps = [timing.time for timing in timings]
+    scan_key_row = get_formatted_scans_key_row(item[-1], timings)
     for bids_file in bids_files:
         # get filenames
         f_name = "/".join(bids_file.split("/")[-2:])
         f_name = f_name.replace("json", "nii.gz")
-        rows[f_name] = get_formatted_scans_key_row(item[-1][0])
+        rows[f_name] = scan_key_row
         subj_, ses_ = find_subj_ses(f_name)
         if not subj_:
             lgr.warning(
@@ -499,6 +514,17 @@ def save_scans_key(
                 % (ses, ses_, f_name)
             )
         ses = ses_
+    try:
+        check_acq_time_congruency(
+            min(timestamps, default=None),
+            [f for f in bids_files if f.endswith(".json")],
+            label=op.basename(item[0]),
+            timestamps=timestamps,
+            fix=True,
+        )
+    except (OSError, ValueError) as exc:
+        # an unreadable sidecar is not worth aborting the conversion for
+        lgr.warning("Failed to check acq_time of %s: %s", item[0], exc)
     # where should we store it?
     output_dir = op.dirname(op.dirname(bids_file))
     # save
@@ -508,62 +534,154 @@ def save_scans_key(
     )
 
 
+def _save_json_keeping_readonly(json_file: str, data: Any, **kwargs: Any) -> None:
+    """:func:`save_json`, which replaces `json_file`, keeping it read-only if it was."""
+    was_readonly = op.exists(json_file) and is_readonly(json_file)
+    save_json(json_file, data, **kwargs)
+    if was_readonly:
+        set_readonly(json_file)
+
+
+def _ensure_scans_json(scans_json: str) -> None:
+    """Create `scans_json`, or add the ``SCANS_FILE_FIELDS`` keys it is missing.
+
+    Anything else in an existing one, e.g. user-defined keys, is left
+    untouched, and so is one without content (e.g. annexed and not present).
+    """
+    if op.islink(scans_json) and not op.exists(scans_json):
+        return
+    meta = load_json(scans_json) if op.exists(scans_json) else {}
+    if not isinstance(meta, dict):
+        raise ValueError(f"{scans_json} does not contain a JSON object")
+    missing = {k: v for k, v in SCANS_FILE_FIELDS.items() if k not in meta}
+    if missing:
+        _save_json_keeping_readonly(scans_json, {**meta, **missing}, sort_keys=False)
+
+
+def _merge_scans_header(existing_header: list[str], additions: list[str]) -> list[str]:
+    """Extend `existing_header` with whichever of `additions` it is missing.
+
+    Every existing column is kept (BIDS allows custom ones), and a missing
+    one goes right after the one preceding it in `additions`, so e.g. a new
+    "duration" lands next to "acq_time".
+
+    >>> _merge_scans_header(["filename", "acq_time", "custom"], ["acq_time", "duration"])
+    ['filename', 'acq_time', 'duration', 'custom']
+    """
+    merged = list(existing_header)
+    for previous, column in zip([None, *additions], additions):
+        if column not in merged:
+            at = merged.index(previous) + 1 if previous in merged else len(merged)
+            merged.insert(at, column)
+    return merged
+
+
+# a row of a `_scans.tsv`: its fields by column name, a missing one being
+# None, and any beyond the header listed under the key None
+_ScansRow = dict[Any, Any]
+
+
+def _read_scans_tsv(scans_tsv: str) -> tuple[list[str], list[_ScansRow]]:
+    """Read a `_scans.tsv` file into (fieldnames, rows)."""
+    with open(scans_tsv, newline="", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        return list(reader.fieldnames or []), list(reader)
+
+
+def _write_scans_tsv(
+    scans_tsv: str, fieldnames: list[str], rows: list[_ScansRow]
+) -> None:
+    """(Re)write `scans_tsv` atomically, keeping the permissions of an existing one.
+
+    Replacing the directory entry also works for a read-only file or a
+    symlink into git-annex, and leaves the original intact on failure.
+    """
+    tmp = f"{scans_tsv}.{os.getpid()}.tmp"
+    # not mkstemp(), which would not give a new file its umask-default mode
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o666)
+    try:
+        with os.fdopen(fd, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f, delimiter="\t")
+            writer.writerow(fieldnames)
+            writer.writerows(
+                ["n/a" if row.get(k) is None else row[k] for k in fieldnames]
+                + row.get(None, [])
+                for row in rows
+            )
+        if op.exists(scans_tsv):
+            shutil.copymode(scans_tsv, tmp)
+        os.replace(tmp, scans_tsv)
+    finally:
+        Path(tmp).unlink(missing_ok=True)
+
+
 def add_rows_to_scans_keys_file(fn: str, newrows: dict[str, list[str]]) -> None:
-    """Add new rows to the _scans file.
+    """Add or refresh rows in the _scans file.
 
     Parameters
     ----------
     fn: str
       filename
     newrows: dict
-      extra rows to add (acquisition time, referring physician, random string)
+      rows to add or, for a file already in `fn` (e.g. re-converted with
+      `--overwrite`), update (acquisition time, duration, referring
+      physician, random string), in the order of ``SCANS_FILE_FIELDS``
+      (excluding "filename")
     """
-    if op.lexists(fn):
-        with open(fn, "r") as csvfile:
-            reader = csv.reader(csvfile, delimiter="\t")
-            existing_rows = [row for row in reader]
-        # skip header
-        fnames2info = {row[0]: row[1:] for row in existing_rows[1:]}
-
-        newrows_key = newrows.keys()
-        newrows_toadd = list(set(newrows_key) - set(fnames2info.keys()))
-        for key_toadd in newrows_toadd:
-            fnames2info[key_toadd] = newrows[key_toadd]
-        # remove
-        os.unlink(fn)
-    else:
-        fnames2info = newrows
-
-    header = list(SCANS_FILE_FIELDS.keys())
-    # prepare all the data rows
-    data_rows = [[k] + v for k, v in fnames2info.items()]
+    canonical = list(SCANS_FILE_FIELDS.keys())
+    header, rows = _read_scans_tsv(fn) if op.lexists(fn) else ([], [])
+    # values are matched to columns by name, so that a file written by an
+    # older heudiconv (e.g. without "duration") or with extra (e.g.
+    # user-added) columns keeps every value under its own column
+    header = _merge_scans_header(header or canonical, canonical)
+    fnames2info = {row["filename"]: row for row in rows if row.get("filename")}
+    for filename, values in newrows.items():
+        fnames2info.setdefault(filename, {"filename": filename}).update(
+            zip(canonical[1:], values, strict=True)
+        )
     # sort by the date/filename
-    try:
-        data_rows_sorted = sorted(data_rows, key=lambda x: (x[1], x[0]))
-    except TypeError as exc:
-        lgr.warning("Sorting scans by date failed: %s", str(exc))
-        data_rows_sorted = sorted(data_rows)
-    # save
-    with open(fn, "a") as csvfile:
-        writer = csv.writer(csvfile, delimiter="\t")
-        writer.writerows([header] + data_rows_sorted)
+    _write_scans_tsv(
+        fn,
+        header,
+        sorted(
+            fnames2info.values(),
+            key=lambda row: (row.get("acq_time") or "n/a", row["filename"]),
+        ),
+    )
 
 
-def get_formatted_scans_key_row(dcm_fn: str | Path) -> list[str]:
-    """
+def get_formatted_scans_key_row(
+    dcm_fns: str | Path | Sequence[str | Path],
+    timings: list[dicoms.FileTiming] | None = None,
+) -> list[str]:
+    """Build a `_scans.tsv` data row for one converted item.
+
     Parameters
     ----------
-    dcm_fn: str
+    dcm_fns: str or Path, or sequence of str or Path
+        A single representative DICOM, or -- preferably -- every DICOM of
+        the run: `acq_time` is the earliest acquisition time among them
+        (https://github.com/nipy/heudiconv/issues/876), and `duration` is
+        as :mod:`heudiconv.duration` establishes it from them.
+    timings: list of FileTiming, optional
+        What :func:`heudiconv.dicoms.get_file_timings` returns for
+        `dcm_fns`, if already at hand.
 
     Returns
     -------
     row: list
-        [ISO acquisition time, performing physician name, random string]
-
+        [ISO acquisition time, duration in seconds (or 'n/a'), what the
+        duration is from (or 'n/a'), performing physician name, random string]
     """
-    dcm_data = dcm.dcmread(dcm_fn, stop_before_pixels=True, force=True)
-    # we need to store filenames and acquisition datetimes
-    acq_datetime = dicoms.get_datetime_from_dcm(dcm_data=dcm_data)
+    if isinstance(dcm_fns, (str, Path)):
+        dcm_fns = [dcm_fns]
+    dcm_fn_strs: list[str] = [str(f) for f in dcm_fns]
+    if timings is None:
+        timings = dicoms.get_file_timings(dcm_fn_strs)
+    dcm_data = dcm.dcmread(dcm_fn_strs[0], stop_before_pixels=True, force=True)
+    acq_datetime = min((timing.time for timing in timings), default=None)
+    acq_duration = duration.from_dicoms(dcm_fn_strs, timings)
+    lgr.info("Duration of %s: %s", dcm_fn_strs[0], acq_duration or "unknown")
     # add random string
     # But let's make it reproducible by using all UIDs
     # (might change across versions?)
@@ -575,11 +693,503 @@ def get_formatted_scans_key_row(dcm_fn: str | Path) -> list[str]:
         perfphys = dcm_data.PerformingPhysicianName
     except AttributeError:
         perfphys = ""
-    row = [acq_datetime.isoformat() if acq_datetime else "", perfphys, randstr]
+    row = [
+        acq_datetime.isoformat() if acq_datetime else "",
+        *_format_duration(acq_duration),
+        perfphys,
+        randstr,
+    ]
     # empty entries should be 'n/a'
     # https://github.com/dartmouth-pbs/heudiconv/issues/32
-    row = ["n/a" if not str(e) else e for e in row]
-    return row
+    return ["n/a" if not str(e) else e for e in row]
+
+
+def _get_sidecar_acquisition_datetime(
+    json_file: str, near: datetime.datetime
+) -> datetime.datetime | None:
+    """Return the time-of-day `AcquisitionTime` of a JSON sidecar as a datetime.
+
+    On whichever day puts it closest to `near`, so a run straddling midnight
+    is handled.  None if the sidecar has no `AcquisitionTime`.
+    """
+    acq_time = load_json(json_file).get("AcquisitionTime")
+    if not acq_time:
+        return None
+    time_ = strptime(str(acq_time), ["%H:%M:%S.%f", "%H:%M:%S"]).time()
+    candidates = [
+        # the sidecar carries the same local wall time as a timezone-aware
+        # `near` (from DICOM TimezoneOffsetFromUTC), so take its tzinfo
+        datetime.datetime.combine(
+            near.date() + datetime.timedelta(days=d), time_, tzinfo=near.tzinfo
+        )
+        for d in (-1, 0, 1)
+    ]
+    return min(candidates, key=lambda c: abs(c - near))
+
+
+def check_acq_time_congruency(
+    acq_datetime: datetime.datetime | None,
+    json_files: Sequence[str],
+    label: str,
+    timestamps: Sequence[datetime.datetime] = (),
+    fix: bool = False,
+) -> None:
+    """Check `acq_time` against dcm2niix's sidecar `AcquisitionTime`, fixing it if `fix`.
+
+    `acq_time` is the earliest acquisition timestamp across the run's DICOMs
+    (`timestamps`, see :func:`get_formatted_scans_key_row`), whereas dcm2niix
+    records that of the first DICOM in its own order, which can be later
+    (https://github.com/nipy/heudiconv/issues/876,
+    https://github.com/rordenlab/dcm2niix/issues/1039).  When that is
+    unambiguously what happened -- `acq_time` is the earliest of
+    `timestamps`, and all `json_files` record the same `AcquisitionTime`,
+    one of the later `timestamps` -- the sidecars are corrected in place if
+    `fix`.  Any other disagreement is only warned about.
+
+    Parameters
+    ----------
+    acq_datetime: datetime or None
+        The datetime reported as `acq_time` for the run. Nothing is checked
+        if None.
+    json_files: sequence of str
+        JSON sidecars produced for the run.
+    label: str
+        What to refer to the run as in the log, e.g. its file name.
+    timestamps: sequence of datetime, optional
+        Acquisition timestamps of all DICOMs of the run.  Without them,
+        nothing is considered unambiguous enough to fix.
+    fix: bool, optional
+        Whether to correct the sidecars when unambiguous.
+    """
+    if acq_datetime is None:
+        return
+
+    def close(dt1: datetime.datetime, dt2: datetime.datetime) -> bool:
+        # e.g. a historical, naive acq_time vs timezone-aware DICOM timestamps
+        dt1, dt2 = naive_if_mixed_tz([dt1, dt2])
+        return abs(dt1 - dt2) <= ACQ_TIME_TOLERANCE
+
+    sidecar_times = {
+        json_file: dt
+        for json_file in json_files
+        if (dt := _get_sidecar_acquisition_datetime(json_file, acq_datetime))
+        is not None
+    }
+    if not sidecar_times:
+        return
+    # dcm2niix may split a series into several outputs (e.g. echoes, or
+    # localizer planes) with legitimately different AcquisitionTimes -- the
+    # earliest of them is what corresponds to acq_time
+    json_file, sidecar_datetime = min(sidecar_times.items(), key=lambda i: i[1])
+    if close(sidecar_datetime, acq_datetime):
+        return
+    fixable = (
+        bool(timestamps)
+        and close(acq_datetime, min(timestamps))
+        and len(sidecar_times) == len(json_files)
+        and all(close(dt, sidecar_datetime) for dt in sidecar_times.values())
+        and any(close(sidecar_datetime, t) for t in timestamps)
+    )
+    if fixable and fix:
+        acq_time_str = acq_datetime.strftime("%H:%M:%S.%f")
+        for f in sidecar_times:
+            _save_json_keeping_readonly(
+                f, {**load_json(f), "AcquisitionTime": acq_time_str}, pretty=True
+            )
+        lgr.info(
+            "%s: corrected AcquisitionTime recorded by dcm2niix from %s to "
+            "%s, the earliest of its DICOMs, in %s -- see "
+            "https://github.com/rordenlab/dcm2niix/issues/1039",
+            label,
+            sidecar_datetime.time().isoformat(),
+            acq_time_str,
+            ", ".join(op.basename(f) for f in sidecar_times),
+        )
+        return
+    lgr.warning(
+        "%s: acq_time %s disagrees with AcquisitionTime %s (%+.6f "
+        "seconds) recorded by dcm2niix in %s%s",
+        label,
+        acq_datetime.time().isoformat(),
+        sidecar_datetime.time().isoformat(),
+        (sidecar_datetime - acq_datetime).total_seconds(),
+        op.basename(json_file),
+        (
+            " -- `heudiconv --command populate-scans-duration "
+            "--fix-acq-time` would fix it"
+            if fixable
+            else ""
+        ),
+    )
+
+
+def _find_bids_dataset_root(path: str) -> str | None:
+    """Closest ancestor of `path` (or itself) with a ``dataset_description.json``."""
+    for candidate in [Path(op.abspath(path)), *Path(op.abspath(path)).parents]:
+        if (candidate / "dataset_description.json").exists():
+            return str(candidate)
+    return None
+
+
+def _is_within(path: str, directory: str) -> bool:
+    """Whether `path` leads to `directory` or under it.
+
+    As spelled: symlinks are not resolved, since that of an annexed file
+    points into an object store which may well be elsewhere (for a
+    subdataset, a worktree, an ephemeral clone).
+    """
+    return Path(op.abspath(path)).is_relative_to(op.abspath(directory))
+
+
+def _extract_dicom_tarball(tarball: str, dest: str) -> list[str]:
+    """Extract the regular files of `tarball` into `dest`, sorted by member name.
+
+    They are stored under names of our own, so nothing depends on -- or
+    needs vetting of -- the paths recorded in the archive.
+    """
+    extracted = []
+    with tarfile.open(tarball) as tar:
+        for i, member in enumerate(m for m in tar if m.isfile()):
+            fn = op.join(dest, f"{i:06d}.dcm")
+            src = tar.extractfile(member)
+            assert src is not None  # it is a regular file
+            with src, open(fn, "wb") as dst:
+                shutil.copyfileobj(src, dst)
+            extracted.append((member.name, fn))
+    return [fn for _, fn in sorted(extracted)]
+
+
+def _read_sourcedata_tarball(
+    tarball: str,
+) -> tuple[duration.Duration | None, list[datetime.datetime]]:
+    """Duration, and acquisition timestamps, per a sourcedata DICOM tarball.
+
+    See :func:`heudiconv.dicoms.compress_dicoms` for how it's produced.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        dicom_files = _extract_dicom_tarball(tarball, tmpdir)
+        timings = dicoms.get_file_timings(dicom_files)
+        return (
+            duration.from_dicoms(dicom_files, timings),
+            [timing.time for timing in timings],
+        )
+
+
+def _format_duration(found: duration.Duration | None) -> tuple[str, str]:
+    """Format a duration as the `_scans.tsv` cells for it and its source."""
+    return ("%.3f" % found.seconds, found.source) if found else ("n/a", "n/a")
+
+
+def _parse_bids_name(path: str) -> BIDSFile:
+    """:meth:`BIDSFile.parse` also accepting a name with no entities, e.g. ``T1w.json``."""
+    try:
+        return BIDSFile.parse(op.basename(path))
+    except ValueError:
+        suffix, _, extension = op.basename(path).partition(".")
+        return BIDSFile({}, suffix, extension or None)
+
+
+def _find_json_sidecar(nifti_fn: str, bids_root: str) -> str | None:
+    """Find the JSON sidecar applicable to `nifti_fn`.
+
+    A same-named one right next to it if present, else -- per the `BIDS
+    Inheritance Principle
+    <https://bids-specification.readthedocs.io/en/stable/common-principles.html#the-inheritance-principle>`_
+    -- the most-specific same-suffix ``.json`` (matching entities) found in
+    an ancestor directory up to `bids_root`. None if neither exists.
+    """
+    exact = splitext_addext(nifti_fn)[0] + ".json"
+    if op.exists(exact):
+        return exact
+
+    target = _parse_bids_name(nifti_fn)
+    root = Path(op.realpath(bids_root))
+    directory = Path(op.realpath(op.dirname(nifti_fn)))
+    for current in [directory, *directory.parents]:
+        if not current.is_relative_to(root):
+            break
+        candidates = [
+            (len(candidate.entities), json_fn)
+            for json_fn in sorted(glob(str(current / "*.json")))
+            if (candidate := _parse_bids_name(json_fn)).suffix == target.suffix
+            and all(target[k] == v for k, v in candidate.entities.items())
+        ]
+        if candidates:
+            # most specific (most shared entities) match wins
+            return max(candidates, key=lambda c: c[0])[1]
+    return None
+
+
+def _duration_from_sidecar(nifti_fn: str, bids_root: str) -> duration.Duration | None:
+    """Duration per `nifti_fn` and its JSON sidecar (see :func:`_find_json_sidecar`).
+
+    None if there is no sidecar; either of them not being readable is an error.
+    """
+    json_fn = _find_json_sidecar(nifti_fn, bids_root)
+    if json_fn is None:
+        return None
+    meta = load_json(json_fn)
+    if not isinstance(meta, dict):
+        raise ValueError(f"{json_fn} does not contain a JSON object")
+    return duration.from_sidecar(nifti_fn, meta)
+
+
+def _find_sourcedata_tarball(nifti_fn: str, bids_root: str) -> tuple[str | None, bool]:
+    """Find the heudiconv-produced sourcedata DICOM tarball for `nifti_fn`.
+
+    Returns it (None if not found), and whether it is shared by all outputs
+    of a multi-output item (e.g. ``echo-``, ``magnitude1``/``2``), i.e.
+    named after the item rather than after `nifti_fn` itself.
+    """
+    rel = op.relpath(nifti_fn, bids_root)
+    sourcedata_dir = op.join(bids_root, "sourcedata", op.dirname(rel))
+    stem = splitext_addext(op.basename(rel))[0]
+    exact = op.join(sourcedata_dir, stem + ".dicom.tgz")
+    # also if its content is not present: not to go for another one then
+    if op.lexists(exact):
+        return exact, False
+    # the longest prefix of `stem` without the entities heudiconv inserts to
+    # tell apart the outputs of an item
+    item_stem = re.sub(r"_(echo|part|ch|chunk)-[a-zA-Z0-9]+", "", stem)
+    candidates = [
+        p
+        for p in glob(op.join(sourcedata_dir, "*.dicom.tgz"))
+        if item_stem.startswith(op.basename(p)[: -len(".dicom.tgz")])
+    ]
+    return (max(candidates, key=len), True) if candidates else (None, False)
+
+
+_TarballCache = dict[str, tuple[duration.Duration | None, list[datetime.datetime]]]
+
+
+def _read_sourcedata(
+    nifti_fn: str, bids_root: str, tarballs: _TarballCache
+) -> tuple[duration.Duration | None, list[datetime.datetime], bool] | None:
+    """What the sourcedata DICOMs of an already-converted scan tell.
+
+    Its duration and acquisition timestamps per :func:`_read_sourcedata_tarball`,
+    and whether the tarball is shared with other scans (see
+    :func:`_find_sourcedata_tarball`); None if there is no tarball.  One
+    which cannot be read, as when its content is not present, is an error.
+    `tarballs` caches what was read from each, which the outputs of a
+    multi-output item share.
+    """
+    tarball, shared = _find_sourcedata_tarball(nifti_fn, bids_root)
+    if tarball is None:
+        return None
+    if tarball not in tarballs:
+        try:
+            tarballs[tarball] = _read_sourcedata_tarball(tarball)
+        except Exception as exc:
+            raise RuntimeError(f"cannot read source DICOMs {tarball}: {exc}") from exc
+    return *tarballs[tarball], shared
+
+
+def populate_scans_duration(
+    path: str, overwrite: bool = False, fix_acq_time: bool = False
+) -> None:
+    """Retrospectively populate the 'duration' column of `_scans.tsv` file(s).
+
+    For datasets converted before conversion started to populate it (see
+    :func:`get_formatted_scans_key_row`).
+
+    Parameters
+    ----------
+    path: str
+        A ``*_scans.tsv`` file, or a directory to look for them under.
+    overwrite: bool, optional
+        Also recompute `duration` of rows which already have one.  A value
+        which cannot be re-established is kept.
+    fix_acq_time: bool, optional
+        Whether to replace `acq_time` with the earliest acquisition timestamp
+        of the source DICOMs where they disagree
+        (https://github.com/nipy/heudiconv/issues/876), and likewise
+        `AcquisitionTime` of the scan's own JSON sidecar where unambiguous
+        (see :func:`check_acq_time_congruency`).  Then the source DICOMs of
+        every scan get read.  Otherwise a disagreement is warned about for
+        the scans whose `duration` gets established from them.
+    """
+    if op.isfile(path):
+        scans_tsvs = [path] if path.endswith("_scans.tsv") else []
+    else:
+        scans_tsvs = sorted(
+            find_files(r".*_scans\.tsv$", topdir=path, exclude_vcs=True)
+        )
+    if not scans_tsvs:
+        lgr.warning("No '*_scans.tsv' files found under %s", path)
+        return
+    failures = 0
+    for scans_tsv in scans_tsvs:
+        try:
+            failures += _populate_scans_duration_file(
+                scans_tsv, overwrite, fix_acq_time
+            )
+        except Exception as exc:
+            # one malformed file must not keep the rest of the dataset from
+            # being done
+            lgr.error("Failed to populate 'duration' in %s: %s", scans_tsv, exc)
+            failures += 1
+    if failures:
+        raise RuntimeError(
+            f"Failed for {failures} of the scans or _scans.tsv files under "
+            f"{path}, see the errors logged; the others are done"
+        )
+
+
+def _populate_scans_duration_file(
+    scans_tsv: str, overwrite: bool, fix_acq_time: bool = False
+) -> int:
+    """Backfill the 'duration' column of a single ``_scans.tsv`` file, in place.
+
+    Returns for how many of its scans that failed.
+    """
+    session_dir = op.dirname(scans_tsv)
+    bids_root = _find_bids_dataset_root(session_dir)
+    if bids_root is None:
+        raise ValueError(
+            "it is not within a BIDS dataset (no dataset_description.json)"
+        )
+    fieldnames, rows = _read_scans_tsv(scans_tsv)
+    if "filename" not in fieldnames:
+        raise ValueError("it has no 'filename' column")
+
+    # a legacy file gains the column (and scans.json its description below)
+    # even if there is nothing to compute, e.g. no rows
+    changed = not set(duration.SCANS_FIELDS) <= set(fieldnames)
+    if changed:
+        fieldnames = _merge_scans_header(
+            fieldnames, ["filename", "acq_time", *duration.SCANS_FIELDS]
+        )
+    tarballs: _TarballCache = {}
+    failures = 0
+    for row in rows:
+        filename = row["filename"]
+        want_duration = overwrite or maybe_na(row.get("duration")) == "n/a"
+        if not filename:
+            lgr.warning("%s has a row with no filename, skipping it", scans_tsv)
+        elif want_duration or fix_acq_time:
+            before = dict(row)
+            try:
+                if not _is_within(op.join(session_dir, filename), bids_root):
+                    raise ValueError(f"it is outside of the dataset ({bids_root})")
+                if not op.lexists(op.join(session_dir, filename)):
+                    raise FileNotFoundError("there is no such file")
+                _populate_scans_row(
+                    row,
+                    op.join(session_dir, filename),
+                    bids_root,
+                    want_duration,
+                    fix_acq_time,
+                    tarballs,
+                )
+            except Exception as exc:
+                # e.g. content which is not present, or a malformed sidecar,
+                # must not get in the way of the other rows, nor of
+                # recording what was done to this one
+                lgr.error("Failed for %s of %s: %s", filename, scans_tsv, exc)
+                failures += 1
+            changed |= row != before
+
+    if changed:
+        _write_scans_tsv(scans_tsv, fieldnames, rows)
+        lgr.info("Updated %s", scans_tsv)
+    else:
+        lgr.info("Nothing to update in %s", scans_tsv)
+    _ensure_scans_json(op.join(bids_root, "scans.json"))
+    return failures
+
+
+def _populate_scans_row(
+    row: _ScansRow,
+    nifti_fn: str,
+    bids_root: str,
+    want_duration: bool,
+    fix_acq_time: bool,
+    tarballs: _TarballCache,
+) -> None:
+    """Establish `duration` of `row` if wanted, and check (or fix) its `acq_time`."""
+    sourcedata = _read_sourcedata(nifti_fn, bids_root, tarballs)
+    found, timestamps, shared_tarball = sourcedata or (None, [], False)
+    if want_duration:
+        if sourcedata is None:
+            # not if the DICOMs are there to tell, and do not
+            found = _duration_from_sidecar(nifti_fn, bids_root)
+        lgr.info("Duration of %s: %s", row["filename"], found or "unknown")
+        # keep a value which we could not re-establish
+        if found or maybe_na(row.get("duration")) == "n/a":
+            row.update(zip(duration.SCANS_FIELDS, _format_duration(found)))
+    _check_acq_time(row, nifti_fn, bids_root, timestamps, shared_tarball, fix_acq_time)
+
+
+def _check_acq_time(
+    row: _ScansRow,
+    nifti_fn: str,
+    bids_root: str,
+    timestamps: list[datetime.datetime],
+    shared_tarball: bool,
+    fix: bool,
+) -> None:
+    """Check `acq_time` of `row`, and of its sidecar, against `timestamps`.
+
+    Those of its source DICOMs, of a tarball which is or is not shared with
+    other scans; both get fixed if `fix`, where unambiguous.
+    """
+    acq_datetime = _reconcile_acq_time(row, min(timestamps, default=None), fix)
+    json_fn = _find_json_sidecar(nifti_fn, bids_root)
+    # never touch (or suggest fixing) an inherited sidecar, which is shared
+    # with other scans, nor one of an output of a multi-output item, whose
+    # sidecars may legitimately differ (e.g. localizer planes) -- only
+    # conversion sees all of them together
+    own_sidecar = (
+        json_fn == splitext_addext(nifti_fn)[0] + ".json" and not shared_tarball
+    )
+    check_acq_time_congruency(
+        acq_datetime,
+        [json_fn] if json_fn else [],
+        label=str(row["filename"]),
+        timestamps=timestamps if own_sidecar else (),
+        fix=fix and own_sidecar,
+    )
+
+
+def _reconcile_acq_time(
+    row: _ScansRow, earliest: datetime.datetime | None, fix: bool
+) -> datetime.datetime | None:
+    """Warn if `acq_time` of `row` is not `earliest`, replacing it if `fix`.
+
+    Returns the resulting `acq_time`, None if `row` has no parseable one.
+    A gap suggesting deliberately shifted dates (anonymization), which
+    fixing would undo, is left alone.
+    """
+    try:
+        stored = strptime_bids(row.get("acq_time") or "")
+    except ValueError:
+        return None
+    if earliest is None:
+        return stored
+    # keep the stored value's timezone style (naive/aware)
+    earliest, comparable = naive_if_mixed_tz([earliest, stored])
+    gap = earliest - comparable
+    if abs(gap) <= ACQ_TIME_TOLERANCE:
+        return stored
+    if abs(gap) > ACQ_TIME_DATE_SHIFT_THRESHOLD:
+        fix = False
+        status = "looks anonymized/date-shifted, not fixing"
+    else:
+        status = "fixing" if fix else "not fixed -- pass --fix-acq-time to"
+    lgr.warning(
+        "%s: stored acq_time %s differs from the earliest acquisition "
+        "timestamp re-derived from its source DICOMs (%+.6f seconds; %s). "
+        "See https://github.com/nipy/heudiconv/issues/876",
+        row["filename"],
+        stored.isoformat(),
+        gap.total_seconds(),
+        status,
+    )
+    if not fix:
+        return stored
+    row["acq_time"] = earliest.isoformat()
+    return earliest
 
 
 def convert_sid_bids(subject_id: str) -> str:
@@ -915,14 +1525,8 @@ def select_fmap_from_compatible_groups(
         scans_tsv = glob(op.join(sess_folder, "*_scans.tsv"))[0]
     except IndexError:
         raise FileNotFoundError("No '*_scans' file found for session %s" % sess_folder)
-    with open(scans_tsv) as f:
-        # read the contents, splitting by lines and by tab separators:
-        scans_tsv_content = [line.split("\t") for line in f.read().splitlines()]
-    # get column indices for filename and acq_time from the first line:
-    fname_idx, time_idx = (
-        scans_tsv_content[0].index(k) for k in ["filename", "acq_time"]
-    )
-    acq_times = {line[fname_idx]: line[time_idx] for line in scans_tsv_content[1:]}
+    _, scans_rows = _read_scans_tsv(scans_tsv)
+    acq_times = {row.get("filename"): row.get("acq_time") or "" for row in scans_rows}
     # acq_times for the compatible fmaps:
     acq_times_fmaps = {
         k: acq_times[
@@ -1233,6 +1837,10 @@ class BIDSFile:
     @property
     def extension(self) -> str | None:
         return self._extension
+
+    @property
+    def entities(self) -> dict[str, str]:
+        return dict(self._entities)
 
 
 def sanitize_label(label: str) -> str:

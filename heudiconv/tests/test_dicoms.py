@@ -5,6 +5,8 @@ from glob import glob
 import json
 import os.path as op
 from pathlib import Path
+from typing import Any
+import warnings
 
 import pydicom as dcm
 import pytest
@@ -17,13 +19,14 @@ from heudiconv.dicoms import (
     embed_dicom_and_nifti_metadata,
     get_datetime_from_dcm,
     get_datetime_strings_from_dcm,
+    get_file_timings,
     get_reproducible_int,
     group_dicoms_into_seqinfos,
     parse_private_csa_header,
     wrapper_from_file,
 )
 
-from .utils import TEST_DICOM_PATHS, TESTS_DATA_PATH
+from .utils import TEST_DICOM_PATHS, TESTS_DATA_PATH, make_timed_dicoms
 
 # An enhanced (multiframe) DICOM of a scout from Siemens XA30, with 3 frames,
 # each in its own orientation
@@ -357,3 +360,112 @@ def test_get_reproducible_int_raises_assertion_wo_dt(tmp_path: Path) -> None:
     dcm.dcmwrite(tmp_path, XA30_enhanced_dcm)
     with pytest.raises(AssertionError):
         get_reproducible_int([str(tmp_path)])
+
+
+def _timestamps(offsets: list[float]) -> list[datetime.datetime]:
+    start = datetime.datetime(2020, 1, 1, 12)
+    return [start + datetime.timedelta(seconds=offset) for offset in offsets]
+
+
+def _edit_dicom(fn: str, **tags: Any) -> None:
+    """Set `tags` in the DICOM `fn`; a tag given as None is removed."""
+    dcm_data = dcm.dcmread(fn, stop_before_pixels=True)
+    with warnings.catch_warnings():
+        # pydicom >= 2.3 warns about an invalid value
+        warnings.simplefilter("ignore")
+        for tag, value in tags.items():
+            if value is not None:
+                setattr(dcm_data, tag, value)
+            elif tag in dcm_data:
+                delattr(dcm_data, tag)
+    dcm.dcmwrite(fn, dcm_data)
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize("tz_offset", [None, "+0100"])
+def test_get_file_timings_times(tmp_path: Path, tz_offset: str | None) -> None:
+    dicom_list = make_timed_dicoms(tmp_path, [2, 0, 4, 7], tz_offset=tz_offset)
+    timestamps = [timing.time for timing in get_file_timings(dicom_list)]
+    # in dicom_list order, and exactly what a full header read gives -- in
+    # particular equally timezone-aware, so the two can be compared
+    assert timestamps == [
+        get_datetime_from_dcm(dcm.dcmread(f, stop_before_pixels=True))
+        for f in dicom_list
+    ]
+    assert [t.second for t in timestamps] == [2, 0, 4, 7]
+    assert all((t.tzinfo is not None) == bool(tz_offset) for t in timestamps)
+
+
+_NO_DATETIME = dict.fromkeys(
+    ["AcquisitionDate", "AcquisitionTime", "AcquisitionDateTime", "SeriesDate"]
+    + ["SeriesTime"]
+)
+_SERIES_TIME_ONLY = dict(
+    AcquisitionTime=None, SeriesDate="20200101", SeriesTime="115930.000000"
+)
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "edits,expected_seconds",
+    [
+        # a file with a malformed, or without any, date/time is skipped
+        pytest.param({1: dict(AcquisitionTime="not-a-time")}, [0, 2], id="malformed"),
+        pytest.param({1: _NO_DATETIME}, [0, 2], id="no-datetime"),
+        pytest.param(dict.fromkeys(range(3), _NO_DATETIME), [], id="no-datetimes"),
+        # and so is one with only the (earlier) start time of the series
+        # (https://github.com/nipy/heudiconv/issues/878) ...
+        pytest.param({2: _SERIES_TIME_ONLY}, [0, 1], id="series-time"),
+        pytest.param(
+            {
+                0: _SERIES_TIME_ONLY,
+                1: dict(_NO_DATETIME, AcquisitionDateTime="20200101120005.000000"),
+            },
+            [5, 2],
+            id="series-time-vs-AcquisitionDateTime",
+        ),
+        # ... unless that is all there is
+        pytest.param(
+            dict.fromkeys(range(3), _SERIES_TIME_ONLY), [30] * 3, id="series-times"
+        ),
+    ],
+)
+def test_get_file_timings_times_of_odd_files(
+    tmp_path: Path, edits: dict[int, dict[str, Any]], expected_seconds: list[int]
+) -> None:
+    dicom_list = make_timed_dicoms(tmp_path, [0, 1, 2])
+    for i, tags in edits.items():
+        _edit_dicom(dicom_list[i], **tags)
+    timestamps = [timing.time for timing in get_file_timings(dicom_list)]
+    assert [t.second for t in timestamps] == expected_seconds
+
+
+@pytest.mark.ai_generated
+def test_get_file_timings(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    dicom_list = make_timed_dicoms(tmp_path, [2, 0, 4, 7], numbers=[2, 1, 3, 4])
+    _edit_dicom(dicom_list[0], TemporalPositionIdentifier=5)
+    # those without a time are left out, with a single warning for them all
+    for fn in dicom_list[2:]:
+        _edit_dicom(fn, AcquisitionTime="not-a-time")
+    assert get_file_timings(dicom_list) == [
+        (_timestamps([2])[0], 2, 5),
+        (_timestamps([0])[0], 1, None),
+    ]
+    assert [r.getMessage() for r in caplog.records if r.name == "heudiconv.dicoms"] == [
+        "Failed to parse the acquisition datetime of 2 of 4 files, the first "
+        f"being {dicom_list[2]}: Unable to parse datetime string: not-a-time"
+    ]
+
+
+@pytest.mark.ai_generated
+def test_get_file_timings_times_mixed_timezone_awareness(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    # DICOMs of a run do not always agree on carrying TimezoneOffsetFromUTC,
+    # and a mix of aware and naive datetimes could not be compared
+    dicom_list = make_timed_dicoms(tmp_path, [2, 0, 4, 7], tz_offset="+0100")
+    _edit_dicom(dicom_list[1], TimezoneOffsetFromUTC=None)
+
+    timestamps = [timing.time for timing in get_file_timings(dicom_list)]
+    assert timestamps == _timestamps([2, 0, 4, 7])
+    assert "timezone-naive" in caplog.text

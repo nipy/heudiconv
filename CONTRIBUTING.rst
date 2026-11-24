@@ -183,7 +183,12 @@ Beyond what the tools enforce:
   informative docstrings with sample usage presented as doctests when appropriate.  Note that
   ``pytest`` is configured with ``--doctest-modules``, so doctests are collected and executed as
   part of the test suite.
-* Docstrings are formatted in `NumPy style <https://numpydoc.readthedocs.io/en/latest/format.html>`_.
+* Docstrings are formatted in `NumPy style <https://numpydoc.readthedocs.io/en/latest/format.html>`_,
+  and kept terse: a one-line summary, then -- only if needed -- what a caller has to know (return
+  value semantics, options, caveats), never a restatement of the implementation or its history.
+  Reserve the ``Parameters``/``Returns`` sections for public functions which benefit from them;
+  for a small or private (``_``-prefixed) helper whose annotated signature is already clear, the
+  summary line is enough.
 * Line length is whatever ``black`` produces (88 columns); ``flake8`` is configured to ignore
   ``E501``, so the occasional long URL or string literal is tolerated rather than mangled.
 

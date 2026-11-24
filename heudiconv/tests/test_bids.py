@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from collections.abc import Callable
-from datetime import datetime, timedelta
+from collections.abc import Callable, Sequence
+from contextlib import nullcontext
+from datetime import datetime, timedelta, timezone
 from glob import glob
 import itertools
+from json import JSONDecodeError
 import logging
 import os
 import os.path as op
@@ -14,18 +16,32 @@ from pathlib import Path
 from random import choice, random, seed, shuffle
 import re
 import shutil
+import stat
 import string
+import tarfile
+import tempfile
 from typing import Any
+from unittest.mock import Mock, patch
 
 import nibabel
+import numpy as np
 from numpy import testing as np_testing
 import pytest
 
+from heudiconv import duration
 from heudiconv.bids import (
     SHIM_KEY,
     AllowedCriteriaForFmapAssignment,
     BIDSFile,
     KeyInfoForForce,
+    _duration_from_sidecar,
+    _extract_dicom_tarball,
+    _find_bids_dataset_root,
+    _find_json_sidecar,
+    _merge_scans_header,
+    _read_scans_tsv,
+    _reconcile_acq_time,
+    check_acq_time_congruency,
     find_compatible_fmaps_for_run,
     find_compatible_fmaps_for_session,
     find_fmap_groups,
@@ -33,15 +49,31 @@ from heudiconv.bids import (
     get_shim_setting,
     maybe_na,
     populate_aggregated_jsons,
+    populate_bids_templates,
     populate_intended_for,
+    populate_scans_duration,
     sanitize_label,
+    save_scans_key,
     select_fmap_from_compatible_groups,
     treat_age,
+    tuneup_bids_json_files,
 )
 from heudiconv.cli.run import main as runner
-from heudiconv.utils import Load, create_tree, load_json, remove_suffix, save_json
+from heudiconv.convert import add_taskname_to_infofile
+from heudiconv.dicoms import compress_dicoms
+from heudiconv.duration import Duration
+from heudiconv.utils import (
+    Load,
+    TempDirs,
+    create_tree,
+    is_readonly,
+    load_json,
+    remove_suffix,
+    save_json,
+    set_readonly,
+)
 
-from .utils import TESTS_DATA_PATH, fetch_data, gen_heudiconv_args
+from .utils import TESTS_DATA_PATH, fetch_data, gen_heudiconv_args, make_timed_dicoms
 
 have_datalad = True
 try:
@@ -1786,3 +1818,1061 @@ def test_sanitize_label() -> None:
     assert sanitize_label("az XZ-@09") == "azXZ09"
     with pytest.raises(ValueError):
         sanitize_label(" @ ")
+
+
+BOLD = "func/sub-01_task-rest_bold"
+
+
+class ScansDataset:
+    """A minimal BIDS dataset with the `_scans.tsv` of its sub-01."""
+
+    def __init__(self, tmp_path: Path) -> None:
+        self.tmp_path = tmp_path
+        self.root = tmp_path / "bids"
+        (self.root / "sub-01" / "func").mkdir(parents=True)
+        save_json(
+            self.root / "dataset_description.json",
+            {"Name": "test", "BIDSVersion": "1.8.0"},
+        )
+        self.scans_tsv = self.root / "sub-01" / "sub-01_scans.tsv"
+        self.scans_tsv.write_text("filename\tacq_time\n")
+
+    def add_row(self, *cells: str) -> None:
+        with self.scans_tsv.open("a") as f:
+            f.write("\t".join(cells) + "\n")
+
+    def add_scan(
+        self,
+        stem: str = BOLD,
+        acq_time: str = "2020-01-01T12:00:02",
+        sidecar: dict[str, Any] | str | None = None,
+        nvols: int | None = None,
+        dicom_offsets: Sequence[float] = (),
+        tz_offset: str | None = None,
+    ) -> Path:
+        """Add a scan with its row, and return the path of its JSON sidecar.
+
+        The NIfTI is of `nvols` volumes (3D if 0), or an empty file if None.  The `sidecar` is
+        JSON or, if a str, written as is; none is written if None.  DICOMs
+        acquired at `dicom_offsets`, if any, go under sourcedata/.
+        """
+        nifti, json_file = (
+            self.root / "sub-01" / (stem + ext) for ext in (".nii.gz", ".json")
+        )
+        if nvols is None:
+            nifti.write_bytes(b"")
+        else:
+            shape = (2, 2, 2, nvols) if nvols else (2, 2, 2)
+            nibabel.Nifti1Image(np.zeros(shape), np.eye(4)).to_filename(nifti)
+        if isinstance(sidecar, str):
+            json_file.write_text(sidecar)
+        elif sidecar is not None:
+            save_json(json_file, sidecar)
+        if dicom_offsets:
+            self.add_sourcedata(self.make_dicoms(dicom_offsets, tz_offset), stem)
+        self.add_row(stem + ".nii.gz", acq_time)
+        return json_file
+
+    def make_dicoms(
+        self, offsets: Sequence[float], tz_offset: str | None = None
+    ) -> list[str]:
+        dicom_dir = Path(tempfile.mkdtemp(dir=self.tmp_path))
+        return make_timed_dicoms(dicom_dir, offsets, tz_offset=tz_offset)
+
+    def add_sourcedata(self, dicom_list: list[str], stem: str = BOLD) -> None:
+        """Package `dicom_list` under sourcedata/ as heudiconv does for `stem`."""
+        prefix = self.root / "sourcedata" / "sub-01" / stem
+        prefix.parent.mkdir(parents=True, exist_ok=True)
+        compress_dicoms(dicom_list, str(prefix), TempDirs(), overwrite=True)
+
+    def read(self) -> tuple[list[str], list[dict[str, str | None]]]:
+        return _read_scans_tsv(str(self.scans_tsv))
+
+    @property
+    def rows(self) -> list[dict[str, str | None]]:
+        return self.read()[1]
+
+
+@pytest.fixture
+def scans_ds(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> ScansDataset:
+    """A :class:`ScansDataset`, with durations which are not for these tests.
+
+    That of DICOMs is their number in seconds, and that per a sidecar its
+    "Duration", so that the two could be told apart.
+    """
+    caplog.set_level(logging.INFO, logger="heudiconv.bids")
+    monkeypatch.setattr(
+        duration, "from_dicoms", lambda *args: Duration(float(len(args[0])), "DICOMs")
+    )
+    monkeypatch.setattr(
+        duration,
+        "from_sidecar",
+        lambda *args: (
+            Duration(args[1]["Duration"], "sidecar") if "Duration" in args[1] else None
+        ),
+    )
+    return ScansDataset(tmp_path)
+
+
+def _bids_log(caplog: pytest.LogCaptureFixture, level: int = logging.WARNING) -> str:
+    """Messages of `level` and above, logged by heudiconv.bids."""
+    return "\n".join(
+        f"{r.levelname}: {r.getMessage()}"
+        for r in caplog.records
+        if r.name == "heudiconv.bids" and r.levelno >= level
+    )
+
+
+def _populate_failing(scans_ds: ScansDataset, failures: int, **kwargs: Any) -> None:
+    """populate_scans_duration() which is to fail for that many scans or files."""
+    with (
+        pytest.raises(RuntimeError, match=f"Failed for {failures} of the scans")
+        if failures
+        else nullcontext()
+    ):
+        populate_scans_duration(str(scans_ds.root), **kwargs)
+
+
+def _assert_bids_log(caplog: pytest.LogCaptureFixture, expected: str) -> None:
+    """`expected` is among the warnings of heudiconv.bids, or there are none."""
+    log = _bids_log(caplog)
+    assert expected in log
+    assert bool(log) == bool(expected), log
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize("target", ["dataset", "scans_tsv", "cli"])
+def test_populate_scans_duration_from_sourcedata(
+    scans_ds: ScansDataset, target: str
+) -> None:
+    scans_ds.add_scan()
+    scans_ds.add_sourcedata(
+        sorted(glob(op.join(TESTS_DATA_PATH, "b0dwiForFmap", "*.dcm")))
+    )
+
+    path = str(scans_ds.scans_tsv if target == "scans_tsv" else scans_ds.root)
+    if target == "cli":
+        runner(["--command", "populate-scans-duration", "--files", path])
+    else:
+        populate_scans_duration(path)
+
+    fieldnames, rows = scans_ds.read()
+    assert fieldnames == ["filename", "acq_time", "duration", "duration_source"]
+    assert rows[0]["duration_source"] == "DICOMs"
+    assert rows[0]["duration"] == "3.000"
+    # and the data dictionary of the dataset documents it
+    scans_json = load_json(scans_ds.root / "scans.json")
+    assert {k: scans_json[k] for k in duration.SCANS_FIELDS} == duration.SCANS_FIELDS
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "outputs,tarball",
+    [
+        # heudiconv inserts an entity into the name of each output ...
+        (["task-rest_echo-1_bold", "task-rest_echo-2_bold"], "task-rest_bold"),
+        (["task-rest_part-mag_bold", "task-rest_part-phase_bold"], "task-rest_bold"),
+        (["task-rest_ch-1_bold", "task-rest_ch-2_bold"], "task-rest_bold"),
+        (["task-rest_chunk-1_bold", "task-rest_chunk-2_bold"], "task-rest_bold"),
+        # ... or appends an index to its suffix
+        (["magnitude1", "magnitude2"], "magnitude"),
+    ],
+)
+def test_populate_scans_duration_of_multi_output_item(
+    scans_ds: ScansDataset, outputs: list[str], tarball: str
+) -> None:
+    # sidecar times of the outputs of an item may legitimately differ (e.g.
+    # localizer planes)
+    sidecar_times = ["12:00:02.000000", "12:00:04.000000"]
+    sidecars = [
+        scans_ds.add_scan(f"func/sub-01_{output}", sidecar={"AcquisitionTime": time})
+        for output, time in zip(outputs, sidecar_times, strict=True)
+    ]
+    # they share one sourcedata tarball, named after the item
+    scans_ds.add_sourcedata(
+        scans_ds.make_dicoms([2, 0, 4, 7]), f"func/sub-01_{tarball}"
+    )
+    # which is the longest of those their names start with
+    scans_ds.add_sourcedata(scans_ds.make_dicoms([0, 100]), "func/sub-01")
+
+    with patch(
+        "heudiconv.bids._extract_dicom_tarball", wraps=_extract_dicom_tarball
+    ) as extract:
+        populate_scans_duration(str(scans_ds.root), fix_acq_time=True)
+
+    assert extract.call_count == 1
+    # duration and acq_time, the same for all outputs of an item, are fixed ...
+    assert [(row["acq_time"], row["duration"]) for row in scans_ds.rows] == [
+        ("2020-01-01T12:00:00", "4.000")
+    ] * 2
+    # ... but not the sidecars, which only conversion sees all together
+    assert [load_json(f)["AcquisitionTime"] for f in sidecars] == sidecar_times
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "../../outside.nii.gz",
+        "../../bids-sibling/outside.nii.gz",
+        "/outside.nii.gz",
+    ],
+)
+def test_populate_scans_duration_refuses_paths_outside_dataset(
+    scans_ds: ScansDataset, caplog: pytest.LogCaptureFixture, filename: str
+) -> None:
+    scans_ds.add_row(filename, "n/a")
+
+    _populate_failing(scans_ds, 1, overwrite=True)
+
+    assert "it is outside of the dataset" in caplog.text
+    assert scans_ds.rows[0]["duration"] == "n/a"
+
+
+@pytest.mark.ai_generated
+def test_populate_scans_duration_of_annexed_files(scans_ds: ScansDataset) -> None:
+    # as of a subdataset, a worktree or an ephemeral clone: symlinks into an
+    # object store which is not within the dataset
+    sidecar = scans_ds.add_scan(sidecar={}, dicom_offsets=[2, 0, 4, 7])
+    annex = scans_ds.tmp_path / "elsewhere" / "annex" / "objects"
+    annex.mkdir(parents=True)
+    for path in (
+        sidecar,
+        sidecar.with_suffix(".nii.gz"),
+        scans_ds.root / "sourcedata" / "sub-01" / (BOLD + ".dicom.tgz"),
+    ):
+        path.rename(annex / path.name)
+        path.symlink_to(annex / path.name)
+
+    populate_scans_duration(str(scans_ds.root), fix_acq_time=True)
+
+    assert scans_ds.rows == [
+        {
+            "filename": BOLD + ".nii.gz",
+            "acq_time": "2020-01-01T12:00:00",
+            "duration": "4.000",
+            "duration_source": "DICOMs",
+        }
+    ]
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "stored,tz_offset,fixed",
+    [
+        # https://github.com/nipy/heudiconv/issues/876: acq_time is of the
+        # first DICOM, which is not the earliest acquired
+        ("2020-01-01T12:00:02", None, "2020-01-01T12:00:00"),
+        # heudiconv < 1.3.0 stored it timezone-naive, whereas DICOMs with
+        # TimezoneOffsetFromUTC give aware ones: the stored style is kept
+        ("2020-01-01T12:00:02", "+0100", "2020-01-01T12:00:00"),
+        # a gap of days is rather of date-shifting anonymization, which
+        # fixing would undo
+        ("1900-01-01T12:00:02", None, None),
+    ],
+)
+def test_populate_scans_duration_acq_time(
+    scans_ds: ScansDataset,
+    caplog: pytest.LogCaptureFixture,
+    stored: str,
+    tz_offset: str | None,
+    fixed: str | None,
+) -> None:
+    # dcm2niix's AcquisitionTime is biased the same way
+    # (https://github.com/rordenlab/dcm2niix/issues/1039), and heudiconv
+    # leaves converted files read-only
+    sidecar = scans_ds.add_scan(
+        acq_time=stored,
+        sidecar={"AcquisitionTime": "12:00:02.000000"},
+        dicom_offsets=[2, 0, 4, 7],
+        tz_offset=tz_offset,
+    )
+    set_readonly(str(sidecar))
+
+    populate_scans_duration(str(scans_ds.root))
+
+    # the duration is established whatever the acq_time, which is only
+    # warned about
+    assert scans_ds.rows == [
+        {
+            "filename": BOLD + ".nii.gz",
+            "acq_time": stored,
+            "duration": "4.000",
+            "duration_source": "DICOMs",
+        }
+    ]
+    assert "differs from the earliest acquisition" in caplog.text
+    assert ("pass --fix-acq-time" in caplog.text) == bool(fixed)
+    assert ("looks anonymized/date-shifted, not fixing" in caplog.text) != bool(fixed)
+    # and the sidecar agrees with it
+    assert "disagrees with AcquisitionTime" not in caplog.text
+
+    populate_scans_duration(str(scans_ds.root), overwrite=True, fix_acq_time=True)
+
+    assert scans_ds.rows[0]["acq_time"] == (fixed or stored)
+    assert load_json(sidecar)["AcquisitionTime"] == (
+        "12:00:00.000000" if fixed else "12:00:02.000000"
+    )
+    assert is_readonly(str(sidecar))
+
+
+@pytest.mark.ai_generated
+def test_populate_scans_duration_fix_acq_time_alone(scans_ds: ScansDataset) -> None:
+    # of a scan which has its duration, which then stays as it is
+    scans_ds.add_scan(dicom_offsets=[2, 0, 4, 7])
+    scans_ds.scans_tsv.write_text(
+        f"filename\tacq_time\tduration\n{BOLD}.nii.gz\t2020-01-01T12:00:02\t312.000\n"
+    )
+    populate_scans_duration(str(scans_ds.root))
+    assert scans_ds.rows[0]["acq_time"] == "2020-01-01T12:00:02"
+    populate_scans_duration(str(scans_ds.root), fix_acq_time=True)
+    assert scans_ds.rows == [
+        {
+            "filename": BOLD + ".nii.gz",
+            "acq_time": "2020-01-01T12:00:00",
+            "duration": "312.000",
+            # of which nothing is known
+            "duration_source": "n/a",
+        }
+    ]
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "sidecar,sidecar_time,dicom_offsets",
+    [
+        # shared with other scans (Inheritance Principle)
+        ("task-rest_bold.json", "12:00:02.000000", [2, 0, 4, 7]),
+        # no source DICOMs to tell by whether it is the one which is off
+        (f"sub-01/{BOLD}.json", "12:00:05.000000", []),
+    ],
+    ids=["inherited", "no-tarball"],
+)
+def test_populate_scans_duration_fix_acq_time_leaves_sidecar(
+    scans_ds: ScansDataset,
+    caplog: pytest.LogCaptureFixture,
+    sidecar: str,
+    sidecar_time: str,
+    dicom_offsets: list[float],
+) -> None:
+    scans_ds.add_scan(dicom_offsets=dicom_offsets)
+    content = {"AcquisitionTime": sidecar_time}
+    save_json(scans_ds.root / sidecar, content)
+
+    populate_scans_duration(str(scans_ds.root), overwrite=True, fix_acq_time=True)
+
+    assert load_json(scans_ds.root / sidecar) == content
+    assert "disagrees with AcquisitionTime" in caplog.text
+    assert "would fix it" not in caplog.text
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "sidecar_time,expected,expected_log",
+    [
+        # dcm2niix recorded the time of the first DICOM (as ordered for
+        # conversion), acquired 2s after the earliest one
+        ("12:00:02.000000", "12:00:00.000000", ""),
+        # must not get in the way of the conversion
+        ("junk", "junk", "WARNING: Failed to check acq_time of prefix"),
+    ],
+)
+def test_save_scans_key_checks_sidecar_acquisition_time(
+    scans_ds: ScansDataset,
+    caplog: pytest.LogCaptureFixture,
+    sidecar_time: str,
+    expected: str,
+    expected_log: str,
+) -> None:
+    sidecar = scans_ds.root / "sub-01" / (BOLD + ".json")
+    save_json(sidecar, {"AcquisitionTime": sidecar_time})
+    scans_ds.scans_tsv.unlink()
+
+    save_scans_key(
+        ("prefix", ("nii.gz",), scans_ds.make_dicoms([2, 0, 1, 3])), [str(sidecar)]
+    )
+
+    assert load_json(sidecar)["AcquisitionTime"] == expected
+    _assert_bids_log(caplog, expected_log)
+    assert scans_ds.rows[0] | {"randstr": ""} == {
+        "filename": BOLD + ".nii.gz",
+        "acq_time": "2020-01-01T12:00:00",
+        "duration": "4.000",
+        "duration_source": "DICOMs",
+        "operator": "Yarik",
+        "randstr": "",
+    }
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "sidecar,expected,expected_log",
+    [
+        ({"Duration": 20.0}, 20.0, ""),
+        (None, None, ""),
+    ],
+)
+def test_duration_from_sidecar(
+    scans_ds: ScansDataset,
+    caplog: pytest.LogCaptureFixture,
+    sidecar: dict[str, Any] | None,
+    expected: float | None,
+    expected_log: str,
+) -> None:
+    scans_ds.add_scan(sidecar=sidecar)
+    nifti = scans_ds.root / "sub-01" / (BOLD + ".nii.gz")
+    found = _duration_from_sidecar(str(nifti), str(scans_ds.root))
+    assert (found and found.seconds) == expected
+    _assert_bids_log(caplog, expected_log)
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize("sidecar", ["{not valid json", "[1, 2, 3]"])
+def test_duration_from_malformed_sidecar(scans_ds: ScansDataset, sidecar: str) -> None:
+    scans_ds.add_scan(sidecar=sidecar)
+    nifti = scans_ds.root / "sub-01" / (BOLD + ".nii.gz")
+    with pytest.raises(ValueError):
+        _duration_from_sidecar(str(nifti), str(scans_ds.root))
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize("tz", ["", "+01:00"])
+@pytest.mark.parametrize(
+    "acq_time,sidecar_times,expected",
+    [
+        # agreement
+        ("12:00:00", ["12:00:00.000000"], []),
+        # differences within ACQ_TIME_TOLERANCE are ignored
+        ("12:00:00", ["12:00:00.000500"], []),
+        # no (parseable) AcquisitionTime in the sidecar -- nothing to compare
+        ("12:00:00", [None], []),
+        ("12:00:00", [], []),
+        # no acq_time to compare them to
+        (None, ["12:00:05.000000"], []),
+        # dcm2niix's own AcquisitionTime disagrees
+        # (https://github.com/rordenlab/dcm2niix/issues/1039)
+        (
+            "12:00:00",
+            ["12:00:02.586000"],
+            [
+                "acq_time 12:00:00 disagrees with AcquisitionTime 12:00:02.586000 "
+                "(+2.586000 seconds) recorded by dcm2niix in f0.json"
+            ],
+        ),
+        # several outputs (e.g. localizer planes) with different times: only
+        # the earliest one corresponds to acq_time
+        ("12:00:00", ["12:00:05.000000", "12:00:00.000000"], []),
+        # a run straddling midnight is compared across it, not a day apart
+        (
+            "23:59:59.900000",
+            ["00:00:00.500000"],
+            ["(+0.600000 seconds)"],
+        ),
+    ],
+)
+def test_check_acq_time_congruency(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+    tz: str,
+    acq_time: str | None,
+    sidecar_times: list[str | None],
+    expected: list[str],
+) -> None:
+    sidecars = []
+    for i, sidecar_time in enumerate(sidecar_times):
+        sidecar = tmp_path / f"f{i}.json"
+        save_json(sidecar, {"AcquisitionTime": sidecar_time} if sidecar_time else {})
+        sidecars.append(str(sidecar))
+    caplog.set_level(logging.WARNING, logger="heudiconv.bids")
+    # timezone-aware datetimes come from DICOMs with TimezoneOffsetFromUTC,
+    # and must be comparable to the sidecars' (local wall clock) times
+    check_acq_time_congruency(
+        datetime.fromisoformat("2020-01-01T" + acq_time + tz) if acq_time else None,
+        sidecars,
+        label="sub-01_task-rest_bold",
+    )
+    warnings_ = "\n".join(
+        r.getMessage() for r in caplog.records if r.levelno == logging.WARNING
+    )
+    if not expected:
+        assert not warnings_
+    for e in expected:
+        assert e in warnings_
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize("tz", ["", "+01:00"])
+@pytest.mark.parametrize(
+    "fix,acq,timestamps,sidecars,corrected,expected_log",
+    [
+        # https://github.com/rordenlab/dcm2niix/issues/1039: dcm2niix took
+        # the time of a DICOM which is not the earliest acquired
+        (
+            True,
+            0,
+            [2.586, 0, 1],
+            [2.586],
+            [0],
+            [
+                "INFO: run: corrected AcquisitionTime recorded by dcm2niix "
+                "from 12:00:02.586000 to 12:00:00.000000"
+            ],
+        ),
+        # ... in all outputs alike, e.g. echoes
+        (True, 0, [2.586, 0, 1], [2.586, 2.586], [0, 0], ["INFO: run: corrected"]),
+        # ... but not asked to fix it
+        (
+            False,
+            0,
+            [2.586, 0, 1],
+            [2.586],
+            [2.586],
+            ["WARNING: ", "--fix-acq-time` would fix it"],
+        ),
+        # not one of the run's DICOM timestamps: unclear what happened
+        (True, 0, [2.586, 0, 1], [5], [5], ["WARNING: ", "(+5.000000 seconds)"]),
+        # not all sidecars record an AcquisitionTime
+        (True, 0, [2.586, 0, 1], [2.586, None], [2.586, None], ["WARNING: "]),
+        # sidecars disagree among themselves
+        (True, 0, [2.586, 0, 1], [1, 2.586], [1, 2.586], ["WARNING: "]),
+        # acq_time is not the earliest DICOM timestamp
+        (True, 1, [2.586, 0, 1], [2.586], [2.586], ["WARNING: "]),
+        # no DICOM timestamps to tell by
+        (True, 0, [], [2.586], [2.586], ["WARNING: "]),
+    ],
+)
+def test_check_acq_time_congruency_fix(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+    tz: str,
+    fix: bool,
+    acq: float,
+    timestamps: list[float],
+    sidecars: list[float | None],
+    corrected: list[float | None],
+    expected_log: list[str],
+) -> None:
+    start = datetime.fromisoformat("2020-01-01T12:00:00" + tz)
+
+    def at(offset: float) -> datetime:
+        return start + timedelta(seconds=offset)
+
+    def fmt(offset: float | None) -> str | None:
+        return at(offset).strftime("%H:%M:%S.%f") if offset is not None else None
+
+    json_files = []
+    for i, offset in enumerate(sidecars):
+        json_file = tmp_path / f"f{i}.json"
+        save_json(
+            json_file, {"AcquisitionTime": fmt(offset)} if offset is not None else {}
+        )
+        set_readonly(str(json_file))
+        json_files.append(str(json_file))
+    caplog.set_level(logging.INFO, logger="heudiconv.bids")
+    check_acq_time_congruency(
+        at(acq),
+        json_files,
+        label="run",
+        timestamps=[at(t) for t in timestamps],
+        fix=fix,
+    )
+    assert [load_json(f).get("AcquisitionTime") for f in json_files] == [
+        fmt(o) for o in corrected
+    ]
+    assert all(is_readonly(f) for f in json_files)
+    log = "\n".join(
+        "%s: %s" % (r.levelname, r.getMessage())
+        for r in caplog.records
+        if r.name == "heudiconv.bids"
+    )
+    for e in expected_log:
+        assert e in log
+    if fix:
+        # nothing to suggest -- it either got fixed or is not unambiguous
+        assert "--fix-acq-time" not in log
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "tarball,expected",
+    [
+        (None, "20.000"),
+        # the sidecar is no substitute for DICOMs which should have been
+        # readable, as when their content is not present
+        ("corrupt", "n/a"),
+        ("absent", "n/a"),
+        # which are preferred to the sidecar ...
+        ("of-duration", "1.000"),
+        # ... also where it tells that the duration cannot be told
+        ("of-no-duration", "n/a"),
+    ],
+)
+def test_populate_scans_duration_from_sidecar_without_dicoms(
+    scans_ds: ScansDataset,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    tarball: str | None,
+    expected: str,
+) -> None:
+    scans_ds.add_scan(sidecar={"Duration": 20.0})
+    tarball_file = scans_ds.root / "sourcedata" / "sub-01" / (BOLD + ".dicom.tgz")
+    unreadable = tarball in ("corrupt", "absent")
+    if unreadable:
+        tarball_file.parent.mkdir(parents=True)
+    if tarball == "corrupt":
+        tarball_file.write_bytes(b"not a tarball")
+    elif tarball == "absent":
+        tarball_file.symlink_to("../../../.git/annex/objects/not-here")
+    elif tarball:
+        scans_ds.add_sourcedata(scans_ds.make_dicoms([0]))
+    if tarball == "of-no-duration":
+        monkeypatch.setattr(duration, "from_dicoms", Mock(return_value=None))
+
+    _populate_failing(scans_ds, int(unreadable))
+
+    assert scans_ds.rows[0]["duration"] == expected
+    assert (f"cannot read source DICOMs {tarball_file}" in caplog.text) == unreadable
+
+
+@pytest.mark.ai_generated
+def test_populate_scans_duration_reads_only_what_it_needs(
+    scans_ds: ScansDataset,
+) -> None:
+    # not the DICOMs of a scan which has its duration, unless to fix its acq_time
+    scans_ds.add_scan(dicom_offsets=[2, 0, 4, 7])
+    scans_ds.scans_tsv.write_text(
+        f"filename\tacq_time\tduration\n{BOLD}.nii.gz\t2020-01-01T12:00:00\t312.000\n"
+    )
+    with patch(
+        "heudiconv.bids._extract_dicom_tarball", wraps=_extract_dicom_tarball
+    ) as extract:
+        populate_scans_duration(str(scans_ds.root))
+        assert not extract.called
+        populate_scans_duration(str(scans_ds.root), fix_acq_time=True)
+        assert extract.called
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "sidecar,recomputed",
+    [
+        ({"Duration": 20.0}, "20.000"),
+        # a value which cannot be re-established, e.g. the one Siemens
+        # declared for an anatomical whose DICOMs were not kept, is kept
+        ({}, "312.000"),
+    ],
+)
+def test_populate_scans_duration_overwrite(
+    scans_ds: ScansDataset, sidecar: dict[str, Any], recomputed: str
+) -> None:
+    scans_ds.add_scan(sidecar={"Duration": 20.0})
+    scans_ds.add_scan(_OTHER[:-7], sidecar=sidecar)
+    (scans_ds.root / "sub-01" / "func" / "sub-01_task-gone_bold.nii.gz").touch()
+    scans_ds.scans_tsv.write_text(
+        "filename\tacq_time\tduration\n"
+        f"{BOLD}.nii.gz\t2020-01-01T12:00:00\tn/a\n"
+        f"{_OTHER}\t2020-01-01T12:30:00\t312.000\n"
+        # nothing to establish it from
+        "func/sub-01_task-gone_bold.nii.gz\t2020-01-01T12:40:00\tn/a\n"
+    )
+
+    # only what is missing gets filled in
+    populate_scans_duration(str(scans_ds.root))
+    assert [row["duration"] for row in scans_ds.rows] == ["20.000", "312.000", "n/a"]
+
+    populate_scans_duration(str(scans_ds.root), overwrite=True)
+    assert [row["duration"] for row in scans_ds.rows] == ["20.000", recomputed, "n/a"]
+
+
+@pytest.mark.ai_generated
+def test_duration_from_inherited_nifti_sidecar(scans_ds: ScansDataset) -> None:
+    scans_ds.add_scan()
+    save_json(scans_ds.root / "task-rest_bold.json", {"Duration": 20.0})
+    populate_scans_duration(str(scans_ds.root))
+    assert scans_ds.rows[0]["duration"] == "20.000"
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "stored,expected",
+    [
+        ("2020-01-01T12:00:02", "2020-01-01T12:00:00"),
+        ("2020-01-01T23:00:00", "2020-01-01T12:00:00"),
+        ("2020-01-01T01:00:00", "2020-01-01T12:00:00"),
+        # in the style, naive or timezone-aware, of the stored one
+        ("2020-01-01T12:00:02+01:00", "2020-01-01T12:00:00+01:00"),
+        # close enough
+        ("2020-01-01T12:00:00.000900", None),
+        # more than 12 hours apart, either way: rather shifted dates
+        ("2020-01-02T00:00:01", None),
+        ("2019-12-31T23:59:59", None),
+        ("junk", None),
+    ],
+)
+def test_reconcile_acq_time(stored: str, expected: str | None) -> None:
+    row = {"filename": "x", "acq_time": stored}
+    earliest = datetime(2020, 1, 1, 12, tzinfo=timezone(timedelta(hours=1)))
+    _reconcile_acq_time(row, earliest, fix=True)
+    assert row["acq_time"] == (expected or stored)
+    _reconcile_acq_time(row := {"filename": "x", "acq_time": stored}, earliest, False)
+    assert row["acq_time"] == stored
+
+
+@pytest.mark.ai_generated
+def test_extract_dicom_tarball(tmp_path: Path) -> None:
+    # only regular files, under names of our own, ordered by member name
+    members = tmp_path / "members"
+    (members / "sub").mkdir(parents=True)
+    for name in ("b.dcm", "sub/a.dcm", "c.dcm"):
+        (members / name).write_text(name)
+    (members / "link.dcm").symlink_to("/etc/passwd")
+    tarball = tmp_path / "dicoms.tgz"
+    with tarfile.open(tarball, "w:gz") as tar:
+        for name in ("c.dcm", "link.dcm", "sub", "b.dcm"):
+            tar.add(members / name, arcname=name)
+        tar.add(members / "b.dcm", arcname="../escaped.dcm")
+    dest = tmp_path / "dest"
+    dest.mkdir()
+
+    extracted = _extract_dicom_tarball(str(tarball), str(dest))
+
+    assert [Path(f).read_text() for f in extracted] == [
+        "b.dcm",  # ../escaped.dcm
+        "b.dcm",
+        "c.dcm",
+        "sub/a.dcm",
+    ]
+    assert sorted(tmp_path.rglob("*.dcm")) == sorted(
+        [*map(Path, extracted), *members.rglob("*.dcm")]
+    )
+
+
+@pytest.mark.ai_generated
+def test_populate_scans_duration_failing_to_write(
+    scans_ds: ScansDataset, caplog: pytest.LogCaptureFixture
+) -> None:
+    content = scans_ds.scans_tsv.read_text()
+    with patch("heudiconv.bids.os.replace", side_effect=OSError("disk full")):
+        _populate_failing(scans_ds, 1)
+    assert "ERROR: Failed to populate 'duration'" in _bids_log(caplog)
+    assert scans_ds.scans_tsv.read_text() == content
+    assert sorted(os.listdir(scans_ds.scans_tsv.parent)) == ["func", "sub-01_scans.tsv"]
+
+
+@pytest.mark.ai_generated
+def test_populate_scans_duration_no_scans_tsv(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    populate_scans_duration(str(tmp_path))
+    assert "No '*_scans.tsv' files found" in caplog.text
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "flags",
+    [[], ["--overwrite"], ["--fix-acq-time"], ["--overwrite", "--fix-acq-time"]],
+    ids=" ".join,
+)
+def test_populate_scans_duration_cli(tmp_path: Path, flags: list[str]) -> None:
+    with patch("heudiconv.main.populate_scans_duration", autospec=True) as populate:
+        runner(
+            ["--command", "populate-scans-duration", "--files", str(tmp_path), *flags]
+        )
+    populate.assert_called_once_with(
+        str(tmp_path),
+        overwrite="--overwrite" in flags,
+        fix_acq_time="--fix-acq-time" in flags,
+    )
+
+
+@pytest.mark.ai_generated
+def test_find_bids_dataset_root(tmp_path: Path) -> None:
+    session_dir = tmp_path / "sub-01" / "ses-01"
+    session_dir.mkdir(parents=True)
+    assert _find_bids_dataset_root(str(session_dir)) is None
+    (tmp_path / "dataset_description.json").write_text("{}")
+    assert _find_bids_dataset_root(str(session_dir)) == str(tmp_path)
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "content,in_dataset,error",
+    [
+        ("", True, "it has no 'filename' column"),
+        ("acq_time\n2020-01-01T12:00:00\n", True, "it has no 'filename' column"),
+        ("filename\tacq_time\n", False, "it is not within a BIDS dataset"),
+    ],
+)
+def test_populate_scans_duration_skips_malformed_file(
+    scans_ds: ScansDataset,
+    caplog: pytest.LogCaptureFixture,
+    content: str,
+    in_dataset: bool,
+    error: str,
+) -> None:
+    scans_ds.scans_tsv.write_text(content)
+    # a proper one of another subject
+    other = scans_ds.root / "sub-02" / "sub-02_scans.tsv"
+    other.parent.mkdir()
+    other.write_text("filename\tacq_time\n")
+    if not in_dataset:
+        (scans_ds.root / "dataset_description.json").unlink()
+
+    _populate_failing(scans_ds, 1 if in_dataset else 2)
+
+    # is reported, and left as it was ...
+    assert f"ERROR: Failed to populate 'duration' in {scans_ds.scans_tsv}" in (
+        log := _bids_log(caplog)
+    )
+    assert error in log
+    assert scans_ds.scans_tsv.read_text() == content
+    assert sorted(os.listdir(scans_ds.scans_tsv.parent)) == ["func", "sub-01_scans.tsv"]
+    # ... without getting in the way of the others
+    assert _read_scans_tsv(str(other))[0] == (
+        ["filename", "acq_time", "duration", "duration_source"]
+        if in_dataset
+        else ["filename", "acq_time"]
+    )
+    assert (scans_ds.root / "scans.json").exists() == in_dataset
+
+
+_OTHER = "func/sub-01_task-other_bold.nii.gz"
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "cells,sidecar,with_dicoms,expected,expected_log",
+    [
+        (["", "2020-01-01T12:00:00"], None, False, "n/a", "row with no filename"),
+        # not a BIDS name to look the sidecar up for
+        (["func/x_bold.nii.gz", "2020-01-01T12:00:00"], None, False, "n/a", ""),
+        # a short row, and one with fields beyond the header, which are kept
+        ([_OTHER], None, False, "n/a", ""),
+        ([_OTHER, "2020-01-01T12:00:00", "stray", ""], None, False, "n/a", ""),
+        # no acq_time to check, which is no reason not to get the duration
+        ([_OTHER, "junk"], None, True, "3.000", ""),
+        # a sidecar which cannot be checked is an error, which is no reason
+        # not to record the duration either
+        *(
+            (
+                [_OTHER, "2020-01-01T12:00:00"],
+                sidecar,
+                True,
+                "3.000",
+                f"ERROR: Failed for {_OTHER} of ",
+            )
+            for sidecar in ('{"AcquisitionTime": "garbage"}', "[1]", "")
+        ),
+        # as is a file which is not there
+        (["func/sub-01_task-gone_bold.nii.gz"], None, None, "n/a", "there is no such"),
+    ],
+)
+def test_populate_scans_duration_of_odd_row(
+    scans_ds: ScansDataset,
+    caplog: pytest.LogCaptureFixture,
+    cells: list[str],
+    sidecar: str | None,
+    with_dicoms: bool | None,
+    expected: str,
+    expected_log: str,
+) -> None:
+    scans_ds.add_row(*cells)
+    if cells[0] and with_dicoms is not None:
+        (scans_ds.root / "sub-01" / cells[0]).touch()
+    if sidecar is not None:
+        (scans_ds.root / "sub-01" / _OTHER).with_suffix("").with_suffix(
+            ".json"
+        ).write_text(sidecar)
+    if with_dicoms:
+        scans_ds.add_sourcedata(
+            scans_ds.make_dicoms([0, 1, 2]), cells[0].removesuffix(".nii.gz")
+        )
+    scans_ds.add_scan(acq_time="2020-01-01T12:00:00", dicom_offsets=[2, 0, 4, 7])
+
+    _populate_failing(
+        scans_ds, int("ERROR" in expected_log or "no such" in expected_log)
+    )
+
+    odd, regular = scans_ds.rows
+    assert odd == {
+        "filename": cells[0],
+        "acq_time": cells[1] if len(cells) > 1 else "n/a",
+        "duration": expected,
+        "duration_source": "n/a" if expected == "n/a" else "DICOMs",
+    } | ({None: cells[2:]} if cells[2:] else {})
+    assert (regular["duration"], regular["duration_source"]) == ("4.000", "DICOMs")
+    _assert_bids_log(caplog, expected_log)
+
+
+@pytest.mark.ai_generated
+def test_populate_scans_duration_adds_column(scans_ds: ScansDataset) -> None:
+    # nothing to compute, which is no reason not to add the column
+    populate_scans_duration(str(scans_ds.root))
+    assert scans_ds.scans_tsv.read_text().split() == [
+        "filename",
+        "acq_time",
+        "duration",
+        "duration_source",
+    ]
+    scans_json = load_json(scans_ds.root / "scans.json")
+    assert {k: scans_json[k] for k in duration.SCANS_FIELDS} == duration.SCANS_FIELDS
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize("mode", [0o664, 0o444], ids=oct)
+def test_populate_scans_duration_preserves_permissions(
+    scans_ds: ScansDataset, mode: int
+) -> None:
+    os.chmod(scans_ds.scans_tsv, mode)
+    inode = os.stat(scans_ds.scans_tsv).st_ino
+    populate_scans_duration(str(scans_ds.root))
+    assert stat.S_IMODE(os.stat(scans_ds.scans_tsv).st_mode) == mode
+    # replaced, as a read-only one (which root could write to) has to be
+    assert os.stat(scans_ds.scans_tsv).st_ino != inode
+    assert "duration" in scans_ds.scans_tsv.read_text()
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "sidecars,stem,expected",
+    [
+        # the same-named one next to it
+        (
+            [f"sub-01/{BOLD}.json", "task-rest_bold.json"],
+            "sub-01_task-rest_bold",
+            f"sub-01/{BOLD}.json",
+        ),
+        # or else, per the Inheritance Principle, one of an ancestor
+        # directory, as many datasets (e.g. on OpenNeuro) rely on
+        (
+            ["task-rest_bold.json"],
+            "sub-01_task-rest_run-01_bold",
+            "task-rest_bold.json",
+        ),
+        # the most specific of them
+        (
+            ["bold.json", "task-rest_bold.json"],
+            "sub-01_task-rest_run-01_bold",
+            "task-rest_bold.json",
+        ),
+        (["bold.json"], "sub-01_task-rest_run-01_bold", "bold.json"),
+        # but not of other entities, or suffix
+        (["task-other_bold.json"], "sub-01_task-rest_run-01_bold", None),
+        (["task-rest_sbref.json"], "sub-01_task-rest_run-01_bold", None),
+        # nor from outside of the dataset
+        (["../bold.json"], "sub-01_task-rest_run-01_bold", None),
+        # nor for what is not a BIDS name
+        (["bold.json"], "x_bold", None),
+    ],
+)
+def test_find_json_sidecar(
+    scans_ds: ScansDataset, sidecars: list[str], stem: str, expected: str | None
+) -> None:
+    for sidecar in sidecars:
+        save_json(scans_ds.root / sidecar, {})
+    nifti = scans_ds.root / "sub-01" / "func" / f"{stem}.nii.gz"
+    assert _find_json_sidecar(str(nifti), str(scans_ds.root)) == (
+        expected and str(scans_ds.root / expected)
+    )
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "existing_header,expected",
+    [
+        (["filename", "acq_time"], ["filename", "acq_time", "duration"]),
+        (["filename", "acq_time", "duration"], ["filename", "acq_time", "duration"]),
+        (["filename"], ["filename", "acq_time", "duration"]),
+        (["acq_time"], ["acq_time", "duration", "filename"]),
+        # a custom, dataset-specific column is preserved as-is
+        (
+            ["filename", "acq_time", "notes"],
+            ["filename", "acq_time", "duration", "notes"],
+        ),
+    ],
+)
+def test_merge_scans_header(existing_header: list[str], expected: list[str]) -> None:
+    additions = ["filename", "acq_time", "duration"]
+    assert _merge_scans_header(existing_header, additions) == expected
+
+
+@pytest.mark.ai_generated
+def test_populate_bids_templates_syncs_existing_scans_json(tmp_path: Path) -> None:
+    # one predating "duration" gains it, without losing any user-added key
+    save_json(
+        str(tmp_path / "scans.json"),
+        {"acq_time": {"Description": "old"}, "MyCustomField": {"Description": "x"}},
+    )
+    set_readonly(str(tmp_path / "scans.json"))
+
+    populate_bids_templates(str(tmp_path))
+
+    assert is_readonly(str(tmp_path / "scans.json"))
+
+    scans_json = load_json(str(tmp_path / "scans.json"))
+    assert "duration" in scans_json
+    assert scans_json["acq_time"] == {"Description": "old"}  # untouched
+    assert scans_json["MyCustomField"] == {"Description": "x"}  # untouched
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "content,error", [("not json", JSONDecodeError), ("[1]", ValueError)]
+)
+def test_populate_bids_templates_errors_on_malformed_scans_json(
+    tmp_path: Path, content: str, error: type[Exception]
+) -> None:
+    # a malformed scans.json is for the user to fix, not something to
+    # silently leave out of date
+    (tmp_path / "scans.json").write_text(content)
+    with pytest.raises(error):
+        populate_bids_templates(str(tmp_path))
+
+
+@pytest.mark.ai_generated
+def test_populate_bids_templates_leaves_scans_json_without_content(
+    tmp_path: Path,
+) -> None:
+    # e.g. annexed, and not present
+    (tmp_path / "scans.json").symlink_to("nowhere")
+    populate_bids_templates(str(tmp_path))
+    assert os.readlink(tmp_path / "scans.json") == "nowhere"
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "rewrite",
+    [
+        lambda fn: tuneup_bids_json_files([fn]),
+        lambda fn: check_acq_time_congruency(
+            datetime(2020, 1, 1, 12),
+            [fn],
+            label="run",
+            timestamps=[datetime(2020, 1, 1, 12, 0, s) for s in (2, 0)],
+            fix=True,
+        ),
+        add_taskname_to_infofile,
+    ],
+    ids=["tuneup_bids_json_files", "check_acq_time_congruency", "add_taskname"],
+)
+def test_sidecar_rewrites_keep_pretty_json(
+    tmp_path: Path, rewrite: Callable[[str], None]
+) -> None:
+    # sidecars rewritten during conversion must keep numeric arrays on one
+    # line, rather than reformat them one value per line -- a pure-noise diff
+    # on datasets re-converted across heudiconv versions
+    json_fn = tmp_path / "sub-01_task-rest_bold.json"
+    shim = [1, 2, 3, 4, 5, 6, 7, 8]
+    save_json(
+        str(json_fn),
+        {"AcquisitionTime": "12:00:02.000000", "ShimSetting": shim},
+        pretty=True,
+    )
+
+    rewrite(str(json_fn))
+
+    assert '"ShimSetting": [1, 2, 3, 4, 5, 6, 7, 8]' in json_fn.read_text()
+    assert load_json(str(json_fn))["ShimSetting"] == shim

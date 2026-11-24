@@ -8,6 +8,7 @@ API Reference
    api/bids
    api/convert
    api/dicoms
+   api/duration
    api/parser
    api/queue
    api/utils

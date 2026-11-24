@@ -552,6 +552,19 @@ def file_md5sum(filename: str) -> str:
         return hashlib.md5(f.read()).hexdigest()
 
 
+def naive_if_mixed_tz(
+    datetimes: list[datetime.datetime],
+) -> list[datetime.datetime]:
+    """Make `datetimes` comparable with each other.
+
+    Returned as is, unless only some of them are timezone-aware, in which
+    case all are returned timezone-naive, i.e. as their local wall-clock time.
+    """
+    if len({dt.tzinfo is None for dt in datetimes}) < 2:
+        return datetimes
+    return [dt.replace(tzinfo=None) for dt in datetimes]
+
+
 # Borrowed from DataLad (MIT license), with "archives" functionality commented
 # out
 class File:
