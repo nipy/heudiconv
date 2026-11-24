@@ -3,12 +3,14 @@ from __future__ import annotations
 __docformat__ = "numpy"
 
 from collections.abc import Callable
+import gzip
 import logging
 import os
 import os.path as op
 import random
 import re
 import shutil
+from tempfile import TemporaryDirectory
 from types import ModuleType
 from typing import TYPE_CHECKING, Any, cast
 
@@ -990,6 +992,32 @@ def filter_partial_volumes(
         return new_nii_files, new_bids_files, new_bids_metas
 
 
+def _safe_move_nifti(src: str, dest: str, overwrite: bool = False) -> None:
+    """Match the requested extension even if dcm2niix used another encoding."""
+    with open(src, "rb") as stream:
+        compressed = stream.read(2) == b"\x1f\x8b"
+    if compressed == dest.endswith(".gz"):
+        safe_movefile(src, dest, overwrite)
+        return
+
+    import nibabel as nib
+
+    # In particular, do not disguise a truncated large-file conversion as a
+    # successful gzip fallback. Reading the last volume checks the data too.
+    image = cast(nib.spatialimages.SpatialImage, nib.load(src))
+    image.dataobj[..., -1]
+    lgr.info("Adjusting NIfTI compression for %s", dest)
+    with TemporaryDirectory(prefix=".heudiconv-nifti-", dir=op.dirname(dest)) as tmpdir:
+        converted = op.join(tmpdir, op.basename(dest))
+        source_open = gzip.open if compressed else open
+        target_open = gzip.open if dest.endswith(".gz") else open
+        with source_open(src, "rb") as source, target_open(converted, "wb") as target:
+            shutil.copyfileobj(source, target)
+        shutil.copymode(src, converted)
+        safe_movefile(converted, dest, overwrite)
+    os.unlink(src)
+
+
 def save_converted_files(
     res: Node,
     item_dicoms: list[str],
@@ -1220,7 +1248,7 @@ def save_converted_files(
             outfile = outname + "." + outtype
 
             # Write the files needed:
-            safe_movefile(fl, outfile, overwrite)
+            _safe_move_nifti(fl, outfile, overwrite)
             if bids_file:
                 outname_bids_file = "%s.json" % (outname)
                 safe_movefile(bids_file, outname_bids_file, overwrite)
@@ -1229,7 +1257,7 @@ def save_converted_files(
     # res_files is not a list
     else:
         outname = "{}.{}".format(prefix, outtype)
-        safe_movefile(res_files, outname, overwrite)
+        _safe_move_nifti(res_files, outname, overwrite)
         if bids_files:
             try:
                 safe_movefile(bids_files, outname_bids, overwrite)
