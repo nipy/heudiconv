@@ -17,7 +17,10 @@ from .utils import SeqInfo, StudySessionInfo, docstring_parameter
 
 lgr = logging.getLogger(__name__)
 
-_VCS_REGEX = r"%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)" % (op.sep, op.sep)
+_VCS_REGEX = r"%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)" % (
+    re.escape(op.sep),
+    re.escape(op.sep),
+)
 
 
 def _get_unpack_formats() -> dict[str, bool]:
@@ -49,8 +52,8 @@ def find_files(
     exclude: string, optional
       Matches to exclude
     exclude_vcs:
-      If True, excludes commonly known VCS subdirectories.  If string, used
-      as regex to exclude those files (regex: `{}`)
+      If True, excludes commonly known VCS subdirectories from traversal
+      and matching paths from the results (regex: `{}`).
     topdir: string or list, optional
       Directory where to search
     dirs: bool, optional
@@ -66,14 +69,23 @@ def find_files(
                 dirs=dirs,
             )
         return
+    match = re.compile(regex).search
+    excluded = re.compile(exclude) if exclude else None
+    vcs = re.compile(_VCS_REGEX) if exclude_vcs else None
     for dirpath, dirnames, filenames in os.walk(topdir):
+        if vcs:
+            # A VCS directory excludes its entire subtree. Arbitrary `exclude`
+            # expressions, in contrast, may match only the directory itself.
+            dirnames[:] = [
+                name for name in dirnames if not vcs.search(op.join(dirpath, name))
+            ]
         names = (dirnames + filenames) if dirs else filenames
         paths = (op.join(dirpath, name) for name in names)
-        for path in filter(re.compile(regex).search, paths):
+        for path in filter(match, paths):
             path = path.rstrip(op.sep)
-            if exclude and re.search(exclude, path):
+            if excluded and excluded.search(path):
                 continue
-            if exclude_vcs and re.search(_VCS_REGEX, path):
+            if vcs and vcs.search(path):
                 continue
             yield path
 
