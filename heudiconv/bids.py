@@ -207,11 +207,41 @@ def populate_bids_templates(path: str, defaults: dict[str, Any] | None = None) -
     populate_aggregated_jsons(path)
 
 
+def _update_generated_by(path: str, tools: set[tuple[str, str]]) -> None:
+    """Append observed tool versions, preserving existing provenance details."""
+    descriptor = op.join(path, "dataset_description.json")
+    if not tools or not op.lexists(descriptor):
+        return
+    metadata = load_json(descriptor)
+    records = metadata.get("GeneratedBy", [])
+    if not isinstance(records, list):
+        lgr.warning("Not updating %s: GeneratedBy must be a list", descriptor)
+        return
+    known = {
+        (str(record.get("Name", "")).casefold(), record.get("Version"))
+        for record in records
+        if isinstance(record, dict)
+    }
+    added = False
+    for name, version in sorted(tools):
+        identity = (name.casefold(), version)
+        if identity not in known:
+            records.append({"Name": name, "Version": version})
+            known.add(identity)
+            added = True
+    if added:
+        metadata["GeneratedBy"] = records
+        save_json(descriptor, metadata, pretty=True)
+
+
 def populate_aggregated_jsons(path: str) -> None:
     """Aggregate across the entire BIDS dataset ``.json``\\s into top level ``.json``\\s
 
     Top level .json files would contain only the fields which are
     common to all ``subject[/session]/type/*_modality.json``\\s.
+
+    Conversion tool versions from all subject sidecars are collected into
+    ``dataset_description.json:GeneratedBy`` when a descriptor exists.
 
     ATM aggregating only for ``*_task*_bold.json`` files. Only the task- and
     OPTIONAL _acq- field is retained within the aggregated filename.  The other
@@ -224,22 +254,39 @@ def populate_aggregated_jsons(path: str) -> None:
     """
     # TODO: collect all task- .json files for func files to
     tasks = {}
+    generated_by: set[tuple[str, str]] = set()
     # way too many -- let's just collect all which are the same!
     # FIELDS_TO_TRACK = {'RepetitionTime', 'FlipAngle', 'EchoTime',
     #                    'Manufacturer', 'SliceTiming', ''}
     for fpath in find_files(
-        r".*_task-.*\_bold\.json",
+        r".*\.json$",
         topdir=glob(op.join(path, "sub-*")),
         exclude_vcs=True,
         exclude=r"/\.(datalad|heudiconv)/",
     ):
-        #
+        json_ = load_json(fpath, retry=100)
+        if not isinstance(json_, dict):
+            continue
+        version = json_.get(HEUDICONV_VERSION_JSON_KEY)
+        if isinstance(version, str) and version:
+            generated_by.add(("heudiconv", version))
+        software = json_.get("ConversionSoftware")
+        version = json_.get("ConversionSoftwareVersion")
+        if (
+            isinstance(software, str)
+            and software
+            and isinstance(version, str)
+            and version
+        ):
+            generated_by.add((software, version))
+        if "_task-" not in op.basename(fpath) or not fpath.endswith("_bold.json"):
+            continue
+
         # According to BIDS spec I think both _task AND _acq (may be more?
         # _rec, _dir, ...?) should be retained?
         # TODO: if we are to fix it, then old ones (without _acq) should be
         # removed first
         task = re.sub(r".*_(task-[^_\.]*(_acq-[^_\.]*)?)_.*", r"\1", fpath)
-        json_ = load_json(fpath, retry=100)
         if task not in tasks:
             tasks[task] = json_
         else:
@@ -295,6 +342,8 @@ def populate_aggregated_jsons(path: str) -> None:
         lgr.debug("%s %s", act, task_file)
         fields.update(placeholders)
         save_json(task_file, fields, sort_keys=True, pretty=True)
+
+    _update_generated_by(path, generated_by)
 
 
 def tuneup_bids_json_files(json_files: list[str]) -> None:
