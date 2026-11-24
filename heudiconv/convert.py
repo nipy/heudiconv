@@ -480,12 +480,13 @@ def update_uncombined_name(
         Incoming filename
     channel_names : list
         List of all channel names from scan. Used to determine the channel
-        *number* (i.e., index) if field is missing from metadata.
+        *number* (i.e., index) if the coil name has no digits.
 
     Returns
     -------
     filename : str
-        Updated filename with ch entity added, if appropriate.
+        Updated filename with ch entity added, if appropriate. If CoilString
+        is absent or empty, return the original name for the caller's fallback.
     """
     # In case any scan types separate channels differently
     unsupported_types: list[str] = []
@@ -498,7 +499,10 @@ def update_uncombined_name(
         )
 
     # Determine the channel number
-    coil_string = metadata["CoilString"]
+    coil_string = metadata.get("CoilString")
+    if not coil_string:
+        lgr.warning("Cannot add a channel entity without CoilString for %s", filename)
+        return filename
     assert isinstance(coil_string, str)
     channel_number = "".join(c for c in coil_string if c.isdigit())
     if not channel_number:
