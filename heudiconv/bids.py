@@ -67,7 +67,7 @@ SCANS_FILE_FIELDS = OrderedDict(
                 ]
             ),
         ),
-        ("duration", duration.SCANS_FIELD),
+        *duration.SCANS_FIELDS.items(),
         ("operator", OrderedDict([("Description", "Name of the operator")])),
         (
             "randstr",
@@ -670,8 +670,8 @@ def get_formatted_scans_key_row(
     Returns
     -------
     row: list
-        [ISO acquisition time, duration in seconds (or 'n/a'), performing
-        physician name, random string]
+        [ISO acquisition time, duration in seconds (or 'n/a'), what the
+        duration is from (or 'n/a'), performing physician name, random string]
     """
     if isinstance(dcm_fns, (str, Path)):
         dcm_fns = [dcm_fns]
@@ -695,7 +695,7 @@ def get_formatted_scans_key_row(
         perfphys = ""
     row = [
         acq_datetime.isoformat() if acq_datetime else "",
-        _format_duration(acq_duration),
+        *_format_duration(acq_duration),
         perfphys,
         randstr,
     ]
@@ -832,8 +832,13 @@ def _find_bids_dataset_root(path: str) -> str | None:
 
 
 def _is_within(path: str, directory: str) -> bool:
-    """Whether `path`, with symlinks resolved, is at or under `directory`."""
-    return Path(op.realpath(path)).is_relative_to(op.realpath(directory))
+    """Whether `path` leads to `directory` or under it.
+
+    As spelled: symlinks are not resolved, since that of an annexed file
+    points into an object store which may well be elsewhere (for a
+    subdataset, a worktree, an ephemeral clone).
+    """
+    return Path(op.abspath(path)).is_relative_to(op.abspath(directory))
 
 
 def _extract_dicom_tarball(tarball: str, dest: str) -> list[str]:
@@ -870,9 +875,9 @@ def _read_sourcedata_tarball(
         )
 
 
-def _format_duration(found: duration.Duration | None) -> str:
-    """Format a duration as a `_scans.tsv` cell (``'n/a'`` if None)."""
-    return "%.3f" % found.seconds if found else "n/a"
+def _format_duration(found: duration.Duration | None) -> tuple[str, str]:
+    """Format a duration as the `_scans.tsv` cells for it and its source."""
+    return ("%.3f" % found.seconds, found.source) if found else ("n/a", "n/a")
 
 
 def _parse_bids_name(path: str) -> BIDSFile:
@@ -916,17 +921,16 @@ def _find_json_sidecar(nifti_fn: str, bids_root: str) -> str | None:
 
 
 def _duration_from_sidecar(nifti_fn: str, bids_root: str) -> duration.Duration | None:
-    """Duration per `nifti_fn` and its JSON sidecar (see :func:`_find_json_sidecar`)."""
+    """Duration per `nifti_fn` and its JSON sidecar (see :func:`_find_json_sidecar`).
+
+    None if there is no sidecar; either of them not being readable is an error.
+    """
     json_fn = _find_json_sidecar(nifti_fn, bids_root)
     if json_fn is None:
         return None
-    try:
-        meta = load_json(json_fn)
-        if not isinstance(meta, dict):
-            raise ValueError("not a JSON object")
-    except (OSError, ValueError) as exc:
-        lgr.warning("Failed to load %s to get acquisition duration: %s", json_fn, exc)
-        return None
+    meta = load_json(json_fn)
+    if not isinstance(meta, dict):
+        raise ValueError(f"{json_fn} does not contain a JSON object")
     return duration.from_sidecar(nifti_fn, meta)
 
 
@@ -941,7 +945,8 @@ def _find_sourcedata_tarball(nifti_fn: str, bids_root: str) -> tuple[str | None,
     sourcedata_dir = op.join(bids_root, "sourcedata", op.dirname(rel))
     stem = splitext_addext(op.basename(rel))[0]
     exact = op.join(sourcedata_dir, stem + ".dicom.tgz")
-    if op.exists(exact):
+    # also if its content is not present: not to go for another one then
+    if op.lexists(exact):
         return exact, False
     # the longest prefix of `stem` without the entities heudiconv inserts to
     # tell apart the outputs of an item
@@ -954,9 +959,7 @@ def _find_sourcedata_tarball(nifti_fn: str, bids_root: str) -> tuple[str | None,
     return (max(candidates, key=len), True) if candidates else (None, False)
 
 
-_TarballCache = dict[
-    str, tuple[duration.Duration | None, list[datetime.datetime]] | None
-]
+_TarballCache = dict[str, tuple[duration.Duration | None, list[datetime.datetime]]]
 
 
 def _read_sourcedata(
@@ -966,9 +969,10 @@ def _read_sourcedata(
 
     Its duration and acquisition timestamps per :func:`_read_sourcedata_tarball`,
     and whether the tarball is shared with other scans (see
-    :func:`_find_sourcedata_tarball`); None if there is no tarball, or it
-    cannot be read.  `tarballs` caches what was read from each, which the
-    outputs of a multi-output item share.
+    :func:`_find_sourcedata_tarball`); None if there is no tarball.  One
+    which cannot be read, as when its content is not present, is an error.
+    `tarballs` caches what was read from each, which the outputs of a
+    multi-output item share.
     """
     tarball, shared = _find_sourcedata_tarball(nifti_fn, bids_root)
     if tarball is None:
@@ -977,11 +981,8 @@ def _read_sourcedata(
         try:
             tarballs[tarball] = _read_sourcedata_tarball(tarball)
         except Exception as exc:
-            # a corrupt archive or DICOM within
-            lgr.warning("Failed to read source DICOMs from %s: %s", tarball, exc)
-            tarballs[tarball] = None
-    read = tarballs[tarball]
-    return read and (*read, shared)
+            raise RuntimeError(f"cannot read source DICOMs {tarball}: {exc}") from exc
+    return *tarballs[tarball], shared
 
 
 def populate_scans_duration(
@@ -1017,18 +1018,31 @@ def populate_scans_duration(
     if not scans_tsvs:
         lgr.warning("No '*_scans.tsv' files found under %s", path)
         return
+    failures = 0
     for scans_tsv in scans_tsvs:
         try:
-            _populate_scans_duration_file(scans_tsv, overwrite, fix_acq_time)
+            failures += _populate_scans_duration_file(
+                scans_tsv, overwrite, fix_acq_time
+            )
         except Exception as exc:
-            # one malformed file must not abort the rest of the dataset
+            # one malformed file must not keep the rest of the dataset from
+            # being done
             lgr.error("Failed to populate 'duration' in %s: %s", scans_tsv, exc)
+            failures += 1
+    if failures:
+        raise RuntimeError(
+            f"Failed for {failures} of the scans or _scans.tsv files under "
+            f"{path}, see the errors logged; the others are done"
+        )
 
 
 def _populate_scans_duration_file(
     scans_tsv: str, overwrite: bool, fix_acq_time: bool = False
-) -> None:
-    """Backfill the 'duration' column of a single ``_scans.tsv`` file, in place."""
+) -> int:
+    """Backfill the 'duration' column of a single ``_scans.tsv`` file, in place.
+
+    Returns for how many of its scans that failed.
+    """
     session_dir = op.dirname(scans_tsv)
     bids_root = _find_bids_dataset_root(session_dir)
     if bids_root is None:
@@ -1041,29 +1055,25 @@ def _populate_scans_duration_file(
 
     # a legacy file gains the column (and scans.json its description below)
     # even if there is nothing to compute, e.g. no rows
-    changed = "duration" not in fieldnames
+    changed = not set(duration.SCANS_FIELDS) <= set(fieldnames)
     if changed:
         fieldnames = _merge_scans_header(
-            fieldnames, ["filename", "acq_time", "duration"]
+            fieldnames, ["filename", "acq_time", *duration.SCANS_FIELDS]
         )
     tarballs: _TarballCache = {}
+    failures = 0
     for row in rows:
         filename = row["filename"]
         want_duration = overwrite or maybe_na(row.get("duration")) == "n/a"
         if not filename:
             lgr.warning("%s has a row with no filename, skipping it", scans_tsv)
-        elif not (want_duration or fix_acq_time):
-            pass
-        elif not _is_within(op.join(session_dir, filename), bids_root):
-            lgr.warning(
-                "Refusing %r in %s: resolves outside of the dataset (%s)",
-                filename,
-                scans_tsv,
-                bids_root,
-            )
-        else:
+        elif want_duration or fix_acq_time:
             before = dict(row)
             try:
+                if not _is_within(op.join(session_dir, filename), bids_root):
+                    raise ValueError(f"it is outside of the dataset ({bids_root})")
+                if not op.lexists(op.join(session_dir, filename)):
+                    raise FileNotFoundError("there is no such file")
                 _populate_scans_row(
                     row,
                     op.join(session_dir, filename),
@@ -1073,9 +1083,11 @@ def _populate_scans_duration_file(
                     tarballs,
                 )
             except Exception as exc:
-                # e.g. a malformed sidecar must not get in the way of the
-                # other rows, nor of recording what was done to this one
-                lgr.warning("Failed to process %s: %s", filename, exc)
+                # e.g. content which is not present, or a malformed sidecar,
+                # must not get in the way of the other rows, nor of
+                # recording what was done to this one
+                lgr.error("Failed for %s of %s: %s", filename, scans_tsv, exc)
+                failures += 1
             changed |= row != before
 
     if changed:
@@ -1084,6 +1096,7 @@ def _populate_scans_duration_file(
     else:
         lgr.info("Nothing to update in %s", scans_tsv)
     _ensure_scans_json(op.join(bids_root, "scans.json"))
+    return failures
 
 
 def _populate_scans_row(
@@ -1103,9 +1116,8 @@ def _populate_scans_row(
             found = _duration_from_sidecar(nifti_fn, bids_root)
         lgr.info("Duration of %s: %s", row["filename"], found or "unknown")
         # keep a value which we could not re-establish
-        row["duration"] = (
-            _format_duration(found) if found else maybe_na(row.get("duration"))
-        )
+        if found or maybe_na(row.get("duration")) == "n/a":
+            row.update(zip(duration.SCANS_FIELDS, _format_duration(found)))
     _check_acq_time(row, nifti_fn, bids_root, timestamps, shared_tarball, fix_acq_time)
 
 

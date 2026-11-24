@@ -8,7 +8,7 @@ the durations they report.
 All that HeuDiConv knows about establishing it is in this module, for it to
 be replaceable as a whole should the converter (dcm2niix) come to report it:
 :func:`from_dicoms` is used upon conversion, :func:`from_sidecar` for data
-converted earlier, and :data:`SCANS_FIELD` describes the result.  The rules,
+converted earlier, and :data:`SCANS_FIELDS` describes the result.  The rules,
 what they are based on, and their limitations are in ``docs/duration.rst``.
 """
 
@@ -27,22 +27,87 @@ import pydicom as dcm
 
 from .dicoms import FileTiming, parse_private_csa_protocol
 
-__all__ = ["Duration", "SCANS_FIELD", "from_dicoms", "from_sidecar"]
+__all__ = ["Duration", "SCANS_FIELDS", "SOURCES", "from_dicoms", "from_sidecar"]
 
 lgr = logging.getLogger(__name__)
 
-#: Description of the ``duration`` column, for ``scans.json``
-SCANS_FIELD = OrderedDict(
+#: What a duration could be established from, and what it then is of
+SOURCES = OrderedDict(
     [
-        ("LongName", "Scan duration"),
         (
-            "Description",
-            "Wallclock duration of the scan, in seconds, from the onset of the "
-            "first to the end of the last stored volume or sample, as "
-            "established by HeuDiConv. See also "
-            "https://github.com/bids-standard/bids-specification/pull/2508",
+            "volume-onsets",
+            "From the onset of the first stored volume to the end of the last "
+            "one, per the acquisition times of the volumes as numbered in the "
+            "DICOMs. Does not include what precedes the first stored volume",
         ),
-        ("Units", "s"),
+        (
+            "ge-tag",
+            "GE's private Acquisition Duration (0019,105A) of the DICOMs. "
+            "Includes preparation and dummy scans",
+        ),
+        (
+            "ge-tag-scaled",
+            "As ge-tag, scaled to the share of the planned volumes which is stored",
+        ),
+        (
+            "dicom-tag",
+            "AcquisitionDuration (0018,9073) of the DICOMs. Includes "
+            "preparation, reference and dummy scans, and is of what was "
+            "planned should the scan have been aborted",
+        ),
+        (
+            "siemens-protocol",
+            "Scan time which the Siemens protocol of a single volume declares "
+            "(lTotalScanTimeSec), in whole seconds",
+        ),
+        (
+            "tr-x-volumes",
+            "RepetitionTime times the number of volumes of the NIfTI, there "
+            "being no DICOMs to tell",
+        ),
+        (
+            "sidecar-tag",
+            "AcquisitionDuration of the JSON sidecar of a single volume, as "
+            "the converter recorded it, there being no DICOMs to tell",
+        ),
+    ]
+)
+
+#: Descriptions, for ``scans.json``, of the columns of ``_scans.tsv`` for a
+#: :class:`Duration`: its seconds and its source
+SCANS_FIELDS = OrderedDict(
+    [
+        (
+            "duration",
+            OrderedDict(
+                [
+                    ("LongName", "Scan duration"),
+                    (
+                        "Description",
+                        "Wallclock duration of the scan, in seconds, from the "
+                        "onset of the first to the end of the last stored volume "
+                        "or sample, as established by HeuDiConv. What it "
+                        "includes depends on duration_source. See also "
+                        "https://github.com/bids-standard/bids-specification/pull/2508",
+                    ),
+                    ("Units", "s"),
+                ]
+            ),
+        ),
+        (
+            "duration_source",
+            OrderedDict(
+                [
+                    ("LongName", "Source of the scan duration"),
+                    (
+                        "Description",
+                        "What HeuDiConv established duration from, which "
+                        "determines what it includes",
+                    ),
+                    ("Levels", SOURCES),
+                ]
+            ),
+        ),
     ]
 )
 
@@ -58,7 +123,7 @@ _NOT_REPETITION_PACED = {"asl", "m0scan", "svs", "mrsi", "unloc", "mrsref"}
 
 class Duration(NamedTuple):
     seconds: float
-    #: what it was established from, the meaning differing between them
+    #: one of :data:`SOURCES`
     source: str
 
 
@@ -82,19 +147,14 @@ def from_sidecar(nifti_fn: str, meta: dict[str, Any]) -> Duration | None:
     ``VolumeTiming``, or for ASL and spectroscopy, which are told by the
     BIDS suffix of `nifti_fn` (or ``ArterialSpinLabelingType``).  Of a single
     volume it is the ``AcquisitionDuration`` which the converter recorded.
-    None if unknown, as when `nifti_fn` cannot be read for how many it has.
+    None if unknown.  `nifti_fn` has to be readable, for how many it has.
     """
-    try:
-        shape = nb.load(nifti_fn).shape  # type: ignore[attr-defined]
-    except Exception as exc:
-        # arbitrary, possibly corrupted or truncated, user data
-        lgr.warning("Failed to load %s to get the number of volumes: %s", nifti_fn, exc)
-        return None
+    shape = nb.load(nifti_fn).shape  # type: ignore[attr-defined]
     if len(shape) < 4 or shape[3] == 1:
         duration = _positive(meta.get("AcquisitionDuration"))
         if duration is None or duration > _LONGEST:
             return None
-        return Duration(duration, "AcquisitionDuration of the sidecar")
+        return Duration(duration, "sidecar-tag")
     suffix = splitext_addext(op.basename(nifti_fn))[0].rpartition("_")[2]
     repetition_time = _positive(meta.get("RepetitionTime"))
     if (
@@ -103,7 +163,7 @@ def from_sidecar(nifti_fn: str, meta: dict[str, Any]) -> Duration | None:
         or {"VolumeTiming", "ArterialSpinLabelingType"} & meta.keys()
     ):
         return None
-    return Duration(repetition_time * shape[3], "RepetitionTime x volumes")
+    return Duration(repetition_time * shape[3], "tr-x-volumes")
 
 
 @dataclass(frozen=True)
@@ -161,24 +221,24 @@ def estimate(
         return None
     if header.ge_duration is not None:
         return _scale_to_stored_volumes(header, n_files)
-    for source, numbers in {
-        "AcquisitionNumber": [t.acquisition_number for t in timings],
-        "TemporalPositionIdentifier": [t.temporal_position for t in timings],
-    }.items():
+    for numbers in (
+        [t.acquisition_number for t in timings],
+        [t.temporal_position for t in timings],
+    ):
         onsets = _get_onsets(numbers, timings)
         if onsets is not None:
             seconds = _span_volumes(onsets, header.repetition_time)
             if seconds is None:
                 return None
-            return Duration(seconds, f"volumes numbered by {source}")
+            return Duration(seconds, "volume-onsets")
     times = [t.time for t in timings]
     span = (max(times) - min(times)).total_seconds() if times else 0.0
     tag = header.acquisition_duration
     # UIH has it in milliseconds; shorter than the span it is of a volume
     if tag and not header.manufacturer.startswith("UIH") and span <= tag <= _LONGEST:
-        return Duration(tag, "AcquisitionDuration tag")
+        return Duration(tag, "dicom-tag")
     if header.siemens_duration is not None:
-        return Duration(header.siemens_duration, "Siemens protocol")
+        return Duration(header.siemens_duration, "siemens-protocol")
     return None
 
 
@@ -189,9 +249,9 @@ def _scale_to_stored_volumes(header: SeriesHeader, n_files: int) -> Duration:
     if planned and locations and n_files // locations < planned:
         return Duration(
             header.ge_duration * max(n_files // locations, 1) / planned,
-            "GE's private tag, scaled to the stored volumes",
+            "ge-tag-scaled",
         )
-    return Duration(header.ge_duration, "GE's private tag")
+    return Duration(header.ge_duration, "ge-tag")
 
 
 def _get_onsets(

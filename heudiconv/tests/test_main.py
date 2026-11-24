@@ -210,16 +210,16 @@ def test_get_formatted_scans_key_row() -> None:
     )
 
     row1 = get_formatted_scans_key_row(dcm_fn)
-    assert len(row1) == 4
+    assert len(row1) == 5
     assert row1[0] == "2016-10-14T09:26:34.692500"
     # as heudiconv.duration establishes it, here per the patch above
-    assert row1[1] == "1.000"
-    assert row1[2] == "n/a"
-    prandstr1 = row1[3]
+    assert row1[1:3] == ["1.000", "number of DICOMs"]
+    assert row1[3] == "n/a"
+    prandstr1 = row1[4]
 
     # if we rerun - should be identical!
     row2 = get_formatted_scans_key_row(dcm_fn)
-    prandstr2 = row2[3]
+    prandstr2 = row2[4]
     assert prandstr1 == prandstr2
     assert row1 == row2
     # So it is consistent across pythons etc, we use explicit value here
@@ -228,7 +228,7 @@ def test_get_formatted_scans_key_row() -> None:
     # but the prandstr should change when we consider another DICOM file
     row3 = get_formatted_scans_key_row("%s/01-anat-scout/0001.dcm" % TESTS_DATA_PATH)
     assert row3 != row1
-    prandstr3 = row3[3]
+    prandstr3 = row3[4]
     assert prandstr1 != prandstr3
     assert prandstr3 == "fae3befb"
 
@@ -251,8 +251,8 @@ def test_get_formatted_scans_key_row_acq_time_is_earliest_timestamp(
 def test_add_rows_to_scans_keys_file(tmp_path: Path) -> None:
     fn = opj(tmp_path, "file.tsv")
     rows = {
-        "my_file.nii.gz": ["2016adsfasd", "1.500", "", "fasadfasdf"],
-        "another_file.nii.gz": ["2018xxxxx", "n/a", "", "fasadfasdf"],
+        "my_file.nii.gz": ["2016adsfasd", "1.500", "dicom-tag", "", "fasadfasdf"],
+        "another_file.nii.gz": ["2018xxxxx", "n/a", "n/a", "", "fasadfasdf"],
     }
     add_rows_to_scans_keys_file(fn, rows)
     # not e.g. the owner-only permissions of a temporary file
@@ -271,6 +271,7 @@ def test_add_rows_to_scans_keys_file(tmp_path: Path) -> None:
                     "filename",
                     "acq_time",
                     "duration",
+                    "duration_source",
                     "operator",
                     "randstr",
                 ]
@@ -286,9 +287,9 @@ def test_add_rows_to_scans_keys_file(tmp_path: Path) -> None:
     assert not op.exists(opj(tmp_path, "file.json"))
     # add a new one
     extra_rows = {
-        "a_new_file.nii.gz": ["2016adsfasd23", "n/a", "", "fasadfasdf"],
-        "my_file.nii.gz": ["2016adsfasd", "1.500", "", "fasadfasdf"],
-        "another_file.nii.gz": ["2018xxxxx", "n/a", "", "fasadfasdf"],
+        "a_new_file.nii.gz": ["2016adsfasd23", "n/a", "n/a", "", "fasadfasdf"],
+        "my_file.nii.gz": ["2016adsfasd", "1.500", "dicom-tag", "", "fasadfasdf"],
+        "another_file.nii.gz": ["2018xxxxx", "n/a", "n/a", "", "fasadfasdf"],
     }
     add_rows_to_scans_keys_file(fn, extra_rows)
     _check_rows(fn, extra_rows)
@@ -307,10 +308,10 @@ def test_add_rows_to_scans_keys_file(tmp_path: Path) -> None:
             ],
             "utf-8",
             [
-                "filename\tacq_time\tduration\toperator\trandstr",
-                "old.nii.gz\t2016\tn/a\tDr. Old\told1",
-                "redone.nii.gz\t2017b\t2.000\tDr. New\tnew2",
-                "new.nii.gz\t2018\t1.500\t\tnew1",
+                "filename\tacq_time\tduration\tduration_source\toperator\trandstr",
+                "old.nii.gz\t2016\tn/a\tn/a\tDr. Old\told1",
+                "redone.nii.gz\t2017b\t2.000\tdicom-tag\tDr. New\tnew2",
+                "new.nii.gz\t2018\t1.500\tvolume-onsets\t\tnew1",
             ],
             id="older-header",
         ),
@@ -324,10 +325,10 @@ def test_add_rows_to_scans_keys_file(tmp_path: Path) -> None:
             ],
             "utf-8",
             [
-                "filename\tacq_time\tduration\toperator\trandstr\tnotes",
-                "old.nii.gz\t2016\tn/a\tDr. Old\told1\thand-added",
-                "redone.nii.gz\t2017b\t2.000\tDr. New\tnew2\tkeep me",
-                "new.nii.gz\t2018\t1.500\t\tnew1\tn/a",
+                "filename\tacq_time\tduration\tduration_source\toperator\trandstr\tnotes",
+                "old.nii.gz\t2016\tn/a\tn/a\tDr. Old\told1\thand-added",
+                "redone.nii.gz\t2017b\t2.000\tdicom-tag\tDr. New\tnew2\tkeep me",
+                "new.nii.gz\t2018\t1.500\tvolume-onsets\t\tnew1\tn/a",
             ],
             id="custom-column",
         ),
@@ -337,10 +338,10 @@ def test_add_rows_to_scans_keys_file(tmp_path: Path) -> None:
             ["filename\tacq_time", "old.nii.gz\t2016"],
             "utf-8-sig",
             [
-                "filename\tacq_time\tduration\toperator\trandstr",
-                "old.nii.gz\t2016\tn/a\tn/a\tn/a",
-                "redone.nii.gz\t2017b\t2.000\tDr. New\tnew2",
-                "new.nii.gz\t2018\t1.500\t\tnew1",
+                "filename\tacq_time\tduration\tduration_source\toperator\trandstr",
+                "old.nii.gz\t2016\tn/a\tn/a\tn/a\tn/a",
+                "redone.nii.gz\t2017b\t2.000\tdicom-tag\tDr. New\tnew2",
+                "new.nii.gz\t2018\t1.500\tvolume-onsets\t\tnew1",
             ],
             id="byte-order-mark",
         ),
@@ -349,10 +350,10 @@ def test_add_rows_to_scans_keys_file(tmp_path: Path) -> None:
             ["filename\tnotes\tacq_time", "old.nii.gz\tn\t2019"],
             "utf-8",
             [
-                "filename\tnotes\tacq_time\tduration\toperator\trandstr",
-                "redone.nii.gz\tn/a\t2017b\t2.000\tDr. New\tnew2",
-                "new.nii.gz\tn/a\t2018\t1.500\t\tnew1",
-                "old.nii.gz\tn\t2019\tn/a\tn/a\tn/a",
+                "filename\tnotes\tacq_time\tduration\tduration_source\toperator\trandstr",
+                "redone.nii.gz\tn/a\t2017b\t2.000\tdicom-tag\tDr. New\tnew2",
+                "new.nii.gz\tn/a\t2018\t1.500\tvolume-onsets\t\tnew1",
+                "old.nii.gz\tn\t2019\tn/a\tn/a\tn/a\tn/a",
             ],
             id="acq_time-after-custom-column",
         ),
@@ -361,10 +362,10 @@ def test_add_rows_to_scans_keys_file(tmp_path: Path) -> None:
             ["filename\tacq_time", "old.nii.gz\t2016\tstray\t"],
             "utf-8",
             [
-                "filename\tacq_time\tduration\toperator\trandstr",
-                "old.nii.gz\t2016\tn/a\tn/a\tn/a\tstray\t",
-                "redone.nii.gz\t2017b\t2.000\tDr. New\tnew2",
-                "new.nii.gz\t2018\t1.500\t\tnew1",
+                "filename\tacq_time\tduration\tduration_source\toperator\trandstr",
+                "old.nii.gz\t2016\tn/a\tn/a\tn/a\tn/a\tstray\t",
+                "redone.nii.gz\t2017b\t2.000\tdicom-tag\tDr. New\tnew2",
+                "new.nii.gz\t2018\t1.500\tvolume-onsets\t\tnew1",
             ],
             id="fields-beyond-header",
         ),
@@ -378,8 +379,8 @@ def test_add_rows_to_existing_scans_keys_file(
     add_rows_to_scans_keys_file(
         str(fn),
         {
-            "new.nii.gz": ["2018", "1.500", "", "new1"],
-            "redone.nii.gz": ["2017b", "2.000", "Dr. New", "new2"],
+            "new.nii.gz": ["2018", "1.500", "volume-onsets", "", "new1"],
+            "redone.nii.gz": ["2017b", "2.000", "dicom-tag", "Dr. New", "new2"],
         },
     )
     assert fn.read_text().splitlines() == expected

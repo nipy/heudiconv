@@ -15,28 +15,32 @@ should ``dcm2niix`` come to provide such a duration (see `Relation to
 dcm2niix`_).  Where no source below applies, ``n/a`` is recorded: no
 duration is preferred to a wrong one.
 
+What a duration includes depends on what it was established from, which the
+``duration_source`` column next to it tells, by the names given below in
+parentheses; ``scans.json`` describes them too.
+
 From DICOMs
 ===========
 
 Upon conversion, and for a dataset converted earlier which has its DICOMs
 under ``sourcedata/``, the first of these to apply is used:
 
-1. **GE's private "Acquisition Duration"** (0019,105A).  It is of all the
-   volumes planned (``NumberOfTemporalPositions``), so if fewer are stored,
-   it is scaled to their share.  The acquisition times in GE files do not
+1. **GE's private "Acquisition Duration"** (0019,105A) (``ge-tag``).  It is
+   of all the volumes planned (``NumberOfTemporalPositions``), so if fewer
+   are stored, it is scaled to their share (``ge-tag-scaled``).  The acquisition times in GE files do not
    tell their volumes apart, hence this comes first.
-2. **Onsets of the numbered volumes.**  Volumes are numbered by
+2. **Onsets of the numbered volumes** (``volume-onsets``).  Volumes are numbered by
    ``AcquisitionNumber`` (Siemens) or ``TemporalPositionIdentifier``
    (Philips), if the files have at least two of those, and their volumes
    follow in time as they do in number.  The duration is from the first
    onset to the end of the last volume, a volume taking as long as onsets
    are apart per their numbers.  This is the only source which leaves out
    what precedes the first stored volume.
-3. **The AcquisitionDuration tag** (0018,9073), unless shorter than the
+3. **The AcquisitionDuration tag** (0018,9073) (``dicom-tag``), unless shorter than the
    acquisition times of the files span (then it is of a single volume),
    longer than 4 hours, or of UIH, which has it in milliseconds.
-4. **The scan time declared in a Siemens protocol** (``lTotalScanTimeSec``),
-   if the protocol is of a single volume.
+4. **The scan time declared in a Siemens protocol** (``lTotalScanTimeSec``)
+   (``siemens-protocol``), if the protocol is of a single volume.
 
 Spectroscopy gets none: its ``AcquisitionDuration`` could be of each file.
 
@@ -50,14 +54,16 @@ From a NIfTI and its sidecar
 
 Only if a scan has no (readable) DICOMs under ``sourcedata/``,
 ``--command populate-scans-duration`` goes by the converted files: for more
-than one volume it is their number times ``RepetitionTime``, and for a
-single one the ``AcquisitionDuration`` of the sidecar, if not over 4 hours.
+than one volume it is their number times ``RepetitionTime``
+(``tr-x-volumes``), and for a single one the ``AcquisitionDuration`` of the
+sidecar (``sidecar-tag``), if not over 4 hours.
 Volumes which are not a ``RepetitionTime`` apart get ``n/a``: anything with
 ``VolumeTiming``, and ASL and spectroscopy, which are told by their BIDS
 suffix (``asl``, ``m0scan``, ``svs``, ``mrsi``, ``unloc``, ``mrsref``) or, for
 ASL, ``ArterialSpinLabelingType`` in the sidecar -- which ``dcm2niix`` records
 for Siemens only.  A NIfTI which cannot be read, e.g. annexed and not
-present, gets ``n/a`` and a warning, the number of its volumes being unknown.
+present, is an error, as are DICOMs which are there but cannot be read: the
+sidecar is no substitute for them.
 
 What the rules are based on
 ===========================
@@ -143,7 +149,8 @@ Known limitations
 - From a NIfTI and its sidecar, the number of volumes times
   ``RepetitionTime`` leaves out any delay between volumes, and
   ``AcquisitionDuration`` is as ``dcm2niix`` passed it on.  A dataset with
-  DICOMs kept for some scans only thus has durations of two kinds.
+  DICOMs kept for some scans only thus has durations of two kinds, told
+  apart by ``duration_source``.
 - Where conversion goes by a tag, converting and filling in later without
   DICOMs give different durations: 150 s against 130 s for Canon's diffusion,
   40 s against 20 s for ``dcm_qa_trt``.

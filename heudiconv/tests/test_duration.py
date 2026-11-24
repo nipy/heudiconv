@@ -82,7 +82,7 @@ def test_estimate_of_dcm_qa(row: dict[str, Any]) -> None:
     # that is not how long a volume takes, as for ASL
     if (
         found
-        and found.source.startswith("volumes numbered")
+        and found.source == "volume-onsets"
         and "dcm2niix" in row
         and "asl" not in row["description"].lower()
     ):
@@ -158,7 +158,7 @@ def test_dcm_qa_table_is_current() -> None:  # pragma: no cover
             dict(repetition_time=1.0, acquisition_duration=27.89),
             20,
             _numbered(*range(20)),
-            (20.0, "volumes numbered by AcquisitionNumber"),
+            (20.0, "volume-onsets"),
             id="dcm_qa_xa30 BOLD: volumes, the tag counting 8 more TRs",
         ),
         pytest.param(
@@ -167,49 +167,49 @@ def test_dcm_qa_table_is_current() -> None:  # pragma: no cover
             _timings(
                 *((t + e, n, None) for n, t in enumerate([0, 2, 4]) for e in (0, 0.018))
             ),
-            (6.0, "volumes numbered by AcquisitionNumber"),
+            (6.0, "volume-onsets"),
             id="dcm_qa_me: a file per echo",
         ),
         pytest.param(
             {},
             4,
             _timings((0, 1, None), (0.5, 1, None), (2, 2, None), (4, 3, None)),
-            (6.0, "volumes numbered by AcquisitionNumber"),
+            (6.0, "volume-onsets"),
             id="onset of a volume is the earliest time of its files",
         ),
         pytest.param(
             {},
             4,
             _timings((0, 1, 1), (1, 2, 1), (2, 3, 2), (3, 4, 2)),
-            (4.0, "volumes numbered by AcquisitionNumber"),
+            (4.0, "volume-onsets"),
             id="AcquisitionNumber rather than TemporalPositionIdentifier",
         ),
         pytest.param(
             dict(repetition_time=1.81, acquisition_duration=602.735),
             2,
             _timings((0, 1, None), (36.2, 21, None)),
-            (pytest.approx(38.01), "volumes numbered by AcquisitionNumber"),
+            (pytest.approx(38.01), "volume-onsets"),
             id="xa_4d_interrupted: volumes 1 and 21 of an aborted run",
         ),
         pytest.param(
             dict(repetition_time=0.25, acquisition_duration=248.0),
             8,
             _timings(*((8.0 * (i // 2), None, 1 + i // 2) for i in range(8))),
-            (32.0, "volumes numbered by TemporalPositionIdentifier"),
+            (32.0, "volume-onsets"),
             id="dcm_qa_philips_asl: volumes which take many TRs",
         ),
         pytest.param(
             dict(repetition_time=0.6, acquisition_duration=76.182),
             2,
             _timings((0, 1, None), (0.6025, 1, None)),
-            (76.182, "AcquisitionDuration tag"),
+            (76.182, "dicom-tag"),
             id="dcm_qa_xa30 field map: echoes a TR apart are of one volume",
         ),
         pytest.param(
             dict(repetition_time=3.0),
             2,
             _numbered(0, 3.0125),
-            (6.0, "volumes numbered by AcquisitionNumber"),
+            (6.0, "volume-onsets"),
             id="two volumes a TR apart",
         ),
         pytest.param(
@@ -224,7 +224,7 @@ def test_dcm_qa_table_is_current() -> None:  # pragma: no cover
                 dict(repetition_time=3.0),
                 2,
                 _numbered(0, 3.0 * apart),
-                expected and (6.0, "volumes numbered by AcquisitionNumber"),
+                expected and (6.0, "volume-onsets"),
                 id=f"two volumes {apart} TR apart",
             )
             for apart, expected in [(0.94, None), (0.96, 1), (1.04, 1), (1.06, None)]
@@ -233,7 +233,7 @@ def test_dcm_qa_table_is_current() -> None:  # pragma: no cover
             {},
             4,
             _timings((0, 1, None), (9, None, None), (2, 2, None), (4, 3, None)),
-            (6.0, "volumes numbered by AcquisitionNumber"),
+            (6.0, "volume-onsets"),
             id="a file without a number among numbered volumes",
         ),
         pytest.param(
@@ -247,7 +247,7 @@ def test_dcm_qa_table_is_current() -> None:  # pragma: no cover
             dict(repetition_time=2.0, acquisition_duration=40.0),
             20,
             _timings(*((i // 10, None, 1 + i % 10) for i in range(20))),
-            (40.0, "AcquisitionDuration tag"),
+            (40.0, "dicom-tag"),
             id="dcm_qa_trt, were it not GE: times do not follow the numbers",
         ),
         pytest.param(
@@ -261,21 +261,21 @@ def test_dcm_qa_table_is_current() -> None:  # pragma: no cover
             dict(acquisition_duration=2.0),
             2,
             _timings((0, None, None), (2.0, None, None)),
-            (2.0, "AcquisitionDuration tag"),
+            (2.0, "dicom-tag"),
             id="tag as long as the timestamps span",
         ),
         pytest.param(
             dict(acquisition_duration=349.76, siemens_duration=14.0),
             1,
             _timings((0, 1, None)),
-            (349.76, "AcquisitionDuration tag"),
+            (349.76, "dicom-tag"),
             id="tag of a single volume",
         ),
         pytest.param(
             dict(acquisition_duration=349.76),
             1,
             [],
-            (349.76, "AcquisitionDuration tag"),
+            (349.76, "dicom-tag"),
             id="tag of a file without a time",
         ),
         pytest.param(
@@ -303,7 +303,7 @@ def test_dcm_qa_table_is_current() -> None:  # pragma: no cover
             dict(acquisition_duration=14400.0),
             1,
             [],
-            (14400.0, "AcquisitionDuration tag"),
+            (14400.0, "dicom-tag"),
             id="4 hours",
         ),
         pytest.param(
@@ -320,49 +320,49 @@ def test_dcm_qa_table_is_current() -> None:  # pragma: no cover
             dict(siemens_duration=54.0, repetition_time=0.4),
             36,
             _timings(*((i / 100, 1, None) for i in range(36))),
-            (54.0, "Siemens protocol"),
+            (54.0, "siemens-protocol"),
             id="dcm_qa_fmap: protocol, timestamps being of slices",
         ),
         pytest.param(
             dict(ge_duration=60.0, planned_volumes=60, ge_locations=77),
             240,
             _timings((0, 1, 1), (1, 1, 2)),
-            (3.0, "GE's private tag, scaled to the stored volumes"),
+            (3.0, "ge-tag-scaled"),
             id="dcm_qa_ge: 3 of 60 volumes, and a part of one",
         ),
         pytest.param(
             dict(ge_duration=60.0, planned_volumes=60, ge_locations=77),
             4620,
             _timings((0, 1, 1)),
-            (60.0, "GE's private tag"),
+            (60.0, "ge-tag"),
             id="GE: all the files, whichever have a time",
         ),
         pytest.param(
             dict(ge_duration=60.0, planned_volumes=60, ge_locations=1),
             59,
             [],
-            (59.0, "GE's private tag, scaled to the stored volumes"),
+            (59.0, "ge-tag-scaled"),
             id="GE: all the volumes but one",
         ),
         pytest.param(
             dict(ge_duration=40.0, planned_volumes=10, ge_locations=54),
             540,
             [],
-            (40.0, "GE's private tag"),
+            (40.0, "ge-tag"),
             id="dcm_qa_trt: all the volumes",
         ),
         pytest.param(
             dict(ge_duration=60.0, planned_volumes=60, ge_locations=77),
             70,
             [],
-            (1.0, "GE's private tag, scaled to the stored volumes"),
+            (1.0, "ge-tag-scaled"),
             id="GE: not all of a volume",
         ),
         pytest.param(
             dict(ge_duration=327.0),
             196,
             _numbered(*range(20)),
-            (327.0, "GE's private tag"),
+            (327.0, "ge-tag"),
             id="GE: not telling how many volumes",
         ),
         pytest.param(dict(repetition_time=2.0), 1, _numbered(0), None, id="nothing"),
@@ -480,14 +480,14 @@ def test_series_header_siemens_duration(name: str, expected: float | None) -> No
         ("", None),
         # 3 volumes 4.15s (their TR) apart, not the 591s which their protocol
         # declares
-        ("b0dwiForFmap/*.dcm", (12.45, "volumes numbered by AcquisitionNumber")),
+        ("b0dwiForFmap/*.dcm", (12.45, "volume-onsets")),
         # a single volume: what its protocol declares
-        ("phantom.dcm", (14.0, "Siemens protocol")),
+        ("phantom.dcm", (14.0, "siemens-protocol")),
         # nothing to go by: its protocol is of more than a volume
         ("axasc35.dcm", None),
         # volumes 1 and 21, 20 of their 1.81s TR apart, of an aborted run,
         # whose AcquisitionDuration of 602.735s is of what was planned
-        ("xa_4d_interrupted/*", (38.01, "volumes numbered by AcquisitionNumber")),
+        ("xa_4d_interrupted/*", (38.01, "volume-onsets")),
     ],
 )
 def test_from_dicoms(dicoms: str, expected: tuple[float, str] | None) -> None:
@@ -502,12 +502,12 @@ def test_from_dicoms_goes_by_the_files_and_timings_given(tmp_path: Path) -> None
         tmp_path, [2, 0, 4, 7], numbers=[2, 1, 3, 4], AcquisitionDuration=30.0
     )
     found: Any = from_dicoms(dicom_list, get_file_timings(dicom_list))
-    assert found == (pytest.approx(7 + 7 / 3), "volumes numbered by AcquisitionNumber")
+    assert found == (pytest.approx(7 + 7 / 3), "volume-onsets")
     # with the header of the first of them
     dcm_data = dcm.dcmread(dicom_list[-1])
     dcm_data.AcquisitionDuration = 99.0
     dcm.dcmwrite(dicom_list[-1], dcm_data)
-    assert from_dicoms(dicom_list, []) == (30.0, "AcquisitionDuration tag")
+    assert from_dicoms(dicom_list, []) == (30.0, "dicom-tag")
     # and their number, whichever of them have timings
     with patch("heudiconv.duration.estimate") as estimate_:
         from_dicoms(dicom_list, [])
@@ -532,13 +532,13 @@ def _nifti(tmp_path: Path, name: str, shape: tuple[int, ...] | None) -> str:
             (2, 2, 2, 10),
             # not AcquisitionDuration, which also counts what precedes them
             {"RepetitionTime": 2.0, "AcquisitionDuration": 27.89},
-            (20.0, "RepetitionTime x volumes"),
+            (20.0, "tr-x-volumes"),
         ),
         (
             "sub-1_dwi.nii.gz",
             (2, 2, 2, 7),
             {"RepetitionTime": 3.0},
-            (21.0, "RepetitionTime x volumes"),
+            (21.0, "tr-x-volumes"),
         ),
         *(
             ("sub-1_task-rest_bold.nii.gz", (2, 2, 2, 10), {"RepetitionTime": tr}, None)
@@ -559,7 +559,7 @@ def _nifti(tmp_path: Path, name: str, shape: tuple[int, ...] | None) -> str:
             "sub-1_task-rest_bold.nii.gz",
             (2, 2, 2, 2),
             {"RepetitionTime": 2.0, "AcquisitionDuration": 27.89},
-            (4.0, "RepetitionTime x volumes"),
+            (4.0, "tr-x-volumes"),
         ),
         (
             "sub-1_task-rest_bold.nii.gz",
@@ -578,20 +578,18 @@ def _nifti(tmp_path: Path, name: str, shape: tuple[int, ...] | None) -> str:
             "sub-1_T1w.nii.gz",
             (2, 2, 2),
             {"RepetitionTime": 2.3, "AcquisitionDuration": 312.0},
-            (312.0, "AcquisitionDuration of the sidecar"),
+            (312.0, "sidecar-tag"),
         ),
         (
             "sub-1_T1w.nii.gz",
             (2, 2, 2, 1),
             {"AcquisitionDuration": 312.0},
-            (312.0, "AcquisitionDuration of the sidecar"),
+            (312.0, "sidecar-tag"),
         ),
         ("sub-1_T1w.nii.gz", (2, 2, 2), {"RepetitionTime": 2.3}, None),
         ("sub-1_T1w.nii.gz", (2, 2, 2), {"AcquisitionDuration": "junk"}, None),
         # not in seconds
         ("sub-1_T1w.nii.gz", (2, 2, 2), {"AcquisitionDuration": 190713.0}, None),
-        # cannot tell how many volumes
-        ("sub-1_T1w.nii.gz", None, {"AcquisitionDuration": 312.0}, None),
     ],
 )
 def test_from_sidecar(
@@ -602,3 +600,10 @@ def test_from_sidecar(
     expected: tuple[float, str] | None,
 ) -> None:
     assert from_sidecar(_nifti(tmp_path, name, shape), meta) == expected
+
+
+@pytest.mark.ai_generated
+def test_from_sidecar_of_unreadable_nifti(tmp_path: Path) -> None:
+    # how many volumes it has cannot be told, e.g. its content not being present
+    with pytest.raises(Exception, match="sub-1_T1w.nii.gz"):
+        from_sidecar(_nifti(tmp_path, "sub-1_T1w.nii.gz", None), {"RepetitionTime": 2})

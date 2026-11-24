@@ -146,10 +146,11 @@ def test_scans_keys_reproin(tmp_path: Path, invocation: list[str]) -> None:
                     "filename",
                     "acq_time",
                     "duration",
+                    "duration_source",
                     "operator",
                     "randstr",
                 ]
-            assert len(row) == 5
+            assert len(row) == 6
             if i != 0:
                 assert os.path.exists(pjoin(dirname(scans_keys[0]), row[0]))
                 assert re.match(
@@ -157,7 +158,7 @@ def test_scans_keys_reproin(tmp_path: Path, invocation: list[str]) -> None:
                 )
                 # the one conversion whose duration is checked for real:
                 # as its Siemens protocol declares, see heudiconv.duration
-                assert row[2] == "3.000"
+                assert row[2:4] == ["3.000", "siemens-protocol"]
 
 
 @patch("sys.stdout", new_callable=StringIO)

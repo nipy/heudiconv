@@ -15,15 +15,20 @@ Scan durations in ``_scans.tsv``
 ================================
 
 Upon conversion to BIDS, the ``duration`` column of each ``_scans.tsv`` gets
-the :doc:`duration of the stored data <duration>` in seconds, and ``acq_time``
-the time of its earliest DICOM.  To add ``duration`` to a dataset converted
+the :doc:`duration of the stored data <duration>` in seconds,
+``duration_source`` what it was established from, and ``acq_time`` the time
+of the earliest DICOM.  To add ``duration`` to a dataset converted
 before that, run::
 
     heudiconv --command populate-scans-duration --files /path/to/bids
 
 It is taken from the DICOMs kept under ``sourcedata/`` or, without those,
 estimated from the NIfTI and its JSON sidecar; ``n/a`` is recorded where
-neither tells.  Rows which already have a duration are left alone unless
+neither tells.  The content of those files has to be present: in a DataLad
+dataset, ``datalad get`` them first (``sourcedata`` too), or name them as
+``--input`` of ``datalad run``.  A scan whose DICOMs are there but cannot be
+read, or which has none and whose NIfTI cannot be read, is an error: the
+other scans get done, and the command fails in the end.  Rows which already have a duration are left alone unless
 ``--overwrite`` is given, and even then keep a value which could not be
 re-established.
 
