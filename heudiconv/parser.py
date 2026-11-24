@@ -163,6 +163,41 @@ def get_extracted_dicoms(fl: Iterable[str]) -> ItemsView[str | None, list[str]]:
     return sessions.items()
 
 
+def get_grouped_dicoms(
+    files_opt: list[str],
+    heuristic: ModuleType | None,
+    grouping: str = "studyUID",
+) -> dict[str | None, dict[SeqInfo, list[str]]]:
+    """Expand input paths and archives, then group DICOM sequences.
+
+    Unlike :func:`get_study_sessions`, this does not resolve subject or session
+    identities. When a heuristic is supplied, its filtering and grouping hooks
+    are applied before returning the groups.
+    """
+    files: list[str] = []
+    for f in files_opt:
+        if op.isdir(f):
+            files += sorted(
+                find_files(".*", topdir=f, exclude_vcs=True, exclude=r"/\.datalad/")
+            )
+        else:
+            files.append(f)
+
+    # Group by DICOM metadata rather than archive-derived session labels.
+    extracted_files: list[str] = []
+    for _, files_ex in get_extracted_dicoms(files):
+        extracted_files += files_ex
+
+    return group_dicoms_into_seqinfos(
+        extracted_files,
+        grouping,
+        file_filter=getattr(heuristic, "filter_files", None),
+        dcmfilter=getattr(heuristic, "filter_dicom", None),
+        custom_grouping=getattr(heuristic, "grouping", None),
+        custom_seqinfo=getattr(heuristic, "custom_seqinfo", None),
+    )
+
+
 def get_study_sessions(
     dicom_dir_template: str | None,
     files_opt: list[str] | None,
@@ -218,29 +253,7 @@ def get_study_sessions(
         # YOH - what if it is the initial run?
         # prep files
         assert files_opt
-        files: list[str] = []
-        for f in files_opt:
-            if op.isdir(f):
-                files += sorted(
-                    find_files(".*", topdir=f, exclude_vcs=True, exclude=r"/\.datalad/")
-                )
-            else:
-                files.append(f)
-
-        # in this scenario we don't care about sessions obtained this way
-        extracted_files: list[str] = []
-        for _, files_ex in get_extracted_dicoms(files):
-            extracted_files += files_ex
-
-        # sort all DICOMS using heuristic
-        seqinfo_dict = group_dicoms_into_seqinfos(
-            extracted_files,
-            grouping,
-            file_filter=getattr(heuristic, "filter_files", None),
-            dcmfilter=getattr(heuristic, "filter_dicom", None),
-            custom_grouping=getattr(heuristic, "grouping", None),
-            custom_seqinfo=getattr(heuristic, "custom_seqinfo", None),
-        )
+        seqinfo_dict = get_grouped_dicoms(files_opt, heuristic, grouping)
 
         if sids:
             if len(sids) != 1:

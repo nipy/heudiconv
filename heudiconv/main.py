@@ -11,7 +11,7 @@ from . import __packagename__, __version__
 from .bids import populate_bids_templates, populate_intended_for, tuneup_bids_json_files
 from .convert import prep_conversion
 from .due import Doi, due
-from .parser import get_study_sessions
+from .parser import get_grouped_dicoms, get_study_sessions
 from .queue import queue_conversion
 from .utils import SeqInfo, anonymize_sid, load_heuristic, sanitize_path, treat_infofile
 
@@ -94,13 +94,17 @@ def process_extra_commands(
         for fname in files:
             treat_infofile(fname)
     elif command == "ls":
-        ensure_heuristic_arg(heuristic)
-        assert heuristic is not None
         ensure_has_files()
         assert files is not None  # for mypy now
-        heuristic_mod = load_heuristic(heuristic)
+        heuristic_mod = load_heuristic(heuristic) if heuristic else None
         heuristic_ls = getattr(heuristic_mod, "ls", None)
         for fname in files:
+            if heuristic_mod is None:
+                groups = get_grouped_dicoms([fname], None, grouping)
+                print(fname)
+                for group, seqinfo in groups.items():
+                    print("\t%s %d sequences" % (group, len(seqinfo)))
+                continue
             study_sessions = get_study_sessions(
                 None,
                 [fname],
