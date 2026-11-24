@@ -305,7 +305,8 @@ def tuneup_bids_json_files(json_files: list[str]) -> None:
     for jsonfile in json_files:
         json_ = load_json(jsonfile)
         if "part-phase" in op.basename(jsonfile).split("_"):
-            # Adding a phase entity does not rescale the converter's voxel values.
+            # BIDS requires Units for phase images, and dcm2niix does not provide
+            # them: it does not rescale phase to radians.
             json_.setdefault("Units", "arbitrary")
         # sanitize!
         for f1 in ["Acquisition", "Study", "Series"]:

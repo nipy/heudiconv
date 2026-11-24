@@ -37,6 +37,7 @@ from heudiconv.bids import (
     sanitize_label,
     select_fmap_from_compatible_groups,
     treat_age,
+    tuneup_bids_json_files,
 )
 from heudiconv.cli.run import main as runner
 from heudiconv.utils import Load, create_tree, load_json, remove_suffix, save_json
@@ -58,6 +59,25 @@ def gen_rand_label(label_size: int, label_seed: int, seed_stdout: bool = True) -
     if seed_stdout:
         print(f"Seed used to generate custom label: {label_seed}")
     return rand_char + rand_num
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "filename,existing,expected",
+    [
+        ("sub-01_echo-1_part-phase_MEGRE.json", None, "arbitrary"),
+        ("sub-01_task-rest_part-phase_bold.json", "rad", "rad"),
+        ("sub-01_part-mag_MEGRE.json", None, None),
+        ("sub-01_acq-part-phase_MEGRE.json", None, None),
+    ],
+)
+def test_tuneup_bids_json_files_phase_units(
+    tmp_path: Path, filename: str, existing: str | None, expected: str | None
+) -> None:
+    path = str(tmp_path / filename)
+    save_json(path, {} if existing is None else {"Units": existing})
+    tuneup_bids_json_files([path])
+    assert load_json(path).get("Units") == expected
 
 
 def test_maybe_na() -> None:
@@ -1775,6 +1795,13 @@ def test_ME_mag_phase_conversion(
     # This also checks that the "echo" entity comes before "part":
     for part in ["mag", "phase"]:
         for e in range(1, 4):
+            sidecar = load_json(
+                outdir
+                / f"sub-{subID}"
+                / "anat"
+                / f"sub-{subID}_echo-{e}_part-{part}_MEGRE.json"
+            )
+            assert sidecar.get("Units") == ("arbitrary" if part == "phase" else None)
             for ext in ["nii.gz", "json"]:
                 assert op.exists(
                     op.join(outdir, "sub-%s", "anat", "sub-%s_echo-%s_part-%s_MEGRE.%s")
