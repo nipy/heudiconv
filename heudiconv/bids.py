@@ -1029,12 +1029,8 @@ def populate_intended_for(
                 json_file, fmap_groups, criterion=criterion
             )
 
-    # Loop through all the unique fmap_groups in compatible_fmaps:
-    unique_fmap_groups = {}
-    for cf in compatible_fmaps.values():
-        for key, values in cf.items():
-            if key not in unique_fmap_groups:
-                unique_fmap_groups[key] = values
+    # Include groups with no compatible runs so they are reported as unused too.
+    unique_fmap_groups = find_fmap_groups(fmap_dir)
 
     for fmap_group in unique_fmap_groups:
         intended_for = []
@@ -1050,6 +1046,13 @@ def populate_intended_for(
             # Add this intended_for to all fmap files in the fmap_group:
             for fm_json in unique_fmap_groups[fmap_group]:
                 update_json(fm_json, {"IntendedFor": intended_for}, pretty=True)
+        else:
+            lgr.warning(
+                "Fieldmap group %s in %s was not assigned to any run "
+                "(no IntendedFor targets).",
+                fmap_group,
+                fmap_dir,
+            )
 
 
 class BIDSFile:
