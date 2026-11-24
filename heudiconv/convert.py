@@ -142,6 +142,8 @@ def prep_conversion(
                 "BIDS requires alphanumeric subject ID. Got an empty value"
             )
         sid = sanitize_label(sid)
+        if anon_sid:
+            anon_sid = sanitize_label(anon_sid)
         if ses:
             ses = sanitize_label(ses)
 
