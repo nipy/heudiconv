@@ -102,11 +102,14 @@ def add_to_datalad(
             known_attrs = [line.decode("utf-8").rstrip() for line in f.readlines()]
     else:
         known_attrs = []
-    for attr in desired_attrs.split("\n"):
-        if attr not in known_attrs:
-            known_attrs.append(attr)
+    # Git uses the last matching rule. Keep defaults in a stable order before
+    # user rules, even when an older dataset contains only some of the defaults.
+    default_attrs = desired_attrs.splitlines()
+    known_attrs = default_attrs + [
+        attr for attr in known_attrs if attr not in default_attrs
+    ]
     with open(gitattributes_path, "wb") as f:
-        f.write("\n".join(known_attrs).encode("utf-8"))
+        f.write(("\n".join(known_attrs) + "\n").encode("utf-8"))
 
     # ds might have memories of having ds.repo GitRepo
     superds = Dataset(topdir)
