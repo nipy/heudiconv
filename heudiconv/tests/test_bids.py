@@ -1786,3 +1786,17 @@ def test_sanitize_label() -> None:
     assert sanitize_label("az XZ-@09") == "azXZ09"
     with pytest.raises(ValueError):
         sanitize_label(" @ ")
+
+
+@pytest.mark.ai_generated
+def test_anon_sid_sanitized(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """An ID returned by --anon-cmd must become a valid BIDS label (gh-247)."""
+    monkeypatch.setattr("heudiconv.main.anonymize_sid", lambda _sid, _cmd: "SAX_OA_34")
+    datadir = op.join(TESTS_DATA_PATH, "01-localizer_64ch")
+    runner(
+        gen_heudiconv_args(
+            datadir, str(tmp_path), "SAX_EIB_034", "bids_localizer.py", "anon-cmd"
+        )
+    )
+    assert [p.name for p in tmp_path.glob("sub-*")] == ["sub-SAXOA34"]
+    assert (tmp_path / "sub-SAXOA34" / "sub-SAXOA34_scans.tsv").exists()
