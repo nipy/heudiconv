@@ -128,7 +128,13 @@ def prep_conversion(
     overwrite: bool,
     dcmconfig: str | None,
     grouping: str,
+    rerun_heuristic: bool = False,
 ) -> None:
+    """Prepare conversion assignments and optionally convert the input DICOMs.
+
+    With ``rerun_heuristic=True``, regenerate cached assignments from the current
+    inputs, including replacing manual edits in the conversion table.
+    """
     if dicoms:
         lgr.info("Processing %d dicoms", len(dicoms))
     elif seqinfo:
@@ -168,8 +174,7 @@ def prep_conversion(
 
     # if conversion table(s) do not exist -- we need to prepare them
     # (the *prepare* stage in https://github.com/nipy/heudiconv/issues/134)
-    # if overwrite - recalculate this anyways
-    reuse_conversion_table = op.exists(edit_file)
+    reuse_conversion_table = op.exists(edit_file) and not rerun_heuristic
     # We also might need to redo it if changes in the heuristic file
     # detected
     # ref: https://github.com/nipy/heudiconv/issues/84#issuecomment-330048609

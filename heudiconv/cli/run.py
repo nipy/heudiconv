@@ -145,6 +145,14 @@ def get_parser() -> ArgumentParser:
         help="Overwrite existing converted files.",
     )
     parser.add_argument(
+        "--rerun-heuristic",
+        action="store_true",
+        default=False,
+        help="Regenerate cached conversion assignments from the current inputs, "
+        "replacing any manual edits. Use --overwrite separately to overwrite "
+        "existing converted files.",
+    )
+    parser.add_argument(
         "--datalad",
         action="store_true",
         help="Store the entire collection as DataLad dataset(s). Small files "

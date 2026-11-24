@@ -23,6 +23,25 @@ However, there is a large variety of data out there, and not all DICOMs
 will be covered by the existing heuristics. This section will outline what
 makes up a heuristic file, and some useful functions available when making one.
 
+Rerunning a heuristic
+---------------------
+
+HeuDiConv normally reuses the cached conversion assignments for a subject and
+session, including manual changes to the ``.edit.txt`` file under
+``.heudiconv``. Changing the heuristic file regenerates these assignments.
+
+When the heuristic is unchanged but the input DICOMs have changed, pass
+``--rerun-heuristic`` to regenerate the assignments and file groups from the
+current input. This replaces the cached ``.auto.txt`` and ``.edit.txt`` tables,
+``dicominfo`` and ``filegroup`` files for the processed subject/session, so save
+any manual edits you need before using it. Supply all series you want to include
+in the new assignments; this option does not merge the old and new inputs.
+
+Use ``-c none`` to preview the regenerated assignments without converting images.
+``--rerun-heuristic`` does not overwrite existing converted images; that requires
+``--overwrite``. Conversely, ``--overwrite`` alone does not rerun an unchanged
+heuristic.
+
 Components
 ==========
 
