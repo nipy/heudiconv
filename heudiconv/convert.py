@@ -40,6 +40,7 @@ from .utils import (
     assure_no_file_exists,
     clear_temp_dicoms,
     file_md5sum,
+    get_dicom_filter,
     load_json,
     read_config,
     safe_copyfile,
@@ -220,7 +221,7 @@ def prep_conversion(
                 dicoms,
                 grouping,
                 file_filter=getattr(heuristic, "filter_files", None),
-                dcmfilter=getattr(heuristic, "filter_dicom", None),
+                dcmfilter=get_dicom_filter(heuristic),
                 flatten=True,
                 custom_grouping=getattr(heuristic, "grouping", None),
                 # callable which will be provided dcminfo and returned

@@ -234,6 +234,11 @@ def filter_dicom(dcmdata: dcm.dataset.Dataset) -> bool:
     return True if dcmdata.StudyInstanceUID in dicoms2skip else False
 
 
+def filter_dicoms(dcmdata: dcm.dataset.Dataset) -> bool:
+    """Return True to keep DICOMs outside the configured skip list."""
+    return not filter_dicom(dcmdata)
+
+
 def filter_files(_fn: str) -> bool:
     """Return True if a file should be kept, else False.
 

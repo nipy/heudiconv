@@ -27,6 +27,11 @@ def filter_dicom(dcmdata: dcm.dataset.Dataset) -> bool:
     return False
 
 
+def filter_dicoms(dcmdata: dcm.dataset.Dataset) -> bool:
+    """Return True to keep DICOMs that are not reference volumes."""
+    return not filter_dicom(dcmdata)
+
+
 def extract_moco_params(
     basename: str, _outypes: tuple[str, ...], dicoms: list[str]
 ) -> None:

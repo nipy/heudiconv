@@ -446,6 +446,30 @@ def get_heuristic_description(name: str, full: bool = False) -> str:
         return "Failed to load: %s" % exc
 
 
+def get_dicom_filter(heuristic: ModuleType) -> Callable[[dcm.Dataset], Any] | None:
+    """Return an exclusion predicate for the heuristic's DICOM filter.
+
+    ``filter_dicoms`` keeps truthy results, like ``filter_files``. Adapt it to
+    the exclusion convention used by DICOM validation and custom grouping.
+    The legacy ``filter_dicom`` hook keeps its original semantics, but is
+    deprecated. If both hooks exist, only ``filter_dicoms`` is used.
+    """
+    keep = getattr(heuristic, "filter_dicoms", None)
+    if keep is not None:
+        return lambda dataset: not keep(dataset)
+    exclude: Callable[[dcm.Dataset], Any] | None = getattr(
+        heuristic, "filter_dicom", None
+    )
+    if exclude is not None:
+        warnings.warn(
+            "filter_dicom is deprecated; use filter_dicoms with inverted logic "
+            "(True keeps a DICOM, False excludes it).",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+    return exclude
+
+
 def get_known_heuristics_with_descriptions() -> dict[str, str]:
     from collections import OrderedDict
 
