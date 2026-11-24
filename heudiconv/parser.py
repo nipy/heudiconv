@@ -13,7 +13,7 @@ from types import ModuleType
 
 from .archives import tempdirs
 from .dicoms import group_dicoms_into_seqinfos
-from .utils import SeqInfo, StudySessionInfo, docstring_parameter
+from .utils import SeqInfo, StudySessionInfo, docstring_parameter, get_dicom_filter
 
 lgr = logging.getLogger(__name__)
 
@@ -237,7 +237,7 @@ def get_study_sessions(
             extracted_files,
             grouping,
             file_filter=getattr(heuristic, "filter_files", None),
-            dcmfilter=getattr(heuristic, "filter_dicom", None),
+            dcmfilter=get_dicom_filter(heuristic),
             custom_grouping=getattr(heuristic, "grouping", None),
             custom_seqinfo=getattr(heuristic, "custom_seqinfo", None),
         )

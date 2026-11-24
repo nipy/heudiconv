@@ -85,17 +85,33 @@ A utility function used to filter any input files.
 If this function is included, every file found will go through this filter. Any
 files where this function returns ``False`` will be filtered out (files where
 this function returns ``True`` will be kept).
-Note: this function's logic is opposite to ``filter_dicom`` (see
-below). Think of it as an input for Python's built-in ``filter()``.
+Think of it as an input for Python's built-in ``filter()``.
+
+----------------------------
+``filter_dicoms(dcm_data)``
+----------------------------
+
+A utility function used to filter DICOMs after reading their headers.
+Return ``True`` to keep a DICOM, or ``False`` to exclude it, just like
+``filter_files``. For example::
+
+    def filter_dicoms(dcm_data):
+        return dcm_data.get("Modality") == "MR"
+
+This hook applies to both ``--files`` and ``--dicom_dir_template`` inputs.
+If both DICOM filter hooks are defined, only ``filter_dicoms`` is used.
+Custom grouping functions still receive an exclusion predicate as their
+``dcmfilter`` argument; HeuDiConv adapts the inclusion hook for them.
 
 --------------------------
 ``filter_dicom(dcm_data)``
 --------------------------
 
-A utility function used to filter any DICOMs.
+Deprecated: use ``filter_dicoms`` instead, reversing the return value.
 
 If this function is included, every DICOM found will go through this filter. Any
 DICOMs where this function returns ``True`` will be filtered out.
+Existing heuristics retain this behavior and emit a ``DeprecationWarning``.
 
 -------------------------------
 ``infotoids(seqinfos, outdir)``
