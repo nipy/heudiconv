@@ -338,7 +338,7 @@ def workflow(
         numpy.random.seed(random_seed)
     # Ensure only supported bids options are passed
     if debug:
-        lgr.setLevel(logging.DEBUG)
+        logging.getLogger("heudiconv").setLevel(logging.DEBUG)
     # Should be possible but only with a single subject -- will be used to
     # override subject deduced from the DICOMs
     if files and subjs and len(subjs) > 1:
