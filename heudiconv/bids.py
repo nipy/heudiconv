@@ -248,26 +248,6 @@ def populate_aggregated_jsons(path: str) -> None:
             for field in sorted(rec):
                 if field not in json_ or json_[field] != rec[field]:
                     del rec[field]
-        # create a stub onsets file for each one of those
-        suf = "_bold.json"
-        assert fpath.endswith(suf)
-
-        # specify the name of the '_events.tsv' file:
-        parsed_fpath = BIDSFile.parse(op.basename(fpath))
-        for events_invalid_entity in ["chunk", "echo", "part"]:
-            # events.tsv with these entities are not specified
-            parsed_fpath.drop(events_invalid_entity, missing_ok=True)
-        fpath = op.join(op.dirname(fpath), str(parsed_fpath))
-        events_file = remove_suffix(fpath, suf) + "_events.tsv"
-        # do not touch any existing thing, it may be precious
-        if not op.lexists(events_file):
-            lgr.debug("Generating %s", events_file)
-            with open(events_file, "w") as fp:
-                fp.write(
-                    "onset\tduration\ttrial_type\tresponse_time\tstim_file"
-                    "\tTODO -- fill in rows and add more tab-separated "
-                    "columns if desired"
-                )
     # extract tasks files stubs
     for task_acq, fields in tasks.items():
         task_file = op.join(path, task_acq + "_bold.json")
@@ -295,6 +275,47 @@ def populate_aggregated_jsons(path: str) -> None:
         lgr.debug("%s %s", act, task_file)
         fields.update(placeholders)
         save_json(task_file, fields, sort_keys=True, pretty=True)
+
+
+def populate_events_template(jsonfile: str, root: str) -> None:
+    """Create an events template for a newly converted BOLD run if needed.
+
+    A matching events file in the run's directory or any ancestor up to the
+    dataset root applies through BIDS inheritance and must not be shadowed.
+    """
+    if not jsonfile.endswith("_bold.json"):
+        return
+    bold = BIDSFile.parse(op.basename(jsonfile))
+    if not bold["task"]:
+        return
+    for entity in ("chunk", "echo", "part"):
+        bold.drop(entity, missing_ok=True)
+
+    directory = Path(jsonfile).parent.resolve()
+    dataset_root = Path(root).resolve()
+    directory.relative_to(dataset_root)
+    parent = directory
+    while True:
+        for candidate in parent.glob("*_events.tsv"):
+            try:
+                inherited = BIDSFile.parse(candidate.name)
+            except ValueError:
+                continue
+            if inherited.suffix == "events" and all(
+                bold[entity] == value for entity, value in inherited._entities.items()
+            ):
+                return
+        if parent == dataset_root:
+            break
+        parent = parent.parent
+
+    events_file = directory / (remove_suffix(str(bold), "_bold.json") + "_events.tsv")
+    if create_file_if_missing(
+        str(events_file),
+        "onset\tduration\ttrial_type\tresponse_time\tstim_file"
+        "\tTODO -- fill in rows and add more tab-separated columns if desired",
+    ):
+        lgr.debug("Generating %s", events_file)
 
 
 def tuneup_bids_json_files(json_files: list[str]) -> None:
