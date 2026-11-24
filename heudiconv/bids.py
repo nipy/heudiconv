@@ -298,12 +298,16 @@ def populate_aggregated_jsons(path: str) -> None:
 
 
 def tuneup_bids_json_files(json_files: list[str]) -> None:
-    """Given a list of BIDS .json files, e.g."""
+    """Sanitize BIDS sidecars and supply missing phase-image units."""
     if not json_files:
         return
     # Harmonize generic .json formatting
     for jsonfile in json_files:
         json_ = load_json(jsonfile)
+        if "part-phase" in op.basename(jsonfile).split("_"):
+            # BIDS requires Units for phase images, and dcm2niix does not provide
+            # them: it does not rescale phase to radians.
+            json_.setdefault("Units", "arbitrary")
         # sanitize!
         for f1 in ["Acquisition", "Study", "Series"]:
             for f2 in ["DateTime", "Date"]:
