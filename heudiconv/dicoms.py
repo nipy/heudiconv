@@ -791,6 +791,7 @@ def embed_metadata_from_dicoms(
 
     """
     from nipype import Function, Node
+    from nipype.utils.filemanip import indirectory
 
     tmpdir = tempdirs(prefix="embedmeta")
 
@@ -820,7 +821,7 @@ def embed_metadata_from_dicoms(
     embedfunc.inputs.bids_info = (
         load_json(op.abspath(outname_bids)) if (bids_options is not None) else None
     )
-    embedfunc.base_dir = tmpdir
+    embedfunc.base_dir = op.abspath(tmpdir)
     cwd = os.getcwd()
 
     lgr.debug(
@@ -834,11 +835,17 @@ def embed_metadata_from_dicoms(
             # TODO: handle annexed file case
             if not op.islink(scaninfo):
                 set_readonly(scaninfo, False)
-        res = embedfunc.run()
+        with indirectory(embedfunc.base_dir):
+            res = embedfunc.run()
         set_readonly(scaninfo)
         if with_prov:
+            from rdflib import Graph
+
             assert isinstance(prov_file, str)
-            g = res.provenance.rdf()
+            g = Graph().parse(
+                data=res.provenance.serialize(format="rdf", rdf_format="turtle"),
+                format="turtle",
+            )
             g.parse(prov_file, format="turtle")
             g.serialize(prov_file, format="turtle")
             set_readonly(prov_file)
