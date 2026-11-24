@@ -200,7 +200,9 @@ def populate_bids_templates(path: str, defaults: dict[str, Any] | None = None) -
     create_file_if_missing(
         op.join(path, "scans.json"), json_dumps(SCANS_FILE_FIELDS, sort_keys=False)
     )
-    create_file_if_missing(op.join(path, ".bidsignore"), ".duecredit.p")
+    create_file_if_missing(
+        op.join(path, ".bidsignore"), ".duecredit.p\n.git\n.datalad\n.heudiconv\n"
+    )
     if op.lexists(op.join(path, ".git")):
         create_file_if_missing(op.join(path, ".gitignore"), ".duecredit.p")
 
