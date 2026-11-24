@@ -52,10 +52,10 @@ If you are unsure what that means, here is a set-up workflow you may wish to fol
 1. Set up a clone of the repository on your local machine and connect it to both the “official”
    and your copy of the repository on GitHub::
 
-     git clone git://github.com/nipy/heudiconv
+     git clone https://github.com/nipy/heudiconv
      cd heudiconv
      git remote rename origin official
-     git remote add origin git://github.com/YOUR_GITHUB_USERNAME/heudiconv
+     git remote add origin https://github.com/YOUR_GITHUB_USERNAME/heudiconv
 
 2. When you wish to start a new contribution, create a new branch::
 
@@ -66,7 +66,7 @@ If you are unsure what that means, here is a set-up workflow you may wish to fol
      git add the/paths/to/files/you/modified can/be/more/than/one
      git commit
 
-3. Push the changes to your copy of the code on GitHub, following which Git will
+4. Push the changes to your copy of the code on GitHub, following which Git will
    provide you with a link which you can click to initiate a pull request::
 
      git push -u origin topic_of_your_contribution
@@ -104,7 +104,7 @@ Development environment
 We support Python 3 only (>= 3.10), and test against all Python versions from 3.10 through 3.14.
 
 Dependencies which you will need are listed in `pyproject.toml <./pyproject.toml>`_.
-Note that you will likely have these will already be available on your system if you used a
+Note that you will likely have these already available on your system if you used a
 package manager (e.g. Debian's ``apt-get``, Gentoo's ``emerge``, or simply PIP) to install the
 software.
 
@@ -220,7 +220,54 @@ several near-identical functions::
 Adding a case then costs one line, every case is exercised by the same assertions, and a failure
 reports which case broke.  Shared setup belongs in a fixture for the same reason.
 
+A bug fix should come with a test demonstrating the bug ("red/green"): the test must fail
+without the fix and pass with it.  Verify that it does -- e.g. by running the new test against the
+unpatched code -- instead of assuming so, and say in the pull request how it was verified.
+
 To reproduce the full CI matrix of linting, type checking, and tests in one go, run ``tox``.
+
+Test data
+~~~~~~~~~
+
+Tests should exercise real DICOMs whenever the behavior under test depends on what is in them;
+hand-crafted mocks of ``pydicom`` datasets or of ``dcm2niix`` outputs tend to encode our
+assumptions about the data rather than the data.  Before adding any new data, or mocking it, look
+for a suitable sample in the following order:
+
+1. **Bundled samples** in `heudiconv/tests/data/ <./heudiconv/tests/data>`_ -- a small collection
+   of single DICOMs and tiny series (Siemens VB/VE and XA, a Phoenix report, a field map, DWI,
+   ...) plus a few NIfTI/bval files.  Refer to them via ``TESTS_DATA_PATH`` and
+   ``TEST_DICOM_PATHS`` of `heudiconv/tests/utils.py <./heudiconv/tests/utils.py>`_ instead of
+   composing paths by hand; parametrizing a test over ``TEST_DICOM_PATHS`` runs it on all of
+   them.  ``gen_heudiconv_args`` of the same module composes a typical command line for an
+   end-to-end conversion.
+
+2. **DataLad datasets** of http://datasets-tests.datalad.org, for tests which need complete
+   series or sessions.  ``fetch_data(tmp_path, "dbic/QA", getpath=...)`` of
+   ``heudiconv/tests/utils.py`` installs the dataset and gets only the requested part of it; see
+   ``heudiconv/tests/test_regression.py`` for the pattern to follow, including the ``skipif`` on
+   absent ``datalad`` and ``pytest.skip`` upon a failed download, so that the suite remains usable
+   offline.
+
+3. **New samples**, only if neither of the above has what is needed (e.g. another vendor, software
+   version, or modality).  A good source is the collection of ``dcm_qa*`` validation datasets by
+   Chris Rorden, https://github.com/neurolabusc?tab=repositories&q=dcm_ (``dcm_qa``,
+   ``dcm_qa_xa30``, ``dcm_qa_enh``, ``dcm_qa_philips``, ``dcm_qa_ge``, ``dcm_qa_me``, ...), which
+   is what ``dcm2niix`` itself is validated against.  When adding files to
+   ``heudiconv/tests/data/``:
+
+   - add the minimum needed -- typically one or a few DICOMs, not an entire series or repository:
+     the directory is shipped within the source distribution, so aim at well under 1 MB per
+     addition and justify anything larger in the pull request;
+   - take only data which is public, free of personal information (phantoms or properly
+     de-identified), and under a license permitting redistribution (most of ``dcm_qa*`` are
+     BSD-2-Clause, but do check); never add data from your own studies without such clearance;
+   - state the provenance (source URL and commit, license) in the commit message;
+   - keep files unmodified, unless the modification is the point of the test -- then describe it
+     too.
+
+   Data too large to bundle should rather be requested to be added to
+   http://datasets-tests.datalad.org and used via ``fetch_data``.
 
 AI-assisted contributions
 -------------------------
@@ -264,3 +311,33 @@ code you submit.
 If an assistant was used substantially for the non-test portion of a change as well, please say so
 in the pull request description.  Do not paste in code you do not understand or cannot explain in
 review.
+
+Assistants also tend to produce more code than the problem needs.  Before writing a new helper,
+search the code base (``heudiconv/utils.py``, ``heudiconv/bids.py``, ``heudiconv/dicoms.py``,
+``heudiconv/tests/utils.py``, ...) for an existing one to use or extend; keep the change limited
+to what the issue at hand requires, without drive-by refactoring, speculative options, or defensive
+handling of situations which cannot happen.
+
+Reviewing pull requests
+-----------------------
+
+The following is what reviewers -- human or AI -- are expected to look at, roughly in the order of
+importance, and thus also what a contributor should check before asking for a review:
+
+* **Correctness and scope**: the change does what its description says and addresses the
+  referenced issue, without unrelated modifications.  Changes in behavior of conversion and of the
+  ``reproin`` heuristic affect existing studies, so backward compatibility matters.
+* **Reuse and size**: existing functionality of the project and of its dependencies is used
+  instead of new ad-hoc helpers, nothing is duplicated, and the solution is not larger than the
+  problem.
+* **Tests**: present, fail without the change, are parametrized instead of copy-pasted, use the
+  data as described in `Test data`_, and carry the ``ai_generated`` marker where due.
+* **Conventions** of this document: type annotations, docstrings, and style.
+* **CI status**: failures caused by the pull request are for its author to address; point at the
+  failing job and at the relevant portion of its log.  Failures also present on ``master`` should
+  be told apart and reported separately.
+* **Release label** (see `Releases and Changelog`_): suggest the one which fits.
+
+Review comments should be specific and actionable -- ideally a GitHub suggestion for a small
+change -- and should distinguish what must be fixed from optional remarks.  References to issues
+and pull requests should be hyperlinks.
