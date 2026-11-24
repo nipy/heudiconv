@@ -226,6 +226,7 @@ def workflow(
     session: str | None = None,
     bids_options: str | None = None,
     overwrite: bool = False,
+    rerun_heuristic: bool = False,
     datalad: bool = False,
     debug: bool = False,
     command: str | None = None,
@@ -294,6 +295,9 @@ def workflow(
         mode to prevent possible race conditions. Default is None.
     overwrite : bool, optional
         Overwrite existing converted files. Default is False.
+    rerun_heuristic : bool, optional
+        Regenerate cached conversion assignments from current inputs, replacing
+        manual edits. Does not imply overwrite. Default is False.
     datalad : bool, optional
         Store the entire collection as DataLad dataset(s). Small files
         will be committed directly to git, while large to annex. New
@@ -491,6 +495,7 @@ def workflow(
             seqinfo=seqinfo,
             min_meta=minmeta,
             overwrite=overwrite,
+            rerun_heuristic=rerun_heuristic,
             dcmconfig=dcmconfig,
             grouping=grouping,
         )
