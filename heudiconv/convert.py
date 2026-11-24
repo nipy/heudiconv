@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, cast
 import filelock
 from nipype import Node
 from nipype.interfaces.base import TraitListObject
+from nipype.utils.filemanip import indirectory
 
 from .archives import tempdirs as archive_tempdirs
 from .bids import (
@@ -904,7 +905,7 @@ def nipype_convert(
         lgr.info("Using custom config file %s", fromfile)
 
     convertnode = Node(Dcm2niix(from_file=fromfile), name="convert")
-    convertnode.base_dir = tmpdir
+    convertnode.base_dir = op.abspath(tmpdir)
     convertnode.inputs.source_names = item_dicoms
     convertnode.inputs.out_filename = op.basename(
         prefix
@@ -912,7 +913,7 @@ def nipype_convert(
     prefix_dir = op.dirname(prefix)
     # if provided prefix had a path in it -- pass is as output_dir instead of default curdir
     if prefix_dir:
-        convertnode.inputs.output_dir = prefix_dir
+        convertnode.inputs.output_dir = op.abspath(prefix_dir)
 
     if nipype.__version__.split(".")[0] == "0":
         # deprecated since 1.0, might be needed(?) before
@@ -920,14 +921,19 @@ def nipype_convert(
     else:
         convertnode.terminal_output = "allatonce"
     convertnode.inputs.bids_format = bids_options is not None
-    eg = convertnode.run()
+    # Nipype may write provenance after restoring the interface's working
+    # directory. Keep those files inside our temporary directory as well.
+    os.makedirs(convertnode.base_dir, exist_ok=True)
+    with indirectory(convertnode.base_dir):
+        eg = convertnode.run()
 
     # prov information
     prov_file = prefix + "_prov.ttl" if with_prov else None
     if prov_file:
-        safe_movefile(
-            op.join(convertnode.base_dir, convertnode.name, "provenance.ttl"), prov_file
-        )
+        source = op.join(convertnode.base_dir, convertnode.name, "provenance.ttl")
+        if not op.exists(source):
+            source = op.join(convertnode.base_dir, "provenance.ttl")
+        safe_movefile(source, prov_file)
 
     return eg, prov_file
 
