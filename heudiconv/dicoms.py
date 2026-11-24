@@ -73,8 +73,25 @@ def create_seqinfo(
         size.append(1)
 
     # parse DICOM for seqinfo fields
-    TR = get_typed_attr(dcminfo, "RepetitionTime", float, -1000) / 1000
-    TE = get_typed_attr(dcminfo, "EchoTime", float, -1)
+    TR = get_typed_attr(dcminfo, "RepetitionTime", float)
+    TE = get_typed_attr(dcminfo, "EchoTime", float)
+    # Enhanced MR stores timing in shared or per-frame functional groups.
+    # SeqInfo has scalar timing fields, so use the first frame when necessary.
+    for group_name in (
+        "SharedFunctionalGroupsSequence",
+        "PerFrameFunctionalGroupsSequence",
+    ):
+        groups = dcminfo.get(group_name, [])
+        if not groups:
+            continue
+        timing = groups[0].get("MRTimingAndRelatedParametersSequence", [])
+        echoes = groups[0].get("MREchoSequence", [])
+        if TR is None and timing:
+            TR = get_typed_attr(timing[0], "RepetitionTime", float)
+        if TE is None and echoes:
+            TE = get_typed_attr(echoes[0], "EffectiveEchoTime", float)
+    TR = TR / 1000 if TR is not None else -1
+    TE = TE if TE is not None else -1
     refphys = get_typed_attr(dcminfo, "ReferringPhysicianName", str, "")
     image_type = get_typed_attr(dcminfo, "ImageType", tuple, ())
     is_moco = "MOCO" in image_type

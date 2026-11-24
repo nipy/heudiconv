@@ -327,6 +327,45 @@ def test_get_reproducible_int(dcmfile: str) -> None:
     assert type(get_reproducible_int([dcmfile])) is int
 
 
+@pytest.mark.ai_generated
+@pytest.mark.parametrize(
+    "location", ["original", "shared", "per-frame", "legacy", "missing"]
+)
+def test_create_seqinfo_enhanced_timing(location: str) -> None:
+    """Read timing from the bundled XA30 enhanced DICOM's functional groups."""
+    mw = wrapper_from_file(XA30_ENHANCED_DCM_PATH)
+    data = mw.dcm_data
+    shared = data.SharedFunctionalGroupsSequence[0]
+    frames = data.PerFrameFunctionalGroupsSequence
+    if location == "shared":
+        shared.MREchoSequence = frames[0].MREchoSequence
+        for frame in frames:
+            del frame.MREchoSequence
+    elif location == "per-frame":
+        for frame in frames:
+            frame.MRTimingAndRelatedParametersSequence = (
+                shared.MRTimingAndRelatedParametersSequence
+            )
+        del shared.MRTimingAndRelatedParametersSequence
+    elif location == "legacy":
+        data.RepetitionTime = 2500
+        data.EchoTime = 30
+    elif location == "missing":
+        del shared.MRTimingAndRelatedParametersSequence
+        for frame in frames:
+            del frame.MREchoSequence
+
+    seqinfo = create_seqinfo(mw, [XA30_ENHANCED_DCM_PATH], "enhanced")
+    expected: tuple[float, float]
+    if location == "legacy":
+        expected = (2.5, 30)
+    elif location == "missing":
+        expected = (-1, -1)
+    else:
+        expected = (0.00315, 1.37)
+    assert (seqinfo.TR, seqinfo.TE) == pytest.approx(expected)
+
+
 @pytest.mark.skip(
     reason="This test was mistakenly marked as a fixture, and removing the fixture decorator led to the test failing.  Don't know how to fix."
 )
