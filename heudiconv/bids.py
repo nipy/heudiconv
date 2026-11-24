@@ -192,8 +192,16 @@ def populate_bids_templates(path: str, defaults: dict[str, Any] | None = None) -
     )
     create_file_if_missing(
         op.join(path, "README"),
-        "TODO: Provide description for the dataset -- basic details about the "
-        "study, possibly pointing to pre-registration (if public or embargoed)",
+        "TODO: Describe the study and its purpose, participants, acquisition "
+        "protocols, tasks, and any known data quality issues. Link to the study "
+        "pre-registration, related publications, and analysis code where available.\n\n"
+        "For a detailed README template and guidance, see the BIDS starter kit:\n"
+        "https://github.com/bids-standard/bids-starter-kit/blob/main/templates/README.MD\n\n"
+        "Explain how to obtain and use the data, and whom to contact with questions. "
+        "For datasets shared with DataLad, include instructions for retrieving file "
+        "content; see:\n"
+        "https://handbook.datalad.org/en/latest/basics/101-180-FAQ.html"
+        "#how-can-i-help-others-get-started-with-a-shared-dataset\n",
         # TODO: get from schema
         glob_suffixes=[".md", ".txt", ".rst", ""],
     )
