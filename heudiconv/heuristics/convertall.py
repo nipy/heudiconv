@@ -25,9 +25,16 @@ def infotodict(
     allowed template fields - follow python string module:
 
     item: index within category
-    subject: participant id
+    subject: participant id without the "sub-" prefix
+    session: session entity including "ses-" (e.g., "ses-01")
+    bids_subject_session_prefix: "sub-<subject>[_ses-<session>]"
+    bids_subject_session_dir: "sub-<subject>[/ses-<session>]"
     seqitem: run number during scanning
     subindex: sub index within group
+
+    Use the bids_subject_session helpers for templates that also support
+    sessionless data; the session field itself becomes "ses-None" if no
+    session is supplied.
     """
 
     data = create_key("run{item:03d}")

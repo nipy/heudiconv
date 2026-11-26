@@ -42,12 +42,20 @@ Conversion outputs are defined as keys, a `tuple` consisting of three elements:
 The following details of the sequences could also be used as a ``{detail}`` in the conversion keys:
 
 - ``item``: an index of seqinfo (e.g., ``1``),
-- ``subject``: a subject label (e.g., ``qa``)
+- ``subject``: a subject label without ``sub-`` (e.g., ``qa``)
 - ``seqitem``: sequence item, index with a sequence/protocol name (e.g., ``3-anat-scout_ses-{date}`` or ``3-anat-scout_ses-DATE`` for Siemens X60 which does not allow {} in names)
 - ``subindex``: an index within the ``seqinfo`` (e.g., ``1``),
-- ``session``: empty (no session) or a session entity (along with ``ses-``, e.g., ``ses-20191216``),
+- ``session``: a session entity including ``ses-`` (e.g., ``ses-20191216``),
 - ``bids_subject_session_prefix``: shortcut for BIDS file name prefix combining subject and optional session (e.g., ``sub-qa_ses-20191216``),
 - ``bids_subject_session_dir``: shortcut for BIDS file path combining subject and optional session (e.g., ``sub-qa/ses-20191216``).
+
+Do not add another ``ses-`` before ``{session}``: for ``-s qa -ss 01``,
+``sub-{subject}/{session}`` expands to ``sub-qa/ses-01``. Unlike ``{subject}``,
+``{session}`` already contains its entity prefix. When no session is supplied,
+the current formatter produces ``ses-None`` for ``{session}``. Use
+``{bids_subject_session_dir}`` and ``{bids_subject_session_prefix}`` for templates
+that need to support both sessionful and sessionless data; they omit the session
+component when it is absent.
 
 .. note:: An example conversion key
 
