@@ -1,6 +1,7 @@
 #!/bin/bash
 # Generic anonymization script which would anonymize sid based on what it had
 # seen in the past or simply what the translation dict already has.
+# TODO: make git-annex use optional
 
 set -eu
 
@@ -11,7 +12,7 @@ debug() {
 # Translation file location
 # Store under .git by default to guarantee that it is not committed or locked by git-annex etc
 # But it might not fit some usecases where there is no .git
-anon_file_default=$(dirname "$0")/../.git/anon_sid_map.csv
+anon_file_default="${0}_map.csv"
 anon_file="${AC_ANON_FILE:-$anon_file_default}"
 anon_fmt="${AC_ANON_FMT:-%03d}"
 
@@ -24,6 +25,12 @@ debug "Using $anon_file to map $sid"
 
 if [ ! -e "$anon_file" ]; then
     touch "$anon_file"  # initiate it
+
+    if ! git annex add --force-large "$anon_file"; then
+	echo "WARNING: Setting metadata for annex failed, but we proceed -- may be not under git-annex"
+    else
+    	git annex metadata --set distribution-restrictions=sensitive "$anon_file"
+    fi
 fi
 
 # apparently heudiconv passes even those we provided in `-s` CLI option
@@ -42,13 +49,16 @@ if [ -n "$res" ]; then
     ann="${res##*,}"
     debug "Found $ann in '$res'"
 else
-    echo "We have all sids mapped already! Will not create a new one for $sid" >&2; exit 1
+    # TODO: uncomment if you think that all subjects already known.
+    # echo "We have all sids mapped already! Will not create a new one for $sid" >&2; exit 1
     # need to take the latest one
     largest=$(sed -e 's/.*,//g' "$anon_file" | sort -n | tail -n1 | sed -e 's,^0*,,g')
     next=$((largest+1))
     # shellcheck disable=SC2059
     ann=$(printf "$anon_fmt" $next)
     debug "Found $largest and $next to get $ann, storing"
+    git annex unlock "$anon_file"
     echo "$sid,$ann" >> "$anon_file"
+    git annex add --force-large "$anon_file"
 fi
 echo "$ann"
