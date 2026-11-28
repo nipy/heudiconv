@@ -21,7 +21,9 @@ import nibabel
 from numpy import testing as np_testing
 import pytest
 
+from heudiconv import __version__
 from heudiconv.bids import (
+    HEUDICONV_VERSION_JSON_KEY,
     SHIM_KEY,
     AllowedCriteriaForFmapAssignment,
     BIDSFile,
@@ -37,6 +39,7 @@ from heudiconv.bids import (
     sanitize_label,
     select_fmap_from_compatible_groups,
     treat_age,
+    tuneup_bids_json_files,
 )
 from heudiconv.cli.run import main as runner
 from heudiconv.utils import Load, create_tree, load_json, remove_suffix, save_json
@@ -65,6 +68,27 @@ def test_maybe_na() -> None:
         assert maybe_na(na) == "n/a"
     for notna in 0, 1, False, True, "value":
         assert maybe_na(notna) == str(notna)
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize("previous_version", [None, "0.13.1", str(__version__)])
+def test_tuneup_bids_json_can_be_repeated(
+    tmp_path: Path, previous_version: str | None
+) -> None:
+    sidecar = tmp_path / "sub-01_T1w.json"
+    metadata = {"RepetitionTime": 2.0, "StudyDate": "20200101"}
+    if previous_version is not None:
+        metadata[HEUDICONV_VERSION_JSON_KEY] = previous_version
+    save_json(str(sidecar), metadata)
+
+    tuneup_bids_json_files([str(sidecar)])
+    assert load_json(str(sidecar)) == {
+        "RepetitionTime": 2.0,
+        HEUDICONV_VERSION_JSON_KEY: str(__version__),
+    }
+    first_result = sidecar.read_bytes()
+    tuneup_bids_json_files([str(sidecar)])
+    assert sidecar.read_bytes() == first_result
 
 
 def test_treat_age() -> None:
